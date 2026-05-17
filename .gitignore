@@ -1,0 +1,12 @@
+.env
+.claude/
+output/
+logs/
+data/
+__pycache__/
+*.pyc
+*_compressed.mp4
+temp_video/
+node_modules/
+dist/
+electron/dist/

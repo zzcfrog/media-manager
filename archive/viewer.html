@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video Analyzer</title>
+<style>
+:root {
+  --bg: #0a0a0a; --surface: #141414; --surface2: #1c1c1c; --surface3: #222;
+  --border: #252525; --border2: #333;
+  --text: #e8e8e8; --text2: #999; --text3: #666;
+  --accent: #6c8cff; --accent-dim: rgba(108,140,255,0.15);
+  --green: #4caf50; --green-bg: rgba(76,175,80,0.06);
+  --tag-shot: #81c784; --tag-lens: #80deea; --tag-angle: #f48fb1;
+  --tag-move: #a5d6a7; --tag-persp: #ef9a9a; --tag-scene: #64b5f6;
+  --tag-mood: #ce93d8; --tag-light: #fff176; --tag-weather: #ffb74d;
+  --tag-color: #90a4ae; --tag-subject: #b0bec5;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+.header { padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.header .logo { font-size: 15px; font-weight: 700; color: var(--accent); letter-spacing: -0.5px; margin-right: 8px; }
+.header .logo span { color: var(--text3); font-weight: 400; }
+.btn { font-size: 12px; cursor: pointer; padding: 5px 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; color: var(--text2); transition: all 0.15s; white-space: nowrap; }
+.btn:hover { background: #252525; color: var(--text); }
+.btn input { display: none; }
+.header select { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; font-size: 12px; }
+.analyze-group { display: flex; align-items: center; gap: 4px; position: relative; }
+.analyze-group .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.info-icon { font-size: 14px; color: var(--text3); cursor: pointer; user-select: none; line-height: 1; }
+.info-icon:hover { color: var(--text2); }
+.info-tooltip { display: none; position: absolute; top: 32px; right: 0; background: var(--surface3); border: 1px solid var(--border2); border-radius: 6px; padding: 8px 12px; font-size: 11px; color: var(--text2); white-space: nowrap; z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+.info-tooltip.show { display: block; }
+
+/* Modal base */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(3px); }
+.modal-overlay.show { display: flex; }
+.modal { background: var(--surface); border: 1px solid var(--border2); border-radius: 14px; padding: 28px 32px; max-width: 420px; width: 92%; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+
+/* Confirm modal */
+.modal h3 { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 14px; }
+.modal p { font-size: 13px; color: var(--text2); line-height: 1.7; margin-bottom: 20px; }
+.modal p strong { color: var(--text); font-weight: 500; }
+.modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
+.modal-btns button { font-size: 12px; padding: 7px 18px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; transition: all 0.15s; }
+.btn-cancel { background: var(--surface2); color: var(--text2); }
+.btn-confirm { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-confirm:hover { background: #5a7aef; }
+
+/* Custom dropdown */
+.cdropdown { position: relative; flex: 1; }
+.cdropdown-toggle { width: 100%; background: var(--surface2); color: var(--text2); border: 1px solid var(--border); border-radius: 6px; padding: 7px 28px 7px 10px; font-size: 12px; cursor: pointer; text-align: left; position: relative; }
+.cdropdown-toggle::after { content: '▾'; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--text3); font-size: 10px; }
+.cdropdown-menu { display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px; z-index: 50; max-height: 280px; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+.cdropdown.open .cdropdown-menu { display: block; }
+.cdropdown-menu::-webkit-scrollbar { width: 4px; }
+.cdropdown-menu::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+.cdropdown-item { padding: 8px 12px; cursor: pointer; transition: background 0.15s; border-bottom: 1px solid var(--border); }
+.cdropdown-item:last-child { border-bottom: none; }
+.cdropdown-item:hover { background: var(--surface3); }
+.cdropdown-item.selected { background: var(--accent-dim); }
+.mi-name { font-size: 12px; color: var(--text); font-weight: 500; }
+.mi-desc { font-size: 10px; color: var(--text3); margin-top: 2px; }
+
+/* Analysis progress modal */
+.analysis-modal { max-width: 440px; padding: 32px 36px; }
+.analysis-modal h3 { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 24px; text-align: center; }
+
+/* Timeline */
+.timeline { position: relative; padding-left: 32px; }
+.timeline::before { content: ''; position: absolute; left: 11px; top: 8px; bottom: 8px; width: 2px; background: var(--border); }
+
+.tl-step { position: relative; padding-bottom: 24px; }
+.tl-step:last-child { padding-bottom: 0; }
+
+.tl-dot { position: absolute; left: -32px; top: 4px; width: 24px; height: 24px; border-radius: 50%; background: var(--surface2); border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; z-index: 1; transition: all 0.5s cubic-bezier(.4,0,.2,1); }
+.tl-dot svg { width: 12px; height: 12px; opacity: 0; transition: opacity 0.3s; }
+.tl-dot svg.poly-check polyline { stroke-dasharray: 30; stroke-dashoffset: 30; }
+
+.tl-step.active .tl-dot { border-color: var(--accent); background: var(--accent-dim); box-shadow: 0 0 0 4px rgba(108,140,255,0.12); animation: dotPulse 2s ease-in-out infinite; }
+.tl-step.active .tl-dot svg { opacity: 1; color: var(--accent); }
+.tl-step.done .tl-dot { border-color: var(--green); background: rgba(76,175,80,0.15); box-shadow: 0 0 0 4px rgba(76,175,80,0.08); transform: scale(1.05); }
+.tl-step.done .tl-dot svg { opacity: 1; animation: none; color: var(--green); }
+.tl-step.done .tl-dot svg.poly-check polyline { animation: drawCheck 0.5s ease forwards 0.15s; }
+.tl-step.error .tl-dot { border-color: #ef5350; background: rgba(239,83,80,0.15); box-shadow: 0 0 0 4px rgba(239,83,80,0.12); animation: errorPulse 1.5s ease-in-out infinite; }
+.tl-step.error .tl-dot svg { opacity: 1; color: #ef5350; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes dotPulse { 0%,100% { box-shadow: 0 0 0 4px rgba(108,140,255,0.12); } 50% { box-shadow: 0 0 0 8px rgba(108,140,255,0.2); } }
+@keyframes errorPulse { 0%,100% { box-shadow: 0 0 0 4px rgba(239,83,80,0.12); } 50% { box-shadow: 0 0 0 8px rgba(239,83,80,0.25); } }
+@keyframes drawCheck { to { stroke-dashoffset: 0; } }
+
+.tl-title { font-size: 13px; color: var(--text3); font-weight: 500; margin-bottom: 6px; transition: color 0.3s; display: flex; align-items: center; gap: 0; }
+.tl-step.active .tl-title { color: var(--text); }
+.tl-step.done .tl-title { color: var(--text2); }
+.tl-step.error .tl-title { color: #ef5350; }
+.analyze-tip { font-weight: 400; font-size: 11px; color: var(--accent); opacity: 0; margin-left: 6px; white-space: nowrap; }
+.tl-step.active .analyze-tip { opacity: 1; }
+.tip-cursor { font-size: 11px; color: var(--accent); opacity: 0; font-weight: 300; animation: none; margin-left: 1px; }
+.tl-step.active .tip-cursor { opacity: 1; animation: blink 1s step-end infinite; }
+@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+
+.tl-bar-track { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-bottom: 4px; }
+.tl-bar-fill { height: 100%; width: 0; border-radius: 3px; background: var(--accent); transition: width 0.5s cubic-bezier(.4,0,.2,1); }
+.tl-step.active .tl-bar-fill { box-shadow: 0 0 8px rgba(108,140,255,0.3); }
+.tl-step.done .tl-bar-fill { background: var(--green); box-shadow: 0 0 6px rgba(76,175,80,0.2); }
+
+.tl-info { display: flex; justify-content: space-between; font-size: 11px; color: var(--text3); min-height: 16px; }
+.tl-info span:first-child { transition: opacity 0.2s ease; }
+.tl-step.done .tl-time { color: var(--green); }
+
+/* Pulse animation for active step */
+.tl-step.active .tl-bar-fill { background: linear-gradient(90deg, var(--accent), #8fa8ff); background-size: 200% 100%; animation: shimmer 1.5s ease infinite; }
+@keyframes shimmer { 0%,100% { background-position: 0% 0; } 50% { background-position: 100% 0; } }
+
+/* Retry button */
+.btn-retry { display: none; margin-top: 16px; width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(239,83,80,0.3); background: rgba(239,83,80,0.08); color: #ef5350; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+.btn-retry:hover { background: rgba(239,83,80,0.15); border-color: rgba(239,83,80,0.5); }
+.btn-retry.show { display: block; animation: fadeUp 0.3s ease; }
+
+/* Done summary */
+.done-summary { margin-top: 20px; padding: 16px; background: rgba(76,175,80,0.06); border: 1px solid rgba(76,175,80,0.15); border-radius: 10px; display: none; }
+.done-summary.show { display: block; animation: fadeUp 0.4s ease; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; margin-bottom: 16px; }
+.summary-num { font-size: 22px; font-weight: 700; color: var(--accent); }
+.summary-label { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.btn-done { display: block; width: 100%; padding: 10px; border-radius: 8px; border: none; background: var(--accent); color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.15s; }
+.btn-done:hover { background: #5a7aef; }
+
+.main { display: flex; flex: 1; overflow: hidden; }
+.video-panel { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #000; }
+.video-panel video { width: 100%; flex: 1; object-fit: contain; }
+.waveform-wrap { height: 64px; flex-shrink: 0; background: #111; cursor: pointer; position: relative; border-top: 1px solid #1a1a1a; display: none; }
+.waveform-wrap.show { display: block; }
+.waveform-wrap canvas { width: 100%; height: 100%; display: block; }
+.video-info { display: none; padding: 6px 12px; font-size: 11px; color: var(--text3); border-top: 1px solid var(--border); flex-wrap: wrap; gap: 4px 16px; line-height: 1.8; }
+.video-info.show { display: flex; }
+.video-info span { white-space: nowrap; }
+.video-info .label { color: var(--text3); }
+.video-info .val { color: var(--text2); }
+.scopes-row { display: none; flex-shrink: 0; gap: 1px; background: #1a1a1a; border-top: 1px solid #1a1a1a; }
+.scopes-row.show { display: flex; }
+.scope-box { flex: 1; background: #0a0a0a; position: relative; min-width: 0; }
+.scope-box canvas { width: 100%; height: 100%; display: block; }
+.scope-label { position: absolute; top: 3px; left: 6px; font-size: 9px; color: rgba(255,255,255,0.2); font-family: "SF Mono", Menlo, monospace; pointer-events: none; text-transform: uppercase; }
+.no-video { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--text3); font-size: 13px; }
+
+.right-panel { width: 460px; flex-shrink: 0; display: flex; flex-direction: column; border-left: 1px solid var(--border); background: var(--surface); }
+.filters { padding: 10px 14px; flex-shrink: 0; display: none; }
+.filters.show { display: flex; flex-direction: column; gap: 10px; background: var(--surface2); border-radius: 8px; margin: 10px; border: 1px solid var(--border); }
+.filter-section-label { font-size: 10px; color: var(--text3); margin-bottom: 5px; display: flex; align-items: center; gap: 4px; }
+.filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.filter-dd { position: relative; }
+.filter-dd-btn { font-size: 11px; padding: 3px 10px; border-radius: 5px; background: var(--surface); color: var(--text3); border: 1px solid var(--border); cursor: pointer; transition: all 0.15s; user-select: none; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.filter-dd-btn:hover { border-color: var(--border2); color: var(--text2); }
+.filter-dd-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+.filter-dd-btn .arrow { font-size: 8px; opacity: 0.5; }
+.filter-dd-btn .cnt { font-size: 9px; background: var(--accent); color: #fff; border-radius: 8px; padding: 0 5px; line-height: 14px; }
+.filter-dd-menu { display: none; position: absolute; top: calc(100% + 4px); left: 0; background: var(--surface); border: 1px solid var(--border2); border-radius: 8px; padding: 6px 0; min-width: 120px; max-height: 240px; overflow-y: auto; z-index: 20; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+.filter-dd-menu.show { display: block; }
+.filter-dd-menu::-webkit-scrollbar { width: 4px; }
+.filter-dd-menu::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+.filter-dd-item { padding: 5px 12px; font-size: 11px; color: var(--text2); cursor: pointer; transition: all 0.1s; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.filter-dd-item:hover { background: var(--surface2); color: var(--text); }
+.filter-dd-item .ck { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; font-size: 9px; color: transparent; transition: all 0.1s; flex-shrink: 0; }
+.filter-dd-item.on .ck { background: var(--accent); border-color: var(--accent); color: #fff; }
+.filter-dd-item.on { color: var(--accent); }
+.filter-dd-x { font-size: 10px; color: var(--text3); cursor: pointer; display: none; line-height: 1; padding: 0 1px; }
+.filter-dd-x:hover { color: var(--text); }
+.filter-dd-btn.active .filter-dd-x { display: inline; }
+.search-box { display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; }
+.search-box input { background: none; border: none; outline: none; color: var(--text); font-size: 11px; width: 100%; }
+.search-box input::placeholder { color: var(--text3); }
+.count-bar { padding: 6px 14px; font-size: 11px; color: var(--text3); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.segments-list { flex: 1; overflow-y: auto; }
+.segments-list::-webkit-scrollbar { width: 5px; }
+.segments-list::-webkit-scrollbar-track { background: transparent; }
+.segments-list::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+.segment { padding: 14px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s; position: relative; }
+.segment:hover { background: var(--surface2); }
+.segment.active { background: var(--green-bg); }
+.segment.active::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--green); border-radius: 0 2px 2px 0; }
+.seg-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.seg-time { font-size: 13px; font-weight: 600; color: var(--accent); font-family: "SF Mono", Menlo, monospace; }
+.seg-duration { font-size: 10px; color: var(--text3); background: var(--surface3); padding: 1px 6px; border-radius: 3px; }
+.seg-visual { font-size: 12px; color: var(--text); line-height: 1.6; margin-bottom: 8px; }
+.seg-text-line { font-size: 12px; color: var(--text2); line-height: 1.5; margin-bottom: 4px; }
+.seg-text-line .prefix { color: var(--text3); margin-right: 4px; font-size: 11px; }
+.dim-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 6px 0; padding: 7px 10px; background: var(--surface2); border-radius: 6px; border: 1px solid var(--border); }
+.dim-row + .dim-row { margin-top: 4px; }
+.dim-row-icon { font-size: 12px; flex-shrink: 0; }
+.dim-pair { display: flex; align-items: center; gap: 3px; }
+.dim-label { font-size: 10px; color: var(--text3); }
+.dim-value { font-size: 11px; color: var(--text2); }
+.dim-value.shot { color: var(--tag-shot); } .dim-value.lens { color: var(--tag-lens); } .dim-value.angle { color: var(--tag-angle); }
+.dim-value.move { color: var(--tag-move); } .dim-value.persp { color: var(--tag-persp); } .dim-value.scene { color: var(--tag-scene); }
+.dim-value.mood { color: var(--tag-mood); } .dim-value.light { color: var(--tag-light); } .dim-value.weather { color: var(--tag-weather); }
+.array-group { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.array-label { font-size: 10px; color: var(--text3); white-space: nowrap; min-width: 32px; }
+.array-pills { display: flex; flex-wrap: wrap; gap: 4px; }
+.array-pills .pill { font-size: 10px; padding: 2px 8px; border-radius: 10px; }
+.pill.color { background: rgba(144,164,174,0.12); color: var(--tag-color); border: 1px solid rgba(144,164,174,0.2); }
+.pill.subject { background: rgba(176,190,197,0.1); color: var(--tag-subject); border: 1px solid rgba(176,190,197,0.15); }
+.no-data { padding: 60px 20px; text-align: center; color: var(--text3); font-size: 13px; }
+
+/* Toast */
+.toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-20px); background: var(--surface3); color: var(--text2); border: 1px solid var(--border2); border-radius: 8px; padding: 10px 20px; font-size: 13px; z-index: 200; opacity: 0; transition: all 0.3s ease; pointer-events: none; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">VideoAnalyzer <span>/ Viewer</span></div>
+  <label class="btn">打开视频<input type="file" id="videoInput" accept="video/*"></label>
+  <div class="analyze-group">
+    <button class="btn" id="analyzeBtn" disabled>开始分析</button>
+    <span class="info-icon" id="infoIcon">ⓘ</span>
+    <div class="info-tooltip" id="infoTooltip">通过大模型分析将会消耗token，产生费用。</div>
+  </div>
+  <select id="presetSelect"><option value="">已有分析</option></select>
+</div>
+
+<div class="main">
+  <div class="video-panel">
+    <div class="no-video" id="noVideo">选择视频文件开始</div>
+    <video id="player" controls style="display:none"></video>
+    <div class="waveform-wrap" id="waveformWrap"><canvas id="waveformCanvas"></canvas></div>
+    <div class="video-info" id="videoInfo"></div>
+    <div class="scopes-row" id="scopesRow">
+      <div class="scope-box"><canvas id="scopeWaveform"></canvas><span class="scope-label">Waveform</span></div>
+      <div class="scope-box"><canvas id="scopeParade"></canvas><span class="scope-label">Parade</span></div>
+      <div class="scope-box"><canvas id="scopeVector"></canvas><span class="scope-label">Vectorscope</span></div>
+    </div>
+  </div>
+  <div class="right-panel">
+    <div class="filters" id="filters"></div>
+    <div class="count-bar" id="segCount"></div>
+    <div class="segments-list" id="segments">
+      <div class="no-data">加载分析结果查看详情</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Model selection modal -->
+<div class="modal-overlay" id="selectModal">
+  <div class="modal" style="max-width:400px">
+    <h3 id="selectTitle">选择分析模型</h3>
+    <p id="selectWarning" style="display:none">该视频已有一份分析报告。重新分析将<strong>覆盖原有结果</strong>，之前的分析数据无法恢复。每次分析都会消耗 Token 并产生费用。</p>
+    <div style="display:flex;align-items:center;gap:4px;margin-bottom:6px;">
+      <span style="font-size:11px;color:var(--text3);">压缩选项</span>
+      <span class="info-icon" id="compressInfo" style="font-size:14px;color:var(--text3);cursor:pointer;">ⓘ</span>
+      <div class="info-tooltip" id="compressTooltip" style="position:fixed;max-width:300px;white-space:normal;line-height:1.6;">视频需要压缩后编码为 Base64 传给大模型。分辨率越高、帧率越高，画面细节越丰富，识别更准确，但文件更大、消耗 Token 更多。反之可大幅节省费用，但可能丢失细节。建议先用 480P 30fps，如 Token 消耗过高再降低。</div>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;">
+      <div class="cdropdown" id="resDropdown">
+        <div class="cdropdown-toggle" id="resToggle">480P</div>
+        <div class="cdropdown-menu" id="resMenu">
+          <div class="cdropdown-item selected" data-value="480"><div class="mi-name">480P</div><div class="mi-desc">854×480 · 推荐</div></div>
+          <div class="cdropdown-item" data-value="320"><div class="mi-name">320P</div><div class="mi-desc">640×320 · 省 Token</div></div>
+          <div class="cdropdown-item" data-value="240"><div class="mi-name">240P</div><div class="mi-desc">426×240 · 最省 Token</div></div>
+        </div>
+      </div>
+      <div class="cdropdown" id="fpsDropdown">
+        <div class="cdropdown-toggle" id="fpsToggle">30fps</div>
+        <div class="cdropdown-menu" id="fpsMenu">
+          <div class="cdropdown-item selected" data-value="30"><div class="mi-name">30fps</div><div class="mi-desc">流畅 · 推荐</div></div>
+          <div class="cdropdown-item" data-value="20"><div class="mi-name">20fps</div><div class="mi-desc">省 Token</div></div>
+          <div class="cdropdown-item" data-value="10"><div class="mi-name">10fps</div><div class="mi-desc">最省 Token</div></div>
+        </div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:6px;">模型选择</div>
+    <div style="display:flex;gap:10px;margin-bottom:16px;">
+      <div class="cdropdown" id="vendorDropdown">
+        <div class="cdropdown-toggle" id="vendorToggle">智谱 AI</div>
+        <div class="cdropdown-menu" id="vendorMenu">
+          <div class="cdropdown-item selected" data-value="zhipu"><div class="mi-name">智谱 AI</div><div class="mi-desc">国产自研大模型</div></div>
+          <div class="cdropdown-item" data-value="openai"><div class="mi-name">OpenAI</div><div class="mi-desc">GPT 系列模型</div></div>
+          <div class="cdropdown-item" data-value="google"><div class="mi-name">Google</div><div class="mi-desc">Gemini 系列模型</div></div>
+          <div class="cdropdown-item" data-value="anthropic"><div class="mi-name">Anthropic</div><div class="mi-desc">Claude 系列模型</div></div>
+          <div class="cdropdown-item" data-value="ali"><div class="mi-name">阿里云</div><div class="mi-desc">通义千问系列</div></div>
+          <div class="cdropdown-item" data-value="baidu"><div class="mi-name">百度</div><div class="mi-desc">文心一言系列</div></div>
+        </div>
+      </div>
+      <div class="cdropdown" id="modelDropdown">
+        <div class="cdropdown-toggle" id="modelToggle">GLM-4.6V</div>
+        <div class="cdropdown-menu" id="modelMenu"></div>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" id="selectCancel">取消</button>
+      <button class="btn-confirm" id="selectConfirm">开始分析</button>
+    </div>
+  </div>
+</div>
+
+<!-- Analysis progress modal -->
+<div class="modal-overlay" id="progressModal">
+  <div class="modal analysis-modal">
+    <h3>视频分析中</h3>
+    <div class="timeline">
+      <div class="tl-step" id="tl-compress">
+        <div class="tl-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4m0 12v4m-7.07-3.93l2.83-2.83m8.48-8.48l2.83-2.83M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83"/></svg></div>
+        <div class="tl-title">压缩视频</div>
+        <div class="tl-bar-track"><div class="tl-bar-fill" id="bar-compress"></div></div>
+        <div class="tl-info"><span id="status-compress">等待中</span><span id="time-compress"></span></div>
+      </div>
+      <div class="tl-step" id="tl-encode">
+        <div class="tl-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4m0 12v4m-7.07-3.93l2.83-2.83m8.48-8.48l2.83-2.83M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83"/></svg></div>
+        <div class="tl-title">Base64 编码</div>
+        <div class="tl-bar-track"><div class="tl-bar-fill" id="bar-encode"></div></div>
+        <div class="tl-info"><span id="status-encode">等待中</span><span id="time-encode"></span></div>
+      </div>
+      <div class="tl-step" id="tl-analyze">
+        <div class="tl-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4m0 12v4m-7.07-3.93l2.83-2.83m8.48-8.48l2.83-2.83M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83"/></svg></div>
+        <div class="tl-title">大模型分析 <span class="analyze-tip" id="analyzeTip"></span><span class="tip-cursor">|</span></div>
+        <div class="tl-bar-track"><div class="tl-bar-fill" id="bar-analyze"></div></div>
+        <div class="tl-info"><span id="status-analyze">等待中</span><span id="time-analyze"></span></div>
+      </div>
+    </div>
+    <div class="done-summary" id="doneSummary">
+      <div class="summary-grid">
+        <div><div class="summary-num" id="sumSegments">-</div><div class="summary-label">分析片段</div></div>
+        <div><div class="summary-num" id="sumTime">-</div><div class="summary-label">总耗时</div></div>
+        <div><div class="summary-num" id="sumTokens">-</div><div class="summary-label">Tokens</div></div>
+      </div>
+      <button class="btn-done" id="btnDone">查看分析结果</button>
+    </div>
+    <button class="btn-retry" id="btnRetry">重新分析（跳过压缩）</button>
+  </div>
+</div>
+
+<script>
+const player = document.getElementById('player');
+const noVideo = document.getElementById('noVideo');
+const segmentsDiv = document.getElementById('segments');
+const segCountDiv = document.getElementById('segCount');
+const filtersDiv = document.getElementById('filters');
+const videoInput = document.getElementById('videoInput');
+const presetSelect = document.getElementById('presetSelect');
+const analyzeBtn = document.getElementById('analyzeBtn');
+const infoIcon = document.getElementById('infoIcon');
+const infoTooltip = document.getElementById('infoTooltip');
+const reanalyzeModal = null;
+const progressModal = document.getElementById('progressModal');
+const selectModal = document.getElementById('selectModal');
+let isReanalyze = false;
+let allSegments = [], activeIdx = -1, currentVideoFile = null;
+let pendingResult = null;
+let selectedModel = 'glm-4.6v';
+let lastCompressedPath = '', lastVideoName = '';
+
+// Toast
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// Vendor-Model cascade
+const VENDOR_MODELS = {
+  zhipu: [
+    { value: 'glm-4.6v', label: 'GLM-4.6V', desc: '性价比最高 · 1/3元 per M tokens' },
+    { value: 'glm-4.6v-flash', label: 'GLM-4.6V-Flash', desc: '免费模型 · 适合快速测试' },
+    { value: 'glm-4.6v-flashx', label: 'GLM-4.6V-FlashX', desc: '0.15/1.5元 per M tokens' },
+    { value: 'glm-4.5v', label: 'GLM-4.5V', desc: '更强理解 · 2/6元 per M tokens' },
+    { value: 'glm-4v-plus', label: 'GLM-4V-Plus', desc: '旗舰模型 · 4/8元 per M tokens' },
+    { value: 'glm-4.1v-thinking-flashx', label: 'GLM-4.1V-Thinking-FlashX', desc: '思维链推理 · 2元 per M tokens' },
+  ],
+  openai: [{ value: 'gpt-4o', label: 'GPT-4o', desc: '即将支持' }],
+  google: [{ value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', desc: '即将支持' }],
+  anthropic: [{ value: 'claude-4-opus', label: 'Claude 4 Opus', desc: '即将支持' }],
+  ali: [{ value: 'qwen-vl-max', label: 'Qwen-VL-Max', desc: '即将支持' }],
+  baidu: [{ value: 'ernie-4.5-vision', label: 'ERNIE 4.5 Vision', desc: '即将支持' }],
+};
+
+let selectedVendor = 'zhipu';
+
+// Custom dropdown logic
+function initDropdown(id, onSelect) {
+  const dd = document.getElementById(id);
+  const toggle = dd.querySelector('.cdropdown-toggle');
+  const menu = dd.querySelector('.cdropdown-menu');
+
+  toggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.querySelectorAll('.cdropdown.open').forEach(d => { if (d !== dd) d.classList.remove('open'); });
+    dd.classList.toggle('open');
+  });
+
+  menu.addEventListener('click', (e) => {
+    const item = e.target.closest('.cdropdown-item');
+    if (!item) return;
+    e.stopPropagation();
+    menu.querySelectorAll('.cdropdown-item').forEach(i => i.classList.remove('selected'));
+    item.classList.add('selected');
+    toggle.textContent = item.querySelector('.mi-name').textContent;
+    dd.classList.remove('open');
+    if (onSelect) onSelect(item.dataset.value);
+  });
+
+  return { dd, toggle, menu };
+}
+
+const vendorDD = initDropdown('vendorDropdown', (vendor) => {
+  if (vendor !== 'zhipu') {
+    showToast('该厂商模型正在开发中，敬请期待');
+    // Reset to zhipu
+    const menu = document.getElementById('vendorMenu');
+    menu.querySelectorAll('.cdropdown-item').forEach(i => {
+      i.classList.toggle('selected', i.dataset.value === 'zhipu');
+    });
+    vendorDD.toggle.textContent = '智谱 AI';
+    vendor = 'zhipu';
+    return;
+  }
+  selectedVendor = vendor;
+  populateModels(vendor);
+});
+
+const modelDD = initDropdown('modelDropdown', (model) => {
+  selectedModel = model;
+});
+
+let selectedRes = '480';
+let selectedFps = '30';
+initDropdown('resDropdown', (val) => { selectedRes = val; });
+initDropdown('fpsDropdown', (val) => { selectedFps = val; });
+
+// Compress info tooltip
+const compressInfo = document.getElementById('compressInfo');
+const compressTooltip = document.getElementById('compressTooltip');
+compressInfo.addEventListener('click', (e) => {
+  e.stopPropagation();
+  compressTooltip.classList.toggle('show');
+  const rect = compressInfo.getBoundingClientRect();
+  compressTooltip.style.top = (rect.bottom + 6) + 'px';
+  compressTooltip.style.left = Math.max(8, rect.left - 200) + 'px';
+});
+document.addEventListener('click', (e) => { if (!compressInfo.contains(e.target) && !compressTooltip.contains(e.target)) compressTooltip.classList.remove('show'); });
+
+function populateModels(vendor) {
+  const models = VENDOR_MODELS[vendor] || [];
+  const menu = modelDD.menu;
+  menu.innerHTML = models.map((m, i) =>
+    `<div class="cdropdown-item${i === 0 ? ' selected' : ''}" data-value="${m.value}"><div class="mi-name">${m.label}</div><div class="mi-desc">${m.desc}</div></div>`
+  ).join('');
+  if (models.length) {
+    selectedModel = models[0].value;
+    modelDD.toggle.textContent = models[0].label;
+  }
+}
+
+// Initialize models for default vendor
+populateModels('zhipu');
+
+document.addEventListener('click', () => {
+  document.querySelectorAll('.cdropdown.open').forEach(d => d.classList.remove('open'));
+});
+
+infoIcon.addEventListener('click', () => infoTooltip.classList.toggle('show'));
+document.addEventListener('click', e => { if (!infoIcon.contains(e.target)) infoTooltip.classList.remove('show'); });
+
+function updateAnalyzeBtn(hasResult) { analyzeBtn.disabled = !currentVideoFile; analyzeBtn.textContent = hasResult ? '重新分析' : '开始分析'; }
+
+analyzeBtn.addEventListener('click', () => {
+  if (!currentVideoFile) return;
+  isReanalyze = analyzeBtn.textContent === '重新分析';
+  // Show model selection modal
+  document.getElementById('selectTitle').textContent = isReanalyze ? '重新分析' : '选择分析模型';
+  document.getElementById('selectWarning').style.display = isReanalyze ? 'block' : 'none';
+  document.getElementById('selectConfirm').textContent = isReanalyze ? '重新分析' : '开始分析';
+  selectModal.classList.add('show');
+});
+document.getElementById('selectCancel').addEventListener('click', () => selectModal.classList.remove('show'));
+document.getElementById('selectConfirm').addEventListener('click', () => {
+  selectModal.classList.remove('show');
+  startAnalyze();
+});
+document.getElementById('btnDone').addEventListener('click', async () => {
+  progressModal.classList.remove('show');
+  const jsonFile = presetSelect.value;
+  if (pendingResult) {
+    loadData(pendingResult);
+  } else if (jsonFile) {
+    const r = await fetch(`/api/analysis/${encodeURIComponent(jsonFile)}`);
+    loadData(await r.json());
+  }
+  pendingResult = null;
+  analyzeBtn.disabled = false; analyzeBtn.textContent = '重新分析';
+});
+
+function resetProgressModal() {
+  stopAnalyzeTips();
+  stopAllStepTimers();
+  ['compress','encode','analyze'].forEach(s => {
+    const step = document.getElementById('tl-' + s);
+    step.className = 'tl-step';
+    document.getElementById('bar-' + s).style.width = '0%';
+    document.getElementById('status-' + s).textContent = '等待中';
+    document.getElementById('time-' + s).textContent = '';
+  });
+  document.getElementById('doneSummary').classList.remove('show');
+  document.getElementById('btnRetry').classList.remove('show');
+  // Reset all dots to spinner icon
+  ['compress','encode','analyze'].forEach(s => {
+    document.querySelector(`#tl-${s} .tl-dot`).innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4m0 12v4m-7.07-3.93l2.83-2.83m8.48-8.48l2.83-2.83M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83"/></svg>';
+  });
+}
+
+function startAnalyze() {
+  if (!currentVideoFile) return;
+  analyzeBtn.disabled = true;
+  lastVideoName = currentVideoFile.name;
+  lastCompressedPath = '';
+  resetProgressModal();
+  progressModal.classList.add('show');
+
+  const form = new FormData();
+  form.append('video', currentVideoFile);
+  form.append('model', selectedModel);
+  form.append('resolution', selectedRes);
+  form.append('fps', selectedFps);
+
+  fetch('/api/analyze', { method: 'POST', body: form }).then(response => {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    function read() {
+      reader.read().then(({ done, value }) => {
+        if (done) return;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try { handleSSE(JSON.parse(line.slice(6))); } catch(e) {}
+        }
+        read();
+      });
+    }
+    read();
+  }).catch(err => {
+    document.getElementById('tl-analyze').className = 'tl-step error';
+    document.getElementById('status-analyze').textContent = err.message;
+  });
+}
+
+function setStep(name, state, pct, msg, time) {
+  const step = document.getElementById('tl-' + name);
+  step.className = 'tl-step ' + state;
+  document.getElementById('bar-' + name).style.width = pct + '%';
+  if (msg !== undefined) document.getElementById('status-' + name).textContent = msg;
+  if (time !== undefined) document.getElementById('time-' + name).textContent = time;
+  // Start/stop elapsed timer
+  if (state === 'active') {
+    if (!stepTimers[name]) startStepTimer(name);
+  } else {
+    stopStepTimer(name);
+  }
+  // Swap dot icon based on state
+  const dot = step.querySelector('.tl-dot');
+  if (state === 'done') {
+    dot.innerHTML = '<svg class="poly-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    if (name === 'analyze') stopAnalyzeTips();
+  } else if (state === 'error') {
+    dot.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+    if (name === 'analyze') stopAnalyzeTips();
+  }
+}
+
+// Analyze step typing tips
+const ANALYZE_TIPS = [
+  '正在逐帧扫描视频画面…',
+  '正在识别画面中的场景与人物…',
+  '正在分析画面内容与动作描述…',
+  '正在识别语音对话与说话人…',
+  '正在提取画面中的字幕文字…',
+  '正在分析主要颜色与色调分布…',
+  '正在识别画面中的主要主体…',
+  '正在判断镜头景别类型…',
+  '正在分析镜头焦段特征…',
+  '正在识别摄像机拍摄角度…',
+  '正在分析镜头运镜方式…',
+  '正在判断画面视角透视关系…',
+  '正在识别场景类型与环境…',
+  '正在分析画面情绪氛围…',
+  '正在判断光线类型与特征…',
+  '正在识别天气与环境条件…',
+  '正在检测场景转场与切镜点…',
+  '正在划分时间段落…',
+  '正在生成结构化分析报告…',
+  '正在整理分析结果并输出…',
+];
+let tipTimers = [];
+let stepTimers = {};
+
+function startStepTimer(name) {
+  stopStepTimer(name);
+  const el = document.getElementById('time-' + name);
+  const t0 = Date.now();
+  el.textContent = '0.0s';
+  stepTimers[name] = setInterval(() => {
+    const sec = ((Date.now() - t0) / 1000).toFixed(1);
+    el.textContent = sec + 's';
+  }, 100);
+}
+
+function stopStepTimer(name) {
+  if (stepTimers[name]) { clearInterval(stepTimers[name]); delete stepTimers[name]; }
+}
+
+function stopAllStepTimers() {
+  Object.keys(stepTimers).forEach(k => stopStepTimer(k));
+}
+
+function clearTipTimers() {
+  tipTimers.forEach(t => clearTimeout(t));
+  tipTimers = [];
+}
+
+function typeTip(text, el, cb) {
+  clearTipTimers();
+  el.textContent = '';
+  let i = 0;
+  const speed = 60 + Math.random() * 40;
+  function next() {
+    if (i < text.length) {
+      el.textContent += text[i];
+      i++;
+      const t = setTimeout(next, speed + Math.random() * 50);
+      tipTimers.push(t);
+    } else if (cb) {
+      const t = setTimeout(cb, 3000 + Math.random() * 2000);
+      tipTimers.push(t);
+    }
+  }
+  next();
+}
+
+function startAnalyzeTips() {
+  stopAnalyzeTips();
+  const el = document.getElementById('analyzeTip');
+  el.textContent = '';
+  // Shuffle tips
+  const shuffled = [...ANALYZE_TIPS].sort(() => Math.random() - 0.5);
+  let idx = 0;
+  function showNext() {
+    typeTip(shuffled[idx % shuffled.length], el, () => {
+      idx++;
+      // Erase then show next
+      const eraseT = setInterval(() => {
+        if (el.textContent.length > 0) {
+          el.textContent = el.textContent.slice(0, -1);
+        } else {
+          clearInterval(eraseT);
+          const t = setTimeout(showNext, 300);
+          tipTimers.push(t);
+        }
+      }, 30);
+      tipTimers.push(eraseT);
+    });
+  }
+  showNext();
+}
+
+function stopAnalyzeTips() {
+  clearTipTimers();
+  const el = document.getElementById('analyzeTip');
+  if (el) el.textContent = '';
+}
+
+function handleSSE(data) {
+  if (data.type === 'progress') {
+    if (data.step === 'compressing') setStep('compress', 'active', 50, `压缩中 ${selectedRes}P ${selectedFps}fps...`);
+    else if (data.step === 'compressed') {
+      const t = data.message.match(/([\d.]+)s/);
+      setStep('compress', 'done', 100, '压缩完成', t ? t[1] + 's' : '');
+      setStep('encode', 'active', 50, '编码中...');
+    }
+    else if (data.step === 'encoding') setStep('encode', 'active', 50, '编码中...');
+    else if (data.step === 'encoded') {
+      const m = data.message.match(/([\d.]+)MB/);
+      setStep('encode', 'done', 100, '编码完成', m ? m[1] + 'MB' : '');
+      setStep('analyze', 'active', 0, '');
+      startAnalyzeTips();
+    }
+    else if (data.step === 'analyzing') { setStep('analyze', 'active', 5, ''); startAnalyzeTips(); }
+  } else if (data.type === 'content') {
+    // Gradually fill analyze progress bar based on content length
+    const bar = document.getElementById('bar-analyze');
+    const current = parseInt(bar.style.width) || 5;
+    if (current < 90) setStep('analyze', 'active', current + 0.5);
+  } else if (data.type === 'done') {
+    setStep('analyze', 'done', 100, '分析完成', data.analyze_time + 's');
+    // Show summary
+    document.getElementById('sumSegments').textContent = data.segments_count;
+    const total = (parseFloat(data.compress_time) + parseFloat(data.analyze_time)).toFixed(1);
+    document.getElementById('sumTime').textContent = total + 's';
+    document.getElementById('sumTokens').textContent = data.tokens ? data.tokens.total.toLocaleString() : '-';
+    document.getElementById('doneSummary').classList.add('show');
+    // Ensure the new file appears in the dropdown
+    if (!presetSelect.querySelector(`option[value="${data.json_file}"]`)) {
+      const opt = document.createElement('option');
+      opt.value = data.json_file;
+      opt.textContent = data.json_file.replace(/_analysis.*\.json$/, '');
+      presetSelect.appendChild(opt);
+    }
+    presetSelect.value = data.json_file;
+    // Store result for later
+    fetch(`/api/analysis/${encodeURIComponent(data.json_file)}`).then(r => r.json()).then(d => { pendingResult = d; });
+  } else if (data.type === 'error') {
+    setStep('analyze', 'error', 0, data.message);
+    if (data.compressed_path) {
+      lastCompressedPath = data.compressed_path;
+      document.getElementById('btnRetry').classList.add('show');
+    }
+  }
+}
+
+document.getElementById('btnRetry').addEventListener('click', () => {
+  document.getElementById('btnRetry').classList.remove('show');
+  // Reset only the analyze step, keep compress & encode as done
+  const analyzeStep = document.getElementById('tl-analyze');
+  analyzeStep.className = 'tl-step';
+  document.getElementById('bar-analyze').style.width = '0%';
+  document.getElementById('status-analyze').textContent = '等待中';
+  document.getElementById('time-analyze').textContent = '';
+  analyzeStep.querySelector('.tl-dot').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4m0 12v4m-7.07-3.93l2.83-2.83m8.48-8.48l2.83-2.83M2 12h4m12 0h4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83"/></svg>';
+
+  fetch('/api/retry-analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ compressed_path: lastCompressedPath, model: selectedModel, video_name: lastVideoName })
+  }).then(response => {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    function read() {
+      reader.read().then(({ done, value }) => {
+        if (done) return;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try { handleSSE(JSON.parse(line.slice(6))); } catch(e) {}
+        }
+        read();
+      });
+    }
+    read();
+  }).catch(err => {
+    setStep('analyze', 'error', 0, err.message);
+  });
+});
+
+const DIM_FIELDS = [
+  { key: 'shot_type', label: '景别', cls: 'shot' },
+  { key: 'focal_length', label: '焦段', cls: 'lens' },
+  { key: 'camera_angle', label: '视角', cls: 'angle' },
+  { key: 'camera_movement', label: '运镜', cls: 'move' },
+  { key: 'perspective', label: '透视', cls: 'persp' },
+  { key: 'scene_type', label: '场景', cls: 'scene' },
+  { key: 'mood', label: '氛围', cls: 'mood' },
+  { key: 'lighting', label: '光线', cls: 'light' },
+  { key: 'weather', label: '天气', cls: 'weather' },
+];
+let filters = {};
+
+fetch('/api/analyses').then(r => r.json()).then(list => {
+  list.forEach(name => { const opt = document.createElement('option'); opt.value = name; opt.textContent = name.replace(/_analysis.*\.json$/, ''); presetSelect.appendChild(opt); });
+});
+
+presetSelect.addEventListener('change', async () => {
+  if (!presetSelect.value) return;
+  loadData(await (await fetch(`/api/analysis/${encodeURIComponent(presetSelect.value)}`)).json());
+});
+
+videoInput.addEventListener('change', async e => {
+  const file = e.target.files[0]; if (!file) return;
+  currentVideoFile = file;
+  player.src = URL.createObjectURL(file); player.style.display = 'block'; noVideo.style.display = 'none';
+  loadWaveform(player.src);
+  const result = await (await fetch('/api/find?name=' + encodeURIComponent(file.name))).json();
+  if (result && result.data) { loadData(result.data); presetSelect.value = result.file; updateAnalyzeBtn(true); }
+  else { allSegments = []; filters = {}; filtersDiv.classList.remove('show'); segCountDiv.textContent = ''; segmentsDiv.innerHTML = '<div class="no-data">该视频暂无分析结果</div>'; presetSelect.value = ''; updateAnalyzeBtn(false); }
+});
+
+function loadData(data) {
+  if (data.segments) { allSegments = data.segments; if (data.source_video && player.style.display === 'none') autoLoadVideo(data.source_video); }
+  else if (Array.isArray(data)) allSegments = data;
+  buildFilters(); applyFilters(); updateAnalyzeBtn(allSegments.length > 0);
+}
+
+function autoLoadVideo(path) {
+  player.src = '/video?path=' + encodeURIComponent(path);
+  player.style.display = 'block'; noVideo.style.display = 'none';
+  loadWaveform(player.src);
+  loadVideoInfo(path);
+}
+function loadVideoInfo(path) {
+  const infoDiv = document.getElementById('videoInfo');
+  fetch('/api/probe?path=' + encodeURIComponent(path)).then(r => r.json()).then(d => {
+    if (!d) return;
+    let html = '';
+    if (d.resolution) html += `<span><span class="label">分辨率</span> <span class="val">${d.resolution}</span></span>`;
+    if (d.fps) html += `<span><span class="label">帧率</span> <span class="val">${d.fps}</span></span>`;
+    if (d.codec) html += `<span><span class="label">编码</span> <span class="val">${d.codec}</span></span>`;
+    if (d.duration) html += `<span><span class="label">时长</span> <span class="val">${parseFloat(d.duration).toFixed(1)}s</span></span>`;
+    if (d.size_mb) html += `<span><span class="label">大小</span> <span class="val">${d.size_mb}MB</span></span>`;
+    if (d.camera) html += `<span><span class="label">设备</span> <span class="val">${d.camera}</span></span>`;
+    if (d.path) html += `<span><span class="label">路径</span> <span class="val" title="${d.path}">${d.path.split('/').pop()}</span></span>`;
+    infoDiv.innerHTML = html;
+    infoDiv.classList.add('show');
+  }).catch(() => {});
+}
+function parseTime(str) { const p = str.split(':'); return parseFloat(p[0]) * 60 + parseFloat(p[1]); }
+function fmtDur(a, b) { const d = parseTime(b) - parseTime(a); return d >= 1 ? d.toFixed(0) + 's' : d.toFixed(1) + 's'; }
+
+// Waveform
+const waveformWrap = document.getElementById('waveformWrap');
+const wfCanvas = document.getElementById('waveformCanvas');
+const wfCtx = wfCanvas.getContext('2d');
+let wfPeaks = null, wfDuration = 0, wfAnimFrame = null;
+
+function resizeWaveformCanvas() {
+  const rect = waveformWrap.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  wfCanvas.width = rect.width * dpr;
+  wfCanvas.height = rect.height * dpr;
+  wfCtx.scale(dpr, dpr);
+  if (wfPeaks) drawWaveform(player.currentTime);
+}
+
+async function loadWaveform(url) {
+  waveformWrap.classList.add('show');
+  resizeWaveformCanvas();
+  wfPeaks = null;
+  try {
+    const resp = await fetch(url);
+    const buf = await resp.arrayBuffer();
+    const actx = new (window.AudioContext || window.webkitAudioContext)();
+    const audio = await actx.decodeAudioData(buf);
+    actx.close();
+    const data = audio.getChannelData(0);
+    wfDuration = audio.duration;
+    const rect = waveformWrap.getBoundingClientRect();
+    const w = Math.floor(rect.width);
+    const samplesPerPeak = Math.max(1, Math.floor(data.length / w));
+    wfPeaks = [];
+    for (let i = 0; i < w; i++) {
+      let max = 0;
+      const start = i * samplesPerPeak;
+      for (let j = 0; j < samplesPerPeak; j++) {
+        const idx = start + j;
+        if (idx < data.length) {
+          const v = Math.abs(data[idx]);
+          if (v > max) max = v;
+        }
+      }
+      wfPeaks.push(max);
+    }
+    drawWaveform(0);
+  } catch(e) {
+    // No audio or decode failed — show flat line
+    wfPeaks = null;
+  }
+}
+
+function drawWaveform(time) {
+  if (!wfPeaks) return;
+  const rect = waveformWrap.getBoundingClientRect();
+  const w = rect.width, h = rect.height;
+  wfCtx.clearRect(0, 0, w, h);
+  const mid = h / 2;
+  // Waveform bars
+  for (let i = 0; i < wfPeaks.length; i++) {
+    const barH = Math.max(1, wfPeaks[i] * mid * 0.85);
+    const played = (time / wfDuration) * w;
+    if (i < played) {
+      wfCtx.fillStyle = 'rgba(108,140,255,0.5)';
+    } else {
+      wfCtx.fillStyle = '#333';
+    }
+    wfCtx.fillRect(i, mid - barH, 1, barH * 2);
+  }
+  // Position line
+  const x = (time / wfDuration) * w;
+  wfCtx.fillStyle = '#6c8cff';
+  wfCtx.fillRect(Math.round(x) - 1, 0, 2, h);
+}
+
+function startWaveformAnim() {
+  if (wfAnimFrame) return;
+  function loop() {
+    if (player.paused) { wfAnimFrame = null; return; }
+    drawWaveform(player.currentTime);
+    wfAnimFrame = requestAnimationFrame(loop);
+  }
+  wfAnimFrame = requestAnimationFrame(loop);
+}
+
+player.addEventListener('seeked', () => { if (wfPeaks) drawWaveform(player.currentTime); if (scopesRow.classList.contains('show')) { const f = captureVideoFrame(); if (f) { drawWaveformScope(f); drawParadeScope(f); drawVectorscope(f); } } });
+player.addEventListener('loadeddata', () => { showVideoScopes(); const f = captureVideoFrame(); if (f) { drawWaveformScope(f); drawParadeScope(f); drawVectorscope(f); } });
+
+waveformWrap.addEventListener('click', e => {
+  if (!wfPeaks || !wfDuration) return;
+  const rect = waveformWrap.getBoundingClientRect();
+  const ratio = (e.clientX - rect.left) / rect.width;
+  player.currentTime = ratio * wfDuration;
+  drawWaveform(player.currentTime);
+});
+
+window.addEventListener('resize', () => { if (wfPeaks) resizeWaveformCanvas(); resizeVideoScopes(); });
+
+// Video Scopes (Waveform, Parade, Vectorscope)
+const scopesRow = document.getElementById('scopesRow');
+const scopeWfCanvas = document.getElementById('scopeWaveform');
+const scopePrCanvas = document.getElementById('scopeParade');
+const scopeVtCanvas = document.getElementById('scopeVector');
+const scopeOffscreen = document.createElement('canvas');
+const scopeOffCtx = scopeOffscreen.getContext('2d', { willReadFrequently: true });
+let videoScopeFrame = null, lastScopeTime = 0;
+
+function resizeVideoScopes() {
+  if (!scopesRow.classList.contains('show')) return;
+  const dpr = window.devicePixelRatio || 1;
+  [scopeWfCanvas, scopePrCanvas, scopeVtCanvas].forEach(c => {
+    const rect = c.parentElement.getBoundingClientRect();
+    c.width = Math.round(rect.width * dpr);
+    c.height = Math.round(rect.height * dpr);
+  });
+}
+
+function showVideoScopes() {
+  scopesRow.classList.add('show');
+  resizeVideoScopes();
+}
+
+function captureVideoFrame() {
+  if (!player.videoWidth) return null;
+  const scale = 0.2;
+  const sw = Math.max(1, Math.floor(player.videoWidth * scale));
+  const sh = Math.max(1, Math.floor(player.videoHeight * scale));
+  scopeOffscreen.width = sw;
+  scopeOffscreen.height = sh;
+  scopeOffCtx.drawImage(player, 0, 0, sw, sh);
+  return scopeOffCtx.getImageData(0, 0, sw, sh);
+}
+
+function drawWaveformScope(imgData) {
+  const ctx = scopeWfCanvas.getContext('2d');
+  const cw = scopeWfCanvas.width, ch = scopeWfCanvas.height;
+  const out = ctx.createImageData(cw, ch);
+  const pixels = out.data;
+  const { data, width: fw, height: fh } = imgData;
+  const step = 2;
+  for (let y = 0; y < fh; y += step) {
+    for (let x = 0; x < fw; x += step) {
+      const i = (y * fw + x) * 4;
+      const luma = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+      const sx = Math.floor((x / fw) * cw);
+      const sy = Math.floor((1 - luma / 255) * (ch - 1));
+      if (sx >= 0 && sx < cw && sy >= 0 && sy < ch) {
+        const pi = (sy * cw + sx) * 4;
+        pixels[pi] = Math.min(255, pixels[pi] + 20);
+        pixels[pi+1] = Math.min(255, pixels[pi+1] + 22);
+        pixels[pi+2] = Math.min(255, pixels[pi+2] + 28);
+        pixels[pi+3] = 255;
+      }
+    }
+  }
+  ctx.putImageData(out, 0, 0);
+}
+
+function drawParadeScope(imgData) {
+  const ctx = scopePrCanvas.getContext('2d');
+  const cw = scopePrCanvas.width, ch = scopePrCanvas.height;
+  const out = ctx.createImageData(cw, ch);
+  const pixels = out.data;
+  const { data, width: fw, height: fh } = imgData;
+  const third = Math.floor(cw / 3);
+  const step = 2;
+  for (let y = 0; y < fh; y += step) {
+    for (let x = 0; x < fw; x += step) {
+      const i = (y * fw + x) * 4;
+      const channels = [data[i], data[i+1], data[i+2]]; // R, G, B
+      for (let c = 0; c < 3; c++) {
+        const sx = Math.floor((x / fw) * third) + c * third;
+        const sy = Math.floor((1 - channels[c] / 255) * (ch - 1));
+        if (sx >= 0 && sx < cw && sy >= 0 && sy < ch) {
+          const pi = (sy * cw + sx) * 4;
+          const boost = 18;
+          if (c === 0) pixels[pi] = Math.min(255, pixels[pi] + boost);
+          else if (c === 1) pixels[pi+1] = Math.min(255, pixels[pi+1] + boost);
+          else pixels[pi+2] = Math.min(255, pixels[pi+2] + boost);
+          pixels[pi+3] = 255;
+        }
+      }
+    }
+  }
+  // Dividers
+  for (let y = 0; y < ch; y++) {
+    for (const dx of [third, third * 2]) {
+      if (dx < cw) { const pi = (y * cw + dx) * 4; pixels[pi] = pixels[pi+1] = pixels[pi+2] = 25; pixels[pi+3] = 255; }
+    }
+  }
+  ctx.putImageData(out, 0, 0);
+}
+
+function drawVectorscope(imgData) {
+  const ctx = scopeVtCanvas.getContext('2d');
+  const cw = scopeVtCanvas.width, ch = scopeVtCanvas.height;
+  const out = ctx.createImageData(cw, ch);
+  const pixels = out.data;
+  const cx = cw / 2, cy = ch / 2;
+  const radius = Math.min(cx, cy) * 0.9;
+  const { data, width: fw, height: fh } = imgData;
+  const step = 3;
+  for (let y = 0; y < fh; y += step) {
+    for (let x = 0; x < fw; x += step) {
+      const i = (y * fw + x) * 4;
+      const r = data[i], g = data[i+1], b = data[i+2];
+      const cb = (-0.169 * r - 0.331 * g + 0.5 * b) / 127.5;
+      const cr = (0.5 * r - 0.419 * g - 0.081 * b) / 127.5;
+      const sx = Math.round(cx + cb * radius);
+      const sy = Math.round(cy - cr * radius);
+      if (sx >= 0 && sx < cw && sy >= 0 && sy < ch) {
+        const pi = (sy * cw + sx) * 4;
+        pixels[pi] = Math.min(255, pixels[pi] + 10);
+        pixels[pi+1] = Math.min(255, pixels[pi+1] + 12);
+        pixels[pi+2] = Math.min(255, pixels[pi+2] + 14);
+        pixels[pi+3] = 255;
+      }
+    }
+  }
+  ctx.putImageData(out, 0, 0);
+  // Reference circle
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  // Crosshair
+  ctx.beginPath();
+  ctx.moveTo(cx - radius, cy); ctx.lineTo(cx + radius, cy);
+  ctx.moveTo(cx, cy - radius); ctx.lineTo(cx, cy + radius);
+  ctx.stroke();
+}
+
+function renderVideoScopes() {
+  const now = performance.now();
+  if (now - lastScopeTime < 66) { videoScopeFrame = requestAnimationFrame(renderVideoScopes); return; }
+  lastScopeTime = now;
+  const frame = captureVideoFrame();
+  if (frame) {
+    drawWaveformScope(frame);
+    drawParadeScope(frame);
+    drawVectorscope(frame);
+  }
+  videoScopeFrame = requestAnimationFrame(renderVideoScopes);
+}
+
+function startVideoScopes() {
+  if (videoScopeFrame) return;
+  showVideoScopes();
+  renderVideoScopes();
+}
+
+function stopVideoScopes() {
+  if (videoScopeFrame) { cancelAnimationFrame(videoScopeFrame); videoScopeFrame = null; }
+}
+
+player.addEventListener('play', () => { startVideoScopes(); if (wfPeaks) startWaveformAnim(); });
+player.addEventListener('pause', () => { stopVideoScopes(); if (wfPeaks) { cancelAnimationFrame(wfAnimFrame); wfAnimFrame = null; drawWaveform(player.currentTime); } });
+player.addEventListener('ended', () => stopVideoScopes());
+
+function buildFilters() {
+  filters = {}; filtersDiv.innerHTML = ''; filtersDiv.classList.remove('show');
+  if (!allSegments.length) return;
+  const camFields = [
+    { key: 'shot_type', label: '景别' },
+    { key: 'focal_length', label: '焦段' },
+    { key: 'camera_angle', label: '视角' },
+    { key: 'camera_movement', label: '运镜' },
+    { key: 'perspective', label: '透视' },
+  ];
+  const contentFields = [
+    { key: 'scene_type', label: '场景' },
+    { key: 'mood', label: '氛围' },
+    { key: 'lighting', label: '光线' },
+    { key: 'weather', label: '天气' },
+  ];
+  function makeRow(icon, title, fields) {
+    const row = document.createElement('div'); row.className = 'filter-row';
+    const hasAny = fields.some(({ key }) => [...new Set(allSegments.map(s => s[key]).filter(Boolean))].length > 0);
+    if (!hasAny) return null;
+    row.innerHTML = `<span style="font-size:11px;color:var(--text2);white-space:nowrap;">${icon} ${title}</span>`;
+    fields.forEach(({ key, label }) => {
+      const vals = [...new Set(allSegments.map(s => s[key]).filter(Boolean))].sort();
+      if (!vals.length) return;
+      const dd = document.createElement('div'); dd.className = 'filter-dd';
+      const btn = document.createElement('div'); btn.className = 'filter-dd-btn';
+      btn.innerHTML = `<span>${label}</span><span class="cnt" style="display:none"></span><span class="filter-dd-x">✕</span><span class="arrow">▾</span>`;
+      const menu = document.createElement('div'); menu.className = 'filter-dd-menu';
+      const cntEl = btn.querySelector('.cnt');
+      vals.forEach(v => {
+        const item = document.createElement('div'); item.className = 'filter-dd-item';
+        item.innerHTML = `<span class="ck">✓</span><span>${v}</span>`;
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (!filters[key]) filters[key] = [];
+          const idx = filters[key].indexOf(v);
+          if (idx >= 0) { filters[key].splice(idx, 1); if (!filters[key].length) delete filters[key]; item.classList.remove('on'); }
+          else { filters[key].push(v); item.classList.add('on'); }
+          if (filters[key]?.length) { cntEl.textContent = filters[key].length; cntEl.style.display = ''; btn.classList.add('active'); }
+          else { cntEl.style.display = 'none'; btn.classList.remove('active'); }
+          applyFilters();
+        });
+        menu.appendChild(item);
+      });
+      const xBtn = btn.querySelector('.filter-dd-x');
+      xBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        delete filters[key];
+        menu.querySelectorAll('.filter-dd-item.on').forEach(i => i.classList.remove('on'));
+        cntEl.style.display = 'none'; btn.classList.remove('active');
+        applyFilters();
+      });
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = menu.classList.contains('show');
+        document.querySelectorAll('.filter-dd-menu.show').forEach(m => m.classList.remove('show'));
+        if (!isOpen) menu.classList.add('show');
+      });
+      dd.appendChild(btn); dd.appendChild(menu);
+      row.appendChild(dd);
+    });
+    return row;
+  }
+  // Search row
+  const searchRow = document.createElement('div');
+  searchRow.innerHTML = `<div class="search-box">🔍<input type="text" id="searchInput" placeholder="搜索对话、字幕内容…"></div>`;
+  const camRow = makeRow('🎥', '镜头', camFields);
+  const contentRow = makeRow('🌍', '内容', contentFields);
+  filtersDiv.appendChild(searchRow);
+  if (camRow) filtersDiv.appendChild(camRow);
+  if (contentRow) filtersDiv.appendChild(contentRow);
+  filtersDiv.classList.add('show');
+  document.getElementById('searchInput').addEventListener('input', () => applyFilters());
+  document.addEventListener('click', e => { if (!e.target.closest('.filter-dd')) document.querySelectorAll('.filter-dd-menu.show').forEach(m => m.classList.remove('show')); });
+}
+
+function applyFilters() {
+  const searchText = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
+  const f = allSegments.filter(seg => {
+    for (const [k, vals] of Object.entries(filters)) {
+      if (!vals.includes(seg[k])) return false;
+    }
+    if (searchText) {
+      const haystack = [seg.asr, seg.subtitle, seg.visual].filter(Boolean).join(' ').toLowerCase();
+      if (!haystack.includes(searchText)) return false;
+    }
+    return true;
+  });
+  segCountDiv.textContent = f.length === allSegments.length ? `${allSegments.length} 个片段` : `${f.length} / ${allSegments.length} 个片段`;
+  renderSegments(f);
+}
+
+function renderSegments(segs) {
+  if (!segs.length) { segmentsDiv.innerHTML = '<div class="no-data">无匹配片段</div>'; return; }
+  segmentsDiv.innerHTML = '';
+  segs.forEach(seg => {
+    const el = document.createElement('div'); el.className = 'segment';
+    // Camera row: 景别、焦段、视角、运镜、透视
+    const camFields = [
+      { key: 'shot_type', label: '景别', cls: 'shot' },
+      { key: 'focal_length', label: '焦段', cls: 'lens' },
+      { key: 'camera_angle', label: '视角', cls: 'angle' },
+      { key: 'camera_movement', label: '运镜', cls: 'move' },
+      { key: 'perspective', label: '透视', cls: 'persp' },
+    ];
+    const camHtml = camFields.map(f => seg[f.key] ? `<span class="dim-pair"><span class="dim-label">${f.label}</span><span class="dim-value ${f.cls}">${seg[f.key]}</span></span>` : '').filter(Boolean).join('');
+    // Scene row: 场景、氛围、光线、天气
+    const sceneFields = [
+      { key: 'scene_type', label: '场景', cls: 'scene' },
+      { key: 'mood', label: '氛围', cls: 'mood' },
+      { key: 'lighting', label: '光线', cls: 'light' },
+      { key: 'weather', label: '天气', cls: 'weather' },
+    ];
+    const sceneHtml = sceneFields.map(f => seg[f.key] ? `<span class="dim-pair"><span class="dim-label">${f.label}</span><span class="dim-value ${f.cls}">${seg[f.key]}</span></span>` : '').filter(Boolean).join('');
+    const colors = (seg.dominant_colors || []).map(c => `<span class="pill color">${c}</span>`).join('');
+    const subjects = (seg.main_subjects || []).map(s => `<span class="pill subject">${s}</span>`).join('');
+    let textLines = '';
+    if (seg.asr && seg.asr !== '无') textLines += `<div class="seg-text-line"><span class="prefix">💬 对话</span>${seg.asr}</div>`;
+    if (seg.subtitle && seg.subtitle !== '无') textLines += `<div class="seg-text-line"><span class="prefix">📝 字幕</span>${seg.subtitle}</div>`;
+    el.innerHTML = `<div class="seg-top"><span class="seg-time">${seg.time_start} → ${seg.time_end}</span><span class="seg-duration">${fmtDur(seg.time_start, seg.time_end)}</span></div>
+      <div class="seg-visual">${seg.visual || ''}</div>${textLines}
+      ${camHtml ? `<div class="dim-row"><span class="dim-row-icon">🎥</span>${camHtml}</div>` : ''}
+      ${sceneHtml ? `<div class="dim-row"><span class="dim-row-icon">🌍</span>${sceneHtml}</div>` : ''}
+      <div class="array-group"><span class="array-label">🎨 颜色</span><div class="array-pills">${colors || '<span style="color:var(--text3);font-size:10px">-</span>'}</div></div>
+      <div class="array-group"><span class="array-label">🎬 主体</span><div class="array-pills">${subjects || '<span style="color:var(--text3);font-size:10px">-</span>'}</div></div>`;
+    el.addEventListener('click', () => { player.currentTime = parseTime(seg.time_start); player.play(); });
+    segmentsDiv.appendChild(el);
+  });
+}
+
+player.addEventListener('timeupdate', () => {
+  if (!allSegments.length) return;
+  const t = player.currentTime;
+  let idx = allSegments.findIndex(seg => t >= parseTime(seg.time_start) && t < parseTime(seg.time_end));
+  if (idx === -1) idx = allSegments.length - 1;
+  if (idx === activeIdx) return; activeIdx = idx;
+  const filtered = allSegments.filter(seg => {
+    for (const [k, vals] of Object.entries(filters)) { if (!vals.includes(seg[k])) return false; }
+    return true;
+  });
+  const visIdx = filtered.indexOf(allSegments[idx]);
+  const els = segmentsDiv.querySelectorAll('.segment'); els.forEach(el => el.classList.remove('active'));
+  if (visIdx >= 0 && els[visIdx]) {
+    els[visIdx].classList.add('active');
+    const el = els[visIdx], cr = segmentsDiv.getBoundingClientRect(), er = el.getBoundingClientRect();
+    if (er.top < cr.top || er.bottom > cr.bottom) {
+      segmentsDiv.scrollTop = segmentsDiv.scrollTop + er.top - cr.top - (cr.height - er.height) / 2;
+    }
+  }
+});
+</script>
+</body>
+</html>

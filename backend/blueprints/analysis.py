@@ -1,0 +1,301 @@
+from flask import Blueprint, request, jsonify, Response, current_app
+import os, json, time
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+from ..db import get_db, get_setting
+from ..compressor import compress_video
+from ..analyzer import analyze_video, analyze_image, CODING_BASE_URL
+from ..asr import get_engine as get_asr_engine
+
+bp = Blueprint("analysis", __name__)
+
+_SEGMENT_COLS = "id, media_id, time_start, time_end, visual, asr, subtitle, dominant_colors, main_subjects, shot_type, focal_length, camera_angle, camera_movement, perspective, scene_type, mood, lighting, weather, seq"
+
+
+@bp.route("/<int:media_id>")
+def get_analysis(media_id):
+    db = get_db()
+    row = db.execute("SELECT analysis_model, analysis_date, analysis_status FROM media WHERE id = ?", (media_id,)).fetchone()
+    if not row:
+        return jsonify({"error": "Not found"}), 404
+    seg_rows = db.execute(f"SELECT {_SEGMENT_COLS} FROM media_segment WHERE media_id = ? ORDER BY seq, id", (media_id,)).fetchall()
+    segments = [_segment_to_dict(r) for r in seg_rows]
+    return jsonify({
+        "status": row["analysis_status"],
+        "model": row["analysis_model"],
+        "date": row["analysis_date"],
+        "segments": segments,
+    })
+
+
+@bp.route("/<int:media_id>", methods=["DELETE"])
+def delete_analysis(media_id):
+    db = get_db()
+    media = db.execute("SELECT id FROM media WHERE id = ?", (media_id,)).fetchone()
+    if not media:
+        return jsonify({"error": "Not found"}), 404
+    db.execute("DELETE FROM media_segment WHERE media_id = ?", (media_id,))
+    db.execute("DELETE FROM media_fts WHERE media_id = ?", (media_id,))
+    db.execute("UPDATE media SET analysis_status = 'none', analysis_model = NULL, analysis_date = NULL WHERE id = ?", (media_id,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@bp.route("/<int:media_id>", methods=["POST"])
+def start_analysis(media_id):
+    db = get_db()
+    media = db.execute("SELECT id, file_path, media_type FROM media WHERE id = ?", (media_id,)).fetchone()
+    if not media:
+        return jsonify({"error": "Not found"}), 404
+
+    app = current_app._get_current_object()
+
+    if media["media_type"] == "video":
+        return _start_video_analysis(media_id, media, app)
+    elif media["media_type"] == "image":
+        return _start_image_analysis(media_id, media, app)
+    else:
+        return jsonify({"error": "Unsupported media type"}), 400
+
+
+def _start_image_analysis(media_id, media, app):
+    db = get_db()
+    model = get_setting(db, "model", "glm-4.6v")
+    api_key = get_setting(db, "video_api_key", "")
+    if not api_key:
+        return jsonify({"error": "API Key 未设置，请在设置中配置"}), 400
+    db.execute("UPDATE media SET analysis_status = 'processing' WHERE id = ?", (media_id,))
+    db.commit()
+    file_path = media["file_path"]
+
+    def generate():
+        with app.app_context():
+            try:
+                yield f"data: {json.dumps({'type': 'progress', 'step': 'analyzing', 'message': f'调用 {model} 分析中...'}, ensure_ascii=False)}\n\n"
+
+                result, analyze_time, usage = analyze_image(
+                    file_path, api_key, model=model, base_url=CODING_BASE_URL,
+                )
+
+                segments = [result]
+                save_segments(media_id, segments, model=model)
+
+                usage_dict = None
+                if usage:
+                    usage_dict = usage
+
+                yield f"data: {json.dumps({'type': 'done', 'message': '分析完成', 'analyze_time': round(analyze_time, 1), 'tokens': usage_dict, 'segments_count': 1}, ensure_ascii=False)}\n\n"
+            except Exception as e:
+                db = get_db()
+                db.execute("UPDATE media SET analysis_status = 'error' WHERE id = ?", (media_id,))
+                db.commit()
+                yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
+
+    return Response(generate(), mimetype="text/event-stream")
+
+
+def _start_video_analysis(media_id, media, app):
+    db = get_db()
+    model = get_setting(db, "model", "glm-4.6v")
+    resolution = get_setting(db, "resolution", "480")
+    fps = get_setting(db, "fps", "30")
+    use_multimodal = get_setting(db, "use_multimodal", "true") == "true"
+    asr_engine_name = get_setting(db, "asr_engine", "whisper")
+    api_key = get_setting(db, "video_api_key", "")
+    if not api_key:
+        return jsonify({"error": "API Key 未设置，请在设置中配置"}), 400
+    file_path = media["file_path"]
+
+    def generate():
+        compressed_path = None
+        with app.app_context():
+            try:
+                yield f"data: {json.dumps({'type': 'progress', 'step': 'compressing', 'message': '压缩视频中...'}, ensure_ascii=False)}\n\n"
+                t0 = time.time()
+                compressed_path, compress_time, cw, ch, cfps = compress_video(file_path, resolution=resolution, fps=fps)
+                compressed_path_holder[0] = str(compressed_path)
+                size_mb = compressed_path.stat().st_size / (1024 * 1024)
+                yield f"data: {json.dumps({'type': 'progress', 'step': 'compressed', 'message': f'压缩完成: {size_mb:.1f}MB, 耗时 {compress_time:.1f}s', 'width': cw, 'height': ch, 'fps': cfps}, ensure_ascii=False)}\n\n"
+
+                if use_multimodal:
+                    yield f"data: {json.dumps({'type': 'progress', 'step': 'analyzing', 'message': f'AI 综合分析中（{model}）...'}, ensure_ascii=False)}\n\n"
+                    segments, analyze_time, usage = analyze_video(
+                        compressed_path, api_key, model=model,
+                        base_url=CODING_BASE_URL, multimodal=True,
+                    )
+                else:
+                    asr_engine = get_asr_engine(asr_engine_name)
+
+                    if asr_engine:
+                        yield f"data: {json.dumps({'type': 'progress', 'step': 'analyzing', 'message': f'AI 分析 & 语音识别并行中...'}, ensure_ascii=False)}\n\n"
+
+                        pool = ThreadPoolExecutor(max_workers=2)
+                        vlm_future = pool.submit(analyze_video, compressed_path, api_key, model=model, base_url=CODING_BASE_URL, multimodal=False)
+                        asr_future = pool.submit(_run_asr, asr_engine, compressed_path)
+
+                        try:
+                            segments, analyze_time, usage = vlm_future.result()
+                        except Exception:
+                            asr_future.cancel()
+                            pool.shutdown(wait=False, cancel_futures=True)
+                            raise
+
+                        asr_segments = asr_future.result()
+                        pool.shutdown(wait=False)
+
+                        if asr_segments:
+                            _merge_asr(segments, asr_segments)
+                    else:
+                        yield f"data: {json.dumps({'type': 'progress', 'step': 'analyzing', 'message': f'调用 {model} 分析中...'}, ensure_ascii=False)}\n\n"
+
+                        segments, analyze_time, usage = analyze_video(
+                            compressed_path, api_key, model=model,
+                            base_url=CODING_BASE_URL, multimodal=False,
+                        )
+
+                save_segments(media_id, segments, model=model)
+
+                usage_dict = None
+                if usage:
+                    usage_dict = usage
+
+                yield f"data: {json.dumps({'type': 'done', 'message': '分析完成', 'compress_time': round(compress_time, 1), 'analyze_time': round(analyze_time, 1), 'tokens': usage_dict, 'segments_count': len(segments)}, ensure_ascii=False)}\n\n"
+            except Exception as e:
+                db = get_db()
+                db.execute("UPDATE media SET analysis_status = 'error' WHERE id = ?", (media_id,))
+                db.commit()
+                yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
+            finally:
+                if compressed_path and compressed_path.exists():
+                    try:
+                        compressed_path.unlink()
+                    except OSError:
+                        pass
+
+    def _cleanup_temp(path):
+        if path and Path(path).exists():
+            try:
+                Path(path).unlink()
+            except OSError:
+                pass
+
+    compressed_path_holder = [None]
+    resp = Response(generate(), mimetype="text/event-stream")
+    resp.call_on_close(lambda: _cleanup_temp(compressed_path_holder[0]))
+    return resp
+
+
+def _run_asr(engine, audio_path):
+    try:
+        return engine.transcribe(audio_path)
+    except Exception as e:
+        print(f"ASR failed: {e}")
+        return []
+
+
+def _parse_time(ts: str) -> float:
+    parts = ts.split(":")
+    if len(parts) == 2:
+        return float(parts[0]) * 60 + float(parts[1])
+    return float(ts)
+
+
+def _merge_asr(vlm_segments, asr_segments):
+    for seg in vlm_segments:
+        try:
+            start = _parse_time(seg.get("time_start", "0"))
+            end = _parse_time(seg.get("time_end", "0"))
+        except (ValueError, IndexError):
+            continue
+        texts = [a.text for a in asr_segments
+                 if _parse_time(a.time_start) < end and _parse_time(a.time_end) > start]
+        if texts:
+            seg["asr"] = "; ".join(texts)
+
+
+def save_segments(media_id, segments, model=""):
+    """Parse analysis result and save segments to DB."""
+    import json
+    db = get_db()
+    db.execute("DELETE FROM media_segment WHERE media_id = ?", (media_id,))
+
+    for i, seg in enumerate(segments):
+        db.execute(
+            "INSERT INTO media_segment (media_id, time_start, time_end, visual, asr, subtitle, dominant_colors, main_subjects, shot_type, focal_length, camera_angle, camera_movement, perspective, scene_type, mood, lighting, weather, seq) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                media_id,
+                seg.get("time_start", ""),
+                seg.get("time_end", ""),
+                seg.get("visual", ""),
+                seg.get("asr", ""),
+                seg.get("subtitle", ""),
+                json.dumps(seg.get("dominant_colors", []), ensure_ascii=False),
+                json.dumps(seg.get("main_subjects", []), ensure_ascii=False),
+                seg.get("shot_type", ""),
+                seg.get("focal_length", ""),
+                seg.get("camera_angle", ""),
+                seg.get("camera_movement", ""),
+                seg.get("perspective", ""),
+                seg.get("scene_type", ""),
+                seg.get("mood", ""),
+                seg.get("lighting", ""),
+                seg.get("weather", ""),
+                i,
+            ),
+        )
+
+    db.execute(
+        "UPDATE media SET analysis_status = 'done', analysis_model = ?, analysis_date = datetime('now'), updated_at = datetime('now') WHERE id = ?",
+        (model, media_id),
+    )
+    _refresh_fts(db, media_id, segments)
+    db.commit()
+
+
+def _refresh_fts(db, media_id, segments):
+    import json
+    from .library import _segment
+    visual, asr, subtitle = [], [], []
+    subjects, colors = set(), set()
+    for seg in segments:
+        if seg.get("visual"):
+            visual.append(seg["visual"])
+        if seg.get("asr") and seg["asr"] != "无":
+            asr.append(seg["asr"])
+        if seg.get("subtitle") and seg["subtitle"] != "无":
+            subtitle.append(seg["subtitle"])
+        for s in seg.get("main_subjects", []):
+            subjects.add(s)
+        for c in seg.get("dominant_colors", []):
+            colors.add(c)
+    row = db.execute("SELECT file_name FROM media WHERE id = ?", (media_id,)).fetchone()
+    file_name = row["file_name"] if row else ""
+    tag_rows = db.execute(
+        "SELECT t.name FROM tags t JOIN media_tags mt ON t.id = mt.tag_id WHERE mt.media_id = ?",
+        (media_id,),
+    ).fetchall()
+    tags_str = " ".join(r["name"] for r in tag_rows)
+
+    db.execute("DELETE FROM media_fts WHERE media_id = ?", (media_id,))
+    db.execute(
+        "INSERT INTO media_fts (media_id, file_name, visual, asr, subtitle, subjects, colors, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (media_id, _segment(file_name), _segment(" ".join(visual)), _segment(" ".join(asr)),
+         _segment(" ".join(subtitle)), _segment(" ".join(subjects)), _segment(" ".join(colors)), _segment(tags_str)),
+    )
+
+
+def _segment_to_dict(row):
+    import json
+    d = dict(row)
+    for col in ("dominant_colors", "main_subjects"):
+        v = d.get(col, "")
+        if isinstance(v, str) and v:
+            try:
+                d[col] = json.loads(v)
+            except json.JSONDecodeError:
+                d[col] = [v]
+        elif not v:
+            d[col] = []
+    return d

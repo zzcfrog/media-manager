@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Media Manager</title>
+<link rel="stylesheet" href="/static/css/quasar.prod.css">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" type="text/css">
+<link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+<div id="app">
+  <q-layout view="hHh LpR fF" style="height:100vh">
+    <!-- Top bar -->
+    <q-header style="height:40px;border-bottom:1px solid var(--border)">
+      <q-toolbar style="min-height:40px;height:40px">
+        <img src="/static/icon.png" style="width:24px;height:24px;border-radius:5px">
+        <span class="text-primary text-weight-bold" style="font-size:13px;margin:0 8px">MediaManager</span>
+        <q-space></q-space>
+        <q-btn flat round dense icon="palette" size="sm" color="grey-6">
+	          <q-tooltip :delay="1000">主题色</q-tooltip>
+          <q-menu anchor="bottom right" self="top right">
+            <div style="padding:12px;min-width:200px" class="bg-menu-popup">
+              <div class="text-caption text-grey-5 q-mb-sm">主题色</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <span v-for="c in skinColors" :key="c.value" class="skin-dot"
+                      :style="{background: c.color}" :class="{active: accentColor===c.value}"
+                      @click="setAccentColor(c.value)"></span>
+              </div>
+            </div>
+          </q-menu>
+        </q-btn>
+        <q-btn flat round dense :icon="themeIcon" size="sm" color="grey-6" @click="cycleTheme">
+          <q-tooltip :delay="1000">{{ themeMode === 'dark' ? '夜间模式' : themeMode === 'light' ? '日间模式' : '跟随系统' }}</q-tooltip>
+        </q-btn>
+        <q-btn flat round dense icon="refresh" size="sm" color="grey-6"
+               @mousedown="startLongRefresh" @mouseup="cancelLongRefresh" @mouseleave="cancelLongRefresh"
+               @touchstart="startLongRefresh" @touchend="cancelLongRefresh">
+          <q-tooltip :delay="1000">刷新页面（长按强制刷新）</q-tooltip>
+        </q-btn>
+        <q-btn flat round dense icon="settings" size="sm" color="grey-6" @click="showSettings=true">
+          <q-tooltip :delay="1000">设置</q-tooltip>
+        </q-btn>
+      </q-toolbar>
+    </q-header>
+
+    <!-- Sidebar -->
+    <q-drawer v-model="drawerOpen" :width="260" :mini="drawerMini" :breakpoint="0" bordered style="display:flex;flex-direction:column" mini-width="56">
+      <q-list dense>
+        <q-item-label header>浏览</q-item-label>
+        <q-expansion-item dense-toggle expand-separator
+          v-model="libraryExpanded"
+          :content-inset-level="0.1"
+          :header-style="route==='#/gallery' && !collectionFilter && !selectedFolder ? 'background:var(--accent-dim);border-radius:4px' : ''"
+          @update:model-value="onLibraryToggle">
+          <template v-slot:header>
+            <q-item-section avatar><q-icon name="movie" size="18px" :color="route==='#/gallery' && !collectionFilter && !selectedFolder ? 'primary' : 'grey-6'"></q-icon></q-item-section>
+            <q-item-section>素材库</q-item-section>
+          </template>
+          <q-tree :nodes="folderTree" node-key="path" label-key="label"
+            dense no-connectors
+            :selected="selectedFolder" @update:selected="onFolderSelect"
+            default-expand-all>
+            <template v-slot:default-header="prop">
+              <div class="row items-center no-wrap" style="width:100%;padding:4px 6px;margin:-4px -6px"
+                :style="selectedFolder===prop.node.path ? 'background:var(--accent-dim);border-radius:4px' : ''">
+                <q-icon name="folder" size="16px" :color="selectedFolder===prop.node.path ? 'primary' : 'grey-6'" class="q-mr-xs"></q-icon>
+                <span class="folder-label" style="font-size:13px">{{ prop.node.label }}</span>
+                <q-space></q-space>
+                <span class="text-caption text-grey-6">{{ prop.node.totalCount || 0 }}</span>
+                <q-tooltip :delay="1000" v-if="prop.node.label.length > 10">{{ prop.node.label }}</q-tooltip>
+              </div>
+            </template>
+          </q-tree>
+        </q-expansion-item>
+        <q-item clickable :active="route==='#/favorites'"
+                @click="nav('#/favorites')"
+                active-class="bg-primary text-white">
+          <q-item-section avatar><q-icon name="favorite" size="18px"></q-icon></q-item-section>
+          <q-item-section>我的收藏</q-item-section>
+        </q-item>
+      </q-list>
+      <q-separator></q-separator>
+      <q-list dense>
+        <q-item-label header>收藏夹</q-item-label>
+        <q-item v-for="c in collections" :key="c.id" clickable
+                :active="route==='#/collections/'+c.id"
+                @click="nav('#/collections/'+c.id)"
+                active-class="bg-primary text-white">
+          <q-item-section avatar><q-icon name="folder" size="18px"></q-icon></q-item-section>
+          <q-item-section>{{ c.name }}</q-item-section>
+          <q-item-section side><span class="text-caption text-grey-6">{{ c.item_count || 0 }}</span></q-item-section>
+        </q-item>
+        <q-item v-if="!collections.length"><q-item-section class="text-grey-7" style="font-size:11px">暂无收藏夹</q-item-section></q-item>
+      </q-list>
+      <q-separator></q-separator>
+      <q-list dense style="flex:1;overflow-y:auto">
+        <q-item-label header>标签</q-item-label>
+        <q-item v-for="t in tags" :key="t.id">
+          <q-item-section avatar><q-icon name="tag" size="18px"></q-icon></q-item-section>
+          <q-item-section># {{ t.name }}</q-item-section>
+          <q-item-section side><span class="text-caption text-grey-6">{{ t.usage_count }}</span></q-item-section>
+        </q-item>
+      </q-list>
+      <div style="padding:12px 14px">
+        <q-btn v-if="!drawerMini" color="primary" class="full-width" icon="add_circle_outline" label="导入素材" @click="openImport"></q-btn>
+        <q-btn v-else flat round dense icon="add" color="primary" @click="openImport"></q-btn>
+      </div>
+      <div style="padding:4px 8px;text-align:center">
+      </div>
+    </q-drawer>
+
+    <!-- Main content -->
+    <q-page-container>
+      <q-page style="display:flex;flex-direction:column;height:calc(100vh - 40px);overflow:hidden">
+        <keep-alive>
+          <gallery-page v-if="currentView==='gallery'" ref="gallery"></gallery-page>
+        </keep-alive>
+        <detail-page v-if="currentView==='detail'" :key="detailId"></detail-page>
+      </q-page>
+    </q-page-container>
+  </q-layout>
+
+  <!-- Drawer toggle -->
+  <q-btn flat round dense :icon="drawerMini ? 'chevron_right' : 'chevron_left'" size="xs" color="grey-6"
+          class="drawer-toggle-btn" @click="drawerMini = !drawerMini"
+          :style="{position:'fixed', left: (drawerMini ? 46 : 250) + 'px', top: '30px', zIndex: 2000}">
+    <q-tooltip :delay="1000">收起侧边栏</q-tooltip>
+  </q-btn>
+
+  <!-- Settings modal -->
+  <q-dialog v-model="showSettings" @show="loadSettings">
+    <q-card style="min-width:440px" class="dialog-card">
+      <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" v-close-popup></q-btn>
+      <q-card-section>
+        <div class="text-h6">设置</div>
+      </q-card-section>
+      <q-card-section style="display:flex;flex-direction:column;gap:24px">
+        <!-- 视频分析 -->
+        <div>
+          <div class="text-subtitle2 q-mb-md" style="padding-left:10px;border-left:3px solid var(--accent);line-height:1">视频分析</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div class="row q-col-gutter-sm">
+              <q-select v-model="settingsForm.resolution" :options="settingResOptions" label="压缩分辨率" dense filled emit-value map-options class="col"></q-select>
+              <q-select v-model="settingsForm.fps" :options="settingFpsOptions" label="帧率" dense filled emit-value map-options class="col"></q-select>
+            </div>
+            <q-select v-model="settingsForm.model" :options="settingModelOptions" label="AI 模型" dense filled emit-value map-options></q-select>
+            <q-input v-model="settingsForm.videoApiKey" :type="showVideoKey ? 'text' : 'password'" label="API Key" dense filled>
+              <template v-slot:append>
+                <q-icon :name="showVideoKey ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="showVideoKey = !showVideoKey"></q-icon>
+              </template>
+              <template v-slot:hint>
+                <span class="text-grey-6" style="font-size:11px">在 AI 平台获取的 API Key</span>
+              </template>
+            </q-input>
+            <q-toggle v-model="settingsForm.useMultimodal" label="由视频模型同时处理音频（无需独立 ASR）"></q-toggle>
+          </div>
+        </div>
+        <!-- 音频分析（仅独立 ASR 模式显示） -->
+        <div v-if="!settingsForm.useMultimodal">
+          <div class="text-subtitle2 q-mb-md" style="padding-left:10px;border-left:3px solid var(--accent);line-height:1">音频分析</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <q-select v-model="settingsForm.asrEngine" :options="settingAsrOptions" label="ASR 引擎" dense filled emit-value map-options></q-select>
+            <q-input v-if="settingsForm.asrEngine !== 'whisper'" v-model="settingsForm.asrApiKey" :type="showAsrKey ? 'text' : 'password'" label="ASR API Key" dense filled>
+              <template v-slot:append>
+                <q-icon :name="showAsrKey ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="showAsrKey = !showAsrKey"></q-icon>
+              </template>
+              <template v-slot:hint>
+                <span class="text-grey-6" style="font-size:11px">云端 ASR 服务的 API Key</span>
+              </template>
+            </q-input>
+          </div>
+        </div>
+      </q-card-section>
+      <q-card-actions align="right">
+        <q-btn color="primary" label="确定" @click="saveSettings(); showSettings=false"></q-btn>
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
+
+  <!-- Import modal -->
+  <q-dialog v-model="showImport" persistent seamless>
+    <q-card style="min-width:480px;max-width:560px" class="dialog-card">
+      <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" @click="showImport=false; loadSidebar(); $nextTick(() => $refs.gallery?.load())"></q-btn>
+      <!-- Step 1: Select -->
+      <template v-if="importStep === 'select'">
+        <q-card-section>
+          <div class="text-h6">导入素材</div>
+        </q-card-section>
+        <q-card-section>
+          <div class="import-drop-zone" @dragover.prevent="onDragOver" @dragleave="onDragLeave" @drop.prevent="onDrop">
+            <q-icon name="cloud_upload" size="36px" color="grey-6"></q-icon>
+            <div class="text-grey-5 q-mt-sm" style="font-size:13px">拖入文件或文件夹</div>
+            <div style="display:flex;gap:16px;margin-top:10px;font-size:12px">
+              <a href="#" class="import-link" @click.prevent="pickFiles">选择文件</a>
+              <a href="#" class="import-link" @click.prevent="pickDirectory">选择文件夹</a>
+            </div>
+          </div>
+        </q-card-section>
+        <q-card-section v-if="selectedPaths.length" style="max-height:260px;overflow-y:auto">
+          <q-list dense bordered separator>
+            <q-item v-for="(p, i) in selectedPaths" :key="i">
+              <q-item-section avatar><q-icon name="movie" size="16px" color="grey-6"></q-icon></q-item-section>
+              <q-item-section>{{ pathName(p) }}</q-item-section>
+              <q-item-section side>
+                <q-btn flat round dense icon="close" size="xs" @click="selectedPaths.splice(i, 1)"></q-btn>
+              </q-item-section>
+            </q-item>
+          </q-list>
+          <div class="text-caption text-grey-6 q-mt-sm">已选 {{ selectedPaths.length }} 个路径</div>
+        </q-card-section>
+        <q-card-section v-else>
+          <div class="text-center text-grey-6" style="padding:20px">
+            <q-icon name="folder_open" size="32px" color="grey-7"></q-icon>
+            <p class="q-mt-sm" style="font-size:12px">选择文件或文件夹开始导入</p>
+          </div>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn color="primary" label="确认导入" :disable="!selectedPaths.length || importing" @click="startImport"></q-btn>
+        </q-card-actions>
+      </template>
+
+      <!-- Step 2: Progress -->
+      <template v-if="importStep === 'progress'">
+        <q-card-section>
+          <div class="text-h6">正在导入</div>
+        </q-card-section>
+        <q-card-section>
+          <div class="row justify-between text-caption text-grey-6 q-mb-sm">
+            <span>{{ importedItems.length }} / {{ importTotal }} 已完成</span>
+            <span>{{ Math.round(importedItems.length / Math.max(1, importTotal) * 100) }}%</span>
+          </div>
+          <q-linear-progress :value="importedItems.length / Math.max(1, importTotal)" color="primary" size="6px"></q-linear-progress>
+        </q-card-section>
+        <q-card-section ref="importListWrap" style="max-height:300px;overflow-y:auto">
+          <div class="import-preview-grid">
+            <div v-for="item in importedItems" :key="item.id" class="import-preview-card">
+              <div class="import-preview-thumb">
+                <img v-if="item.thumbnail_path" :src="API.thumbUrl(item.id)">
+                <div v-else class="import-preview-placeholder">
+                  <q-icon :name="item.media_type === 'video' ? 'movie' : 'image'" size="24px" color="grey-6"></q-icon>
+                </div>
+              </div>
+              <div class="import-preview-name">{{ item.file_name }}</div>
+            </div>
+          </div>
+        </q-card-section>
+      </template>
+
+      <!-- Step 3: Done -->
+      <template v-if="importStep === 'done'">
+        <q-card-section>
+          <div class="text-h6">导入完成</div>
+        </q-card-section>
+        <q-card-section>
+          <div style="display:flex;justify-content:center;gap:32px;padding:12px 0">
+            <div class="text-center">
+              <div class="text-h4 text-primary text-weight-bold">{{ importedItems.length }}</div>
+              <div class="text-caption text-grey-5" style="margin-top:4px">成功导入</div>
+            </div>
+            <div class="text-center">
+              <div style="display:flex;align-items:baseline;justify-content:center;gap:4px">
+                <span class="text-h4 text-weight-bold" :class="skippedItems.length ? 'text-orange' : 'text-grey-6'">{{ skippedItems.length }}</span>
+                <q-icon v-if="skippedItems.length" name="info" size="16px" color="orange" style="cursor:pointer" @click="showSkippedList=!showSkippedList; showFailedList=false"></q-icon>
+              </div>
+              <div class="text-caption text-grey-5" style="margin-top:4px">跳过（重复）</div>
+            </div>
+            <div class="text-center">
+              <div style="display:flex;align-items:baseline;justify-content:center;gap:4px">
+                <span class="text-h4 text-weight-bold" :class="failedItems.length ? 'text-negative' : 'text-grey-6'">{{ failedItems.length }}</span>
+                <q-icon v-if="failedItems.length" name="info" size="16px" color="negative" style="cursor:pointer" @click="showFailedList=!showFailedList; showSkippedList=false"></q-icon>
+              </div>
+              <div class="text-caption text-grey-5" style="margin-top:4px">失败</div>
+            </div>
+          </div>
+          <div v-if="showSkippedList && skippedItems.length" style="max-height:180px;overflow-y:auto;background:var(--surface2);border-radius:6px;padding:8px 12px;margin-top:4px">
+            <div v-for="s in skippedItems" :key="s.file_path || s.file_name" class="text-caption" style="padding:3px 0;color:var(--text2)">
+              {{ s.file_path || s.file_name }}
+            </div>
+          </div>
+          <div v-if="showFailedList && failedItems.length" style="max-height:180px;overflow-y:auto;background:var(--surface2);border-radius:6px;padding:8px 12px;margin-top:4px">
+            <div v-for="f in failedItems" :key="f.file_path" class="text-caption" style="padding:3px 0;color:var(--text2)">
+              {{ f.file_path }}
+            </div>
+          </div>
+        </q-card-section>
+        <q-card-section v-if="importedItems.length" style="max-height:300px;overflow-y:auto">
+          <div class="import-preview-grid">
+            <div v-for="item in importedItems" :key="item.id" class="import-preview-card" @click="openDetail(item.id)" style="cursor:pointer">
+              <div class="import-preview-thumb">
+                <img v-if="item.thumbnail_path" :src="API.thumbUrl(item.id)">
+                <div v-else class="import-preview-placeholder">
+                  <q-icon :name="item.media_type === 'video' ? 'movie' : 'image'" size="24px" color="grey-6"></q-icon>
+                </div>
+              </div>
+              <div class="import-preview-name">{{ item.file_name }}</div>
+              <div class="import-preview-meta" v-if="item.width">{{ item.width }}x{{ item.height }} &middot; {{ fmtSize(item.file_size) }}</div>
+            </div>
+          </div>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="关闭" @click="showImport=false; loadSidebar(); $nextTick(() => $refs.gallery?.load())"></q-btn>
+          <q-btn color="primary" label="查看素材库" @click="showImport=false; loadSidebar(); $nextTick(() => $refs.gallery?.load())"></q-btn>
+        </q-card-actions>
+      </template>
+    </q-card>
+  </q-dialog>
+</div>
+
+<script src="/static/js/vue.global.prod.js"></script>
+<script src="/static/js/quasar.umd.prod.js"></script>
+<script src="/static/js/lottie.min.js"></script>
+<script src="/static/js/api.js"></script>
+<script src="/static/js/gallery.js"></script>
+<script src="/static/js/detail.js"></script>
+<script>
+const app = Vue.createApp({
+  data() {
+    return {
+      route: "#/gallery",
+      currentView: "gallery",
+      detailId: null,
+      collectionFilter: null,
+      favFilter: false,
+      galleryKey: 0,
+      searchQuery: "",
+      searchText: "",
+      showImport: false,
+      showSettings: false,
+      settingsForm: { resolution: "480", fps: "30", model: "glm-4.6v", useMultimodal: true, asrEngine: "whisper", videoApiKey: "", asrApiKey: "" },
+      showVideoKey: false,
+      showAsrKey: false,
+      settingResOptions: [
+        { label: "480P · 推荐", value: "480" },
+        { label: "320P · 省 Token", value: "320" },
+        { label: "240P · 最省", value: "240" },
+      ],
+      settingFpsOptions: [
+        { label: "30fps · 推荐", value: "30" },
+        { label: "20fps · 省 Token", value: "20" },
+        { label: "10fps · 最省", value: "10" },
+      ],
+      settingModelOptions: [
+        { label: "智谱 GLM-4V-Plus · 旗舰", value: "glm-4v-plus" },
+        { label: "智谱 GLM-4.6V · 性价比", value: "glm-4.6v" },
+        { label: "智谱 GLM-4.6V-Flash · 免费", value: "glm-4.6v-flash" },
+        { label: "智谱 GLM-4.6V-FlashX", value: "glm-4.6v-flashx" },
+        { label: "智谱 GLM-4.5V", value: "glm-4.5v" },
+      ],
+      settingAsrOptions: [
+        { label: "本地模型 (Whisper)", value: "whisper" },
+        { label: "智谱 AI (GLM-ASR)", value: "zhipu-asr" },
+      ],
+      importStep: "select",
+      importing: false,
+      importProgress: "",
+      importPercent: 0,
+      importTotal: 0,
+      importedItems: [],
+      skippedItems: [],
+      failedItems: [],
+      showSkippedList: false,
+      showFailedList: false,
+      selectedPaths: [],
+      collections: [],
+      tags: [],
+      folderTree: [],
+      selectedFolder: null,
+      libraryExpanded: true,
+      drawerOpen: true,
+      drawerMini: false,
+      themeMode: localStorage.getItem("theme") || "dark",
+      accentColor: localStorage.getItem("accent") || "#6c8cff",
+      skinColors: [
+        { value: "#6c8cff", color: "#6c8cff" },
+        { value: "#42a5f5", color: "#42a5f5" },
+        { value: "#26c6da", color: "#26c6da" },
+        { value: "#66bb6a", color: "#66bb6a" },
+        { value: "#ffca28", color: "#ffca28" },
+        { value: "#ff7043", color: "#ff7043" },
+        { value: "#ef5350", color: "#ef5350" },
+        { value: "#ab47bc", color: "#ab47bc" },
+      ],
+    };
+  },
+  created() {
+    this.loadSidebar();
+    this.applyTheme();
+    if (this.accentColor) this.setAccentColor(this.accentColor);
+    window.addEventListener("hashchange", () => this.resolveRoute());
+    this.resolveRoute();
+  },
+  updated() {
+    if (this.importStep === "progress" && this.$refs.importListWrap) {
+      const el = this.$refs.importListWrap.$el || this.$refs.importListWrap;
+      el.scrollTop = el.scrollHeight;
+    }
+  },
+  computed: {
+    themeIcon() {
+      if (this.themeMode === "dark") return "dark_mode";
+      if (this.themeMode === "light") return "light_mode";
+      return "brightness_medium";
+    },
+  },
+  methods: {
+    API,
+    nav(hash) { location.hash = hash; },
+    startLongRefresh() {
+      this._longTimer = setTimeout(() => {
+        this._longFired = true;
+        if (window.caches) window.caches.keys().then(ks => ks.forEach(k => window.caches.delete(k)));
+        location.reload(true);
+      }, 600);
+    },
+    cancelLongRefresh() {
+      clearTimeout(this._longTimer);
+      if (!this._longFired) location.reload();
+      this._longFired = false;
+    },
+    cycleTheme() {
+      const modes = ["dark", "light", "auto"];
+      const idx = modes.indexOf(this.themeMode);
+      this.themeMode = modes[(idx + 1) % 3];
+      this.applyTheme();
+    },
+    setTheme(mode) {
+      this.themeMode = mode;
+      localStorage.setItem("theme", mode);
+      this.applyTheme();
+    },
+    applyTheme() {
+      localStorage.setItem("theme", this.themeMode);
+      let dark;
+      if (this.themeMode === "auto") {
+        dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      } else {
+        dark = this.themeMode === "dark";
+      }
+      Quasar.Dark.set(dark);
+      document.body.style.background = dark ? "#0a0a0a" : "#f5f5f5";
+    },
+    setAccentColor(color) {
+      this.accentColor = color;
+      localStorage.setItem("accent", color);
+      document.documentElement.style.setProperty("--accent", color);
+      document.documentElement.style.setProperty("--accent-dim", color + "26");
+      document.body.style.setProperty("--q-primary", color);
+    },
+    openDetail(id) { this.showImport = false; location.hash = "#/detail/" + id; },
+    resolveRoute() {
+      const hash = location.hash || "#/gallery";
+      this.route = hash;
+      const prevView = this.currentView;
+      if (hash.startsWith("#/detail/")) {
+        this.currentView = "detail";
+        this.detailId = parseInt(hash.split("/")[2]);
+      } else if (hash === "#/favorites") {
+        this.currentView = "gallery";
+        this.collectionFilter = null;
+        this.favFilter = true;
+        this.selectedFolder = null;
+        this.libraryExpanded = false;
+        if (prevView !== "gallery") this.galleryKey++;
+        else this.$refs.gallery?.load();
+      } else if (hash.startsWith("#/collections/")) {
+        this.currentView = "gallery";
+        this.collectionFilter = parseInt(hash.split("/")[2]);
+        this.favFilter = false;
+        this.selectedFolder = null;
+        this.libraryExpanded = false;
+        if (prevView !== "gallery") this.galleryKey++;
+        else this.$refs.gallery?.load();
+      } else {
+        this.currentView = "gallery";
+        this.collectionFilter = null;
+        this.favFilter = false;
+        this.selectedFolder = null;
+        this.libraryExpanded = true;
+        if (prevView !== "gallery") {
+          this.galleryKey++;
+        } else {
+          this.$refs.gallery?.load();
+        }
+      }
+    },
+    async loadSidebar() {
+      try {
+        const [colRes, tagRes, folderRes] = await Promise.all([API.getCollections(), API.getTags(), API.getFolders()]);
+        this.collections = colRes.data || [];
+        this.tags = tagRes.data || [];
+        this.folderTree = folderRes.data || [];
+      } catch (e) { console.error(e); }
+    },
+    doSearch() {
+      this.searchQuery = this.searchText.trim();
+      if (this.currentView !== "gallery") {
+        location.hash = "#/gallery";
+      } else {
+        this.$refs.gallery?.load();
+      }
+    },
+    onFolderSelect(path) {
+      this.selectedFolder = this.selectedFolder === path ? null : path;
+      this.collectionFilter = null;
+      this.favFilter = false;
+      this.libraryExpanded = true;
+      if (this.currentView !== "gallery") {
+        location.hash = "#/gallery";
+      } else {
+        this.$refs.gallery?.load();
+      }
+    },
+    onLibraryToggle(v) {
+      if (v) {
+        this.selectedFolder = null;
+        this.favFilter = false;
+        this.collectionFilter = null;
+        if (this.route !== "#/gallery") {
+          location.hash = "#/gallery";
+        } else {
+          this.$refs.gallery?.load();
+        }
+      }
+    },
+    openImport() {
+      this.importStep = "select";
+      this.importedItems = [];
+      this.selectedPaths = [];
+      this.importProgress = "";
+      this.importPercent = 0;
+      this.showImport = true;
+    },
+    async loadSettings() {
+      try {
+        const s = await API.getSettings();
+        this.settingsForm.resolution = s.resolution || "480";
+        this.settingsForm.fps = s.fps || "30";
+        this.settingsForm.model = s.model || "glm-4.6v";
+        this.settingsForm.useMultimodal = s.use_multimodal !== "false";
+        this.settingsForm.asrEngine = s.asr_engine || "whisper";
+        this.settingsForm.videoApiKey = s.video_api_key || "";
+        this.settingsForm.asrApiKey = s.asr_api_key || "";
+      } catch (e) { console.error(e); }
+    },
+    async saveSettings() {
+      try {
+        await API.saveSettings({
+          resolution: this.settingsForm.resolution,
+          fps: this.settingsForm.fps,
+          model: this.settingsForm.model,
+          use_multimodal: String(this.settingsForm.useMultimodal),
+          asr_engine: this.settingsForm.asrEngine,
+          video_api_key: this.settingsForm.videoApiKey,
+          asr_api_key: this.settingsForm.asrApiKey,
+        });
+        Quasar.Notify.create({ message: "设置已保存", position: "top", timeout: 1500 });
+      } catch (e) { console.error(e); }
+    },
+    fmtSize(bytes) {
+      if (!bytes) return "";
+      if (bytes < 1024) return bytes + " B";
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + " KB";
+      if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+      return (bytes / (1024 * 1024 * 1024)).toFixed(1) + " GB";
+    },
+    pathName(p) { return p.split("/").pop(); },
+    async pickFiles() {
+      if (window.electronAPI) {
+        const paths = await window.electronAPI.selectFiles();
+        if (paths?.length) this.selectedPaths.push(...paths);
+      }
+    },
+    async pickDirectory() {
+      if (window.electronAPI) {
+        const paths = await window.electronAPI.selectDirectory();
+        if (paths?.length) this.selectedPaths.push(...paths);
+      }
+    },
+    onDragOver(e) {
+      e.currentTarget.classList.add("drag-over");
+    },
+    onDragLeave(e) {
+      e.currentTarget.classList.remove("drag-over");
+    },
+    onDrop(e) {
+      e.currentTarget.classList.remove("drag-over");
+      const files = e.dataTransfer.files;
+      if (!files.length) return;
+      for (const f of files) {
+        let p = null;
+        if (window.electronAPI?.getPathForFile) p = window.electronAPI.getPathForFile(f);
+        if (!p) p = f.path || f.name;
+        if (p && !this.selectedPaths.includes(p)) this.selectedPaths.push(p);
+      }
+    },
+    async startImport() {
+      this.importStep = "progress";
+      this.importing = true;
+      this.importedItems = [];
+      this.skippedItems = [];
+      this.failedItems = [];
+      this.showSkippedList = false;
+      this.showFailedList = false;
+      this.importTotal = 0;
+
+      try {
+        const scanRes = await API.scanPaths(this.selectedPaths);
+        const files = scanRes.data || [];
+        this.skippedItems = scanRes.skipped || [];
+        this.importTotal = files.length;
+
+        if (!files.length) {
+          this.importing = false;
+          this.importStep = "done";
+          return;
+        }
+
+        // Concurrent import (3 at a time)
+        const CONCURRENT = 3;
+        let running = 0, idx = 0;
+        await new Promise(resolve => {
+          const next = () => {
+            while (running < CONCURRENT && idx < files.length) {
+              const f = files[idx++];
+              running++;
+              API.importOne(f.file_path)
+                .then(res => { if (res.data) this.importedItems.push(res.data); })
+                .catch(e => { this.failedItems.push({ file_name: f.file_name, file_path: f.file_path, error: e.message || String(e) }); })
+                .finally(() => { running--; next(); if (running === 0 && idx >= files.length) resolve(); });
+            }
+          };
+          next();
+        });
+      } catch (e) {
+        console.error(e);
+      }
+
+      this.importing = false;
+      this.importStep = "done";
+      this.loadSidebar();
+    },
+  },
+});
+
+app.use(Quasar, {
+  config: {
+    brand: {
+      primary: '#6c8cff',
+      secondary: '#333',
+      accent: '#6c8cff',
+      dark: '#0a0a0a',
+      'dark-page': '#0a0a0a',
+    },
+    notify: { position: 'top', color: 'dark', textColor: 'white', timeout: 1800 }
+  }
+});
+Quasar.Dark.set(true);
+
+app.config.globalProperties.API = API;
+app.config.errorHandler = (err) => {
+  console.error(err);
+  Quasar.Notify.create({ message: err.message || "发生错误", position: "top", color: "negative", timeout: 3000 });
+};
+app.component("gallery-page", GalleryPage);
+app.component("detail-page", DetailPage);
+app.mount("#app");
+</script>
+</body>
+</html>

@@ -1,0 +1,244 @@
+import os
+from collections import defaultdict
+
+from flask import Blueprint, request, jsonify
+import jieba
+
+from ..db import get_db
+
+
+def _segment(text):
+    return " ".join(jieba.cut(text))
+
+
+def _segment_query(q):
+    words = [w.strip() for w in jieba.cut(q) if w.strip() and w.strip() not in ("，", "。", "、", "的", "了", "在", "是", "和", "与", "有", "被", "把", "让", "向", "从", "到", "为", "着", "也", "都", "又", "而", "及", "等", "中", "上", "下", "里")]
+    return " AND ".join(words) if words else q
+
+
+bp = Blueprint("library", __name__)
+
+
+@bp.route("/")
+def list_media():
+    db = get_db()
+    page = max(1, request.args.get("page", 1, type=int))
+    per_page = max(1, min(200, request.args.get("per_page", 50, type=int)))
+    sort = request.args.get("sort", "imported_at")
+    order = "ASC" if request.args.get("order") == "asc" else "DESC"
+    media_type = request.args.get("media_type")
+    rating = request.args.get("rating", type=int)
+    color_label = request.args.get("color_label")
+    favorite = request.args.get("favorite")
+    analysis_status = request.args.get("analysis_status")
+    folder = request.args.get("folder")
+    q = request.args.get("q", "").strip()
+
+    allowed_sorts = {"imported_at", "date_taken", "rating", "file_name", "file_size", "duration", "resolution"}
+    if sort not in allowed_sorts:
+        sort = "imported_at"
+
+    where_clauses = []
+    params = []
+
+    if media_type and media_type != "all":
+        where_clauses.append("media_type = ?")
+        params.append(media_type)
+    if rating is not None:
+        where_clauses.append("rating >= ?")
+        params.append(rating)
+    if color_label:
+        where_clauses.append("color_label = ?")
+        params.append(color_label)
+    if favorite == "true":
+        where_clauses.append("favorite = 1")
+    if analysis_status == "analyzed":
+        where_clauses.append("analysis_status = 'done'")
+    if folder:
+        where_clauses.append("file_path LIKE ?")
+        params.append(folder.rstrip("/") + "/%")
+
+    if q:
+        seg_q = _segment_query(q)
+        where_clauses.append(
+            "id IN (SELECT media_id FROM media_fts WHERE media_fts MATCH ?)"
+        )
+        params.append(seg_q)
+
+    where = (" WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+    order_expr = "(width * height)" if sort == "resolution" else sort
+
+    total = db.execute(f"SELECT COUNT(*) FROM media{where}", params).fetchone()[0]
+
+    rows = db.execute(
+        f"SELECT * FROM media{where} ORDER BY {order_expr} {order} LIMIT ? OFFSET ?",
+        params + [per_page, (page - 1) * per_page],
+    ).fetchall()
+
+    return jsonify({
+        "data": [dict(r) for r in rows],
+        "pagination": {
+            "page": page,
+            "per_page": per_page,
+            "total": total,
+            "pages": (total + per_page - 1) // per_page,
+        },
+    })
+
+
+@bp.route("/folders")
+def list_folders():
+    db = get_db()
+    rows = db.execute("SELECT file_path FROM media").fetchall()
+
+    if not rows:
+        return jsonify({"data": []})
+
+    dir_counts = defaultdict(int)
+    for row in rows:
+        d = os.path.dirname(row["file_path"])
+        dir_counts[d] += 1
+
+    all_dirs = set(dir_counts.keys())
+    for d in list(all_dirs):
+        parts = d.split("/")
+        for i in range(2, len(parts) + 1):
+            all_dirs.add("/" + "/".join(parts[1:i]))
+
+    total_counts = dict(dir_counts)
+    for d in sorted(all_dirs, key=lambda x: x.count("/"), reverse=True):
+        parent = os.path.dirname(d)
+        if parent and parent in all_dirs:
+            total_counts[parent] = total_counts.get(parent, 0) + total_counts.get(d, 0)
+
+    nodes = {}
+    for d in sorted(all_dirs, key=lambda x: x.count("/")):
+        label = d.split("/")[-1] if "/" in d else d
+        nodes[d] = {
+            "label": label,
+            "path": d,
+            "totalCount": total_counts.get(d, 0),
+            "children": [],
+        }
+
+    roots = []
+    for d in sorted(all_dirs):
+        node = nodes[d]
+        parent = os.path.dirname(d)
+        if parent and parent in nodes:
+            nodes[parent]["children"].append(node)
+        else:
+            roots.append(node)
+
+    return jsonify({"data": roots})
+
+
+@bp.route("/<int:media_id>")
+def get_media(media_id):
+    db = get_db()
+    row = db.execute("SELECT * FROM media WHERE id = ?", (media_id,)).fetchone()
+    if not row:
+        return jsonify({"error": "Not found"}), 404
+    media = dict(row)
+    tags = db.execute(
+        "SELECT t.id, t.name FROM tags t JOIN media_tags mt ON t.id = mt.tag_id WHERE mt.media_id = ?",
+        (media_id,),
+    ).fetchall()
+    media["tags"] = [dict(t) for t in tags]
+    return jsonify(media)
+
+
+@bp.route("/import-one", methods=["POST"])
+def import_one():
+    from ..services.importer import import_single_file
+    data = request.get_json()
+    file_path = data.get("path", "")
+    if not file_path:
+        return jsonify({"error": "No path"}), 400
+    result = import_single_file(file_path)
+    if result:
+        return jsonify({"data": result})
+    return jsonify({"data": None})
+
+
+@bp.route("/scan", methods=["POST"])
+def scan_paths():
+    from ..services.importer import scan_only
+    data = request.get_json()
+    paths = data.get("paths", [])
+    result, skipped = scan_only(paths)
+    return jsonify({"data": result, "skipped": skipped})
+
+
+@bp.route("/<int:media_id>", methods=["PATCH"])
+def update_media(media_id):
+    db = get_db()
+    data = request.get_json()
+    fields = []
+    params = []
+    for col in ("rating", "color_label", "favorite", "notes"):
+        if col in data:
+            fields.append(f"{col} = ?")
+            params.append(data[col])
+    if not fields:
+        return jsonify({"error": "No fields to update"}), 400
+    fields.append("updated_at = datetime('now')")
+    params.append(media_id)
+    db.execute(f"UPDATE media SET {', '.join(fields)} WHERE id = ?", params)
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@bp.route("/<int:media_id>", methods=["DELETE"])
+def delete_media(media_id):
+    db = get_db()
+    row = db.execute("SELECT thumbnail_path FROM media WHERE id = ?", (media_id,)).fetchone()
+    if row and row["thumbnail_path"]:
+        from ..config import THUMB_DIR
+        thumb = THUMB_DIR / row["thumbnail_path"]
+        if thumb.exists():
+            thumb.unlink()
+    db.execute("DELETE FROM media_tags WHERE media_id = ?", (media_id,))
+    db.execute("DELETE FROM collection_items WHERE media_id = ?", (media_id,))
+    db.execute("DELETE FROM media_segment WHERE media_id = ?", (media_id,))
+    db.execute("DELETE FROM media_fts WHERE media_id = ?", (media_id,))
+    db.execute("DELETE FROM media WHERE id = ?", (media_id,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@bp.route("/batch", methods=["POST"])
+def batch_update():
+    db = get_db()
+    data = request.get_json()
+    ids = data.get("ids", [])
+    action = data.get("action")
+    value = data.get("value")
+    if not ids or not action:
+        return jsonify({"error": "Missing ids or action"}), 400
+
+    placeholders = ",".join("?" * len(ids))
+
+    if action == "rate":
+        db.execute(f"UPDATE media SET rating = ?, updated_at = datetime('now') WHERE id IN ({placeholders})", [value] + ids)
+    elif action == "color_label":
+        db.execute(f"UPDATE media SET color_label = ?, updated_at = datetime('now') WHERE id IN ({placeholders})", [value] + ids)
+    elif action == "favorite":
+        db.execute(f"UPDATE media SET favorite = ?, updated_at = datetime('now') WHERE id IN ({placeholders})", [value] + ids)
+    elif action == "delete":
+        rows = db.execute(f"SELECT thumbnail_path FROM media WHERE id IN ({placeholders})", ids).fetchall()
+        for row in rows:
+            if row["thumbnail_path"]:
+                from ..config import THUMB_DIR
+                thumb = THUMB_DIR / row["thumbnail_path"]
+                if thumb.exists():
+                    thumb.unlink()
+        db.execute(f"DELETE FROM media_tags WHERE media_id IN ({placeholders})", ids)
+        db.execute(f"DELETE FROM collection_items WHERE media_id IN ({placeholders})", ids)
+        db.execute(f"DELETE FROM media_segment WHERE media_id IN ({placeholders})", ids)
+        db.execute(f"DELETE FROM media_fts WHERE media_id IN ({placeholders})", ids)
+        db.execute(f"DELETE FROM media WHERE id IN ({placeholders})", ids)
+
+    db.commit()
+    return jsonify({"ok": True})

@@ -1,0 +1,709 @@
+const GalleryPage = {
+  template: `
+  <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+    <div class="filter-bar">
+      <q-btn-group unelevated style="border-radius:6px;overflow:hidden">
+        <q-btn unelevated dense :color="filters.media_type==='all'?'primary':'grey-9'" :text-color="filters.media_type==='all'?'white':'grey-6'" size="sm" label="ALL" @click="filters.media_type='all'; load()">
+          <q-tooltip :delay="1000">全部</q-tooltip>
+        </q-btn>
+        <q-btn unelevated dense :color="filters.media_type==='image'?'primary':'grey-9'" :text-color="filters.media_type==='image'?'white':'grey-6'" icon="image" size="sm" @click="filters.media_type='image'; load()">
+          <q-tooltip :delay="1000">图片</q-tooltip>
+        </q-btn>
+        <q-btn unelevated dense :color="filters.media_type==='video'?'primary':'grey-9'" :text-color="filters.media_type==='video'?'white':'grey-6'" icon="play_arrow" size="sm" @click="filters.media_type='video'; load()">
+          <q-tooltip :delay="1000">视频</q-tooltip>
+        </q-btn>
+      </q-btn-group>
+      <div style="display:flex;gap:2px">
+        <q-btn flat round dense :color="favOnly ? 'red' : 'grey-7'" icon="favorite" size="sm" @click="favOnly=!favOnly; showFilterToast(); load()">
+          <q-tooltip :delay="1000">只看收藏</q-tooltip>
+        </q-btn>
+        <q-btn flat round dense :color="analyzedOnly ? 'primary' : 'grey-7'" icon="auto_awesome" size="sm" @click="analyzedOnly=!analyzedOnly; showFilterToast(); load()">
+          <q-tooltip :delay="1000">只看已分析</q-tooltip>
+        </q-btn>
+      </div>
+      <div class="filter-stars">
+        <span v-for="n in 5" :key="n" class="star-btn" :class="{lit: filters.rating && n <= filters.rating}" @click="toggleRating(n)">★</span>
+      </div>
+      <div class="filter-colors">
+        <span v-for="c in colorOptions" :key="c.value" class="color-swatch" :class="['bg-'+c.value, {active: filters.color_label===c.value, dim: filters.color_label && filters.color_label!==c.value}]" @click="toggleColor(c.value)"></span>
+      </div>
+      <div style="width:30px;display:flex;align-items:center;justify-content:center">
+        <q-btn v-if="hasFilters" flat round dense icon="filter_list_off" size="sm" color="grey-6" @click="resetFilters">
+          <q-tooltip :delay="1000">重置筛选</q-tooltip>
+        </q-btn>
+      </div>
+      <q-input v-model="searchText" dense filled placeholder="搜索文件名、分析内容…"
+               color="grey-5" style="width:220px" @keyup.enter="doSearch">
+        <template v-slot:append>
+          <q-icon v-if="searchText" name="close" size="14px" color="grey-6" style="cursor:pointer" @click="searchText=''; doSearch()"></q-icon>
+          <q-btn flat round dense icon="search" size="xs" color="grey-6" @click="doSearch"></q-btn>
+        </template>
+      </q-input>
+      <div class="spacer"></div>
+      <div class="sort-group">
+        <q-select v-model="sortBy" dense filled options-dense
+          :options="sortOptions" emit-value map-options
+          @update:model-value="load"></q-select>
+        <q-btn flat dense :icon="sortOrder==='desc' ? 'arrow_downward' : 'arrow_upward'"
+               color="grey-6" size="sm" @click="sortOrder=sortOrder==='desc'?'asc':'desc'; load()"></q-btn>
+      </div>
+      <q-select v-if="isTimeSort" v-model="groupBy" dense filled options-dense
+        :options="timeGroupOptions" emit-value map-options
+        style="min-width:100px" class="q-ml-xs"></q-select>
+      <q-select v-if="sortBy==='duration'" v-model="groupBy" dense filled options-dense
+        :options="durGroupOptions" emit-value map-options
+        style="min-width:100px" class="q-ml-xs"></q-select>
+      <div class="filter-sep"></div>
+      <q-btn-group flat>
+        <q-btn flat dense :color="viewMode==='grid'?'primary':'grey-7'" icon="apps" size="md" @click="viewMode='grid'">
+          <q-tooltip :delay="1000">网格视图</q-tooltip>
+        </q-btn>
+        <q-btn flat dense :color="viewMode==='list'?'primary':'grey-7'" icon="list" size="md" @click="viewMode='list'">
+          <q-tooltip :delay="1000">列表视图</q-tooltip>
+        </q-btn>
+      </q-btn-group>
+    </div>
+    <div ref="galleryPage" class="gallery-page" @mousedown="startLasso" @contextmenu.prevent>
+      <!-- Grid view: grouped with timeline -->
+      <template v-if="items.length && viewMode==='grid' && groupedItems">
+        <q-timeline color="primary" layout="dense" style="padding-left:8px">
+          <q-timeline-entry v-for="g in groupedItems" :key="g.key"
+            :title="g.label + '  ·  ' + g.items.length + ' 个素材'"
+            tag="div" class="timeline-group">
+            <div class="grid" :style="{'--card-w': (180*gridScale)+'px'}">
+            <div class="media-card" v-for="m in g.items" :key="m.id"
+                 :class="{selected: selArr.includes(m.id)}"
+                 :data-id="m.id"
+                 @mousedown.stop
+                 @click="onCardClick(m, $event)"
+                 @dblclick="openDetail(m.id)"
+                 @contextmenu.prevent="showCtx($event, m)">
+              <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
+              <div class="thumb-wrap">
+                <img class="thumb" :src="API.thumbUrl(m.id)" loading="lazy" @error="$event.target.src='/static/img/no-thumb.svg'">
+                <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
+                <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
+                <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
+                <span v-if="m.analysis_status==='done'" class="ai-badge"><q-icon name="auto_awesome" size="10px" color="white"></q-icon></span>
+              </div>
+              <div v-if="m.rating" class="rating">{{ '★'.repeat(m.rating) }}</div>
+              <div class="info">
+                <div class="name" :title="m.file_name">{{ m.file_name }}</div>
+                <div class="meta">
+                  <span v-if="m.width">{{ m.width }}x{{ m.height }}</span>
+                  <span v-if="m.camera_model">{{ m.camera_model }}</span>
+                  <span class="spacer"></span>
+                  <span v-if="m.duration" class="dur-inline">{{ fmtDur(m.duration) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </q-timeline-entry>
+        </q-timeline>
+      </template>
+      <!-- Grid view: flat -->
+      <div v-if="items.length && viewMode==='grid' && !groupedItems" class="grid" :style="{'--card-w': (180*gridScale)+'px'}">
+        <div class="media-card" v-for="m in items" :key="m.id"
+             :class="{selected: selArr.includes(m.id)}"
+             :data-id="m.id"
+             @mousedown.stop
+             @click="onCardClick(m, $event)"
+             @dblclick="openDetail(m.id)"
+             @contextmenu.prevent="showCtx($event, m)">
+          <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
+          <div class="thumb-wrap">
+            <img class="thumb" :src="API.thumbUrl(m.id)" loading="lazy" @error="$event.target.src='/static/img/no-thumb.svg'">
+            <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
+            <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
+            <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
+            <span v-if="m.analysis_status==='done'" class="ai-badge"><q-icon name="auto_awesome" size="10px" color="white"></q-icon></span>
+          </div>
+          <div v-if="m.rating" class="rating">{{ '★'.repeat(m.rating) }}</div>
+          <div class="info">
+            <div class="name" :title="m.file_name">{{ m.file_name }}</div>
+            <div class="meta">
+              <span v-if="m.width">{{ m.width }}x{{ m.height }}</span>
+              <span v-if="m.camera_model">{{ m.camera_model }}</span>
+              <span class="spacer"></span>
+              <span v-if="m.duration" class="dur-inline">{{ fmtDur(m.duration) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- List view: grouped with timeline -->
+      <template v-if="items.length && viewMode==='list' && groupedItems">
+        <q-timeline color="primary" layout="dense" style="padding-left:8px">
+          <q-timeline-entry v-for="g in groupedItems" :key="g.key"
+            :title="g.label + '  ·  ' + g.items.length + ' 个素材'"
+            tag="div" class="timeline-group">
+            <div class="list">
+            <div class="media-row" v-for="m in g.items" :key="m.id"
+                 :class="{selected: selArr.includes(m.id)}"
+                 :data-id="m.id"
+                 @click="onCardClick(m, $event)"
+                 @dblclick="openDetail(m.id)"
+                 @contextmenu.prevent="showCtx($event, m)">
+              <div class="row-thumb-wrap">
+                <img class="row-thumb" :src="API.thumbUrl(m.id)" loading="lazy" @error="$event.target.src='/static/img/no-thumb.svg'">
+                <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
+              </div>
+              <div class="row-name" :title="m.file_name">{{ m.file_name }}</div>
+              <span class="row-col">{{ m.width ? m.width+'x'+m.height : '-' }}</span>
+              <span class="row-col">{{ m.duration ? fmtDur(m.duration) : '-' }}</span>
+              <span class="row-col">{{ fmtSize(m.file_size) }}</span>
+              <span class="row-col">{{ fmtListDate(m.date_taken) }}</span>
+              <span class="row-col">{{ fmtListDate(m.imported_at) }}</span>
+              <span class="row-col">
+                <span v-if="m.rating" class="row-stars">{{ '★'.repeat(m.rating) }}</span>
+                <span v-if="m.favorite" class="row-fav"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
+                <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
+                <span v-if="m.analysis_status==='done'" class="row-ai"><q-icon name="auto_awesome" size="12px" color="var(--accent)"></q-icon></span>
+              </span>
+              <span style="width:32px"></span>
+            </div>
+          </div>
+        </q-timeline-entry>
+        </q-timeline>
+      </template>
+      <!-- List view: flat -->
+      <div v-if="items.length && viewMode==='list' && !groupedItems" class="list">
+        <div class="list-header">
+          <span style="width:72px"></span>
+          <span class="lh-name lh-sort" @click="toggleSort('file_name')">文件名 <span v-if="sortBy==='file_name'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
+          <span class="lh-col lh-sort" @click="toggleSort('resolution')">分辨率 <span v-if="sortBy==='resolution'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
+          <span class="lh-col lh-sort" @click="toggleSort('duration')">时长 <span v-if="sortBy==='duration'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
+          <span class="lh-col lh-sort" @click="toggleSort('file_size')">大小 <span v-if="sortBy==='file_size'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
+          <span class="lh-col lh-sort" @click="toggleSort('date_taken')">拍摄时间 <span v-if="sortBy==='date_taken'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
+          <span class="lh-col lh-sort" @click="toggleSort('imported_at')">导入时间 <span v-if="sortBy==='imported_at'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
+          <span class="lh-col lh-sort" @click="toggleSort('rating')">评分 <span v-if="sortBy==='rating'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
+          <span style="width:32px"></span>
+        </div>
+        <div class="media-row" v-for="m in items" :key="m.id"
+             :class="{selected: selArr.includes(m.id)}"
+             :data-id="m.id"
+             @click="onCardClick(m, $event)"
+             @dblclick="openDetail(m.id)"
+             @contextmenu.prevent="showCtx($event, m)">
+          <div class="row-thumb-wrap">
+            <img class="row-thumb" :src="API.thumbUrl(m.id)" loading="lazy" @error="$event.target.src='/static/img/no-thumb.svg'">
+            <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
+          </div>
+          <div class="row-name" :title="m.file_name">{{ m.file_name }}</div>
+          <span class="row-col">{{ m.width ? m.width+'x'+m.height : '-' }}</span>
+          <span class="row-col">{{ m.duration ? fmtDur(m.duration) : '-' }}</span>
+          <span class="row-col">{{ fmtSize(m.file_size) }}</span>
+          <span class="row-col">{{ fmtListDate(m.date_taken) }}</span>
+          <span class="row-col">{{ fmtListDate(m.imported_at) }}</span>
+          <span class="row-col">
+            <span v-if="m.rating" class="row-stars">{{ '★'.repeat(m.rating) }}</span>
+            <span v-if="m.favorite" class="row-fav"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
+            <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
+            <span v-if="m.analysis_status==='done'" class="row-ai"><q-icon name="auto_awesome" size="12px" color="var(--accent)"></q-icon></span>
+          </span>
+          <span style="width:32px"></span>
+        </div>
+      </div>
+      <div v-if="!items.length && !loading" class="empty">
+        <q-icon name="folder_open" size="40px" color="grey-7"></q-icon>
+        <p>暂无素材，点击左上角"导入"添加</p>
+      </div>
+      <div ref="sentinel" style="height:1px;width:100%"></div>
+      <div v-if="loadingMore" class="load-more-spinner">
+        <q-spinner-dots color="grey-6" size="28px"></q-spinner-dots>
+      </div>
+    </div>
+    <q-toolbar class="gallery-footer" style="border-top:1px solid var(--border);min-height:36px;flex-shrink:0">
+      <span class="text-caption text-grey-6">{{ total }} 个素材
+        <span v-if="selArr.length" class="text-primary q-ml-sm">已选 {{ selArr.length }}</span>
+      </span>
+      <q-space></q-space>
+      <template v-if="viewMode==='grid'">
+        <span class="text-caption text-grey-6 q-mr-sm">{{ Math.round(gridScale*100) }}%</span>
+        <q-slider v-model="gridScale" :min="0.5" :max="2" :step="0.25"
+                  style="width:100px" color="primary"></q-slider>
+      </template>
+    </q-toolbar>
+    <!-- Context menu -->
+    <div v-if="ctxMenu.show" class="ctx-menu-popup" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }">
+      <q-list dense style="min-width:200px;border-radius:8px;overflow:hidden">
+        <q-item clickable @click="ctxMenu.show = false; openDetail(selArr[0])" :disable="selArr.length > 1" style="padding-left:8px;padding-right:12px">
+          <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="visibility" size="14px" color="grey-6"></q-icon></q-item-section>
+          <q-item-section>查看详情</q-item-section>
+          <q-item-section side style="flex-shrink:0;white-space:nowrap;display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--text3)">↵</span></q-item-section>
+        </q-item>
+        <q-item clickable @click="ctxMenu.show = false; deleteCtx()" style="padding-left:8px;padding-right:12px">
+          <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="delete_outline" size="14px" color="grey-6"></q-icon></q-item-section>
+          <q-item-section>{{ selArr.length > 1 ? '移出 ' + selArr.length + ' 个素材' : '移出素材库' }}</q-item-section>
+          <q-item-section side style="flex-shrink:0;white-space:nowrap;display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--text3)">⌘+⌫</span></q-item-section>
+        </q-item>
+      </q-list>
+    </div>
+    <!-- Delete confirm -->
+    <q-dialog v-model="confirmDelete.show">
+      <q-card style="min-width:360px" class="dialog-card">
+        <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" v-close-popup></q-btn>
+        <q-card-section>
+          <div class="text-h6">确认移除</div>
+        </q-card-section>
+        <q-card-section>
+          <p class="text-body2">确定要移除「{{ confirmDelete.name }}」吗？</p>
+          <p class="text-caption text-grey-6">原文件不会被删除，仅清除库中的记录。</p>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="取消" @click="confirmDelete.show=false"></q-btn>
+          <q-btn color="red" label="确认移除" @click="doDelete"></q-btn>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+    <!-- Batch delete confirm -->
+    <q-dialog v-model="confirmBatch.show">
+      <q-card style="min-width:360px" class="dialog-card">
+        <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" v-close-popup></q-btn>
+        <q-card-section>
+          <div class="text-h6">批量移除</div>
+        </q-card-section>
+        <q-card-section>
+          <p class="text-body2">确定要移除选中的 {{ selArr.length }} 个素材吗？</p>
+          <p class="text-caption text-grey-6">原文件不会被删除，仅清除库中的记录。</p>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="取消" @click="confirmBatch.show=false"></q-btn>
+          <q-btn color="red" label="确认移除" @click="doBatchDelete"></q-btn>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+    <!-- Lasso overlay -->
+    <div v-if="lasso" class="lasso" :style="lassoStyle"></div>
+  </div>
+  `,
+  data() {
+    return {
+      items: [], total: 0, page: 1, perPage: 60, loading: false, loadingMore: false, allLoaded: false, viewMode: "grid", searchText: "",
+      sortBy: "imported_at", sortOrder: "desc", gridScale: 1,
+      selArr: [], lasso: null, lastClickIdx: -1,
+      ctxMenu: { show: false, item: null, x: 0, y: 0 },
+      confirmDelete: { show: false, id: null, name: "" },
+      confirmBatch: { show: false },
+      filters: { media_type: "all", rating: "", color_label: "" },
+      favOnly: false,
+      analyzedOnly: false,
+      groupBy: "",
+      colorOptions: [
+        { value: "red" }, { value: "yellow" }, { value: "green" }, { value: "blue" }, { value: "purple" },
+      ],
+      sortOptions: [
+        { label: "导入时间", value: "imported_at" },
+        { label: "拍摄时间", value: "date_taken" },
+        { label: "名称", value: "file_name" },
+        { label: "分辨率", value: "resolution" },
+        { label: "时长", value: "duration" },
+        { label: "大小", value: "file_size" },
+        { label: "评分", value: "rating" },
+      ],
+      timeGroupOptions: [
+        { label: "不分组", value: "" },
+        { label: "按日", value: "day" },
+        { label: "按周", value: "week" },
+        { label: "按月", value: "month" },
+        { label: "按季度", value: "quarter" },
+        { label: "按年", value: "year" },
+      ],
+      durGroupOptions: [
+        { label: "不分组", value: "" },
+        { label: "按时长", value: "dur_seg" },
+      ],
+    };
+  },
+  watch: {
+    sortBy(val) {
+      if (val !== "imported_at" && val !== "date_taken" && val !== "duration") this.groupBy = "";
+    },
+  },
+  computed: {
+    hasFilters() {
+      return this.filters.media_type !== "all" || this.filters.rating || this.filters.color_label || this.favOnly || this.analyzedOnly || this.searchText;
+    },
+    isTimeSort() {
+      return this.sortBy === "imported_at" || this.sortBy === "date_taken";
+    },
+    timeField() {
+      return this.isTimeSort ? this.sortBy : "";
+    },
+    groupedItems() {
+      if (!this.groupBy) return null;
+      const groups = [];
+      let current = null;
+      if (this.groupBy === "dur_seg") {
+        for (const m of this.items) {
+          const key = this.getDurKey(m.duration);
+          if (!current || current.key !== key) {
+            current = { key, label: key, items: [] };
+            groups.push(current);
+          }
+          current.items.push(m);
+        }
+      } else {
+        if (!this.timeField) return null;
+        for (const m of this.items) {
+          const raw = m[this.timeField];
+          const key = this.getGroupKey(raw, this.groupBy);
+          if (!current || current.key !== key) {
+            current = { key, label: this.fmtGroupLabel(key, this.groupBy), items: [] };
+            groups.push(current);
+          }
+          current.items.push(m);
+        }
+      }
+      return groups;
+    },
+    lassoStyle() {
+      if (!this.lasso) return {};
+      return {
+        left: Math.min(this.lasso.sx, this.lasso.ex) + "px",
+        top: Math.min(this.lasso.sy, this.lasso.ey) + "px",
+        width: Math.abs(this.lasso.ex - this.lasso.sx) + "px",
+        height: Math.abs(this.lasso.ey - this.lasso.sy) + "px",
+      };
+    },
+  },
+  created() {
+    this.load();
+    document.addEventListener("mousedown", this.closeCtx);
+    document.addEventListener("keydown", this.onKeyDelete, true);
+    document.addEventListener("keydown", this.onKeyEnter, true);
+  },
+  mounted() {
+    this._observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) this.loadMore();
+    }, { root: this.$refs.galleryPage, rootMargin: "200px" });
+    this.$nextTick(() => {
+      if (this.$refs.sentinel) this._observer.observe(this.$refs.sentinel);
+    });
+  },
+  beforeUnmount() {
+    document.removeEventListener("mousedown", this.closeCtx);
+    document.removeEventListener("keydown", this.onKeyDelete, true);
+    document.removeEventListener("keydown", this.onKeyEnter, true);
+    if (this._observer) this._observer.disconnect();
+  },
+  methods: {
+    API,
+    async load() {
+      this.selArr = [];
+      this.page = 1;
+      this.allLoaded = false;
+      this.loading = true;
+      const cid = this.$root.collectionFilter;
+      try {
+        let data;
+        if (cid) {
+          const res = await API.getCollectionMedia(cid);
+          data = res.data || [];
+          this.total = data.length;
+        } else {
+          const params = { page: 1, per_page: this.perPage, sort: this.sortBy, order: this.sortOrder };
+          if (this.filters.media_type !== "all") params.media_type = this.filters.media_type;
+          if (this.filters.rating) params.rating = this.filters.rating;
+          if (this.filters.color_label) params.color_label = this.filters.color_label;
+          if (this.favOnly || this.$root.favFilter) params.favorite = "true";
+          if (this.analyzedOnly) params.analysis_status = "analyzed";
+          const q = this.$root.searchQuery;
+          if (q) params.q = q;
+          const folder = this.$root.selectedFolder;
+          if (folder) params.folder = folder;
+          const res = await API.getLibrary(params);
+          data = res.data || [];
+          this.total = res.pagination?.total || 0;
+          if (data.length < this.perPage) this.allLoaded = true;
+        }
+        this.items = data;
+      } catch(e) {
+        console.error("gallery load error:", e);
+      }
+      this.loading = false;
+    },
+    async loadMore() {
+      if (this.loadingMore || this.allLoaded) return;
+      this.loadingMore = true;
+      this.page++;
+      try {
+        const params = { page: this.page, per_page: this.perPage, sort: this.sortBy, order: this.sortOrder };
+        if (this.filters.media_type !== "all") params.media_type = this.filters.media_type;
+        if (this.filters.rating) params.rating = this.filters.rating;
+        if (this.filters.color_label) params.color_label = this.filters.color_label;
+        if (this.favOnly || this.$root.favFilter) params.favorite = "true";
+        const q = this.$root.searchQuery;
+        if (q) params.q = q;
+        const folder = this.$root.selectedFolder;
+        if (folder) params.folder = folder;
+        const res = await API.getLibrary(params);
+        const data = res.data || [];
+        this.items = this.items.concat(data);
+        this.total = res.pagination?.total || 0;
+        if (data.length < this.perPage) this.allLoaded = true;
+      } catch(e) {
+        console.error("gallery loadMore error:", e);
+        this.page--;
+      }
+      this.loadingMore = false;
+    },
+    openDetail(id) {
+      location.hash = `#/detail/${id}`;
+    },
+    toggleSort(field) {
+      if (this.sortBy === field) {
+        this.sortOrder = this.sortOrder === "desc" ? "asc" : "desc";
+      } else {
+        this.sortBy = field;
+        this.sortOrder = "desc";
+      }
+      this.load();
+    },
+    onRatingChange(val) {
+    },
+    toggleRating(n) {
+      this.filters.rating = this.filters.rating === String(n) ? "" : String(n);
+      this.showFilterToast();
+      this.load();
+    },
+    toggleColor(c) {
+      this.filters.color_label = this.filters.color_label === c ? "" : c;
+      this.showFilterToast();
+      this.load();
+    },
+    showFilterToast() {
+      const parts = [];
+      const typeMap = {image:"图片",video:"视频"};
+      if (this.filters.media_type !== "all") parts.push(typeMap[this.filters.media_type]);
+      if (this.filters.rating) parts.push(`${this.filters.rating} 星以上`);
+      if (this.filters.color_label) {
+        const cn = {red:"红色",yellow:"黄色",green:"绿色",blue:"蓝色",purple:"紫色"};
+        parts.push(cn[this.filters.color_label] + "标签");
+      }
+      if (this.favOnly) parts.push("已收藏");
+      if (this.analyzedOnly) parts.push("已分析");
+      const msg = parts.length ? parts.join(" · ") : "已清除所有筛选";
+      Quasar.Notify.create({ message: msg, position: 'top', timeout: 1800 });
+    },
+    doSearch() {
+      this.$root.searchQuery = this.searchText.trim();
+      this.load();
+    },
+    resetFilters() {
+      this.filters.media_type = "all";
+      this.filters.rating = null;
+      this.filters.color_label = null;
+      this.favOnly = false;
+      this.analyzedOnly = false;
+      this.searchText = "";
+      this.$root.searchQuery = "";
+      this.load();
+    },
+    onCardClick(m, e) {
+      const idx = this.items.findIndex(item => item.id === m.id);
+      if (e.shiftKey && this.lastClickIdx >= 0) {
+        const from = Math.min(this.lastClickIdx, idx);
+        const to = Math.max(this.lastClickIdx, idx);
+        const ids = [];
+        for (let i = from; i <= to; i++) ids.push(this.items[i].id);
+        this.selArr = ids;
+      } else if (e.ctrlKey || e.metaKey) {
+        const arr = [...this.selArr];
+        const i = arr.indexOf(m.id);
+        if (i >= 0) arr.splice(i, 1); else arr.push(m.id);
+        this.selArr = arr;
+        this.lastClickIdx = idx;
+      } else {
+        this.selArr = [m.id];
+        this.lastClickIdx = idx;
+      }
+    },
+    startLasso(e) {
+      if (this.viewMode !== "grid" || e.button !== 0) return;
+      e.preventDefault();
+      const container = this.$refs.galleryPage;
+      if (!container) return;
+      const sx = e.clientX, sy = e.clientY;
+      const startScroll = container.scrollTop;
+      let dragging = false;
+      let scrollRaf = null;
+      const EDGE = 60;
+      const SPEED = 12;
+      const doScroll = (ev) => {
+        const rect = container.getBoundingClientRect();
+        let vy = 0;
+        if (ev.clientY < rect.top + EDGE) vy = -SPEED;
+        else if (ev.clientY > rect.bottom - EDGE) vy = SPEED;
+        if (vy) {
+          container.scrollTop += vy;
+          scrollRaf = requestAnimationFrame(() => doScroll(ev));
+        } else if (scrollRaf) {
+          cancelAnimationFrame(scrollRaf);
+          scrollRaf = null;
+        }
+      };
+      const hitTest = (ev) => {
+        const scrollDelta = container.scrollTop - startScroll;
+        const syAdj = sy - scrollDelta;
+        const x1 = Math.min(sx, ev.clientX), y1 = Math.min(syAdj, ev.clientY);
+        const x2 = Math.max(sx, ev.clientX), y2 = Math.max(syAdj, ev.clientY);
+        const cards = document.querySelectorAll(".media-card[data-id]");
+        const ids = [];
+        cards.forEach(el => {
+          const r = el.getBoundingClientRect();
+          if (r.left < x2 && r.right > x1 && r.top < y2 && r.bottom > y1) {
+            ids.push(parseInt(el.dataset.id));
+          }
+        });
+        this.selArr = ids;
+      };
+      const onMove = (ev) => {
+        ev.preventDefault();
+        if (!dragging && (Math.abs(ev.clientX - sx) < 4 && Math.abs(ev.clientY - sy) < 4)) return;
+        dragging = true;
+        const scrollDelta = container.scrollTop - startScroll;
+        const syAdj = sy - scrollDelta;
+        this.lasso = { sx, sy: syAdj, ex: ev.clientX, ey: ev.clientY };
+        hitTest(ev);
+        if (scrollRaf) cancelAnimationFrame(scrollRaf);
+        doScroll(ev);
+      };
+      const onUp = () => {
+        if (!dragging) this.selArr = [];
+        this.lasso = null;
+        if (scrollRaf) cancelAnimationFrame(scrollRaf);
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+      };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    },
+    showCtx(e, m) {
+      if (!this.selArr.includes(m.id)) this.selArr = [m.id];
+      this.ctxMenu.item = m;
+      this.ctxMenu.x = e.clientX;
+      this.ctxMenu.y = e.clientY;
+      this.ctxMenu.show = true;
+    },
+    closeCtx(e) {
+      if (!this.ctxMenu.show) return;
+      if (e.target.closest(".ctx-menu-popup")) return;
+      this.ctxMenu.show = false;
+    },
+    onKeyDelete(e) {
+      if (e.key !== "Backspace" && e.key !== "Delete") return;
+      if (!e.metaKey && !e.ctrlKey) return;
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      if (!this.selArr.length) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this.deleteCtx();
+    },
+    onKeyEnter(e) {
+      if (e.key !== "Enter") return;
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      if (this.selArr.length === 1) {
+        e.preventDefault();
+        this.openDetail(this.selArr[0]);
+      }
+    },
+    deleteCtx() {
+      if (this.selArr.length > 1) {
+        this.confirmBatch.show = true;
+      } else {
+        const id = this.selArr[0];
+        const m = this.items.find(i => i.id === id);
+        this.confirmDelete = { show: true, id, name: m ? m.file_name : "" };
+      }
+    },
+    async doDelete() {
+      try {
+        await API.deleteMedia(this.confirmDelete.id);
+        this.items = this.items.filter(i => i.id !== this.confirmDelete.id);
+        this.total--;
+        Quasar.Notify.create({ message: "已移除「" + this.confirmDelete.name + "」", position: 'top', color: 'dark', textColor: 'white', timeout: 1800 });
+      } catch (e) {
+        console.error("delete error:", e);
+      }
+      this.selArr = [];
+      this.confirmDelete.show = false;
+    },
+    async doBatchDelete() {
+      const ids = [...this.selArr];
+      try {
+        for (const id of ids) await API.deleteMedia(id);
+        const set = new Set(ids);
+        this.items = this.items.filter(i => !set.has(i.id));
+        this.total -= ids.length;
+        Quasar.Notify.create({ message: `已移除 ${ids.length} 个素材`, position: 'top', color: 'dark', textColor: 'white', timeout: 1800 });
+      } catch (e) { console.error("batch delete error:", e); }
+      this.selArr = [];
+      this.confirmBatch.show = false;
+    },
+    fmtDur(s) {
+      if (!s) return "";
+      const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+      return `${m}:${sec.toString().padStart(2, "0")}`;
+    },
+    fmtSize(bytes) {
+      if (!bytes) return "-";
+      if (bytes < 1024) return bytes + " B";
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + " KB";
+      if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+      return (bytes / (1024 * 1024 * 1024)).toFixed(1) + " GB";
+    },
+    fmtListDate(d) {
+      if (!d) return "-";
+      const dt = new Date(d);
+      if (isNaN(dt)) return d;
+      const pad = n => n.toString().padStart(2, "0");
+      return `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
+    },
+    getGroupKey(raw, mode) {
+      if (!raw) return "unknown";
+      const dt = new Date(raw);
+      if (isNaN(dt)) return "unknown";
+      const y = dt.getFullYear(), m = dt.getMonth() + 1, d = dt.getDate();
+      if (mode === "day") return `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+      if (mode === "week") {
+        const jan1 = new Date(y, 0, 1);
+        const week = Math.ceil(((dt - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+        return `${y}-W${String(week).padStart(2,"0")}`;
+      }
+      if (mode === "month") return `${y}-${String(m).padStart(2,"0")}`;
+      if (mode === "quarter") return `${y}-Q${Math.ceil(m / 3)}`;
+      if (mode === "year") return `${y}`;
+      return "unknown";
+    },
+    fmtGroupLabel(key, mode) {
+      if (key === "unknown") return "未知日期";
+      const weekdays = ["周日","周一","周二","周三","周四","周五","周六"];
+      if (mode === "day") {
+        const dt = new Date(key);
+        return key + " " + (isNaN(dt) ? "" : weekdays[dt.getDay()]);
+      }
+      if (mode === "week") return key.replace("W", " 第") + " 周";
+      if (mode === "month") {
+        const [y, m] = key.split("-");
+        return `${y}年${parseInt(m)}月`;
+      }
+      if (mode === "quarter") {
+        const [y, q] = key.split("-Q");
+        return `${y}年 第${q}季度`;
+      }
+      if (mode === "year") return key + "年";
+      return key;
+    },
+    getDurKey(dur) {
+      if (!dur || dur <= 0) return "无时长";
+      const m = dur / 60;
+      if (m < 1) return "0-1 分钟";
+      if (m < 3) return "1-3 分钟";
+      if (m < 5) return "3-5 分钟";
+      if (m < 10) return "5-10 分钟";
+      if (m < 30) return "10-30 分钟";
+      if (m < 60) return "30-60 分钟";
+      return "60 分钟以上";
+    },
+  },
+};
