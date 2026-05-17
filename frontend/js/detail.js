@@ -2,7 +2,7 @@ const DetailPage = {
   template: `
   <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
     <q-toolbar style="border-bottom:1px solid var(--border);min-height:40px">
-      <q-btn outline dense icon="arrow_back" label="返回" color="grey-6" style="margin-right:6px;border-radius:6px;padding:3px 6px;font-size:13px" @click="goBack"></q-btn>
+      <q-btn flat dense icon="arrow_back" label="返回" color="grey-6" style="margin-right:6px;border-radius:6px;padding:3px 6px;font-size:13px" @click="goBack"></q-btn>
       <q-toolbar-title class="text-body2 text-weight-bold" style="font-size:13px">{{ media?.file_name || '' }}</q-toolbar-title>
       <div class="filter-stars" style="margin-left:16px">
         <span v-for="n in 5" :key="n" class="star-btn" :class="{lit: media?.rating && n <= media.rating}" @click="setRating(media?.rating === n ? 0 : n)">★</span>
@@ -16,7 +16,7 @@ const DetailPage = {
     </q-toolbar>
     <div style="flex:1;display:flex;overflow:hidden">
       <div style="flex:1;display:flex;flex-direction:column;min-width:0">
-        <video v-if="media?.media_type==='video'" ref="player" :src="API.videoUrl(media.id)" controls preload="auto"
+        <video v-if="media?.media_type==='video'" ref="player" :src="API.videoUrl(media.id)" controls preload="auto" tabindex="-1"
                @loadeddata="onVideoLoaded" @play="onVideoPlay" @pause="onVideoPause" @seeked="onVideoSeeked" @error="onVideoError"
                style="width:100%;flex:1;background:var(--surface2)"></video>
         <div v-else-if="media?.media_type==='image'" style="flex:1;display:flex;flex-direction:column;min-height:0">
@@ -86,30 +86,33 @@ const DetailPage = {
         <!-- Analysis section -->
         <div v-if="analysis.status==='done' && analysis.segments?.length" style="border-top:1px solid var(--border);display:flex;flex-direction:column;flex:1;min-height:0">
           <div style="padding:10px 14px;font-size:12px;font-weight:600;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0">
-            <span style="color:var(--accent)">✓ {{ analysis.segments.length }} 个片段</span>
+            <span style="color:var(--accent)">◎ {{ analysis.segments.length }} 个片段</span>
             <div style="flex:1"></div>
             <q-btn flat dense icon="delete_outline" label="清除分析" color="grey-6" size="sm" :disable="analyzing" @click="showClearDialog=true" style="font-size:11px"></q-btn>
-            <q-btn dense icon="auto_awesome" label="重新分析" color="primary" size="sm" :disable="analyzing" @click="openAnalysisConfirm" style="font-size:11px;border-radius:4px"></q-btn>
+            <q-btn dense icon="auto_awesome" label="重新分析" color="primary" size="sm" :disable="analyzing" @click="openAnalysisConfirm" style="font-size:11px;border-radius:4px;padding-left:12px;padding-right:12px"></q-btn>
           </div>
           <q-scroll-area ref="segScroll" style="flex:1">
             <div v-for="(seg,i) in analysis.segments" :key="i" class="segment" :class="{active: activeSeg===i}" @click="seekTo(seg.time_start)">
               <div style="display:flex;align-items:center;justify-content:space-between">
-                <span class="seg-time">{{ seg.time_start }} → {{ seg.time_end }}</span>
-                <span class="seg-dur">{{ fmtSegDur(seg.time_start, seg.time_end) }}</span>
+                <span class="seg-time"><span class="seg-editable" contenteditable @click.stop @blur="e => { saveSegField(seg, 'time_start', e.target.innerText.trim()) }" v-text="seg.time_start"></span> → <span class="seg-editable" contenteditable @click.stop @blur="e => { saveSegField(seg, 'time_end', e.target.innerText.trim()) }" v-text="seg.time_end"></span></span>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <span class="seg-dur">{{ fmtSegDur(seg.time_start, seg.time_end) }}</span>
+                  <q-btn flat round dense icon="delete_outline" size="xs" color="grey-6" class="seg-del-btn" @click.stop="confirmDeleteSeg(seg, i)"><q-tooltip :delay="800">删除片段</q-tooltip></q-btn>
+                </div>
               </div>
-              <div class="seg-visual">{{ seg.visual }}</div>
-              <div v-if="seg.asr && seg.asr!=='无'" class="seg-text-line"><span class="prefix">💬 对话</span>{{ seg.asr }}</div>
-              <div v-if="seg.subtitle && seg.subtitle!=='无'" class="seg-text-line"><span class="prefix">📝 字幕</span>{{ seg.subtitle }}</div>
+              <div class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'visual', e.target.innerText)" v-text="seg.visual"></div>
+              <div v-if="seg.asr && seg.asr!=='无'" class="seg-text-line seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'asr', e.target.innerText)"><span class="prefix">💬 对话</span><span v-text="seg.asr"></span></div>
+              <div v-if="seg.subtitle && seg.subtitle!=='无'" class="seg-text-line seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'subtitle', e.target.innerText)"><span class="prefix">📝 字幕</span><span v-text="seg.subtitle"></span></div>
               <div v-if="dimRowCam(seg)" class="dim-row">
                 <span style="font-size:12px">🎥</span>
-                <template v-for="f in camFields" :key="f.key"><span v-if="seg[f.key]" class="dim-pair"><span class="dim-label">{{ f.label }}</span><span class="dim-value" :class="f.cls">{{ seg[f.key] }}</span></span></template>
+                <template v-for="f in camFields" :key="f.key"><span v-if="seg[f.key]" class="dim-pair"><span class="dim-label">{{ f.label }}</span><span class="dim-value seg-editable" :class="f.cls" contenteditable @click.stop @blur="e => saveSegField(seg, f.key, e.target.innerText.trim())" v-text="seg[f.key]"></span></span></template>
               </div>
               <div v-if="dimRowScene(seg)" class="dim-row">
                 <span style="font-size:12px">🌍</span>
-                <template v-for="f in sceneFields" :key="f.key"><span v-if="seg[f.key]" class="dim-pair"><span class="dim-label">{{ f.label }}</span><span class="dim-value" :class="f.cls">{{ seg[f.key] }}</span></span></template>
+                <template v-for="f in sceneFields" :key="f.key"><span v-if="seg[f.key]" class="dim-pair"><span class="dim-label">{{ f.label }}</span><span class="dim-value seg-editable" :class="f.cls" contenteditable @click.stop @blur="e => saveSegField(seg, f.key, e.target.innerText.trim())" v-text="seg[f.key]"></span></span></template>
               </div>
-              <div class="array-group"><span class="array-label">🎨 颜色</span><div class="array-pills"><span v-for="c in (seg.dominant_colors||[])" :key="c" class="pill color">{{ c }}</span><span v-if="!(seg.dominant_colors||[]).length" style="color:var(--text3);font-size:10px">-</span></div></div>
-              <div class="array-group"><span class="array-label">🎬 主体</span><div class="array-pills"><span v-for="s in (seg.main_subjects||[])" :key="s" class="pill subject">{{ s }}</span><span v-if="!(seg.main_subjects||[]).length" style="color:var(--text3);font-size:10px">-</span></div></div>
+              <div class="array-group"><span class="array-label">🎨 颜色</span><div class="array-pills"><span v-for="c in (seg.dominant_colors||[])" :key="c" class="pill color seg-editable-tag" @click.stop="removeTag(seg, 'dominant_colors', c)">{{ c }}<span style="margin-left:2px;opacity:0.5">×</span></span><input class="tag-add-input" placeholder="+" @click.stop @keydown.enter.stop.prevent="e => { addTag(seg, 'dominant_colors', e.target); e.target.value='' }" /></div></div>
+              <div class="array-group"><span class="array-label">🎬 主体</span><div class="array-pills"><span v-for="s in (seg.main_subjects||[])" :key="s" class="pill subject seg-editable-tag" @click.stop="removeTag(seg, 'main_subjects', s)">{{ s }}<span style="margin-left:2px;opacity:0.5">×</span></span><input class="tag-add-input" placeholder="+" @click.stop @keydown.enter.stop.prevent="e => { addTag(seg, 'main_subjects', e.target); e.target.value='' }" /></div></div>
             </div>
           </q-scroll-area>
         </div>
@@ -151,6 +154,26 @@ const DetailPage = {
         <q-card-actions align="right">
           <q-btn flat label="取消" v-close-popup></q-btn>
           <q-btn color="negative" label="清除" @click="showClearDialog=false; clearAnalysis()"></q-btn>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <!-- Delete segment dialog -->
+    <q-dialog v-model="showDeleteSegDialog">
+      <q-card style="min-width:320px" class="dialog-card">
+        <q-card-section>
+          <div class="text-h6">删除片段</div>
+        </q-card-section>
+        <q-card-section>
+          <p style="font-size:13px;color:var(--text2)">删除此片段后，如何处理相邻片段的时间？</p>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+            <q-btn v-if="deleteSegInfo && deleteSegInfo.hasPrev" outline color="primary" no-caps style="justify-content:flex-start;font-size:12px" @click="doDeleteSeg('prev')">前一个片段结束时间后移至 {{ deleteSegInfo.timeEnd }}</q-btn>
+            <q-btn v-if="deleteSegInfo && deleteSegInfo.hasNext" outline color="primary" no-caps style="justify-content:flex-start;font-size:12px" @click="doDeleteSeg('next')">后一个片段开始时间前移至 {{ deleteSegInfo.timeStart }}</q-btn>
+            <q-btn flat color="grey" no-caps style="font-size:12px" @click="doDeleteSeg('none')">直接删除（不调整时间）</q-btn>
+          </div>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="取消" v-close-popup></q-btn>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -198,7 +221,8 @@ const DetailPage = {
       imgLoading: false,
       analyzing: false, analysisProgress: "", activeSeg: -1,
       analysisStages: [], analyzeTipText: "",
-      showAnalysisDialog: false, showClearDialog: false,
+      showAnalysisDialog: false, showClearDialog: false, showDeleteSegDialog: false,
+      deleteSegInfo: null,
       confirmInfo: { resolution: "480", fps: "30", modelLabel: "智谱 GLM-4.6V", useMultimodal: true, asrEngine: "Whisper" },
       camFields: [
         { key: "shot_type", label: "景别", cls: "shot" },
@@ -217,6 +241,7 @@ const DetailPage = {
     };
   },
   beforeUnmount() {
+    if (this._onKey) document.removeEventListener("keydown", this._onKey, true);
     this.stopScopes();
     this.stopWaveformAnim();
     if (this._segTrackInterval) { clearInterval(this._segTrackInterval); this._segTrackInterval = null; }
@@ -225,6 +250,8 @@ const DetailPage = {
     this._stopAllStepTimers();
   },
   async created() {
+    this._onKey = (e) => this.handleKey(e);
+    document.addEventListener("keydown", this._onKey, true);
     const hash = location.hash || "";
     const id = parseInt(hash.split("/")[2]);
     try {
@@ -442,6 +469,111 @@ const DetailPage = {
       if (parts.length === 2) return parts[0] * 60 + parts[1];
       return parseFloat(str);
     },
+    async saveSegField(seg, field, value) {
+      const old = seg[field];
+      if (value === old) return;
+      seg[field] = value;
+      try {
+        await API.updateSegment(seg.media_id, seg.id, { [field]: value });
+      } catch (e) {
+        seg[field] = old;
+        Quasar.Notify.create({ message: "保存失败: " + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
+      }
+    },
+    async removeTag(seg, field, tag) {
+      const arr = seg[field] || [];
+      const newArr = arr.filter(t => t !== tag);
+      if (newArr.length === arr.length) return;
+      const old = [...arr];
+      seg[field] = newArr;
+      try {
+        await API.updateSegment(seg.media_id, seg.id, { [field]: newArr });
+      } catch (e) {
+        seg[field] = old;
+        Quasar.Notify.create({ message: "保存失败: " + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
+      }
+    },
+    async addTag(seg, field, inputEl) {
+      const val = (inputEl.value || "").trim();
+      if (!val) return;
+      const arr = seg[field] || [];
+      if (arr.includes(val)) return;
+      const old = [...arr];
+      arr.push(val);
+      seg[field] = [...arr];
+      try {
+        await API.updateSegment(seg.media_id, seg.id, { [field]: arr });
+      } catch (e) {
+        seg[field] = old;
+        Quasar.Notify.create({ message: "保存失败: " + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
+      }
+    },
+    confirmDeleteSeg(seg, index) {
+      const segs = this.analysis.segments;
+      this.deleteSegInfo = {
+        seg, index,
+        hasPrev: index > 0,
+        hasNext: index < segs.length - 1,
+        timeStart: seg.time_start,
+        timeEnd: seg.time_end,
+      };
+      this.showDeleteSegDialog = true;
+    },
+    async doDeleteSeg(adjust) {
+      const info = this.deleteSegInfo;
+      if (!info) return;
+      this.showDeleteSegDialog = false;
+      try {
+        await API.deleteSegment(info.seg.media_id, info.seg.id, adjust);
+        if (adjust === 'prev' && info.hasPrev) {
+          this.analysis.segments[info.index - 1].time_end = info.timeEnd;
+        } else if (adjust === 'next' && info.hasNext) {
+          this.analysis.segments[info.index + 1].time_start = info.timeStart;
+        }
+        this.analysis.segments.splice(info.index, 1);
+        Quasar.Notify.create({ message: '片段已删除', position: 'top', color: 'dark', textColor: 'white', timeout: 1500 });
+      } catch (e) {
+        Quasar.Notify.create({ message: '删除失败: ' + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
+      }
+      this.deleteSegInfo = null;
+    },
+    handleKey(e) {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable) return;
+      const key = e.key;
+      // Arrow left/right - prev/next
+      if (key === "ArrowLeft" || key === "ArrowRight") {
+        e.preventDefault(); e.stopPropagation();
+        const dir = key === "ArrowLeft" ? -1 : 1;
+        const adjId = this.$root.getAdjacentId(this.media?.id, dir);
+        if (adjId) location.hash = "#/detail/" + adjId;
+        return;
+      }
+      // Rating 0-5
+      if (key >= "0" && key <= "5") {
+        e.preventDefault();
+        this.setRating(parseInt(key));
+        return;
+      }
+      // F - toggle favorite
+      if (key === "f" || key === "F") {
+        e.preventDefault();
+        this.toggleFav();
+        return;
+      }
+      // Space - play/pause
+      if (key === " ") {
+        e.preventDefault(); e.stopPropagation();
+        const player = this.$refs.player;
+        if (player) { player.paused ? player.play().catch(() => {}) : player.pause(); }
+        return;
+      }
+      // Backspace - go back
+      if (key === "Backspace") {
+        e.preventDefault();
+        this.goBack();
+        return;
+      }
+    },
     goBack() { window.location.hash = "#/gallery"; },
     async setRating(val) {
       await API.updateMedia(this.media.id, { rating: val });
@@ -606,6 +738,7 @@ const DetailPage = {
     // -- Audio waveform --
     onVideoLoaded() {
       const player = this.$refs.player;
+      if (!player) return;
       this.loadWaveform();
       player.currentTime = 0.1;
       this.startSegTrack();

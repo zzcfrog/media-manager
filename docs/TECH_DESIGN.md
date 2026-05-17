@@ -79,7 +79,7 @@ video_analyzer/
 |------|------|------|
 | `serve` | 无 | 媒体文件服务 |
 | `library` | `/api/library` | 媒体库 CRUD、文件夹树 |
-| `analysis` | `/api/analysis` | AI 分析 |
+| `analysis` | `/api/analysis` | AI 分析 + 分段编辑 |
 | `collections` | `/api/collections` | 合集管理 |
 | `tags` | `/api/tags` | 标签管理 |
 | `settings` | `/api/settings` | 全局设置 CRUD |
@@ -164,6 +164,26 @@ settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)
 ```
 
 **`folder` 筛选参数**：在 `list_media` 中通过 `file_path LIKE '<folder>/%'` 实现，匹配目标文件夹及其所有子文件夹下的媒体。
+
+### 3.5 分段编辑 API
+
+| 路由 | 方法 | 说明 |
+|------|------|------|
+| `/api/analysis/<media_id>/segments/<seg_id>` | PATCH | 更新单个分段的部分字段 |
+
+**`_EDITABLE_COLS` 白名单**：`visual`, `asr`, `subtitle`, `shot_type`, `focal_length`, `camera_angle`, `camera_movement`, `perspective`, `scene_type`, `mood`, `lighting`, `weather`, `dominant_colors`, `main_subjects`
+
+**逻辑**：
+1. 验证 `seg_id` 和 `media_id` 匹配
+2. 遍历请求 body 中的字段，仅在 `_EDITABLE_COLS` 白名单内的才更新
+3. `dominant_colors` / `main_subjects` 接收数组，JSON 序列化后存储
+4. 动态构建 `UPDATE ... SET field1=?, field2=? ... WHERE id=?`
+5. 更新后重新查询所有分段，调用 `_refresh_fts(db, media_id, segments)` 刷新搜索索引
+6. 返回 `{ ok: true }`
+
+**前端保存流程**：
+- `saveSegField(seg, field, value)` — 比较新旧值，无变化跳过；乐观更新本地数据 → 调 API → 失败回滚 + Notify 错误
+- `removeTag(seg, field, tag)` — 从数组中 filter 移除目标标签 → 调 API → 失败回滚 + Notify 错误
 
 ## 4. 核心流程
 
@@ -270,6 +290,8 @@ class AsrSegment:
 | 动画 | Lottie（`lottie.min.js`） |
 | 文件夹树 | Quasar `q-tree` 组件，嵌套在素材库 `q-expansion-item` 内（`content-inset-level="0.1"`），应用启动时 `getFolders()` 加载，点击节点设 `selectedFolder` |
 | 媒体类型筛选 | `q-btn-group` 包含独立 `q-btn`（带 `q-tooltip`），替代 `q-btn-toggle` |
+| 分段编辑 | `contenteditable` + `@blur` → `saveSegField()`（文本字段）；`×` 按钮 → `removeTag()`（标签字段） |
+| 键盘快捷键 | `document.addEventListener("keydown")` 全局监听，`created()` 注册 / `beforeUnmount()` 清理；`isContentEditable` 检测避免编辑冲突 |
 
 ### 5.3 文件夹筛选数据流
 

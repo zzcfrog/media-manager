@@ -63,17 +63,70 @@
 - `frontend/index.html` — 设置弹窗分区标题从 `border-bottom` 横线改为左侧强调条（`border-left: 3px solid var(--accent)`）；侧边栏文件夹树集成到素材库 `q-expansion-item` 内（非独立分区）
 - `frontend/css/main.css` — 新增 `.q-menu--square { border-radius: 8px !important }` 覆盖 Quasar 方角下拉菜单；`q-btn-group` 样式调整；文件夹标签 ellipsis 截断 + tooltip
 
+## 已完成：键盘快捷键（2026-05-17）
+
+顶部工具栏新增快捷键按钮（键盘图标），点击弹出快捷键参考弹窗。Gallery 和 Detail 页均已实现快捷键。
+
+**改动文件：**
+- `frontend/index.html` — 新增快捷键按钮（设置图标左侧）、快捷键弹窗（通用/Gallery/Detail 三组）、全局键盘监听（`created()` 注册、`beforeUnmount()` 清理）、`showShortcuts` 数据、`getAdjacentId()`/`handleShortcut()` 方法
+- `frontend/js/gallery.js` — 统一 `handleKey()` 方法替代旧 `onKeyDelete`/`onKeyEnter`，支持方向键（网格感知上下左右）、Delete 删除、Enter 详情、1-5 评分、F 收藏、G 视图切换、`/` 搜索聚焦；新增 `clearSelection()` 方法
+- `frontend/js/detail.js` — `handleKey(e)` 方法：跳过 `isContentEditable` 元素避免与编辑冲突、←→ 上一个/下一个、1-5 评分、F 收藏、Space 播放/暂停、Backspace 返回画廊
+
+**快捷键列表：**
+
+| 快捷键 | Gallery | Detail |
+|--------|---------|--------|
+| `←` `→` `↑` `↓` | 网格内移动选中 | 上一个/下一个素材 |
+| `Enter` | 打开详情 | - |
+| `Delete` | 删除选中 | - |
+| `1`-`5` | 评分 | 评分 |
+| `F` | 切换收藏 | 切换收藏 |
+| `G` | 切换网格/列表 | - |
+| `/` | 搜索聚焦 | - |
+| `Space` | - | 播放/暂停 |
+| `Backspace` | - | 返回画廊 |
+
+## 已完成：分析结果可编辑（2026-05-17）
+
+详情页分析分段的全部字段支持点击即编辑，失焦自动保存。
+
+**改动文件：**
+- `backend/blueprints/analysis.py` — 新增 `PATCH /api/analysis/<media_id>/segments/<seg_id>` 路由；`_EDITABLE_COLS` 白名单控制可更新字段；`dominant_colors`/`main_subjects` 数组字段 JSON 序列化；更新后调用 `_refresh_fts()` 刷新搜索索引
+- `frontend/js/api.js` — 新增 `updateSegment(mediaId, segId, data)` 方法
+- `frontend/js/detail.js` — 分段模板全部可编辑：文本字段（visual/asr/subtitle/镜头维度/场景维度）使用 `contenteditable` + `@blur` → `saveSegField()`；标签字段（colors/subjects）`×` 按钮移除 → `removeTag()`；`handleKey()` 跳过 `isContentEditable` 元素
+- `frontend/css/main.css` — `.seg-editable` hover/focus 样式；`.seg-editable-tag` 可移除标签样式
+
+**编辑逻辑：**
+- `saveSegField(seg, field, value)` — 比较新旧值，无变化跳过；调 API 保存，失败时回滚并 Notify 提示
+- `removeTag(seg, field, tag)` — 从数组中移除目标标签，调 API 保存，失败时回滚
+
+## 已完成：重复素材检测 & 查找相似（2026-05-17）
+
+基于文件哈希和感知哈希的两层重复/相似检测，侧边栏"查找重复"入口，全屏对话框展示结果。
+
+**改动文件：**
+- `backend/db.py` — `_MIGRATIONS` 新增 `file_hash`（SHA256）和 `phash`（pHash）两列
+- `backend/services/importer.py` — 导入时计算文件哈希（`_compute_file_hash`，分块 SHA256）和感知哈希（`_compute_phash`，imagehash 库 phash，视频取中间帧）；INSERT 语句扩展两列
+- `backend/blueprints/library.py` — 新增 `POST /api/library/backfill-hashes`（回填已有素材的哈希）和 `GET /api/library/duplicates?type=exact|similar&threshold=10`（查找重复/相似，exact 按 file_hash 分组，similar 按 phash 汉明距离 ≤ threshold 分组）
+- `frontend/js/api.js` — 新增 `getDuplicates()` 和 `backfillHashes()` 方法
+- `frontend/index.html` — 侧边栏新增"查找重复"菜单项（`content_copy` 图标）；全屏对话框包含完全重复/视觉相似切换、缩略图组展示、回填哈希按钮；新增 `showDupDialog`/`dupType`/`dupGroups`/`dupLoading` 数据和 `openDupDialog`/`loadDupGroups`/`backfillAndReload` 方法
+- `frontend/css/main.css` — `.dup-group`/`.dup-thumb` 样式
+- `requirements.txt` — 新增 `imagehash` 依赖
+
+**重复检测逻辑：**
+- 完全重复：SHA256 文件哈希完全一致（不同路径同一文件）
+- 视觉相似：pHash 汉明距离 ≤ 10（同一照片不同分辨率/压缩版本）
+- 相似模式不提供删除按钮，用户在画廊手动选中删除
+
 ## 下一阶段优化计划
 
 ### 体验提升
-- [ ] **键盘快捷键** — 空格播放/暂停、方向键切换素材、Delete 删除、数字键评分
 - [ ] **批量分析** — 支持选中多个素材一键排队分析
-- [ ] **分析结果可编辑** — 用户可修正 AI 返回的分段描述、标签等内容
 
 ### 功能完善
 - [ ] **智能相册** — 按拍摄日期、相机型号、分辨率等自动分组
-- [ ] **视频播放器集成** — 详情页直接播放视频，点击分析分段跳转到对应时间点
-- [ ] **重复素材检测** — 识别相似/重复文件
+- [x] ~~**视频播放器集成**~~ — 已实现
+- [x] ~~**重复素材检测**~~ — 已实现：文件哈希去重 + 感知哈希查找相似
 
 ### 导出与分享
 - [ ] **分析报告导出** — 导出 AI 分析结果为 PDF/文本

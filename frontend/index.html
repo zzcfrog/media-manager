@@ -38,6 +38,9 @@
                @touchstart="startLongRefresh" @touchend="cancelLongRefresh">
           <q-tooltip :delay="1000">刷新页面（长按强制刷新）</q-tooltip>
         </q-btn>
+        <q-btn flat round dense icon="keyboard" size="sm" color="grey-6" @click="showShortcuts=true">
+          <q-tooltip :delay="1000">快捷键</q-tooltip>
+        </q-btn>
         <q-btn flat round dense icon="settings" size="sm" color="grey-6" @click="showSettings=true">
           <q-tooltip :delay="1000">设置</q-tooltip>
         </q-btn>
@@ -79,6 +82,11 @@
           <q-item-section avatar><q-icon name="favorite" size="18px"></q-icon></q-item-section>
           <q-item-section>我的收藏</q-item-section>
         </q-item>
+        <q-item clickable :active="route==='#/duplicates'" @click="nav('#/duplicates')"
+                active-class="bg-primary text-white">
+          <q-item-section avatar><q-icon name="content_copy" size="18px"></q-icon></q-item-section>
+          <q-item-section>查找重复</q-item-section>
+        </q-item>
       </q-list>
       <q-separator></q-separator>
       <q-list dense>
@@ -117,6 +125,7 @@
           <gallery-page v-if="currentView==='gallery'" ref="gallery"></gallery-page>
         </keep-alive>
         <detail-page v-if="currentView==='detail'" :key="detailId"></detail-page>
+        <duplicates-page v-if="currentView==='duplicates'"></duplicates-page>
       </q-page>
     </q-page-container>
   </q-layout>
@@ -175,6 +184,45 @@
       <q-card-actions align="right">
         <q-btn color="primary" label="确定" @click="saveSettings(); showSettings=false"></q-btn>
       </q-card-actions>
+    </q-card>
+  </q-dialog>
+
+  <!-- Shortcuts modal -->
+  <q-dialog v-model="showShortcuts">
+    <q-card style="min-width:520px" class="dialog-card">
+      <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" v-close-popup></q-btn>
+      <q-card-section>
+        <div class="text-h6">键盘快捷键</div>
+      </q-card-section>
+      <q-card-section style="display:flex;flex-direction:column;gap:20px">
+        <div>
+          <div class="text-subtitle2 q-mb-sm" style="padding-left:10px;border-left:3px solid var(--accent);line-height:1">通用</div>
+          <table style="width:100%;font-size:13px">
+            <tr v-for="s in [{k:'?',d:'打开快捷键弹窗'},{k:'Esc',d:'关闭弹窗 / 取消选择'}]" style="height:28px">
+              <td style="width:100px"><kbd style="background:var(--surface2);padding:2px 8px;border-radius:4px;font-family:inherit;font-size:12px">{{ s.k }}</kbd></td>
+              <td style="color:var(--text2)">{{ s.d }}</td>
+            </tr>
+          </table>
+        </div>
+        <div>
+          <div class="text-subtitle2 q-mb-sm" style="padding-left:10px;border-left:3px solid var(--accent);line-height:1">素材库</div>
+          <table style="width:100%;font-size:13px">
+            <tr v-for="s in [{k:'↑ ↓ ← →',d:'移动选中项'},{k:'Enter',d:'打开详情'},{k:'Delete',d:'删除选中项'},{k:'1-5',d:'给选中项评分'},{k:'0',d:'清除评分'},{k:'F',d:'切换收藏'},{k:'G',d:'切换网格/列表视图'},{k:'/',d:'聚焦搜索框'}]" style="height:28px">
+              <td style="width:100px"><kbd style="background:var(--surface2);padding:2px 8px;border-radius:4px;font-family:inherit;font-size:12px">{{ s.k }}</kbd></td>
+              <td style="color:var(--text2)">{{ s.d }}</td>
+            </tr>
+          </table>
+        </div>
+        <div>
+          <div class="text-subtitle2 q-mb-sm" style="padding-left:10px;border-left:3px solid var(--accent);line-height:1">详情页</div>
+          <table style="width:100%;font-size:13px">
+            <tr v-for="s in [{k:'← →',d:'上一个 / 下一个素材'},{k:'1-5',d:'评分 1-5 星'},{k:'0',d:'清除评分'},{k:'F',d:'切换收藏'},{k:'Space',d:'播放 / 暂停'},{k:'Backspace',d:'返回素材库'}]" style="height:28px">
+              <td style="width:100px"><kbd style="background:var(--surface2);padding:2px 8px;border-radius:4px;font-family:inherit;font-size:12px">{{ s.k }}</kbd></td>
+              <td style="color:var(--text2)">{{ s.d }}</td>
+            </tr>
+          </table>
+        </div>
+      </q-card-section>
     </q-card>
   </q-dialog>
 
@@ -313,6 +361,7 @@
 <script src="/static/js/api.js"></script>
 <script src="/static/js/gallery.js"></script>
 <script src="/static/js/detail.js"></script>
+<script src="/static/js/duplicates.js"></script>
 <script>
 const app = Vue.createApp({
   data() {
@@ -320,6 +369,7 @@ const app = Vue.createApp({
       route: "#/gallery",
       currentView: "gallery",
       detailId: null,
+      galleryItems: [],
       collectionFilter: null,
       favFilter: false,
       galleryKey: 0,
@@ -327,6 +377,7 @@ const app = Vue.createApp({
       searchText: "",
       showImport: false,
       showSettings: false,
+      showShortcuts: false,
       settingsForm: { resolution: "480", fps: "30", model: "glm-4.6v", useMultimodal: true, asrEngine: "whisper", videoApiKey: "", asrApiKey: "" },
       showVideoKey: false,
       showAsrKey: false,
@@ -388,7 +439,12 @@ const app = Vue.createApp({
     this.applyTheme();
     if (this.accentColor) this.setAccentColor(this.accentColor);
     window.addEventListener("hashchange", () => this.resolveRoute());
+    this._onKey = (e) => this.handleShortcut(e);
+    document.addEventListener("keydown", this._onKey);
     this.resolveRoute();
+  },
+  beforeUnmount() {
+    if (this._onKey) document.removeEventListener("keydown", this._onKey);
   },
   updated() {
     if (this.importStep === "progress" && this.$refs.importListWrap) {
@@ -453,6 +509,7 @@ const app = Vue.createApp({
       this.route = hash;
       const prevView = this.currentView;
       if (hash.startsWith("#/detail/")) {
+        if (this.$refs.gallery?.items) this.galleryItems = [...this.$refs.gallery.items];
         this.currentView = "detail";
         this.detailId = parseInt(hash.split("/")[2]);
       } else if (hash === "#/favorites") {
@@ -463,6 +520,8 @@ const app = Vue.createApp({
         this.libraryExpanded = false;
         if (prevView !== "gallery") this.galleryKey++;
         else this.$refs.gallery?.load();
+      } else if (hash === "#/duplicates") {
+        this.currentView = "duplicates";
       } else if (hash.startsWith("#/collections/")) {
         this.currentView = "gallery";
         this.collectionFilter = parseInt(hash.split("/")[2]);
@@ -491,6 +550,29 @@ const app = Vue.createApp({
         this.tags = tagRes.data || [];
         this.folderTree = folderRes.data || [];
       } catch (e) { console.error(e); }
+    },
+    handleShortcut(e) {
+      const tag = e.target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.key === "?" || (e.key === "/" && e.shiftKey)) {
+        e.preventDefault();
+        this.showShortcuts = true;
+        return;
+      }
+      if (e.key === "Escape") {
+        if (this.showShortcuts) this.showShortcuts = false;
+        else if (this.$refs.gallery) this.$refs.gallery.clearSelection();
+        return;
+      }
+    },
+    getAdjacentId(currentId, dir) {
+      const items = this.galleryItems;
+      if (!items || !items.length) return null;
+      const idx = items.findIndex(m => m.id === currentId);
+      if (idx < 0) return null;
+      const ni = idx + dir;
+      if (ni < 0 || ni >= items.length) return null;
+      return items[ni].id;
     },
     doSearch() {
       this.searchQuery = this.searchText.trim();
@@ -664,6 +746,7 @@ app.config.errorHandler = (err) => {
 };
 app.component("gallery-page", GalleryPage);
 app.component("detail-page", DetailPage);
+app.component("duplicates-page", DuplicatesPage);
 app.mount("#app");
 </script>
 </body>

@@ -53,6 +53,12 @@ scanPaths(paths) {
   getFolders() {
     return this._fetch(`/api/library/folders`);
   },
+  getDuplicates(type, threshold) {
+    return this._fetch(`/api/library/duplicates?type=${type}&threshold=${threshold || 10}`);
+  },
+  backfillHashes() {
+    return this._fetch(`/api/library/backfill-hashes`, { method: "POST" });
+  },
   createTag(name) {
     return this._fetch(`/api/tags/`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
   },
@@ -79,6 +85,13 @@ scanPaths(paths) {
   },
   clearAnalysis(mediaId) {
     return this._fetch(`/api/analysis/${mediaId}`, { method: "DELETE" });
+  },
+  updateSegment(mediaId, segId, data) {
+    return this._fetch(`/api/analysis/${mediaId}/segments/${segId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+  },
+  deleteSegment(mediaId, segId, adjust) {
+    const qs = adjust && adjust !== 'none' ? `?adjust=${adjust}` : '';
+    return this._fetch(`/api/analysis/${mediaId}/segments/${segId}${qs}`, { method: "DELETE" });
   },
   thumbUrl(id) { return `/media/thumbnail/${id}`; },
   videoUrl(id) { return `/media/video/${id}`; },

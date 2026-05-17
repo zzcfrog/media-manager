@@ -171,6 +171,78 @@ def scan_paths():
     return jsonify({"data": result, "skipped": skipped})
 
 
+@bp.route("/backfill-hashes", methods=["POST"])
+def backfill_hashes():
+    from ..services.importer import _compute_file_hash, _compute_phash
+    from pathlib import Path
+    db = get_db()
+    rows = db.execute("SELECT id, file_path, media_type, duration FROM media WHERE file_hash IS NULL").fetchall()
+    count = 0
+    for row in rows:
+        fp = Path(row["file_path"])
+        if not fp.exists():
+            continue
+        fh = _compute_file_hash(fp)
+        ph = _compute_phash(fp, row["media_type"], row["duration"])
+        db.execute("UPDATE media SET file_hash = ?, phash = ? WHERE id = ?", (fh, ph, row["id"]))
+        count += 1
+    db.commit()
+    return jsonify({"ok": True, "count": count})
+
+
+@bp.route("/duplicates")
+def find_duplicates():
+    db = get_db()
+    dup_type = request.args.get("type", "exact")
+    threshold = int(request.args.get("threshold", "10"))
+
+    if dup_type == "exact":
+        rows = db.execute(
+            "SELECT id, file_path, file_name, media_type, file_size, file_hash, thumbnail_path "
+            "FROM media WHERE file_hash IS NOT NULL AND file_hash IN "
+            "(SELECT file_hash FROM media WHERE file_hash IS NOT NULL GROUP BY file_hash HAVING COUNT(*) > 1) "
+            "ORDER BY file_hash, id"
+        ).fetchall()
+        groups = []
+        current = None
+        for r in rows:
+            if current is None or current["hash"] != r["file_hash"]:
+                current = {"hash": r["file_hash"], "items": []}
+                groups.append(current)
+            current["items"].append(dict(r))
+        return jsonify({"groups": groups})
+
+    else:  # similar
+        rows = db.execute(
+            "SELECT id, file_path, file_name, media_type, file_size, phash, thumbnail_path "
+            "FROM media WHERE phash IS NOT NULL"
+        ).fetchall()
+        items = [dict(r) for r in rows]
+        seen = set()
+        groups = []
+        for i in range(len(items)):
+            if i in seen:
+                continue
+            ph_i = int(items[i]["phash"], 16)
+            group_items = []
+            for j in range(i + 1, len(items)):
+                if j in seen:
+                    continue
+                ph_j = int(items[j]["phash"], 16)
+                dist = bin(ph_i ^ ph_j).count("1")
+                if dist <= threshold:
+                    group_items.append((dist, j))
+            if group_items:
+                seen.add(i)
+                g = {"distance": 0, "items": [items[i]]}
+                for dist, j in group_items:
+                    seen.add(j)
+                    g["items"].append(items[j])
+                g["distance"] = min(d for d, _ in group_items)
+                groups.append(g)
+        return jsonify({"groups": groups})
+
+
 @bp.route("/<int:media_id>", methods=["PATCH"])
 def update_media(media_id):
     db = get_db()

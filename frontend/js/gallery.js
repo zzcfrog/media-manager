@@ -1,6 +1,7 @@
 const GalleryPage = {
   template: `
   <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+    <!-- Filter bar: type, fav/analyzed, stars, colors, reset, search, sort, group, view -->
     <div class="filter-bar">
       <q-btn-group unelevated style="border-radius:6px;overflow:hidden">
         <q-btn unelevated dense :color="filters.media_type==='all'?'primary':'grey-9'" :text-color="filters.media_type==='all'?'white':'grey-6'" size="sm" label="ALL" @click="filters.media_type='all'; load()">
@@ -9,7 +10,7 @@ const GalleryPage = {
         <q-btn unelevated dense :color="filters.media_type==='image'?'primary':'grey-9'" :text-color="filters.media_type==='image'?'white':'grey-6'" icon="image" size="sm" @click="filters.media_type='image'; load()">
           <q-tooltip :delay="1000">图片</q-tooltip>
         </q-btn>
-        <q-btn unelevated dense :color="filters.media_type==='video'?'primary':'grey-9'" :text-color="filters.media_type==='video'?'white':'grey-6'" icon="play_arrow" size="sm" @click="filters.media_type='video'; load()">
+        <q-btn unelevated dense :color="filters.media_type==='video'?'primary':'grey-9'" :text-color="filters.media_type==='video'?'white':'grey-6'" icon="smart_display" size="sm" @click="filters.media_type='video'; load()">
           <q-tooltip :delay="1000">视频</q-tooltip>
         </q-btn>
       </q-btn-group>
@@ -63,6 +64,7 @@ const GalleryPage = {
         </q-btn>
       </q-btn-group>
     </div>
+    <!-- Main gallery area with grid/list views and lasso selection -->
     <div ref="galleryPage" class="gallery-page" @mousedown="startLasso" @contextmenu.prevent>
       <!-- Grid view: grouped with timeline -->
       <template v-if="items.length && viewMode==='grid' && groupedItems">
@@ -223,7 +225,7 @@ const GalleryPage = {
                   style="width:100px" color="primary"></q-slider>
       </template>
     </q-toolbar>
-    <!-- Context menu -->
+    <!-- Context menu: view detail, remove, find similar -->
     <div v-if="ctxMenu.show" class="ctx-menu-popup" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }">
       <q-list dense style="min-width:200px;border-radius:8px;overflow:hidden">
         <q-item clickable @click="ctxMenu.show = false; openDetail(selArr[0])" :disable="selArr.length > 1" style="padding-left:8px;padding-right:12px">
@@ -235,6 +237,10 @@ const GalleryPage = {
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="delete_outline" size="14px" color="grey-6"></q-icon></q-item-section>
           <q-item-section>{{ selArr.length > 1 ? '移出 ' + selArr.length + ' 个素材' : '移出素材库' }}</q-item-section>
           <q-item-section side style="flex-shrink:0;white-space:nowrap;display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--text3)">⌘+⌫</span></q-item-section>
+        </q-item>
+        <q-item clickable @click="ctxMenu.show = false; findSimilar()" :disable="selArr.length !== 1" style="padding-left:8px;padding-right:12px">
+          <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="content_copy" size="14px" color="grey-6"></q-icon></q-item-section>
+          <q-item-section>查找相似</q-item-section>
         </q-item>
       </q-list>
     </div>
@@ -276,6 +282,7 @@ const GalleryPage = {
     <div v-if="lasso" class="lasso" :style="lassoStyle"></div>
   </div>
   `,
+  // -- Data: state, filters, sort/group options --
   data() {
     return {
       items: [], total: 0, page: 1, perPage: 60, loading: false, loadingMore: false, allLoaded: false, viewMode: "grid", searchText: "",
@@ -314,7 +321,8 @@ const GalleryPage = {
       ],
     };
   },
-  watch: {
+  // -- Computed: grouped items, lasso style, filter state --
+  computed: {
     sortBy(val) {
       if (val !== "imported_at" && val !== "date_taken" && val !== "duration") this.groupBy = "";
     },
@@ -366,11 +374,11 @@ const GalleryPage = {
       };
     },
   },
+  // -- Lifecycle: load data, register keyboard & scroll observers --
   created() {
     this.load();
     document.addEventListener("mousedown", this.closeCtx);
-    document.addEventListener("keydown", this.onKeyDelete, true);
-    document.addEventListener("keydown", this.onKeyEnter, true);
+    document.addEventListener("keydown", this.handleKey, true);
   },
   mounted() {
     this._observer = new IntersectionObserver(([entry]) => {
@@ -382,12 +390,13 @@ const GalleryPage = {
   },
   beforeUnmount() {
     document.removeEventListener("mousedown", this.closeCtx);
-    document.removeEventListener("keydown", this.onKeyDelete, true);
-    document.removeEventListener("keydown", this.onKeyEnter, true);
+    document.removeEventListener("keydown", this.handleKey, true);
     if (this._observer) this._observer.disconnect();
   },
+  // -- Methods: data loading, selection, keyboard, context menu, formatting --
   methods: {
     API,
+    // Load first page, reset selection
     async load() {
       this.selArr = [];
       this.page = 1;
@@ -417,11 +426,13 @@ const GalleryPage = {
           if (data.length < this.perPage) this.allLoaded = true;
         }
         this.items = data;
+        this.$root.galleryItems = data;
       } catch(e) {
         console.error("gallery load error:", e);
       }
       this.loading = false;
     },
+    // Infinite scroll: load next page
     async loadMore() {
       if (this.loadingMore || this.allLoaded) return;
       this.loadingMore = true;
@@ -439,6 +450,7 @@ const GalleryPage = {
         const res = await API.getLibrary(params);
         const data = res.data || [];
         this.items = this.items.concat(data);
+        this.$root.galleryItems = this.items;
         this.total = res.pagination?.total || 0;
         if (data.length < this.perPage) this.allLoaded = true;
       } catch(e) {
@@ -590,22 +602,92 @@ const GalleryPage = {
       if (e.target.closest(".ctx-menu-popup")) return;
       this.ctxMenu.show = false;
     },
-    onKeyDelete(e) {
-      if (e.key !== "Backspace" && e.key !== "Delete") return;
-      if (!e.metaKey && !e.ctrlKey) return;
-      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
-      if (!this.selArr.length) return;
-      e.preventDefault();
-      e.stopPropagation();
-      this.deleteCtx();
-    },
-    onKeyEnter(e) {
-      if (e.key !== "Enter") return;
-      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
-      if (this.selArr.length === 1) {
-        e.preventDefault();
-        this.openDetail(this.selArr[0]);
+    handleKey(e) {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable) return;
+      // Skip when not on gallery view
+      if (this.$root.currentView !== "gallery") return;
+      const key = e.key;
+      // Arrow keys - move selection
+      if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(key)) {
+        e.preventDefault(); e.stopPropagation();
+        if (!this.items.length) return;
+        if (!this.selArr.length) { this.selArr = [this.items[0].id]; return; }
+        const lastId = this.selArr[this.selArr.length - 1];
+        const idx = this.items.findIndex(m => m.id === lastId);
+        let ni = idx;
+        if (this.viewMode === "grid") {
+          let cols = Math.max(1, Math.floor((this.$refs.galleryPage?.clientWidth || 800) / (180 * this.gridScale)));
+          const cards = this.$refs.galleryPage?.querySelectorAll("[data-id]");
+          if (cards?.length >= 2) {
+            const firstTop = cards[0].getBoundingClientRect().top;
+            const secondRow = Array.from(cards).findIndex(c => c.getBoundingClientRect().top > firstTop + 5);
+            if (secondRow > 0) cols = secondRow;
+          }
+          if (key === "ArrowRight") ni = Math.min(idx + 1, this.items.length - 1);
+          else if (key === "ArrowLeft") ni = Math.max(idx - 1, 0);
+          else if (key === "ArrowDown") ni = Math.min(idx + cols, this.items.length - 1);
+          else if (key === "ArrowUp") ni = Math.max(idx - cols, 0);
+        } else {
+          if (key === "ArrowDown" || key === "ArrowRight") ni = Math.min(idx + 1, this.items.length - 1);
+          else ni = Math.max(idx - 1, 0);
+        }
+        if (ni !== idx) this.selArr = [this.items[ni].id];
+        this.$nextTick(() => {
+          const el = document.querySelector(`[data-id="${this.items[ni]?.id}"]`);
+          el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        });
+        return;
       }
+      // Delete
+      if (key === "Delete" || key === "Backspace") {
+        if (!this.selArr.length) return;
+        e.preventDefault(); e.stopPropagation();
+        this.deleteCtx();
+        return;
+      }
+      // Enter - open detail
+      if (key === "Enter" && this.selArr.length === 1) {
+        e.preventDefault(); e.stopPropagation();
+        this.openDetail(this.selArr[0]);
+        return;
+      }
+      // Rating 0-5
+      if (key >= "0" && key <= "5" && this.selArr.length) {
+        e.preventDefault(); e.stopPropagation();
+        API.batchUpdate({ action: "rate", value: parseInt(key), ids: [...this.selArr] }).then(() => {
+          this.selArr.forEach(id => { const m = this.items.find(i => i.id === id); if (m) m.rating = parseInt(key); });
+        });
+        return;
+      }
+      // F - toggle favorite
+      if (key === "f" || key === "F") {
+        if (!this.selArr.length) return;
+        e.preventDefault(); e.stopPropagation();
+        const id = this.selArr[0];
+        const m = this.items.find(i => i.id === id);
+        if (!m) return;
+        const val = m.favorite ? 0 : 1;
+        API.batchUpdate({ action: "favorite", value: val, ids: [...this.selArr] }).then(() => {
+          this.selArr.forEach(sid => { const sm = this.items.find(i => i.id === sid); if (sm) sm.favorite = val; });
+        });
+        return;
+      }
+      // G - toggle grid/list
+      if (key === "g" || key === "G") {
+        e.preventDefault(); e.stopPropagation();
+        this.viewMode = this.viewMode === "grid" ? "list" : "grid";
+        return;
+      }
+      // / - focus search
+      if (key === "/") {
+        e.preventDefault(); e.stopPropagation();
+        const input = this.$el?.querySelector("input");
+        if (input) input.focus();
+        return;
+      }
+    },
+    clearSelection() {
+      this.selArr = [];
     },
     deleteCtx() {
       if (this.selArr.length > 1) {
@@ -616,10 +698,14 @@ const GalleryPage = {
         this.confirmDelete = { show: true, id, name: m ? m.file_name : "" };
       }
     },
+    findSimilar() {
+      location.hash = '#/duplicates';
+    },
     async doDelete() {
       try {
         await API.deleteMedia(this.confirmDelete.id);
         this.items = this.items.filter(i => i.id !== this.confirmDelete.id);
+        this.$root.galleryItems = this.items;
         this.total--;
         Quasar.Notify.create({ message: "已移除「" + this.confirmDelete.name + "」", position: 'top', color: 'dark', textColor: 'white', timeout: 1800 });
       } catch (e) {
@@ -634,6 +720,7 @@ const GalleryPage = {
         for (const id of ids) await API.deleteMedia(id);
         const set = new Set(ids);
         this.items = this.items.filter(i => !set.has(i.id));
+        this.$root.galleryItems = this.items;
         this.total -= ids.length;
         Quasar.Notify.create({ message: `已移除 ${ids.length} 个素材`, position: 'top', color: 'dark', textColor: 'white', timeout: 1800 });
       } catch (e) { console.error("batch delete error:", e); }

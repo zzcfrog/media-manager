@@ -299,3 +299,67 @@ def _segment_to_dict(row):
         elif not v:
             d[col] = []
     return d
+
+
+_EDITABLE_COLS = {
+    "time_start", "time_end", "visual", "asr", "subtitle", "shot_type", "focal_length",
+    "camera_angle", "camera_movement", "perspective", "scene_type",
+    "mood", "lighting", "weather", "dominant_colors", "main_subjects",
+}
+
+
+@bp.route("/<int:media_id>/segments/<int:seg_id>", methods=["PATCH"])
+def update_segment(media_id, seg_id):
+    import json as _json
+    db = get_db()
+    row = db.execute("SELECT id FROM media_segment WHERE id = ? AND media_id = ?", (seg_id, media_id)).fetchone()
+    if not row:
+        return jsonify({"error": "Segment not found"}), 404
+
+    data = request.get_json()
+    fields, params = [], []
+    for col in _EDITABLE_COLS:
+        if col not in data:
+            continue
+        val = data[col]
+        if col in ("dominant_colors", "main_subjects"):
+            val = _json.dumps(val if isinstance(val, list) else [val])
+        fields.append(f"{col} = ?")
+        params.append(val)
+
+    if not fields:
+        return jsonify({"error": "No fields to update"}), 400
+
+    params.append(seg_id)
+    db.execute(f"UPDATE media_segment SET {', '.join(fields)} WHERE id = ?", params)
+
+    segments = [_segment_to_dict(r) for r in db.execute(f"SELECT {_SEGMENT_COLS} FROM media_segment WHERE media_id = ? ORDER BY seq", (media_id,)).fetchall()]
+    _refresh_fts(db, media_id, segments)
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@bp.route("/<int:media_id>/segments/<int:seg_id>", methods=["DELETE"])
+def delete_segment(media_id, seg_id):
+    db = get_db()
+    seg = db.execute("SELECT id, seq, time_start, time_end FROM media_segment WHERE id = ? AND media_id = ?", (seg_id, media_id)).fetchone()
+    if not seg:
+        return jsonify({"error": "Segment not found"}), 404
+
+    adjust = request.args.get("adjust", "")
+
+    if adjust == "prev":
+        prev = db.execute("SELECT id FROM media_segment WHERE media_id = ? AND seq < ? ORDER BY seq DESC LIMIT 1", (media_id, seg["seq"])).fetchone()
+        if prev:
+            db.execute("UPDATE media_segment SET time_end = ? WHERE id = ?", (seg["time_end"], prev["id"]))
+    elif adjust == "next":
+        nxt = db.execute("SELECT id FROM media_segment WHERE media_id = ? AND seq > ? ORDER BY seq ASC LIMIT 1", (media_id, seg["seq"])).fetchone()
+        if nxt:
+            db.execute("UPDATE media_segment SET time_start = ? WHERE id = ?", (seg["time_start"], nxt["id"]))
+
+    db.execute("DELETE FROM media_segment WHERE id = ?", (seg_id,))
+
+    segments = [_segment_to_dict(r) for r in db.execute(f"SELECT {_SEGMENT_COLS} FROM media_segment WHERE media_id = ? ORDER BY seq, id", (media_id,)).fetchall()]
+    _refresh_fts(db, media_id, segments)
+    db.commit()
+    return jsonify({"ok": True})

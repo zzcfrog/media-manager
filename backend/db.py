@@ -141,6 +141,8 @@ _MIGRATIONS = [
     ("camera_make", "ALTER TABLE media ADD COLUMN camera_make TEXT"),
     ("lens_model", "ALTER TABLE media ADD COLUMN lens_model TEXT"),
     ("dialogue_to_asr", None),  # handled in _migrate specially
+    ("file_hash", "ALTER TABLE media ADD COLUMN file_hash TEXT"),
+    ("phash", "ALTER TABLE media ADD COLUMN phash TEXT"),
 ]
 
 

@@ -185,6 +185,22 @@ body:not(.body--dark) .q-dialog .q-card { box-shadow: 0 24px 80px rgba(255,255,2
 .seg-visual { font-size: 12px; color: var(--text); line-height: 1.5; margin-top: 6px; }
 .seg-text-line { font-size: 11px; color: var(--text2); line-height: 1.4; margin-top: 4px; }
 .seg-text-line .prefix { color: var(--text3); margin-right: 4px; }
+.seg-editable { cursor: text; border-radius: 3px; padding: 1px 4px; transition: background 0.15s; }
+.seg-editable:hover { background: var(--surface3); }
+.seg-editable:focus { background: var(--surface2); outline: 1px solid var(--accent); }
+.seg-editable-tag { cursor: pointer; }
+.seg-editable-tag:hover { opacity: 0.7; }
+.tag-add-input { background: none; border: 1px dashed var(--border2); border-radius: 10px; color: var(--text2); font-size: 10px; padding: 1px 6px; width: 36px; outline: none; transition: border-color 0.15s; }
+.tag-add-input:focus { border-color: var(--accent); width: 60px; }
+.tag-add-input::placeholder { color: var(--text3); text-align: center; }
+.seg-del-btn { opacity: 0; transition: opacity 0.15s; }
+.segment:hover .seg-del-btn { opacity: 1; }
+.dup-group { background: var(--surface2); border-radius: 10px; padding: 14px 16px; border: 1px solid var(--border); }
+.dup-badge { background: var(--accent); color: #fff; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 10px; }
+.dup-thumb { cursor: pointer; flex-shrink: 0; }
+.dup-thumb img { width: 140px; height: 80px; object-fit: cover; border-radius: 6px; display: block; border: 1px solid var(--border); transition: border-color 0.15s; }
+.dup-thumb:hover img { border-color: var(--accent); }
+.dup-thumb-name { font-size: 11px; color: var(--text2); margin-top: 4px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dim-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 6px; padding: 5px 8px; background: var(--surface2); border-radius: 5px; }
 .dim-pair { display: flex; align-items: center; gap: 3px; }
 .dim-label { font-size: 10px; color: var(--text3); }
@@ -248,7 +264,7 @@ body.body--dark .q-separator { background: #252525 !important; }
 
 /* Filter bar controls height */
 .filter-bar .q-btn-group { border: none !important; background: var(--surface2); border-radius: 6px; overflow: hidden; box-shadow: none !important; }
-.filter-bar .q-btn-group .q-btn { padding: 3px 10px; min-height: 28px; font-size: 12px; }
+.filter-bar .q-btn-group .q-btn { padding: 3px 10px; min-height: 28px; font-size: 13px; }
 .filter-bar .q-btn-group .q-btn--active { box-shadow: none !important; }
 .filter-bar .q-field { font-size: 12px; }
 .filter-bar .q-field__control { height: 28px !important; min-height: 28px !important; }
