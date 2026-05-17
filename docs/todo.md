@@ -131,6 +131,36 @@
 ### 导出与分享
 - [ ] **分析报告导出** — 导出 AI 分析结果为 PDF/文本
 
+## 已完成：图片压缩分析 + 详情页布局重构 + 色彩曲线检测（2026-05-17）
+
+在 XMP 写入基础上，新增图片压缩分析流程、详情页布局全面重构、色彩曲线检测。
+
+**改动文件：**
+- `backend/compressor.py` — 新增 `compress_image()` 函数，Pillow 缩放 + rawpy 解码 RAW 格式（NEF/DNG/CR2/ARW 等），保存为 JPEG quality=85
+- `backend/db.py` — `_DEFAULTS` 新增 `image_resolution`、`image_api_key`、`image_model`；`_MIGRATIONS` 新增 `picture_control` 列
+- `backend/blueprints/analysis.py` — `_start_image_analysis()` 从设置读取图片独立配置（API Key 不回退视频 Key），压缩后再分析，SSE 推送压缩进度
+- `backend/services/importer.py` — 导入时读取 `PictureControlName`（尼康 N-Log），DJI 文件名 `_D` 后缀推断 D-Log M；INSERT 扩展 `picture_control` 列；exiftool 命令增加 `-PictureControlName`
+- `backend/blueprints/library.py` — 新增 `POST /api/library/backfill-picture-control` 回填历史数据；XMP 写入端点增加分析字段（dominant_colors/main_subjects/scene_type/mood/weather/lighting）作为 dc:Subject 关键字
+- `frontend/index.html` — 设置弹窗新增"图片分析"区块（压缩尺寸/模型/API Key），排在视频分析之前
+- `frontend/js/detail.js` — 详情页布局重构：元数据从右侧边栏移至媒体上方横排显示；视频信息分两列；图片缩放（滚轮/触控板双指张合）+ 拖拽平移（触控板双指滑动/鼠标拖拽）；缩放条贴在图片底边内侧；XMP 写入按钮使用自定义 SVG 图标；图片分析结果隐藏时间范围/片段数/删除按钮
+- `frontend/js/gallery.js` — 卡片新增 XMP 徽章（右下角，自定义 SVG 图标，ungrouped 和 grouped 两种模板均已添加）
+- `frontend/css/main.css` — `.img-meta-bar`/`.img-meta-block`/`.img-meta-title` 横排元数据样式；`.img-zoom-bar` 缩放条贴图底；`.xmp-badge` 移至右下角 right:28px（与类型图标并排）
+- `frontend/img/` — 新增 3 个自定义 SVG 图标：`xmp-badge.svg`（文件+XMP文字）、`xmp-write.svg`（文件+XMP+左箭头）、`xmp-refresh.svg`（文件+XMP+循环箭头）
+- `requirements.txt` — 新增 `rawpy>=0.20.0`
+
+**色彩曲线检测逻辑：**
+- 尼康：从 exiftool 的 `PictureControlName` 读取（如 N-Log），准确
+- 大疆：从文件名后缀 `_D` 推断 D-Log M，可能不准确
+- 前端显示时带叹号图标，悬停提示两种来源的准确性差异
+
+**图片压缩流程：**
+```
+图片分析请求 → 读取 image_resolution 设置 → compress_image()
+  ├── RAW 格式 → rawpy 解码 → Pillow 缩放 → 临时 JPEG
+  └── 普通格式 → Pillow 直接缩放 → 临时 JPEG
+→ analyze_image() → 清理临时文件
+```
+
 ## 已完成：XMP 侧车文件写入（2026-05-17）
 
 将评分、标签、AI 分析摘要写入 XMP 侧车文件（仅照片），供 Lightroom、Bridge 等专业软件识别。

@@ -14,6 +14,7 @@
 | RAW 解码 | rawpy + Pillow |
 | HEIC 解码 | pillow-heif |
 | 中文分词 | jieba（FTS5 索引） |
+| 哈希去重 | hashlib SHA256 + imagehash pHash |
 | 端口 | 6622 |
 
 ## 2. 项目结构
@@ -99,8 +100,9 @@ media (id, file_path UNIQUE, file_name, media_type, file_size, duration,
        width, height, fps, video_codec, video_profile, bit_rate,
        audio_codec, audio_sample_rate, audio_channels,
        color_space, color_range, pix_fmt,
-       camera_make, camera_model, lens_model,
+       camera_make, camera_model, lens_model, picture_control,
        date_taken, thumbnail_path,
+       file_hash, phash, has_xmp,
        analysis_status, analysis_model, analysis_date,
        rating, color_label, favorite, notes,
        imported_at, updated_at)
@@ -125,7 +127,7 @@ media_fts (FTS5: media_id UNINDEXED, file_name, visual, asr, subtitle,
 
 -- 全局设置
 settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)
--- 默认值: resolution, fps, vendor, model, use_multimodal, asr_engine, video_api_key, asr_api_key
+-- 默认值: resolution, fps, vendor, model, use_multimodal, asr_engine, video_api_key, asr_api_key, image_resolution, image_api_key, image_model
 ```
 
 **迁移系统**：`_MIGRATIONS` 列表 + `_migrate()` 函数，通过 `PRAGMA table_info` 检测缺失列并 ALTER TABLE。特殊情况（如 dialogue→asr 重命名 + FTS 重建）在 `_migrate()` 中硬编码处理。
@@ -200,7 +202,11 @@ scan_only() — 返回文件列表 + 已存在列表
 import_single_file() × 3 并发
     ├── _import_one() — 检查重复（清理旧缩略图）
     ├── _probe() / _probe_image() — ffprobe + exiftool 元数据
-    ├── _generate_thumbnail() — ffmpeg 截帧 / exiftool 提取
+    │   ├── 视频额外检测：DJI 文件名 _D 后缀推断 D-Log M
+    │   └── 图片额外检测：XMP 侧车文件是否存在
+    ├── _compute_file_hash() — SHA256 文件哈希
+    ├── _compute_phash() — 感知哈希（pHash，用于相似检测）
+    ├── _generate_thumbnail() — ffmpeg 截帧 / exiftool 提取（RAW 内嵌缩略图）
     └── INSERT media + media_fts
 ```
 
@@ -334,8 +340,10 @@ Gallery.load() / Gallery.loadMore()
 openai>=1.0.0       # 智谱 AI VLM API（OpenAI 兼容端点）
 python-dotenv>=1.0.0
 flask>=3.0
-Pillow>=10.0        # 图片处理
+Pillow>=10.0        # 图片处理 + 压缩
 faster-whisper>=1.0.0  # 本地 ASR
+rawpy>=0.20.0       # RAW 格式解码（NEF/DNG/CR2/ARW 等）
+imagehash           # 感知哈希（pHash）用于相似图片检测
 ```
 
 运行时额外依赖（非 requirements.txt）：`jieba`、`rawpy`、`pillow-heif`。
