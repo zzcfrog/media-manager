@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from ..db import get_db, get_setting
-from ..compressor import compress_video
+from ..compressor import compress_video, compress_image
 from ..analyzer import analyze_video, analyze_image, CODING_BASE_URL
 from ..asr import get_engine as get_asr_engine
 
@@ -61,21 +61,34 @@ def start_analysis(media_id):
 
 def _start_image_analysis(media_id, media, app):
     db = get_db()
-    model = get_setting(db, "model", "glm-4.6v")
-    api_key = get_setting(db, "video_api_key", "")
-    if not api_key:
-        return jsonify({"error": "API Key 未设置，请在设置中配置"}), 400
+    model = get_setting(db, "image_model", "glm-4.6v")
+    image_api_key = get_setting(db, "image_api_key", "")
+    if not image_api_key:
+        return jsonify({"error": "图片 API Key 未设置，请在设置中配置"}), 400
+    image_resolution = get_setting(db, "image_resolution", "1920")
+    file_path = media["file_path"]
+
     db.execute("UPDATE media SET analysis_status = 'processing' WHERE id = ?", (media_id,))
     db.commit()
-    file_path = media["file_path"]
 
     def generate():
         with app.app_context():
             try:
+                analyze_path = file_path
+
+                if image_resolution != "original":
+                    max_edge = int(image_resolution)
+                    yield f"data: {json.dumps({'type': 'progress', 'step': 'compressing', 'message': f'压缩图片至 {max_edge}px...'}, ensure_ascii=False)}\n\n"
+                    cp, compress_time = compress_image(file_path, max_long_edge=max_edge)
+                    compressed_path_holder[0] = str(cp)
+                    analyze_path = str(cp)
+                    size_kb = cp.stat().st_size / 1024
+                    yield f"data: {json.dumps({'type': 'progress', 'step': 'compressed', 'message': f'压缩完成: {size_kb:.0f}KB, 耗时 {compress_time:.1f}s'}, ensure_ascii=False)}\n\n"
+
                 yield f"data: {json.dumps({'type': 'progress', 'step': 'analyzing', 'message': f'调用 {model} 分析中...'}, ensure_ascii=False)}\n\n"
 
                 result, analyze_time, usage = analyze_image(
-                    file_path, api_key, model=model, base_url=CODING_BASE_URL,
+                    analyze_path, image_api_key, model=model, base_url=CODING_BASE_URL,
                 )
 
                 segments = [result]
@@ -91,8 +104,25 @@ def _start_image_analysis(media_id, media, app):
                 db.execute("UPDATE media SET analysis_status = 'error' WHERE id = ?", (media_id,))
                 db.commit()
                 yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
+            finally:
+                cp = compressed_path_holder[0]
+                if cp and Path(cp).exists():
+                    try:
+                        Path(cp).unlink()
+                    except OSError:
+                        pass
 
-    return Response(generate(), mimetype="text/event-stream")
+    def _cleanup_temp(path):
+        if path and Path(path).exists():
+            try:
+                Path(path).unlink()
+            except OSError:
+                pass
+
+    compressed_path_holder = [None]
+    resp = Response(generate(), mimetype="text/event-stream")
+    resp.call_on_close(lambda: _cleanup_temp(compressed_path_holder[0]))
+    return resp
 
 
 def _start_video_analysis(media_id, media, app):

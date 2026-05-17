@@ -13,80 +13,122 @@ const DetailPage = {
       <q-btn flat round dense :color="media?.favorite ? 'red' : 'grey-6'" icon="favorite" size="sm" style="margin-left:10px" @click="toggleFav">
         <q-tooltip :delay="1000">收藏</q-tooltip>
       </q-btn>
+      <q-btn v-if="media?.media_type==='image' && analysis.status==='done'" flat round dense size="sm" style="margin-left:6px" @click="doWriteXmp">
+        <img :src="media?.has_xmp ? '/static/img/xmp-refresh.svg' : '/static/img/xmp-write.svg'" style="width:18px;height:18px" :style="{opacity: media?.has_xmp ? 1 : 0.45}">
+        <q-tooltip :delay="1000">{{ media?.has_xmp ? '已写入 XMP（点击更新）' : '写入 XMP' }}</q-tooltip>
+      </q-btn>
     </q-toolbar>
     <div style="flex:1;display:flex;overflow:hidden">
       <div style="flex:1;display:flex;flex-direction:column;min-width:0">
-        <video v-if="media?.media_type==='video'" ref="player" :src="API.videoUrl(media.id)" controls preload="auto" tabindex="-1"
-               @loadeddata="onVideoLoaded" @play="onVideoPlay" @pause="onVideoPause" @seeked="onVideoSeeked" @error="onVideoError"
-               style="width:100%;flex:1;background:var(--surface2)"></video>
-        <div v-else-if="media?.media_type==='image'" style="flex:1;display:flex;flex-direction:column;min-height:0">
-          <div style="flex:1;display:flex;align-items:center;justify-content:center;position:relative;min-height:0">
-            <q-spinner-dots v-if="imgLoading" color="grey-6" size="40px" style="position:absolute;z-index:1"></q-spinner-dots>
-            <img ref="imgEl" :src="API.imageUrl(media.id)" @load="onImageLoaded" style="max-width:100%;max-height:100%;object-fit:contain;background:var(--surface2)">
-          </div>
-          <div class="histogram-wrap" ref="histWrap"><canvas ref="histCanvas"></canvas></div>
-        </div>
-        <!-- Audio waveform -->
-        <div v-if="media?.media_type==='video'" class="waveform-wrap" ref="waveformWrap" @click="onWaveformClick">
-          <canvas ref="wfCanvas"></canvas>
-        </div>
-        <!-- Video scopes -->
-        <div v-if="media?.media_type==='video'" class="scopes-row" ref="scopesRow">
-          <div class="scope-box"><canvas ref="scopeWf"></canvas><span class="scope-label">Waveform</span></div>
-          <div class="scope-box"><canvas ref="scopePr"></canvas><span class="scope-label">Parade</span></div>
-          <div class="scope-box"><canvas ref="scopeVt"></canvas><span class="scope-label">Vectorscope</span></div>
-        </div>
-      </div>
-      <div class="detail-sidebar">
-        <div v-if="media" class="meta-row">
-          <div style="display:flex;gap:16px">
-            <div style="flex:1">
-              <div class="meta-section-title">{{ media.media_type === 'video' ? '视频' : '图像' }}</div>
-              <div class="meta-grid">
-                <span class="meta-label">分辨率</span><span>{{ media.width }}x{{ media.height }}</span>
-                <template v-if="media.media_type === 'video'">
+        <div v-if="media?.media_type==='video'" style="flex:1;display:flex;flex-direction:column;min-height:0">
+          <div v-if="media" class="img-meta-bar">
+            <div class="img-meta-block">
+              <div class="img-meta-title">视频</div>
+              <div style="display:flex;gap:14px;align-items:flex-start">
+                <div class="meta-grid" style="gap:4px 14px">
+                  <span class="meta-label">分辨率</span><span>{{ media.width }}x{{ media.height }}</span>
                   <span class="meta-label">时长</span><span>{{ fmtDur(media.duration) }}</span>
                   <span class="meta-label">编码</span><span>{{ media.video_codec }}<template v-if="media.video_profile"> ({{ media.video_profile }})</template></span>
+                </div>
+                <div class="meta-grid" style="gap:4px 14px">
                   <span class="meta-label">帧率</span><span>{{ fmtFps(media.fps) }}</span>
-                  <span class="meta-label">色彩空间</span><span>{{ media.color_space || '-' }}</span>
                   <span class="meta-label">码流</span><span v-if="media.bit_rate">{{ (media.bit_rate / 1000000).toFixed(1) }} Mbps</span><span v-else>-</span>
-                </template>
-                <template v-else>
-                  <span class="meta-label">编码</span><span>{{ media.video_codec || '-' }}</span>
                   <span class="meta-label">色彩空间</span><span>{{ media.color_space || '-' }}</span>
-                  <span class="meta-label">位深度</span><span>{{ media.pix_fmt || '-' }}</span>
-                </template>
+                  <span v-if="media.picture_control" class="meta-label">色彩曲线</span><span v-if="media.picture_control" style="display:inline-flex;align-items:center;gap:3px">{{ media.picture_control }}<q-icon name="help_outline" size="12px" color="grey-6"><q-tooltip :delay="500" style="max-width:280px">尼康的 N-Log 取自 EXIF 元数据（PictureControlName），较为准确。大疆的 D-Log M 根据文件命名后缀 _D 推断，可能存在不准确的情况。</q-tooltip></q-icon></span>
+                </div>
               </div>
-              <template v-if="media.media_type === 'video' && media.audio_codec">
-                <div class="meta-section-title" style="margin-top:10px">音频</div>
-                <div class="meta-grid">
+            </div>
+            <div class="img-meta-block">
+              <div class="img-meta-title">音频</div>
+              <div class="meta-grid" style="gap:4px 14px">
+                <template v-if="media.audio_codec">
                   <span class="meta-label">编码</span><span>{{ media.audio_codec }}</span>
                   <span class="meta-label">采样率</span><span v-if="media.audio_sample_rate">{{ (media.audio_sample_rate / 1000).toFixed(1) }} kHz</span><span v-else>-</span>
                   <span class="meta-label">声道</span><span>{{ media.audio_channels === 1 ? '单声道' : media.audio_channels === 2 ? '立体声' : (media.audio_channels || '-') + ' 声道' }}</span>
-                </div>
-              </template>
+                </template>
+                <template v-else>
+                  <span style="color:var(--text3)">无音频</span>
+                </template>
+              </div>
             </div>
-            <div style="flex:1">
-              <div class="meta-section-title">拍摄设备</div>
-              <div class="meta-grid">
+            <div class="img-meta-block">
+              <div class="img-meta-title">拍摄设备</div>
+              <div class="meta-grid" style="gap:4px 14px">
                 <span class="meta-label">制造商</span><span>{{ media.camera_make || '-' }}</span>
                 <span class="meta-label">机型</span><span>{{ media.camera_model || '-' }}</span>
                 <span class="meta-label">镜头</span><span>{{ media.lens_model || '-' }}</span>
               </div>
-              <div class="meta-section-title" style="margin-top:10px">文件信息</div>
-              <div class="meta-grid">
-                <span class="meta-label">位置</span><span style="display:flex;align-items:center;gap:4px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:15ch;cursor:default"><q-tooltip :delay="1000">{{ media.file_path }}</q-tooltip>{{ media.file_path }}</span><q-icon name="folder_open" size="14px" color="grey-6" style="cursor:pointer;flex-shrink:0" @click="openInFinder"></q-icon></span>
-                <span class="meta-label">大小</span><span>{{ fmtSize(media.file_size) }}</span>
-                <span class="meta-label">导入时间</span><span>{{ fmtDate(media.imported_at) }}</span>
+            </div>
+            <div class="img-meta-block" style="flex:1 1 0;min-width:0;overflow:hidden">
+              <div class="img-meta-title">文件信息</div>
+              <div class="meta-grid" style="gap:4px 14px">
                 <span class="meta-label">拍摄时间</span><span>{{ fmtDate(media.date_taken) }}</span>
+                <span class="meta-label">大小</span><span>{{ fmtSize(media.file_size) }}</span>
+                <span class="meta-label">位置</span><span style="display:flex;align-items:center;gap:4px"><span class="meta-path" style="cursor:default"><q-tooltip :delay="1000">{{ media.file_path }}</q-tooltip>{{ media.file_path }}</span><q-icon name="folder_open" size="13px" color="grey-6" style="cursor:pointer;flex-shrink:0" @click="openInFinder"></q-icon></span>
               </div>
             </div>
           </div>
+          <div style="flex:1;position:relative;min-height:0">
+            <video ref="player" :src="API.videoUrl(media.id)" controls preload="auto" tabindex="-1"
+                   @loadeddata="onVideoLoaded" @play="onVideoPlay" @pause="onVideoPause" @seeked="onVideoSeeked" @error="onVideoError"
+                   style="width:100%;height:100%;background:var(--surface2)"></video>
+          </div>
+          <div class="waveform-wrap" ref="waveformWrap" @click="onWaveformClick">
+            <canvas ref="wfCanvas"></canvas>
+          </div>
+          <div class="scopes-row" ref="scopesRow">
+            <div class="scope-box"><canvas ref="scopeWf"></canvas><span class="scope-label">Waveform</span></div>
+            <div class="scope-box"><canvas ref="scopePr"></canvas><span class="scope-label">Parade</span></div>
+            <div class="scope-box"><canvas ref="scopeVt"></canvas><span class="scope-label">Vectorscope</span></div>
+          </div>
         </div>
+        <div v-else-if="media?.media_type==='image'" style="flex:1;display:flex;flex-direction:column;min-height:0">
+          <div v-if="media" class="img-meta-bar">
+            <div class="img-meta-block">
+              <div class="img-meta-title">图像</div>
+              <div class="meta-grid" style="gap:4px 14px">
+                <span class="meta-label">分辨率</span><span>{{ media.width }}x{{ media.height }}</span>
+                <span class="meta-label">编码</span><span>{{ media.video_codec || '-' }}</span>
+                <span class="meta-label">色彩空间</span><span>{{ media.color_space || '-' }}</span>
+                <span class="meta-label">位深度</span><span>{{ media.pix_fmt || '-' }}</span>
+              </div>
+            </div>
+            <div class="img-meta-block">
+              <div class="img-meta-title">拍摄设备</div>
+              <div class="meta-grid" style="gap:4px 14px">
+                <span class="meta-label">机型</span><span>{{ media.camera_model || '-' }}</span>
+                <span class="meta-label">镜头</span><span>{{ media.lens_model || '-' }}</span>
+              </div>
+            </div>
+            <div class="img-meta-block" style="flex:1 1 0;min-width:0;overflow:hidden">
+              <div class="img-meta-title">文件信息</div>
+              <div class="meta-grid" style="gap:4px 14px">
+                <span class="meta-label">拍摄时间</span><span>{{ fmtDate(media.date_taken) }}</span>
+                <span class="meta-label">大小</span><span>{{ fmtSize(media.file_size) }}</span>
+                <span class="meta-label">位置</span><span style="display:flex;align-items:center;gap:4px"><span class="meta-path" style="cursor:default"><q-tooltip :delay="1000">{{ media.file_path }}</q-tooltip>{{ media.file_path }}</span><q-icon name="folder_open" size="13px" color="grey-6" style="cursor:pointer;flex-shrink:0" @click="openInFinder"></q-icon><span v-if="media.has_xmp" style="display:inline-flex;cursor:default"><img src="/static/img/xmp-badge.svg" style="width:13px;height:13px"><q-tooltip :delay="1000">已写入 XMP</q-tooltip></span></span>
+              </div>
+            </div>
+          </div>
+          <div ref="imgContainer" style="flex:1;display:flex;align-items:flex-start;justify-content:center;position:relative;min-height:0;overflow:hidden">
+            <q-spinner-dots v-if="imgLoading" color="grey-6" size="40px" style="position:absolute;z-index:1"></q-spinner-dots>
+            <div style="position:relative;display:inline-flex;max-width:100%;max-height:100%;line-height:0">
+              <img ref="imgEl" :src="API.imageUrl(media.id)" @load="onImageLoaded" :style="{transform: 'scale(' + imgZoom + ') translate(' + imgPanX + 'px,' + imgPanY + 'px)', transformOrigin: 'center center', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', background: 'var(--surface2)', transition: imgZooming ? 'transform 0.15s ease' : 'none', cursor: imgZoom > 1 ? (imgDragging ? 'grabbing' : 'grab') : 'default'}" @wheel="onImgWheel" @mousedown="onImgMouseDown" @mousemove="onImgMouseMove" @mouseup="onImgMouseUp" @mouseleave="onImgMouseUp" @dragstart.prevent>
+              <div class="img-zoom-bar">
+                <q-btn flat round dense icon="remove" size="xs" color="grey-6" @click="imgZoomBy(-0.25)"></q-btn>
+                <span style="font-size:11px;color:var(--text2);min-width:36px;text-align:center">{{ Math.round(imgZoom * 100) }}%</span>
+                <q-btn flat round dense icon="add" size="xs" color="grey-6" @click="imgZoomBy(0.25)"></q-btn>
+                <q-btn flat round dense icon="fit_screen" size="xs" color="grey-6" @click="imgZoom=1;imgPanX=0;imgPanY=0" v-if="imgZoom!==1"></q-btn>
+              </div>
+            </div>
+          </div>
+          <div class="histogram-wrap" ref="histWrap"><canvas ref="histCanvas"></canvas></div>
+        </div>
+      </div>
+      <div class="detail-sidebar">
         <!-- Analysis section -->
         <div v-if="analysis.status==='done' && analysis.segments?.length" style="border-top:1px solid var(--border);display:flex;flex-direction:column;flex:1;min-height:0">
           <div style="padding:10px 14px;font-size:12px;font-weight:600;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0">
-            <span style="color:var(--accent)">◎ {{ analysis.segments.length }} 个片段</span>
+            <span v-if="media?.media_type==='video'" style="color:var(--accent)">◎ {{ analysis.segments.length }} 个片段</span>
             <div style="flex:1"></div>
             <q-btn flat dense icon="delete_outline" label="清除分析" color="grey-6" size="sm" :disable="analyzing" @click="showClearDialog=true" style="font-size:11px"></q-btn>
             <q-btn dense icon="auto_awesome" label="重新分析" color="primary" size="sm" :disable="analyzing" @click="openAnalysisConfirm" style="font-size:11px;border-radius:4px;padding-left:12px;padding-right:12px"></q-btn>
@@ -94,11 +136,11 @@ const DetailPage = {
           <q-scroll-area ref="segScroll" style="flex:1">
             <div v-for="(seg,i) in analysis.segments" :key="i" class="segment" :class="{active: activeSeg===i}" @click="seekTo(seg.time_start)">
               <div style="display:flex;align-items:center;justify-content:space-between">
-                <span class="seg-time"><span class="seg-editable" contenteditable @click.stop @blur="e => { saveSegField(seg, 'time_start', e.target.innerText.trim()) }" v-text="seg.time_start"></span> → <span class="seg-editable" contenteditable @click.stop @blur="e => { saveSegField(seg, 'time_end', e.target.innerText.trim()) }" v-text="seg.time_end"></span></span>
+                <template v-if="media?.media_type==='video'"><span class="seg-time"><span class="seg-editable" contenteditable @click.stop @blur="e => { saveSegField(seg, 'time_start', e.target.innerText.trim()) }" v-text="seg.time_start"></span> → <span class="seg-editable" contenteditable @click.stop @blur="e => { saveSegField(seg, 'time_end', e.target.innerText.trim()) }" v-text="seg.time_end"></span></span>
                 <div style="display:flex;align-items:center;gap:6px">
                   <span class="seg-dur">{{ fmtSegDur(seg.time_start, seg.time_end) }}</span>
                   <q-btn flat round dense icon="delete_outline" size="xs" color="grey-6" class="seg-del-btn" @click.stop="confirmDeleteSeg(seg, i)"><q-tooltip :delay="800">删除片段</q-tooltip></q-btn>
-                </div>
+                </div></template>
               </div>
               <div class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'visual', e.target.innerText)" v-text="seg.visual"></div>
               <div v-if="seg.asr && seg.asr!=='无'" class="seg-text-line seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'asr', e.target.innerText)"><span class="prefix">💬 对话</span><span v-text="seg.asr"></span></div>
@@ -219,6 +261,10 @@ const DetailPage = {
     return {
       media: null, analysis: { status: "none", segments: [] },
       imgLoading: false,
+      imgZoom: 1,
+      imgZooming: false,
+      imgPanX: 0, imgPanY: 0,
+      imgDragging: false, imgDragStart: null,
       analyzing: false, analysisProgress: "", activeSeg: -1,
       analysisStages: [], analyzeTipText: "",
       showAnalysisDialog: false, showClearDialog: false, showDeleteSegDialog: false,
@@ -277,7 +323,51 @@ const DetailPage = {
     API,
     onImageLoaded() {
       this.imgLoading = false;
+      this.imgZoom = 1;
+      this.imgPanX = 0;
+      this.imgPanY = 0;
       this.drawHistogram();
+    },
+    imgZoomBy(delta) {
+      this.imgZooming = true;
+      this.imgZoom = Math.max(0.25, Math.min(5, Math.round((this.imgZoom + delta) * 100) / 100));
+      if (this.imgZoom <= 1) { this.imgPanX = 0; this.imgPanY = 0; }
+      setTimeout(() => { this.imgZooming = false; }, 160);
+    },
+    onImgWheel(e) {
+      e.preventDefault();
+      if (e.ctrlKey) {
+        // 触控板双指张合 → 缩放
+        this.imgZooming = false;
+        const factor = 1 - e.deltaY * 0.005;
+        this.imgZoom = Math.max(0.25, Math.min(5, Math.round(this.imgZoom * factor * 100) / 100));
+      } else if (e.deltaMode === 0) {
+        // 触控板双指滑动 → 平移
+        this.imgZooming = false;
+        this.imgPanX -= e.deltaX;
+        this.imgPanY -= e.deltaY;
+        if (this.imgZoom <= 1) { this.imgPanX = 0; this.imgPanY = 0; }
+      } else {
+        // 鼠标滚轮 → 缩放
+        this.imgZooming = false;
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        this.imgZoom = Math.max(0.25, Math.min(5, Math.round((this.imgZoom + delta) * 100) / 100));
+      }
+      if (this.imgZoom <= 1) { this.imgPanX = 0; this.imgPanY = 0; }
+    },
+    onImgMouseDown(e) {
+      if (this.imgZoom <= 1) return;
+      e.preventDefault();
+      this.imgDragging = true;
+      this.imgDragStart = { x: e.clientX - this.imgPanX, y: e.clientY - this.imgPanY };
+    },
+    onImgMouseMove(e) {
+      if (!this.imgDragging) return;
+      this.imgPanX = e.clientX - this.imgDragStart.x;
+      this.imgPanY = e.clientY - this.imgDragStart.y;
+    },
+    onImgMouseUp() {
+      this.imgDragging = false;
     },
     drawHistogram() {
       const img = this.$refs.imgEl;
@@ -594,6 +684,19 @@ const DetailPage = {
     },
     openInFinder() {
       if (window.electronAPI?.openInFinder) window.electronAPI.openInFinder(this.media.file_path);
+    },
+    async doWriteXmp() {
+      try {
+        const res = await API.writeXmp(this.media.id);
+        if (res.ok) {
+          this.media.has_xmp = 1;
+          Quasar.Notify.create({ message: '已写入 XMP', position: 'top', timeout: 1500 });
+        } else {
+          Quasar.Notify.create({ message: '写入 XMP 失败', position: 'top', color: 'negative', timeout: 2000 });
+        }
+      } catch (e) {
+        Quasar.Notify.create({ message: '写入失败: ' + e.message, position: 'top', color: 'negative', timeout: 2000 });
+      }
     },
     async clearAnalysis() {
       try {

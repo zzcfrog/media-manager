@@ -143,6 +143,8 @@ _MIGRATIONS = [
     ("dialogue_to_asr", None),  # handled in _migrate specially
     ("file_hash", "ALTER TABLE media ADD COLUMN file_hash TEXT"),
     ("phash", "ALTER TABLE media ADD COLUMN phash TEXT"),
+    ("has_xmp", "ALTER TABLE media ADD COLUMN has_xmp INTEGER DEFAULT 0"),
+    ("picture_control", "ALTER TABLE media ADD COLUMN picture_control TEXT"),
 ]
 
 
@@ -191,6 +193,9 @@ _DEFAULTS = {
     "asr_engine": "whisper",
     "video_api_key": "",
     "asr_api_key": "",
+    "image_resolution": "1920",
+    "image_api_key": "",
+    "image_model": "glm-4.6v",
 }
 
 

@@ -130,7 +130,30 @@
 
 ### 导出与分享
 - [ ] **分析报告导出** — 导出 AI 分析结果为 PDF/文本
-- [ ] **元数据写入** — 评分、标签、分析摘要回写到文件 EXIF/XMP
+
+## 已完成：XMP 侧车文件写入（2026-05-17）
+
+将评分、标签、AI 分析摘要写入 XMP 侧车文件（仅照片），供 Lightroom、Bridge 等专业软件识别。
+
+**改动文件：**
+- `backend/db.py` — `_MIGRATIONS` 新增 `has_xmp` 列（INTEGER DEFAULT 0）
+- `backend/services/xmp_writer.py` — **新文件** — XMP 侧车文件写入模块，使用 exiftool CLI
+  - `write_xmp()` — 写入评分（`xmp:Rating`）、标签（`dc:Subject`）、描述（`dc:Description`）、颜色标签（`xmp:Label`）
+  - 已有 XMP 文件：exiftool 直接修改，保留其他字段
+  - 无 XMP 文件：先从源图提取创建，再写入字段
+- `backend/blueprints/library.py` — 新增 `POST /api/library/<id>/write-xmp`（单张写入）和 `POST /api/library/batch-write-xmp`（批量写入，仅处理照片）
+- `frontend/js/api.js` — 新增 `writeXmp()` 和 `batchWriteXmp()` 方法
+- `frontend/js/detail.js` — 工具栏新增"写入 XMP"按钮（仅图片显示，图标 `description`），写入后按钮变蓝；元数据侧边栏显示 XMP 标记
+- `frontend/js/gallery.js` — 卡片新增 XMP 徽章（缩略图左下角）；右键菜单新增"写入 XMP"选项；批量选中后可批量写入
+- `frontend/css/main.css` — `.xmp-badge` 样式（半透明黑色背景，位于 AI 徽章右侧）
+
+**XMP 字段映射：**
+| 数据库字段 | XMP 字段 | 说明 |
+|-----------|---------|------|
+| `rating` | `xmp:Rating` | 1-5 评分 |
+| tags (media_tags) | `dc:Subject` | 标签列表 |
+| segment.visual | `dc:Description` | AI 分析摘要（第一段） |
+| `color_label` | `xmp:Label` | 颜色标签 |
 
 ## 第一轮审计：内存 & 硬盘
 

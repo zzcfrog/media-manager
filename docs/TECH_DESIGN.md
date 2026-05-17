@@ -44,7 +44,8 @@ video_analyzer/
 │   │   ├── tags.py            # 标签管理
 │   │   └── settings.py        # 全局设置 CRUD
 │   └── services/
-│       └── importer.py        # 文件扫描、元数据提取、缩略图生成
+│       ├── importer.py        # 文件扫描、元数据提取、缩略图生成
+│       └── xmp_writer.py     # XMP 侧车文件写入（仅照片）
 ├── frontend/
 │   ├── index.html             # SPA 主页面（Vue app + 路由 + 弹窗）
 │   ├── css/main.css           # 暗色/亮色主题
@@ -324,7 +325,7 @@ Gallery.load() / Gallery.loadMore()
 | 工具 | 用途 |
 |------|------|
 | ffmpeg/ffprobe | 视频压缩、截帧缩略图、实时转码、元数据提取 |
-| exiftool | 相机/镜头元数据、拍摄日期、RAW 内嵌缩略图提取 |
+| exiftool | 相机/镜头元数据、拍摄日期、RAW 内嵌缩略图提取、XMP 侧车文件写入 |
 | faster-whisper | 本地 ASR（large-v3 模型，CTranslate2 后端） |
 
 ### Python 包

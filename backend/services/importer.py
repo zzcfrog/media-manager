@@ -83,13 +83,14 @@ def _import_one(db, filepath: Path) -> dict | None:
 
     file_hash = _compute_file_hash(filepath)
     phash = _compute_phash(filepath, media_type, meta.get("duration"))
+    xmp_exists = 1 if media_type == "image" and filepath.with_suffix(".xmp").exists() else 0
 
     cur = db.execute(
         "INSERT INTO media (file_path, file_name, media_type, file_size, duration, width, height, fps, "
         "video_codec, video_profile, bit_rate, audio_codec, audio_sample_rate, audio_channels, "
         "color_space, color_range, pix_fmt, camera_make, camera_model, lens_model, date_taken, thumbnail_path, "
-        "file_hash, phash) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "file_hash, phash, has_xmp, picture_control) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             str(filepath), filepath.name, media_type,
             filepath.stat().st_size,
@@ -99,7 +100,7 @@ def _import_one(db, filepath: Path) -> dict | None:
             meta.get("audio_channels"), meta.get("color_space"), meta.get("color_range"),
             meta.get("pix_fmt"), meta.get("camera_make"), meta.get("camera_model"),
             meta.get("lens_model"), meta.get("date_taken"), meta.get("thumbnail_path"),
-            file_hash, phash,
+            file_hash, phash, xmp_exists, meta.get("picture_control"),
         ),
     )
     media_id = cur.lastrowid
@@ -142,6 +143,7 @@ def _probe(filepath: Path, media_type: str) -> dict:
         "camera_model": tags.get("com.apple.quicktime.model") or tags.get("model"),
         "camera_make": None,
         "lens_model": None,
+        "picture_control": None,
         "date_taken": _normalize_date(
             tags.get("com.apple.quicktime.creationdate")
             or tags.get("creation_time")
@@ -149,6 +151,12 @@ def _probe(filepath: Path, media_type: str) -> dict:
         ),
     }
     _exif_probe(filepath, meta)
+
+    # DJI D-Log M: detected from filename suffix _D (not in metadata)
+    if not meta.get("picture_control") and meta.get("camera_make") == "DJI":
+        if filepath.stem.endswith("_D"):
+            meta["picture_control"] = "D-Log M"
+
     return meta
 
 
@@ -171,6 +179,7 @@ def _run_exiftool(filepath: Path) -> dict | None:
         "-Make", "-Model", "-CameraModelName", "-LensModel", "-Encoder",
         "-DateTimeOriginal", "-CreateDate",
         "-ImageWidth", "-ImageHeight", "-FileType", "-ColorSpace", "-Compression", "-BitsPerSample",
+        "-PictureControlName",
         str(filepath),
     ]
     try:
@@ -213,6 +222,8 @@ def _apply_exif_tags(tags: dict, meta: dict):
     if tags.get("BitsPerSample") and not meta.get("pix_fmt"):
         bits = str(tags["BitsPerSample"]).split()[0]
         meta["pix_fmt"] = f"{bits}-bit"
+    if tags.get("PictureControlName"):
+        meta["picture_control"] = tags["PictureControlName"].strip()
 
 
 def _exif_probe(filepath: Path, meta: dict):
@@ -231,6 +242,7 @@ def _probe_image(filepath: Path) -> dict:
         "color_space": None, "color_range": None, "pix_fmt": None,
         "duration": None,
         "camera_make": None, "camera_model": None, "lens_model": None,
+        "picture_control": None,
         "date_taken": _normalize_date(datetime.fromtimestamp(filepath.stat().st_mtime).isoformat()),
     }
     tags = _run_exiftool(filepath)

@@ -93,6 +93,12 @@ scanPaths(paths) {
     const qs = adjust && adjust !== 'none' ? `?adjust=${adjust}` : '';
     return this._fetch(`/api/analysis/${mediaId}/segments/${segId}${qs}`, { method: "DELETE" });
   },
+  writeXmp(id) {
+    return this._fetch(`/api/library/${id}/write-xmp`, { method: "POST" });
+  },
+  batchWriteXmp(ids) {
+    return this._fetch(`/api/library/batch-write-xmp`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) });
+  },
   thumbUrl(id) { return `/media/thumbnail/${id}`; },
   videoUrl(id) { return `/media/video/${id}`; },
   imageUrl(id) { return `/media/image/${id}`; },

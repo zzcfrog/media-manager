@@ -1,7 +1,16 @@
+import os
+import sys
 from pathlib import Path
 
 BASE_DIR = Path(__file__).parent.parent
-DATA_DIR = BASE_DIR / "data"
+
+# User data directory: use ~/.media-manager/ when packaged, local data/ in dev
+if os.environ.get("MEDIA_MANAGER_HOME"):
+    DATA_DIR = Path(os.environ["MEDIA_MANAGER_HOME"])
+elif getattr(sys, "frozen", False) if "sys" in dir() else False:
+    DATA_DIR = Path.home() / ".media-manager"
+else:
+    DATA_DIR = BASE_DIR / "data"
 THUMB_DIR = DATA_DIR / "thumbnails"
 OUTPUT_DIR = BASE_DIR / "output"
 DB_PATH = DATA_DIR / "media.db"

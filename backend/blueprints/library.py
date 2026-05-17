@@ -190,6 +190,31 @@ def backfill_hashes():
     return jsonify({"ok": True, "count": count})
 
 
+@bp.route("/backfill-picture-control", methods=["POST"])
+def backfill_picture_control():
+    from ..services.importer import _run_exiftool, _apply_exif_tags
+    from pathlib import Path
+    db = get_db()
+    rows = db.execute("SELECT id, file_path, camera_make FROM media WHERE picture_control IS NULL").fetchall()
+    count = 0
+    for row in rows:
+        fp = Path(row["file_path"])
+        if not fp.exists():
+            continue
+        meta = {"picture_control": None, "camera_make": row["camera_make"]}
+        tags = _run_exiftool(fp)
+        if tags:
+            _apply_exif_tags(tags, meta)
+        # DJI fallback: filename _D suffix
+        if not meta["picture_control"] and meta["camera_make"] == "DJI" and fp.stem.endswith("_D"):
+            meta["picture_control"] = "D-Log M"
+        if meta["picture_control"]:
+            db.execute("UPDATE media SET picture_control = ? WHERE id = ?", (meta["picture_control"], row["id"]))
+            count += 1
+    db.commit()
+    return jsonify({"ok": True, "count": count})
+
+
 @bp.route("/duplicates")
 def find_duplicates():
     db = get_db()
@@ -241,6 +266,117 @@ def find_duplicates():
                 g["distance"] = min(d for d, _ in group_items)
                 groups.append(g)
         return jsonify({"groups": groups})
+
+
+@bp.route("/<int:media_id>/write-xmp", methods=["POST"])
+def write_xmp(media_id):
+    from ..services.xmp_writer import write_xmp as _write_xmp
+    from pathlib import Path
+    db = get_db()
+    row = db.execute("SELECT * FROM media WHERE id = ?", (media_id,)).fetchone()
+    if not row:
+        return jsonify({"error": "Not found"}), 404
+    if row["media_type"] == "video":
+        return jsonify({"error": "Video not supported"}), 400
+
+    tags = db.execute(
+        "SELECT t.name FROM tags t JOIN media_tags mt ON t.id = mt.tag_id WHERE mt.media_id = ?",
+        (media_id,),
+    ).fetchall()
+    tag_names = [t["name"] for t in tags]
+
+    seg = db.execute(
+        "SELECT visual, dominant_colors, main_subjects, scene_type, mood, weather, lighting FROM media_segment WHERE media_id = ? ORDER BY seq LIMIT 1",
+        (media_id,),
+    ).fetchone()
+    description = seg["visual"] if seg else ""
+
+    # Collect analysis keywords from segment fields
+    if seg:
+        import json
+        for col in ("dominant_colors", "main_subjects"):
+            try:
+                vals = json.loads(seg[col]) if seg[col] else []
+            except (json.JSONDecodeError, TypeError):
+                vals = [seg[col]] if seg[col] else []
+            tag_names.extend(v for v in vals if v)
+        for col in ("scene_type", "mood", "weather", "lighting"):
+            if seg[col]:
+                tag_names.append(seg[col])
+
+    try:
+        ok = _write_xmp(
+            Path(row["file_path"]),
+            rating=row["rating"] or 0,
+            tags=tag_names,
+            description=description,
+            color_label=row["color_label"],
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    if ok:
+        db.execute("UPDATE media SET has_xmp = 1 WHERE id = ?", (media_id,))
+        db.commit()
+    return jsonify({"ok": ok})
+
+
+@bp.route("/batch-write-xmp", methods=["POST"])
+def batch_write_xmp():
+    from ..services.xmp_writer import write_xmp as _write_xmp
+    from pathlib import Path
+    db = get_db()
+    data = request.get_json()
+    ids = data.get("ids", [])
+    if not ids:
+        return jsonify({"error": "No ids"}), 400
+
+    count = 0
+    for mid in ids:
+        row = db.execute("SELECT * FROM media WHERE id = ?", (mid,)).fetchone()
+        if not row or row["media_type"] == "video":
+            continue
+
+        tags = db.execute(
+            "SELECT t.name FROM tags t JOIN media_tags mt ON t.id = mt.tag_id WHERE mt.media_id = ?",
+            (mid,),
+        ).fetchall()
+        tag_names = [t["name"] for t in tags]
+
+        seg = db.execute(
+            "SELECT visual, dominant_colors, main_subjects, scene_type, mood, weather, lighting FROM media_segment WHERE media_id = ? ORDER BY seq LIMIT 1",
+            (mid,),
+        ).fetchone()
+        description = seg["visual"] if seg else ""
+
+        if seg:
+            import json
+            for col in ("dominant_colors", "main_subjects"):
+                try:
+                    vals = json.loads(seg[col]) if seg[col] else []
+                except (json.JSONDecodeError, TypeError):
+                    vals = [seg[col]] if seg[col] else []
+                tag_names.extend(v for v in vals if v)
+            for col in ("scene_type", "mood", "weather", "lighting"):
+                if seg[col]:
+                    tag_names.append(seg[col])
+
+        try:
+            ok = _write_xmp(
+                Path(row["file_path"]),
+                rating=row["rating"] or 0,
+                tags=tag_names,
+                description=description,
+                color_label=row["color_label"],
+            )
+            if ok:
+                db.execute("UPDATE media SET has_xmp = 1 WHERE id = ?", (mid,))
+                count += 1
+        except Exception:
+            continue
+
+    db.commit()
+    return jsonify({"ok": True, "count": count})
 
 
 @bp.route("/<int:media_id>", methods=["PATCH"])

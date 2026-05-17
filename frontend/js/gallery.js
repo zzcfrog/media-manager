@@ -87,6 +87,7 @@ const GalleryPage = {
                 <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
                 <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
                 <span v-if="m.analysis_status==='done'" class="ai-badge"><q-icon name="auto_awesome" size="10px" color="white"></q-icon></span>
+                <span v-if="m.has_xmp && m.media_type==='image'" class="xmp-badge" style="color:white;font-size:7px;font-weight:700">XMP</span>
               </div>
               <div v-if="m.rating" class="rating">{{ '★'.repeat(m.rating) }}</div>
               <div class="info">
@@ -119,6 +120,7 @@ const GalleryPage = {
             <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
             <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
             <span v-if="m.analysis_status==='done'" class="ai-badge"><q-icon name="auto_awesome" size="10px" color="white"></q-icon></span>
+            <span v-if="m.has_xmp && m.media_type==='image'" class="xmp-badge" style="color:white;font-size:7px;font-weight:700">XMP</span>
           </div>
           <div v-if="m.rating" class="rating">{{ '★'.repeat(m.rating) }}</div>
           <div class="info">
@@ -241,6 +243,10 @@ const GalleryPage = {
         <q-item clickable @click="ctxMenu.show = false; findSimilar()" :disable="selArr.length !== 1" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="content_copy" size="14px" color="grey-6"></q-icon></q-item-section>
           <q-item-section>查找相似</q-item-section>
+        </q-item>
+        <q-item clickable @click="ctxMenu.show = false; doCtxWriteXmp()" style="padding-left:8px;padding-right:12px">
+          <q-item-section avatar style="min-width:24px;padding-right:8px"><img src="/static/img/xmp-write.svg" style="width:14px;height:14px;opacity:0.6"></q-item-section>
+          <q-item-section>写入 XMP</q-item-section>
         </q-item>
       </q-list>
     </div>
@@ -700,6 +706,23 @@ const GalleryPage = {
     },
     findSimilar() {
       location.hash = '#/duplicates';
+    },
+    async doCtxWriteXmp() {
+      const ids = this.selArr.filter(id => {
+        const m = this.items.find(i => i.id === id);
+        return m && m.media_type === 'image';
+      });
+      if (!ids.length) {
+        Quasar.Notify.create({ message: '没有可写入的图片', position: 'top', timeout: 1500 });
+        return;
+      }
+      try {
+        const res = await API.batchWriteXmp(ids);
+        ids.forEach(id => { const m = this.items.find(i => i.id === id); if (m) m.has_xmp = 1; });
+        Quasar.Notify.create({ message: `已为 ${res.count} 张照片写入 XMP`, position: 'top', timeout: 1500 });
+      } catch (e) {
+        Quasar.Notify.create({ message: '写入失败: ' + e.message, position: 'top', color: 'negative', timeout: 2000 });
+      }
     },
     async doDelete() {
       try {

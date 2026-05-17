@@ -145,6 +145,22 @@
         <div class="text-h6">设置</div>
       </q-card-section>
       <q-card-section style="display:flex;flex-direction:column;gap:24px">
+        <!-- 图片分析 -->
+        <div>
+          <div class="text-subtitle2 q-mb-md" style="padding-left:10px;border-left:3px solid var(--accent);line-height:1">图片分析</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <q-select v-model="settingsForm.imageResolution" :options="settingImgResOptions" label="压缩尺寸" dense filled emit-value map-options></q-select>
+            <q-select v-model="settingsForm.imageModel" :options="settingImgModelOptions" label="AI 模型" dense filled emit-value map-options></q-select>
+            <q-input v-model="settingsForm.imageApiKey" :type="showImgKey ? 'text' : 'password'" label="API Key" dense filled>
+              <template v-slot:append>
+                <q-icon :name="showImgKey ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="showImgKey = !showImgKey"></q-icon>
+              </template>
+              <template v-slot:hint>
+                <span class="text-grey-6" style="font-size:11px">图片分析的 API Key（需单独设置）</span>
+              </template>
+            </q-input>
+          </div>
+        </div>
         <!-- 视频分析 -->
         <div>
           <div class="text-subtitle2 q-mb-md" style="padding-left:10px;border-left:3px solid var(--accent);line-height:1">视频分析</div>
@@ -378,9 +394,10 @@ const app = Vue.createApp({
       showImport: false,
       showSettings: false,
       showShortcuts: false,
-      settingsForm: { resolution: "480", fps: "30", model: "glm-4.6v", useMultimodal: true, asrEngine: "whisper", videoApiKey: "", asrApiKey: "" },
+      settingsForm: { resolution: "480", fps: "30", model: "glm-4.6v", useMultimodal: true, asrEngine: "whisper", videoApiKey: "", asrApiKey: "", imageResolution: "1920", imageApiKey: "", imageModel: "glm-4.6v" },
       showVideoKey: false,
       showAsrKey: false,
+      showImgKey: false,
       settingResOptions: [
         { label: "480P · 推荐", value: "480" },
         { label: "320P · 省 Token", value: "320" },
@@ -401,6 +418,19 @@ const app = Vue.createApp({
       settingAsrOptions: [
         { label: "本地模型 (Whisper)", value: "whisper" },
         { label: "智谱 AI (GLM-ASR)", value: "zhipu-asr" },
+      ],
+      settingImgResOptions: [
+        { label: "1920px · 推荐", value: "1920" },
+        { label: "1280px · 省Token", value: "1280" },
+        { label: "800px · 最省", value: "800" },
+        { label: "原图 · 不压缩", value: "original" },
+      ],
+      settingImgModelOptions: [
+        { label: "智谱 GLM-4V-Plus · 旗舰", value: "glm-4v-plus" },
+        { label: "智谱 GLM-4.6V · 性价比", value: "glm-4.6v" },
+        { label: "智谱 GLM-4.6V-Flash · 免费", value: "glm-4.6v-flash" },
+        { label: "智谱 GLM-4.6V-FlashX", value: "glm-4.6v-flashx" },
+        { label: "智谱 GLM-4.5V", value: "glm-4.5v" },
       ],
       importStep: "select",
       importing: false,
@@ -623,6 +653,9 @@ const app = Vue.createApp({
         this.settingsForm.asrEngine = s.asr_engine || "whisper";
         this.settingsForm.videoApiKey = s.video_api_key || "";
         this.settingsForm.asrApiKey = s.asr_api_key || "";
+        this.settingsForm.imageResolution = s.image_resolution || "1920";
+        this.settingsForm.imageApiKey = s.image_api_key || "";
+        this.settingsForm.imageModel = s.image_model || "glm-4.6v";
       } catch (e) { console.error(e); }
     },
     async saveSettings() {
@@ -635,6 +668,9 @@ const app = Vue.createApp({
           asr_engine: this.settingsForm.asrEngine,
           video_api_key: this.settingsForm.videoApiKey,
           asr_api_key: this.settingsForm.asrApiKey,
+          image_resolution: this.settingsForm.imageResolution,
+          image_api_key: this.settingsForm.imageApiKey,
+          image_model: this.settingsForm.imageModel,
         });
         Quasar.Notify.create({ message: "设置已保存", position: "top", timeout: 1500 });
       } catch (e) { console.error(e); }
