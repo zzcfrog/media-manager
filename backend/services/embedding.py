@@ -7,6 +7,7 @@ import numpy as np
 import onnxruntime as ort
 from PIL import Image
 from torchvision import transforms
+from ..config import RAW_EXTS
 
 _ort_session = None
 _MODEL_PATH = Path(__file__).parent.parent / "models" / "resnet50.onnx"
@@ -18,10 +19,6 @@ _TRANSFORM = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
 ])
-
-_RAW_EXTS = {".nef", ".cr2", ".cr3", ".arw", ".dng", ".raf", ".orf", ".rw2",
-             ".pef", ".srw", ".kdc", ".sr2", ".3fr", ".iiq", ".erf", ".mef",
-             ".mrw", ".nrw", ".dcr", ".raw", ".mos", ".fff", ".x3f", ".rwl", ".crw", ".proraw"}
 
 _HEIF_EXTS = {".heic", ".heif", ".hif", ".avif"}
 
@@ -50,7 +47,7 @@ def _load_image(filepath: Path, media_type: str, duration: float = None):
         elif media_type == "image":
             ext = filepath.suffix.lower()
             try:
-                if ext in _RAW_EXTS:
+                if ext in RAW_EXTS:
                     import rawpy
                     with rawpy.imread(str(filepath)) as raw:
                         rgb = raw.postprocess(use_camera_wb=True, output_color=rawpy.ColorSpace.sRGB)

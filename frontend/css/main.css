@@ -98,15 +98,6 @@ body.body--dark input::placeholder { color: #555 !important; -webkit-text-fill-c
 .bg-green { background: var(--green); }
 .bg-blue { background: var(--blue); }
 .bg-purple { background: var(--purple); }
-.color-red { background: var(--red); }
-.color-yellow { background: var(--yellow); }
-.color-green { background: var(--green); }
-.color-blue { background: var(--blue); }
-.color-purple { background: var(--purple); }
-.stars { color: var(--yellow); }
-
-/* Pagination */
-.pagination { padding: 12px; display: flex; justify-content: center; }
 
 /* Timeline group styling */
 .q-timeline { padding: 8px 0 !important; background: transparent !important; }

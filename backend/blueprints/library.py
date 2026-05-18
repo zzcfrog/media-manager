@@ -1,10 +1,14 @@
 import os
 from collections import defaultdict
 
+import numpy as np
 from flask import Blueprint, request, jsonify
 import jieba
 
 from ..db import get_db
+
+# Core CRUD routes for the media library: list, detail, import, scan, delete,
+# batch operations, duplicate detection, folder tree, and XMP sidecar export.
 
 
 def _segment(text):
@@ -245,13 +249,71 @@ def backfill_picture_control():
     return jsonify({"ok": True, "count": count})
 
 
+def _fetch_embedding_rows(db):
+    rows = db.execute(
+        "SELECT id, file_path, file_name, media_type, file_size, embedding, thumbnail_path "
+        "FROM media WHERE embedding IS NOT NULL"
+    ).fetchall()
+    return rows
+
+
+def _rows_to_groups(rows, indices_groups, sim_matrix=None, vecs=None):
+    groups = []
+    for indices in indices_groups:
+        if len(indices) < 2:
+            continue
+        k = len(indices)
+        if sim_matrix is not None:
+            sub = sim_matrix[np.ix_(indices, indices)]
+            avg_sim = float((sub.sum() - k) / (k * (k - 1)))
+        elif vecs is not None:
+            cv = vecs[indices]
+            sims = cv @ cv.T
+            avg_sim = float((sims.sum() - k) / (k * (k - 1))) if k > 1 else 1.0
+        else:
+            avg_sim = 1.0
+        items = []
+        for i in indices:
+            d = dict(rows[i])
+            d.pop("embedding", None)
+            items.append(d)
+        groups.append({"similarity": round(avg_sim * 100), "items": items})
+    groups.sort(key=lambda g: (-len(g["items"]), -g["similarity"]))
+    return groups
+
+
+def _union_find_groups(sim_matrix, threshold):
+    n = len(sim_matrix)
+    parent = list(range(n))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a, b):
+        a, b = find(a), find(b)
+        if a != b:
+            parent[a] = b
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            if sim_matrix[i][j] >= threshold:
+                union(i, j)
+
+    cluster_map = {}
+    for i in range(n):
+        cluster_map.setdefault(find(i), []).append(i)
+    return [v for v in cluster_map.values() if len(v) >= 2]
+
+
 @bp.route("/duplicates")
 def find_duplicates():
     db = get_db()
     dup_type = request.args.get("type", "similar")
 
     if dup_type == "exact":
-        # file_hash byte-identical detection
         rows = db.execute(
             "SELECT id, file_path, file_name, media_type, file_size, file_hash, thumbnail_path "
             "FROM media WHERE file_hash IS NOT NULL AND file_hash IN "
@@ -268,157 +330,25 @@ def find_duplicates():
         groups.sort(key=lambda g: (-len(g["items"]),))
         return jsonify({"groups": groups})
 
-    elif dup_type == "near":
-        # cosine >= 0.98
-        import numpy as np
+    rows = _fetch_embedding_rows(db)
+    if not rows:
+        return jsonify({"groups": []})
+    vecs = np.array([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
 
-        rows = db.execute(
-            "SELECT id, file_path, file_name, media_type, file_size, embedding, thumbnail_path "
-            "FROM media WHERE embedding IS NOT NULL"
-        ).fetchall()
-        if not rows:
-            return jsonify({"groups": []})
-
-        vecs = np.array([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
-        n = len(vecs)
-        sim_matrix = vecs @ vecs.T
-
-        THRESHOLD = 0.96
-        parent = list(range(n))
-
-        def find(x):
-            while parent[x] != x:
-                parent[x] = parent[parent[x]]
-                x = parent[x]
-            return x
-
-        def union(a, b):
-            a, b = find(a), find(b)
-            if a != b:
-                parent[a] = b
-
-        for i in range(n):
-            for j in range(i + 1, n):
-                if sim_matrix[i][j] >= THRESHOLD:
-                    union(i, j)
-
-        cluster_map = {}
-        for i in range(n):
-            root = find(i)
-            cluster_map.setdefault(root, []).append(i)
-
-        groups = []
-        for indices in cluster_map.values():
-            if len(indices) < 2:
-                continue
-            k = len(indices)
-            sub = sim_matrix[np.ix_(indices, indices)]
-            avg_sim = float((sub.sum() - k) / (k * (k - 1)))
-            items = []
-            for i in indices:
-                d = dict(rows[i])
-                d.pop("embedding", None)
-                items.append(d)
-            groups.append({
-                "similarity": round(avg_sim * 100),
-                "items": items,
-            })
-        groups.sort(key=lambda g: (-len(g["items"]), -g["similarity"]))
-        return jsonify({"groups": groups})
-
-    elif dup_type == "cluster":
-        # HDBSCAN density clustering
-        import numpy as np
+    if dup_type == "cluster":
         import hdbscan
+        labels = hdbscan.HDBSCAN(min_cluster_size=2, metric="euclidean").fit_predict(vecs)
+        indices_groups = [
+            [i for i, l in enumerate(labels) if l == label]
+            for label in set(labels) if label != -1
+        ]
+        return jsonify({"groups": _rows_to_groups(rows, indices_groups, vecs=vecs)})
 
-        rows = db.execute(
-            "SELECT id, file_path, file_name, media_type, file_size, embedding, thumbnail_path "
-            "FROM media WHERE embedding IS NOT NULL"
-        ).fetchall()
-        if not rows:
-            return jsonify({"groups": []})
-
-        vecs = np.array([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
-        clusterer = hdbscan.HDBSCAN(min_cluster_size=2, metric="euclidean")
-        labels = clusterer.fit_predict(vecs)
-
-        groups = []
-        for label in set(labels):
-            if label == -1:
-                continue
-            indices = [i for i, l in enumerate(labels) if l == label]
-            cluster_vecs = vecs[indices]
-            k = len(indices)
-            sims = cluster_vecs @ cluster_vecs.T
-            avg_sim = float((sims.sum() - k) / (k * (k - 1))) if k > 1 else 1.0
-            items = []
-            for i in indices:
-                d = dict(rows[i])
-                d.pop("embedding", None)
-                items.append(d)
-            groups.append({
-                "similarity": round(avg_sim * 100),
-                "items": items,
-            })
-        groups.sort(key=lambda g: (-len(g["items"]), -g["similarity"]))
-        return jsonify({"groups": groups})
-
-    else:  # similar — pairwise cosine similarity
-        import numpy as np
-
-        rows = db.execute(
-            "SELECT id, file_path, file_name, media_type, file_size, embedding, thumbnail_path "
-            "FROM media WHERE embedding IS NOT NULL"
-        ).fetchall()
-        if not rows:
-            return jsonify({"groups": []})
-
-        vecs = np.array([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
-        n = len(vecs)
-        sim_matrix = vecs @ vecs.T
-
-        THRESHOLD = 0.90
-        parent = list(range(n))
-
-        def find(x):
-            while parent[x] != x:
-                parent[x] = parent[parent[x]]
-                x = parent[x]
-            return x
-
-        def union(a, b):
-            a, b = find(a), find(b)
-            if a != b:
-                parent[a] = b
-
-        for i in range(n):
-            for j in range(i + 1, n):
-                if sim_matrix[i][j] >= THRESHOLD:
-                    union(i, j)
-
-        cluster_map = {}
-        for i in range(n):
-            root = find(i)
-            cluster_map.setdefault(root, []).append(i)
-
-        groups = []
-        for indices in cluster_map.values():
-            if len(indices) < 2:
-                continue
-            k = len(indices)
-            sub = sim_matrix[np.ix_(indices, indices)]
-            avg_sim = float((sub.sum() - k) / (k * (k - 1)))
-            items = []
-            for i in indices:
-                d = dict(rows[i])
-                d.pop("embedding", None)
-                items.append(d)
-            groups.append({
-                "similarity": round(avg_sim * 100),
-                "items": items,
-            })
-        groups.sort(key=lambda g: (-len(g["items"]), -g["similarity"]))
-        return jsonify({"groups": groups})
+    # near (0.96) or similar (0.90) — union-find on cosine similarity
+    threshold = 0.96 if dup_type == "near" else 0.90
+    sim_matrix = vecs @ vecs.T
+    indices_groups = _union_find_groups(sim_matrix, threshold)
+    return jsonify({"groups": _rows_to_groups(rows, indices_groups, sim_matrix=sim_matrix)})
 
 
 @bp.route("/<int:media_id>/write-xmp", methods=["POST"])

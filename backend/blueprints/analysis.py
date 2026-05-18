@@ -1,6 +1,9 @@
 from flask import Blueprint, request, jsonify, Response, current_app
-import os, json, time
+import json
+import time
 from concurrent.futures import ThreadPoolExecutor
+
+# Media analysis endpoints: start image/video VLM analysis via SSE, save results.
 from pathlib import Path
 
 from ..db import get_db, get_setting
@@ -11,6 +14,14 @@ from ..asr import get_engine as get_asr_engine
 bp = Blueprint("analysis", __name__)
 
 _SEGMENT_COLS = "id, media_id, time_start, time_end, visual, asr, subtitle, dominant_colors, main_subjects, shot_type, focal_length, camera_angle, camera_movement, perspective, scene_type, mood, lighting, weather, seq"
+
+
+def _cleanup_temp(path):
+    if path and Path(path).exists():
+        try:
+            Path(path).unlink()
+        except OSError:
+            pass
 
 
 @bp.route("/<int:media_id>")
@@ -129,13 +140,6 @@ def _start_image_analysis(media_id, media, app):
                         Path(cp).unlink()
                     except OSError:
                         pass
-
-    def _cleanup_temp(path):
-        if path and Path(path).exists():
-            try:
-                Path(path).unlink()
-            except OSError:
-                pass
 
     compressed_path_holder = [None]
     resp = Response(generate(), mimetype="text/event-stream")
@@ -297,13 +301,6 @@ def _start_video_analysis(media_id, media, app):
                     except OSError:
                         pass
 
-    def _cleanup_temp(path):
-        if path and Path(path).exists():
-            try:
-                Path(path).unlink()
-            except OSError:
-                pass
-
     compressed_path_holder = [None]
     resp = Response(generate(), mimetype="text/event-stream")
     resp.call_on_close(lambda: _cleanup_temp(compressed_path_holder[0]))
@@ -352,8 +349,6 @@ def _merge_asr(vlm_segments, asr_segments):
 
 
 def save_segments(media_id, segments, model=""):
-    """Parse analysis result and save segments to DB."""
-    import json
     db = get_db()
     db.execute("DELETE FROM media_segment WHERE media_id = ?", (media_id,))
 
@@ -392,7 +387,6 @@ def save_segments(media_id, segments, model=""):
 
 
 def _refresh_fts(db, media_id, segments):
-    import json
     from .library import _segment
     visual, asr, subtitle = [], [], []
     subjects, colors = set(), set()
@@ -424,7 +418,6 @@ def _refresh_fts(db, media_id, segments):
 
 
 def _segment_to_dict(row):
-    import json
     d = dict(row)
     for col in ("dominant_colors", "main_subjects"):
         v = d.get(col, "")
@@ -447,7 +440,6 @@ _EDITABLE_COLS = {
 
 @bp.route("/<int:media_id>/segments/<int:seg_id>", methods=["PATCH"])
 def update_segment(media_id, seg_id):
-    import json as _json
     db = get_db()
     row = db.execute("SELECT id FROM media_segment WHERE id = ? AND media_id = ?", (seg_id, media_id)).fetchone()
     if not row:
@@ -460,7 +452,7 @@ def update_segment(media_id, seg_id):
             continue
         val = data[col]
         if col in ("dominant_colors", "main_subjects"):
-            val = _json.dumps(val if isinstance(val, list) else [val])
+            val = json.dumps(val if isinstance(val, list) else [val])
         fields.append(f"{col} = ?")
         params.append(val)
 

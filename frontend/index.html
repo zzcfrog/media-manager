@@ -56,12 +56,12 @@
           @click="navToLibrary">
           <q-item-section avatar><q-icon name="movie" size="18px" :color="route==='#/gallery' && !collectionFilter && !selectedFolder ? 'primary' : 'grey-6'"></q-icon></q-item-section>
           <q-item-section>素材库</q-item-section>
-          <q-item-section side style="padding-left:0;padding-right:4px">
+          <q-item-section v-if="!drawerMini" side style="padding-left:0;padding-right:4px">
             <q-btn flat round dense :icon="libraryExpanded ? 'expand_less' : 'expand_more'" size="xs" color="grey-6"
               @click.stop="libraryExpanded = !libraryExpanded"></q-btn>
           </q-item-section>
         </q-item>
-        <div v-show="libraryExpanded" style="padding-left:28px">
+        <div v-show="libraryExpanded && !drawerMini" style="padding-left:28px">
           <q-tree :nodes="folderTree" node-key="path" label-key="label"
             dense no-connectors
             :selected="selectedFolder" @update:selected="onFolderSelect"
@@ -102,11 +102,10 @@
         </q-item>
         <q-item v-if="!collections.length"><q-item-section class="text-grey-7" style="font-size:11px">暂无收藏夹</q-item-section></q-item>
       </q-list>
-      <div style="padding:12px 14px">
+      <q-space></q-space>
+      <div style="padding:12px 14px;flex-shrink:0">
         <q-btn v-if="!drawerMini" color="primary" class="full-width" icon="add_circle_outline" label="导入素材" @click="openImport"></q-btn>
         <q-btn v-else flat round dense icon="add" color="primary" @click="openImport"></q-btn>
-      </div>
-      <div style="padding:4px 8px;text-align:center">
       </div>
     </q-drawer>
 
@@ -369,6 +368,7 @@
 <script src="/static/js/quasar.umd.prod.js"></script>
 <script src="/static/js/lottie.min.js"></script>
 <script src="/static/js/api.js"></script>
+<script src="/static/js/format.js"></script>
 <script src="/static/js/gallery.js"></script>
 <script src="/static/js/detail.js"></script>
 <script src="/static/js/duplicates.js"></script>
@@ -382,9 +382,7 @@ const app = Vue.createApp({
       galleryItems: [],
       collectionFilter: null,
       favFilter: false,
-      galleryKey: 0,
       searchQuery: "",
-      searchText: "",
       showImport: false,
       showSettings: false,
       showShortcuts: false,
@@ -429,8 +427,6 @@ const app = Vue.createApp({
       ],
       importStep: "select",
       importing: false,
-      importProgress: "",
-      importPercent: 0,
       importTotal: 0,
       importedItems: [],
       skippedItems: [],
@@ -519,11 +515,6 @@ const app = Vue.createApp({
       this.themeMode = modes[(idx + 1) % 3];
       this.applyTheme();
     },
-    setTheme(mode) {
-      this.themeMode = mode;
-      localStorage.setItem("theme", mode);
-      this.applyTheme();
-    },
     applyTheme() {
       localStorage.setItem("theme", this.themeMode);
       let dark;
@@ -586,8 +577,7 @@ const app = Vue.createApp({
         this.favFilter = true;
         this.selectedFolder = null;
         this.libraryExpanded = false;
-        if (prevView !== "gallery") this.galleryKey++;
-        else this.$refs.gallery?.load();
+        this.$refs.gallery?.load();
       } else if (hash === "#/duplicates") {
         this.currentView = "duplicates";
       } else if (hash.startsWith("#/collections/")) {
@@ -596,19 +586,14 @@ const app = Vue.createApp({
         this.favFilter = false;
         this.selectedFolder = null;
         this.libraryExpanded = false;
-        if (prevView !== "gallery") this.galleryKey++;
-        else this.$refs.gallery?.load();
+        this.$refs.gallery?.load();
       } else {
         this.currentView = "gallery";
         this.collectionFilter = null;
         this.favFilter = false;
         this.selectedFolder = null;
         this.libraryExpanded = true;
-        if (prevView !== "gallery") {
-          this.galleryKey++;
-        } else {
-          this.$refs.gallery?.load();
-        }
+        this.$refs.gallery?.load();
       }
     },
     async loadSidebar() {
@@ -641,14 +626,6 @@ const app = Vue.createApp({
       if (ni < 0 || ni >= items.length) return null;
       return items[ni].id;
     },
-    doSearch() {
-      this.searchQuery = this.searchText.trim();
-      if (this.currentView !== "gallery") {
-        location.hash = "#/gallery";
-      } else {
-        this.$refs.gallery?.load();
-      }
-    },
     onFolderSelect(path) {
       this.selectedFolder = this.selectedFolder === path ? null : path;
       this.collectionFilter = null;
@@ -664,8 +641,6 @@ const app = Vue.createApp({
       this.importStep = "select";
       this.importedItems = [];
       this.selectedPaths = [];
-      this.importProgress = "";
-      this.importPercent = 0;
       this.showImport = true;
     },
     async loadSettings() {
@@ -703,13 +678,7 @@ const app = Vue.createApp({
         Quasar.Notify.create({ message: "设置已保存", position: "top", timeout: 1500 });
       } catch (e) { console.error(e); }
     },
-    fmtSize(bytes) {
-      if (!bytes) return "";
-      if (bytes < 1024) return bytes + " B";
-      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + " KB";
-      if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-      return (bytes / (1024 * 1024 * 1024)).toFixed(1) + " GB";
-    },
+    fmtSize,
     pathName(p) { return p.split("/").pop(); },
     async pickFiles() {
       if (window.electronAPI) {

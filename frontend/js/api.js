@@ -1,3 +1,4 @@
+// Thin wrapper around fetch() for all backend API calls.
 const API = {
   async _fetch(url, options) {
     const r = await fetch(url, options);

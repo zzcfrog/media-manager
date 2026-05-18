@@ -1,6 +1,8 @@
 import sqlite3
 from flask import g, current_app
 
+# SQLite connection management and schema bootstrap (auto-migrates on startup).
+
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS media (

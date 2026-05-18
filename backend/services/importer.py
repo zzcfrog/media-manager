@@ -6,7 +6,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from ..config import VIDEO_EXTS, IMAGE_EXTS, THUMB_DIR
+from ..config import VIDEO_EXTS, IMAGE_EXTS, RAW_EXTS, THUMB_DIR
 from ..db import get_db
 
 logger = logging.getLogger(__name__)
@@ -17,9 +17,6 @@ PROBE_TIMEOUT = 60
 EXIFTOOL_TIMEOUT = 30
 FFMPEG_TIMEOUT = 60
 
-_VIDEO_EXTS = VIDEO_EXTS
-_IMAGE_EXTS = IMAGE_EXTS
-
 
 def _collect_files(paths: list[str]) -> list[Path]:
     files = []
@@ -27,11 +24,11 @@ def _collect_files(paths: list[str]) -> list[Path]:
         path = Path(p)
         if path.is_file() and path.name.startswith("._"):
             continue
-        if path.is_file() and path.suffix.lower() in (_VIDEO_EXTS | _IMAGE_EXTS):
+        if path.is_file() and path.suffix.lower() in (VIDEO_EXTS | IMAGE_EXTS):
             files.append(path)
         elif path.is_dir():
             for f in path.rglob("*"):
-                if f.is_file() and not f.name.startswith("._") and f.suffix.lower() in (_VIDEO_EXTS | _IMAGE_EXTS):
+                if f.is_file() and not f.name.startswith("._") and f.suffix.lower() in (VIDEO_EXTS | IMAGE_EXTS):
                     files.append(f)
     return files
 
@@ -50,7 +47,7 @@ def scan_only(paths: list[str]) -> list[dict]:
         results.append({
             "file_path": str(f),
             "file_name": f.name,
-            "media_type": "video" if ext in _VIDEO_EXTS else "image",
+            "media_type": "video" if ext in VIDEO_EXTS else "image",
             "file_size": f.stat().st_size,
         })
     return results, skipped
@@ -60,7 +57,7 @@ def import_single_file(file_path: str) -> dict | None:
     filepath = Path(file_path)
     if not filepath.exists() or filepath.name.startswith("._"):
         return None
-    if filepath.suffix.lower() not in (_VIDEO_EXTS | _IMAGE_EXTS):
+    if filepath.suffix.lower() not in (VIDEO_EXTS | IMAGE_EXTS):
         return None
     db = get_db()
     try:
@@ -345,11 +342,8 @@ def _compute_phash(filepath: Path, media_type: str, duration: float = None) -> s
                 img = Image.open(io.BytesIO(result.stdout))
         elif media_type == "image":
             ext = filepath.suffix.lower()
-            raw_exts = {".nef", ".cr2", ".cr3", ".arw", ".dng", ".raf", ".orf", ".rw2",
-                        ".pef", ".srw", ".kdc", ".sr2", ".3fr", ".iiq", ".erf", ".mef",
-                        ".mrw", ".nrw", ".dcr", ".raw", ".mos", ".fff", ".x3f", ".rwl", ".crw", ".proraw"}
             try:
-                if ext in raw_exts:
+                if ext in RAW_EXTS:
                     import rawpy
                     with rawpy.imread(str(filepath)) as raw:
                         rgb = raw.postprocess(use_camera_wb=True, output_color=rawpy.ColorSpace.sRGB)

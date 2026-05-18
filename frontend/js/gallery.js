@@ -333,8 +333,7 @@ const GalleryPage = {
       ],
     };
   },
-  // -- Computed: grouped items, lasso style, filter state --
-  computed: {
+  watch: {
     sortBy(val) {
       if (val !== "imported_at" && val !== "date_taken" && val !== "duration") this.groupBy = "";
     },
@@ -482,8 +481,6 @@ const GalleryPage = {
         this.sortOrder = "desc";
       }
       this.load();
-    },
-    onRatingChange(val) {
     },
     toggleRating(n) {
       this.filters.rating = this.filters.rating === String(n) ? "" : String(n);
@@ -759,18 +756,8 @@ const GalleryPage = {
       this.selArr = [];
       this.confirmBatch.show = false;
     },
-    fmtDur(s) {
-      if (!s) return "";
-      const m = Math.floor(s / 60), sec = Math.floor(s % 60);
-      return `${m}:${sec.toString().padStart(2, "0")}`;
-    },
-    fmtSize(bytes) {
-      if (!bytes) return "-";
-      if (bytes < 1024) return bytes + " B";
-      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + " KB";
-      if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-      return (bytes / (1024 * 1024 * 1024)).toFixed(1) + " GB";
-    },
+    fmtDur,
+    fmtSize,
     fmtListDate(d) {
       if (!d) return "-";
       const dt = new Date(d);

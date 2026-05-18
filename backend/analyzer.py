@@ -1,9 +1,12 @@
 import base64
 import json
 import sys
+import time
 from pathlib import Path
 
 from openai import OpenAI
+
+# VLM (Vision Language Model) API calls for video/image analysis.
 
 PROMPT_FILE = Path(__file__).parent / "video_prompt.txt"
 IMG_PROMPT_FILE = Path(__file__).parent / "img_prompt.txt"
@@ -56,7 +59,6 @@ def analyze_video(video_path: str | Path, api_key: str, model: str = "glm-4.6v",
     if on_progress:
         on_progress("uploading")
 
-    import time
     t0 = time.time()
     full_content = ""
     usage = None
@@ -129,7 +131,6 @@ def _parse_response(content: str) -> list[dict]:
 def analyze_image(image_path: str | Path, api_key: str, model: str = "glm-4.6v",
                   base_url: str = CODING_BASE_URL, on_progress=None) -> tuple[dict, float, dict | None]:
     """Analyze a single image. Returns (result_dict, elapsed_seconds, usage_dict)."""
-    import time
 
     image_url = encode_image_base64(image_path)
     client = OpenAI(api_key=api_key, base_url=base_url)

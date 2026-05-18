@@ -4,6 +4,9 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 from PIL import Image
+from .config import RAW_EXTS
+
+# Video/image compression for analysis: reduces media before sending to VLM.
 
 
 def check_ffmpeg() -> None:
@@ -83,7 +86,7 @@ def _calc_bitrate(resolution: str, fps: str) -> int:
 
 
 def compress_video(input_path: str | Path, resolution: str = "480", fps: str = "30",
-                    on_progress=None, hw_accel=False) -> tuple[Path, float]:
+                    on_progress=None, hw_accel=False) -> tuple[Path, float, int, int, float]:
     input_path = Path(input_path)
     if not input_path.exists():
         raise FileNotFoundError(f"Video file not found: {input_path}")
@@ -143,9 +146,6 @@ def compress_video(input_path: str | Path, resolution: str = "480", fps: str = "
     return output_path, elapsed, w, h, fps
 
 
-RAW_EXTENSIONS = {".nef", ".cr2", ".cr3", ".arw", ".dng", ".raf", ".orf", ".rw2", ".pef", ".srw", ".nrw", ".kdc", ".sr2", ".3fr", ".meF", ".iiq", ".erf", ".mef"}
-
-
 def compress_image(input_path: str | Path, max_long_edge: int = 1920) -> tuple[Path, float]:
     input_path = Path(input_path)
     if not input_path.exists():
@@ -155,7 +155,7 @@ def compress_image(input_path: str | Path, max_long_edge: int = 1920) -> tuple[P
     t0 = time.time()
 
     ext = input_path.suffix.lower()
-    if ext in RAW_EXTENSIONS:
+    if ext in RAW_EXTS:
         import rawpy
         with rawpy.imread(str(input_path)) as raw:
             rgb = raw.postprocess(use_camera_wb=True, output_color=rawpy.ColorSpace.sRGB)
