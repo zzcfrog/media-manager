@@ -7,6 +7,9 @@ const DuplicatesPage = {
         <q-btn unelevated dense :color="dupType==='exact'?'primary':'grey-9'" :text-color="dupType==='exact'?'white':'grey-6'" icon="content_copy" size="sm" label="重复" @click="switchType('exact')">
           <q-tooltip :delay="1000">文件内容完全相同</q-tooltip>
         </q-btn>
+        <q-btn unelevated dense :color="dupType==='near'?'primary':'grey-9'" :text-color="dupType==='near'?'white':'grey-6'" icon="filter_none" size="sm" label="酷似" @click="switchType('near')">
+          <q-tooltip :delay="1000">余弦相似度 ≥ 98%</q-tooltip>
+        </q-btn>
         <q-btn unelevated dense :color="dupType==='similar'?'primary':'grey-9'" :text-color="dupType==='similar'?'white':'grey-6'" icon="difference" size="sm" label="相似" @click="switchType('similar')">
           <q-tooltip :delay="1000">余弦相似度 ≥ 90%</q-tooltip>
         </q-btn>
@@ -18,8 +21,9 @@ const DuplicatesPage = {
         <q-tooltip :delay="300" max-width="280px">
           <div style="font-size:12px;line-height:1.6">
             <b>重复</b>：文件内容完全相同（SHA256 哈希）<br>
-            <b>相似</b>：余弦相似度 ≥ 90%，检测连拍、同照片不同格式等近重复图片<br>
-            <b>聚类</b>：HDBSCAN 密度聚类，自动发现视觉主题相近的图片组
+            <b>酷似</b>：余弦相似度 ≥ 98%，几乎一致的图片<br>
+            <b>相似</b>：余弦相似度 ≥ 90%，连拍或画面接近的图片<br>
+            <b>聚类</b>：HDBSCAN 密度聚类，视觉主题相近的图片组
           </div>
         </q-tooltip>
       </q-icon>
@@ -68,7 +72,7 @@ const DuplicatesPage = {
   },
   computed: {
     typeLabel() {
-      return { exact: "重复", similar: "相似", cluster: "聚类" }[this.dupType] || "相似";
+      return { exact: "重复", near: "酷似", similar: "相似", cluster: "聚类" }[this.dupType] || "相似";
     },
   },
   methods: {

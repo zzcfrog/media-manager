@@ -246,6 +246,64 @@ def find_duplicates():
         groups.sort(key=lambda g: (-len(g["items"]),))
         return jsonify({"groups": groups})
 
+    elif dup_type == "near":
+        # cosine >= 0.98
+        import numpy as np
+
+        rows = db.execute(
+            "SELECT id, file_path, file_name, media_type, file_size, embedding, thumbnail_path "
+            "FROM media WHERE embedding IS NOT NULL"
+        ).fetchall()
+        if not rows:
+            return jsonify({"groups": []})
+
+        vecs = np.array([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
+        n = len(vecs)
+        sim_matrix = vecs @ vecs.T
+
+        THRESHOLD = 0.98
+        parent = list(range(n))
+
+        def find(x):
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        def union(a, b):
+            a, b = find(a), find(b)
+            if a != b:
+                parent[a] = b
+
+        for i in range(n):
+            for j in range(i + 1, n):
+                if sim_matrix[i][j] >= THRESHOLD:
+                    union(i, j)
+
+        cluster_map = {}
+        for i in range(n):
+            root = find(i)
+            cluster_map.setdefault(root, []).append(i)
+
+        groups = []
+        for indices in cluster_map.values():
+            if len(indices) < 2:
+                continue
+            k = len(indices)
+            sub = sim_matrix[np.ix_(indices, indices)]
+            avg_sim = float((sub.sum() - k) / (k * (k - 1)))
+            items = []
+            for i in indices:
+                d = dict(rows[i])
+                d.pop("embedding", None)
+                items.append(d)
+            groups.append({
+                "similarity": round(avg_sim * 100),
+                "items": items,
+            })
+        groups.sort(key=lambda g: (-len(g["items"]), -g["similarity"]))
+        return jsonify({"groups": groups})
+
     elif dup_type == "cluster":
         # HDBSCAN density clustering
         import numpy as np
