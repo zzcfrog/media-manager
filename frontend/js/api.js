@@ -60,11 +60,12 @@ scanPaths(paths) {
   backfillEmbeddings() {
     return this._fetch(`/api/library/backfill-embeddings`, { method: "POST" });
   },
-  addDupExclusions(pairs) {
-    return this._fetch(`/api/library/dup-exclusions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pairs }) });
+  addDupExclusions(pairs, dupType) {
+    return this._fetch(`/api/library/dup-exclusions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pairs, dup_type: dupType }) });
   },
-  resetDupExclusions() {
-    return this._fetch(`/api/library/dup-exclusions`, { method: "DELETE" });
+  resetDupExclusions(dupType) {
+    const q = dupType ? `?dup_type=${dupType}` : "";
+    return this._fetch(`/api/library/dup-exclusions${q}`, { method: "DELETE" });
   },
   getAnalysis(mediaId) {
     return this._fetch(`/api/analysis/${mediaId}`);

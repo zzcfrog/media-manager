@@ -261,7 +261,7 @@ const DuplicatesPage = {
     },
     async _doExcludePairs(pairs, count) {
       try {
-        await API.addDupExclusions(pairs);
+        await API.addDupExclusions(pairs, this.dupType);
         Quasar.Notify.create({ message: `已排除 ${count} 张照片`, position: 'top', timeout: 1500 });
         this.selArr = [];
         await this.loadGroups();

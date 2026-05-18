@@ -355,8 +355,11 @@ def _union_find_groups(sim_matrix, threshold, id_map=None, excluded_pairs=None):
     return [v for v in cluster_map.values() if len(v) >= 2]
 
 
-def _load_exclusions(db):
-    rows = db.execute("SELECT media_id_a, media_id_b FROM dup_exclusions").fetchall()
+def _load_exclusions(db, dup_type):
+    rows = db.execute(
+        "SELECT media_id_a, media_id_b FROM dup_exclusions WHERE dup_type = ?",
+        (dup_type,),
+    ).fetchall()
     return {(r["media_id_a"], r["media_id_b"]) for r in rows}
 
 
@@ -364,7 +367,7 @@ def _load_exclusions(db):
 def find_duplicates():
     db = get_db()
     dup_type = request.args.get("type", "similar")
-    excluded = _load_exclusions(db)
+    excluded = _load_exclusions(db, dup_type)
 
     rows = _fetch_embedding_rows(db)
     if not rows:
@@ -437,20 +440,28 @@ def find_duplicates():
 def add_dup_exclusions():
     data = request.get_json()
     pairs = data.get("pairs", [])
+    dup_type = data.get("dup_type", "similar")
     if not pairs:
         return jsonify({"error": "No pairs"}), 400
     db = get_db()
     for a, b in pairs:
         lo, hi = min(a, b), max(a, b)
-        db.execute("INSERT OR IGNORE INTO dup_exclusions (media_id_a, media_id_b) VALUES (?, ?)", (lo, hi))
+        db.execute(
+            "INSERT OR IGNORE INTO dup_exclusions (media_id_a, media_id_b, dup_type) VALUES (?, ?, ?)",
+            (lo, hi, dup_type),
+        )
     db.commit()
     return jsonify({"ok": True})
 
 
 @bp.route("/dup-exclusions", methods=["DELETE"])
 def reset_dup_exclusions():
+    dup_type = request.args.get("dup_type")
     db = get_db()
-    db.execute("DELETE FROM dup_exclusions")
+    if dup_type:
+        db.execute("DELETE FROM dup_exclusions WHERE dup_type = ?", (dup_type,))
+    else:
+        db.execute("DELETE FROM dup_exclusions")
     db.commit()
     return jsonify({"ok": True})
 
