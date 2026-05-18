@@ -17,13 +17,13 @@ const DuplicatesPage = {
           <q-tooltip :delay="1000">HDBSCAN 密度聚类</q-tooltip>
         </q-btn>
       </q-btn-group>
-      <q-icon name="help_outline" size="16px" color="grey-6" style="cursor:help">
-        <q-tooltip :delay="300" max-width="280px">
-          <div style="font-size:12px;line-height:1.6">
-            <b>重复</b>：文件内容完全相同（SHA256 哈希）<br>
-            <b>酷似</b>：余弦相似度 ≥ 98%，几乎一致的图片<br>
-            <b>相似</b>：余弦相似度 ≥ 90%，连拍或画面接近的图片<br>
-            <b>聚类</b>：HDBSCAN 密度聚类，视觉主题相近的图片组
+      <q-icon name="help_outline" size="16px" color="grey-6">
+        <q-tooltip :delay="300" max-width="320px">
+          <div style="font-size:12px;line-height:1.8;white-space:nowrap">
+            <b>重复</b>：同一个文件出现了多次<br>
+            <b>酷似</b>：几乎一模一样的照片，比如同一张照片的 JPG 和 RAW<br>
+            <b>相似</b>：画面非常接近，比如连拍的照片<br>
+            <b>聚类</b>：看起来像同一类场景或主题的照片
           </div>
         </q-tooltip>
       </q-icon>
