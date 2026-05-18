@@ -557,9 +557,11 @@ const app = Vue.createApp({
           const parts = filePath.split("/");
           parts.pop();
           const dir = parts.join("/") || "/";
+          this._skipToggle = true;
+          this.libraryExpanded = true;
           this.$nextTick(() => {
             this.selectedFolder = dir;
-            this.libraryExpanded = true;
+            this._skipToggle = false;
           });
         };
         const m = this.galleryItems.find(i => i.id === this.detailId);
@@ -652,6 +654,7 @@ const app = Vue.createApp({
       }
     },
     onLibraryToggle(v) {
+      if (this._skipToggle) return;
       if (v) {
         this.selectedFolder = null;
         this.favFilter = false;
