@@ -184,6 +184,7 @@ def backfill_hashes():
     from ..services.embedding import compute_embedding
     from pathlib import Path
     db = get_db()
+    db.execute("PRAGMA busy_timeout = 30000")
     rows = db.execute("SELECT id, file_path, media_type, duration, file_hash, phash, embedding FROM media WHERE file_hash IS NULL OR phash IS NULL OR (embedding IS NULL AND media_type = 'image')").fetchall()
     count = 0
     for row in rows:
@@ -194,8 +195,8 @@ def backfill_hashes():
         ph = _compute_phash(fp, row["media_type"], row["duration"]) if row["phash"] is None else row["phash"]
         emb = compute_embedding(fp, row["media_type"], row["duration"]) if row["media_type"] == "image" and row["embedding"] is None else row["embedding"]
         db.execute("UPDATE media SET file_hash = ?, phash = ?, embedding = ? WHERE id = ?", (fh, ph, emb, row["id"]))
+        db.commit()
         count += 1
-    db.commit()
     return jsonify({"ok": True, "count": count})
 
 
