@@ -12,7 +12,7 @@ const DuplicatesPage = {
         </q-btn>
       </q-btn-group>
       <div style="flex:1"></div>
-      <q-btn v-if="needBackfill" flat dense no-caps icon="sync" label="计算哈希" color="grey-6" size="sm" @click="backfillAndReload" style="border:1px solid var(--border);border-radius:6px"></q-btn>
+      <q-btn v-if="needBackfill" flat dense no-caps icon="sync" label="计算特征向量" color="grey-6" size="sm" @click="backfillAndReload" style="border:1px solid var(--border);border-radius:6px"></q-btn>
     </div>
     <div v-if="loading" style="flex:1;display:flex;align-items:center;justify-content:center">
       <q-spinner-dots color="grey-6" size="40px"></q-spinner-dots>
@@ -29,7 +29,7 @@ const DuplicatesPage = {
               <span class="dup-badge">{{ g.items.length }}</span>
               <span style="font-size:12px;color:var(--text2)">个{{ dupType === 'exact' ? '重复' : '相似' }}文件</span>
             </div>
-            <span v-if="dupType === 'similar'" style="font-size:11px;color:var(--accent)">相似度 {{ Math.round((1 - g.distance / 256) * 100) }}%</span>
+            <span v-if="dupType === 'similar' && g.similarity != null" style="font-size:11px;color:var(--accent)">相似度 {{ g.similarity }}%</span>
           </div>
           <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px">
             <div v-for="item in g.items" :key="item.id" class="dup-thumb" @click="openDetail(item.id)">
@@ -48,7 +48,7 @@ const DuplicatesPage = {
   `,
   data() {
     return {
-      dupType: "exact",
+      dupType: "similar",
       groups: [],
       loading: false,
       needBackfill: false,
@@ -65,7 +65,7 @@ const DuplicatesPage = {
     async loadGroups() {
       this.loading = true;
       try {
-        const res = await API.getDuplicates(this.dupType, 10);
+        const res = await API.getDuplicates(this.dupType);
         this.groups = res.groups || [];
       } catch (e) {
         this.groups = [];
@@ -76,18 +76,21 @@ const DuplicatesPage = {
       try {
         const res = await API.backfillHashes();
         if (res.count > 0) {
-          Quasar.Notify.create({ message: `已为 ${res.count} 个素材计算哈希`, position: 'top', timeout: 2000 });
+          Quasar.Notify.create({ message: `已为 ${res.count} 个素材计算特征向量`, position: 'top', timeout: 2000 });
+          await this.loadGroups();
         }
-      } catch (e) { /* ignore */ }
-      this.needBackfill = false;
+        this.needBackfill = false;
+      } catch (e) {
+        this.needBackfill = false;
+      }
     },
     async backfillAndReload() {
       try {
         const res = await API.backfillHashes();
-        Quasar.Notify.create({ message: `已计算 ${res.count} 个素材的哈希`, position: 'top', timeout: 2000 });
+        Quasar.Notify.create({ message: `已计算 ${res.count} 个素材的特征向量`, position: 'top', timeout: 2000 });
         await this.loadGroups();
       } catch (e) {
-        Quasar.Notify.create({ message: '回填失败: ' + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
+        Quasar.Notify.create({ message: '计算失败: ' + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
       }
     },
   },

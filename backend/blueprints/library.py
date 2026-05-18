@@ -174,17 +174,19 @@ def scan_paths():
 @bp.route("/backfill-hashes", methods=["POST"])
 def backfill_hashes():
     from ..services.importer import _compute_file_hash, _compute_phash
+    from ..services.embedding import compute_embedding
     from pathlib import Path
     db = get_db()
-    rows = db.execute("SELECT id, file_path, media_type, duration FROM media WHERE file_hash IS NULL").fetchall()
+    rows = db.execute("SELECT id, file_path, media_type, duration FROM media WHERE file_hash IS NULL OR phash IS NULL OR (embedding IS NULL AND media_type = 'image')").fetchall()
     count = 0
     for row in rows:
         fp = Path(row["file_path"])
         if not fp.exists():
             continue
-        fh = _compute_file_hash(fp)
-        ph = _compute_phash(fp, row["media_type"], row["duration"])
-        db.execute("UPDATE media SET file_hash = ?, phash = ? WHERE id = ?", (fh, ph, row["id"]))
+        fh = _compute_file_hash(fp) if row["file_hash"] is None else row["file_hash"]
+        ph = _compute_phash(fp, row["media_type"], row["duration"]) if row["phash"] is None else row["phash"]
+        emb = compute_embedding(fp, row["media_type"], row["duration"]) if row["media_type"] == "image" and row["embedding"] is None else row["embedding"]
+        db.execute("UPDATE media SET file_hash = ?, phash = ?, embedding = ? WHERE id = ?", (fh, ph, emb, row["id"]))
         count += 1
     db.commit()
     return jsonify({"ok": True, "count": count})
@@ -219,7 +221,6 @@ def backfill_picture_control():
 def find_duplicates():
     db = get_db()
     dup_type = request.args.get("type", "exact")
-    threshold = int(request.args.get("threshold", "10"))
 
     if dup_type == "exact":
         rows = db.execute(
@@ -235,36 +236,39 @@ def find_duplicates():
                 current = {"hash": r["file_hash"], "items": []}
                 groups.append(current)
             current["items"].append(dict(r))
+        groups.sort(key=lambda g: (-len(g["items"]),))
         return jsonify({"groups": groups})
 
-    else:  # similar
+    else:  # similar — HDBSCAN clustering on ResNet50 embeddings
+        import numpy as np
+        import hdbscan
+
         rows = db.execute(
-            "SELECT id, file_path, file_name, media_type, file_size, phash, thumbnail_path "
-            "FROM media WHERE phash IS NOT NULL"
+            "SELECT id, file_path, file_name, media_type, file_size, embedding, thumbnail_path "
+            "FROM media WHERE embedding IS NOT NULL"
         ).fetchall()
-        items = [dict(r) for r in rows]
-        seen = set()
+        if not rows:
+            return jsonify({"groups": []})
+
+        vecs = np.array([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
+        clusterer = hdbscan.HDBSCAN(min_cluster_size=2, metric="euclidean")
+        labels = clusterer.fit_predict(vecs)
+
         groups = []
-        for i in range(len(items)):
-            if i in seen:
+        for label in set(labels):
+            if label == -1:
                 continue
-            ph_i = int(items[i]["phash"], 16)
-            group_items = []
-            for j in range(i + 1, len(items)):
-                if j in seen:
-                    continue
-                ph_j = int(items[j]["phash"], 16)
-                dist = bin(ph_i ^ ph_j).count("1")
-                if dist <= threshold:
-                    group_items.append((dist, j))
-            if group_items:
-                seen.add(i)
-                g = {"distance": 0, "items": [items[i]]}
-                for dist, j in group_items:
-                    seen.add(j)
-                    g["items"].append(items[j])
-                g["distance"] = min(d for d, _ in group_items)
-                groups.append(g)
+            indices = [i for i, l in enumerate(labels) if l == label]
+            # Compute average pairwise cosine similarity within cluster
+            cluster_vecs = vecs[indices]
+            n = len(indices)
+            sims = cluster_vecs @ cluster_vecs.T
+            avg_sim = float((sims.sum() - n) / (n * (n - 1))) if n > 1 else 1.0
+            groups.append({
+                "similarity": round(avg_sim * 100),
+                "items": [dict(rows[i]) for i in indices],
+            })
+        groups.sort(key=lambda g: (-len(g["items"]), -g["similarity"]))
         return jsonify({"groups": groups})
 
 

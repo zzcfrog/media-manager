@@ -10,3 +10,4 @@ temp_video/
 node_modules/
 dist/
 electron/dist/
+backend/models/

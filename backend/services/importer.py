@@ -11,6 +11,12 @@ from ..db import get_db
 
 logger = logging.getLogger(__name__)
 
+# Timeout for external tool calls (ffprobe/ffmpeg/exiftool)
+# External disks and large files need more time
+PROBE_TIMEOUT = 60
+EXIFTOOL_TIMEOUT = 30
+FFMPEG_TIMEOUT = 60
+
 _VIDEO_EXTS = VIDEO_EXTS
 _IMAGE_EXTS = IMAGE_EXTS
 
@@ -83,14 +89,24 @@ def _import_one(db, filepath: Path) -> dict | None:
 
     file_hash = _compute_file_hash(filepath)
     phash = _compute_phash(filepath, media_type, meta.get("duration"))
+
+    # Compute embedding for images only
+    embedding = None
+    if media_type == "image":
+        try:
+            from .embedding import compute_embedding
+            embedding = compute_embedding(filepath, "image")
+        except Exception:
+            pass
+
     xmp_exists = 1 if media_type == "image" and filepath.with_suffix(".xmp").exists() else 0
 
     cur = db.execute(
         "INSERT INTO media (file_path, file_name, media_type, file_size, duration, width, height, fps, "
         "video_codec, video_profile, bit_rate, audio_codec, audio_sample_rate, audio_channels, "
         "color_space, color_range, pix_fmt, camera_make, camera_model, lens_model, date_taken, thumbnail_path, "
-        "file_hash, phash, has_xmp, picture_control) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "file_hash, phash, has_xmp, picture_control, embedding) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             str(filepath), filepath.name, media_type,
             filepath.stat().st_size,
@@ -100,7 +116,7 @@ def _import_one(db, filepath: Path) -> dict | None:
             meta.get("audio_channels"), meta.get("color_space"), meta.get("color_range"),
             meta.get("pix_fmt"), meta.get("camera_make"), meta.get("camera_model"),
             meta.get("lens_model"), meta.get("date_taken"), meta.get("thumbnail_path"),
-            file_hash, phash, xmp_exists, meta.get("picture_control"),
+            file_hash, phash, xmp_exists, meta.get("picture_control"), embedding,
         ),
     )
     media_id = cur.lastrowid
@@ -119,7 +135,7 @@ def _import_one(db, filepath: Path) -> dict | None:
 def _probe(filepath: Path, media_type: str) -> dict:
     cmd = ["ffprobe", "-v", "quiet", "-print_format", "json",
            "-show_format", "-show_streams", str(filepath)]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=PROBE_TIMEOUT)
     info = json.loads(result.stdout)
     vs = next((s for s in info.get("streams", []) if s.get("codec_type") == "video"), {})
     au = next((s for s in info.get("streams", []) if s.get("codec_type") == "audio"), {})
@@ -183,7 +199,7 @@ def _run_exiftool(filepath: Path) -> dict | None:
         str(filepath),
     ]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=EXIFTOOL_TIMEOUT)
         if result.returncode != 0:
             return None
         data = json.loads(result.stdout)
@@ -268,7 +284,7 @@ def _generate_thumbnail(filepath: Path, media_type: str) -> str | None:
                 "ffmpeg", "-i", str(filepath),
                 "-vf", "scale=320:-1", "-y", str(thumb_path),
             ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT)
         if result.returncode == 0 and thumb_path.exists():
             return thumb_name
 
@@ -285,7 +301,7 @@ def _generate_thumbnail(filepath: Path, media_type: str) -> str | None:
 def _extract_exif_thumbnail(filepath: Path, thumb_path: Path, thumb_name: str) -> str | None:
     for tag in ("ThumbnailImage", "JpgFromRaw", "PreviewImage"):
         cmd = ["exiftool", "-b", f"-{tag}", str(filepath)]
-        result = subprocess.run(cmd, capture_output=True, timeout=10)
+        result = subprocess.run(cmd, capture_output=True, timeout=EXIFTOOL_TIMEOUT)
         if result.returncode == 0 and len(result.stdout) > 100:
             thumb_path.write_bytes(result.stdout)
             if thumb_path.exists():
@@ -294,7 +310,7 @@ def _extract_exif_thumbnail(filepath: Path, thumb_path: Path, thumb_name: str) -
                     tmp = thumb_path.with_suffix(".tmp.jpg")
                     subprocess.run(
                         ["ffmpeg", "-i", str(thumb_path), "-vf", "scale=320:-1", "-y", str(tmp)],
-                        capture_output=True, text=True, timeout=10,
+                        capture_output=True, text=True, timeout=FFMPEG_TIMEOUT,
                     )
                     if tmp.exists():
                         tmp.replace(thumb_path)
@@ -323,24 +339,45 @@ def _compute_phash(filepath: Path, media_type: str, duration: float = None) -> s
             ss = str(duration / 2) if duration else "1"
             cmd = ["ffmpeg", "-i", str(filepath), "-ss", ss, "-frames:v", "1",
                    "-vf", "scale=128:-1", "-f", "image2pipe", "-vcodec", "png", "-"]
-            result = subprocess.run(cmd, capture_output=True, timeout=15)
+            result = subprocess.run(cmd, capture_output=True, timeout=FFMPEG_TIMEOUT)
             if result.returncode == 0 and result.stdout:
                 import io
                 img = Image.open(io.BytesIO(result.stdout))
         elif media_type == "image":
+            ext = filepath.suffix.lower()
+            raw_exts = {".nef", ".cr2", ".cr3", ".arw", ".dng", ".raf", ".orf", ".rw2",
+                        ".pef", ".srw", ".kdc", ".sr2", ".3fr", ".iiq", ".erf", ".mef",
+                        ".mrw", ".nrw", ".dcr", ".raw", ".mos", ".fff", ".x3f", ".rwl", ".crw", ".proraw"}
             try:
-                img = Image.open(filepath)
+                if ext in raw_exts:
+                    import rawpy
+                    with rawpy.imread(str(filepath)) as raw:
+                        rgb = raw.postprocess(use_camera_wb=True, output_color=rawpy.ColorSpace.sRGB)
+                        img = Image.fromarray(rgb)
+                elif ext in (".heic", ".heif", ".hif", ".avif"):
+                    try:
+                        from pillow_heif import register_heif_opener
+                        register_heif_opener()
+                    except ImportError:
+                        pass
+                    img = Image.open(filepath)
+                    if img.mode in ("I", "I;16", "I;16L", "I;16B", "CMYK", "YCbCr"):
+                        img = img.convert("RGB")
+                else:
+                    img = Image.open(filepath)
+                    if img.mode in ("I", "I;16", "I;16L", "I;16B", "CMYK", "YCbCr"):
+                        img = img.convert("RGB")
             except Exception:
                 if shutil.which("ffmpeg"):
                     cmd = ["ffmpeg", "-i", str(filepath), "-vf", "scale=128:-1",
                            "-f", "image2pipe", "-vcodec", "png", "-"]
-                    result = subprocess.run(cmd, capture_output=True, timeout=15)
+                    result = subprocess.run(cmd, capture_output=True, timeout=FFMPEG_TIMEOUT)
                     if result.returncode == 0 and result.stdout:
                         import io
                         img = Image.open(io.BytesIO(result.stdout))
 
         if img:
-            return str(imagehash.phash(img, hash_size=16))
+            return str(imagehash.phash(img))
     except Exception:
         pass
     return None

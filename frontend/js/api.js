@@ -53,8 +53,8 @@ scanPaths(paths) {
   getFolders() {
     return this._fetch(`/api/library/folders`);
   },
-  getDuplicates(type, threshold) {
-    return this._fetch(`/api/library/duplicates?type=${type}&threshold=${threshold || 10}`);
+  getDuplicates(type) {
+    return this._fetch(`/api/library/duplicates?type=${type}`);
   },
   backfillHashes() {
     return this._fetch(`/api/library/backfill-hashes`, { method: "POST" });
