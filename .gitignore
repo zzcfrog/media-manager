@@ -4,6 +4,7 @@ output/
 logs/
 data/
 __pycache__/
+*.db
 *.pyc
 *_compressed.mp4
 temp_video/

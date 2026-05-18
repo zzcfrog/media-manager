@@ -16,7 +16,7 @@ const GalleryPage = {
       </q-btn-group>
       <div style="display:flex;gap:2px">
         <q-btn flat round dense :color="favOnly ? 'red' : 'grey-7'" icon="favorite" size="sm" @click="favOnly=!favOnly; showFilterToast(); load()">
-          <q-tooltip :delay="1000">只看收藏</q-tooltip>
+          <q-tooltip :delay="1000">只看喜欢</q-tooltip>
         </q-btn>
         <q-btn flat round dense :color="analyzedOnly ? 'primary' : 'grey-7'" icon="auto_awesome" size="sm" @click="analyzedOnly=!analyzedOnly; showFilterToast(); load()">
           <q-tooltip :delay="1000">只看已分析</q-tooltip>
@@ -504,7 +504,7 @@ const GalleryPage = {
         const cn = {red:"红色",yellow:"黄色",green:"绿色",blue:"蓝色",purple:"紫色"};
         parts.push(cn[this.filters.color_label] + "标签");
       }
-      if (this.favOnly) parts.push("已收藏");
+      if (this.favOnly) parts.push("已喜欢");
       if (this.analyzedOnly) parts.push("已分析");
       const msg = parts.length ? parts.join(" · ") : "已清除所有筛选";
       Quasar.Notify.create({ message: msg, position: 'top', timeout: 1800 });

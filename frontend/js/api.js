@@ -47,9 +47,6 @@ scanPaths(paths) {
   addCollectionItems(cid, mediaIds) {
     return this._fetch(`/api/collections/${cid}/items`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ media_ids: mediaIds }) });
   },
-  getTags() {
-    return this._fetch(`/api/tags/`);
-  },
   getFolders() {
     return this._fetch(`/api/library/folders`);
   },
@@ -58,15 +55,6 @@ scanPaths(paths) {
   },
   backfillHashes() {
     return this._fetch(`/api/library/backfill-hashes`, { method: "POST" });
-  },
-  createTag(name) {
-    return this._fetch(`/api/tags/`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
-  },
-  deleteTag(id) {
-    return this._fetch(`/api/tags/${id}`, { method: "DELETE" });
-  },
-  assignTags(mediaId, tags) {
-    return this._fetch(`/api/tags/assign`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ media_id: mediaId, tags }) });
   },
   getAnalysis(mediaId) {
     return this._fetch(`/api/analysis/${mediaId}`);

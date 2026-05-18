@@ -86,7 +86,7 @@ video_analyzer/
 | `library` | `/api/library` | 媒体库 CRUD、文件夹树 |
 | `analysis` | `/api/analysis` | AI 分析 + 分段编辑 |
 | `collections` | `/api/collections` | 合集管理 |
-| `tags` | `/api/tags` | 标签管理 |
+| `tags` | `/api/tags` | 标签管理（后端保留，前端已移除） |
 | `settings` | `/api/settings` | 全局设置 CRUD |
 
 ### 3.3 数据库
@@ -304,7 +304,7 @@ class AsrSegment:
 | 视频示波器 | Canvas，0.2x 离屏缩放，~15fps requestAnimationFrame |
 | 直方图 | 离屏 Canvas 采样 → RGB 三通道曲线 |
 | 动画 | Lottie（`lottie.min.js`） |
-| 文件夹树 | Quasar `q-tree` 组件，嵌套在素材库 `q-expansion-item` 内（`content-inset-level="0.1"`），应用启动时 `getFolders()` 加载，点击节点设 `selectedFolder` |
+| 文件夹树 | Quasar `q-tree` 组件，通过 `v-show` 控制显隐（`libraryExpanded`），使用 `:expanded` + `expandedFolders` 响应式控制展开状态，点击节点设 `selectedFolder` |
 | 媒体类型筛选 | `q-btn-group` 包含独立 `q-btn`（带 `q-tooltip`），替代 `q-btn-toggle` |
 | 分段编辑 | `contenteditable` + `@blur` → `saveSegField()`（文本字段）；`×` 按钮 → `removeTag()`（标签字段） |
 | 键盘快捷键 | `document.addEventListener("keydown")` 全局监听，`created()` 注册 / `beforeUnmount()` 清理；`isContentEditable` 检测避免编辑冲突 |
@@ -315,17 +315,22 @@ class AsrSegment:
 App.mounted()
   └── loadSidebar() → API.getFolders() → this.folderTree  (侧边栏素材库树渲染)
 
+用户点击"素材库"文字区域
+  └── navToLibrary() → 清除筛选，导航到 #/gallery
+
+用户点击展开箭头
+  └── this.libraryExpanded = !this.libraryExpanded  (v-show 控制目录树显隐)
+
 用户点击树节点
   └── onFolderSelect(path)
       └── this.selectedFolder = path  (toggle: 再次点击设 null)
 
-用户展开/收起素材库
-  └── onLibraryToggle()  → this.libraryExpanded = !this.libraryExpanded
-
-路由切换
+路由切换 → 详情页
   └── resolveRoute()
-      ├── 切到收藏/合集 → this.libraryExpanded = false (自动收起)
-      └── 切回画廊       → this.libraryExpanded = true  (自动展开)
+      └── setFolder(filePath)
+          ├── this.libraryExpanded = true
+          ├── 计算祖先路径 → 加入 expandedFolders
+          └── this.selectedFolder = dir
 
 Gallery.load() / Gallery.loadMore()
   └── 读取 this.$root.selectedFolder
@@ -333,7 +338,7 @@ Gallery.load() / Gallery.loadMore()
           └── 后端 WHERE file_path LIKE '<folder>/%'
 ```
 
-`selectedFolder` 同时控制侧边栏"素材库"入口的高亮状态（`selectedFolder` 非空时不高亮），确保文件夹筛选和导航入口互斥。素材库使用 `q-expansion-item` 包裹目录树，`libraryExpanded` 控制展开/收起状态。
+`selectedFolder` 同时控制侧边栏"素材库"入口的高亮状态（`selectedFolder` 非空时不高亮），确保文件夹筛选和导航入口互斥。素材库菜单右侧独立箭头控制 `libraryExpanded`（`v-show` 控制目录树显隐），`expandedFolders` 数组通过 `:expanded` 属性响应式控制节点展开状态。
 
 ## 6. 外部依赖
 

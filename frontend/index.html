@@ -51,36 +51,37 @@
     <q-drawer v-model="drawerOpen" :width="260" :mini="drawerMini" :breakpoint="0" bordered style="display:flex;flex-direction:column" mini-width="56">
       <q-list dense>
         <q-item-label header>浏览</q-item-label>
-        <q-expansion-item dense-toggle expand-separator
-          v-model="libraryExpanded"
-          :content-inset-level="0.1"
-          :header-style="route==='#/gallery' && !collectionFilter && !selectedFolder ? 'background:var(--accent-dim);border-radius:4px' : ''"
-          @update:model-value="onLibraryToggle">
-          <template v-slot:header>
-            <q-item-section avatar><q-icon name="movie" size="18px" :color="route==='#/gallery' && !collectionFilter && !selectedFolder ? 'primary' : 'grey-6'"></q-icon></q-item-section>
-            <q-item-section>素材库</q-item-section>
-          </template>
+        <q-item clickable
+          :style="route==='#/gallery' && !collectionFilter && !selectedFolder ? 'background:var(--accent-dim);border-radius:4px' : ''"
+          @click="navToLibrary">
+          <q-item-section avatar><q-icon name="movie" size="18px" :color="route==='#/gallery' && !collectionFilter && !selectedFolder ? 'primary' : 'grey-6'"></q-icon></q-item-section>
+          <q-item-section>素材库</q-item-section>
+          <q-item-section side style="padding-left:0;padding-right:4px">
+            <q-btn flat round dense :icon="libraryExpanded ? 'expand_less' : 'expand_more'" size="xs" color="grey-6"
+              @click.stop="libraryExpanded = !libraryExpanded"></q-btn>
+          </q-item-section>
+        </q-item>
+        <div v-show="libraryExpanded" style="padding-left:28px">
           <q-tree :nodes="folderTree" node-key="path" label-key="label"
             dense no-connectors
             :selected="selectedFolder" @update:selected="onFolderSelect"
-            default-expand-all>
+            :expanded="expandedFolders" @update:expanded="v => expandedFolders = v">
             <template v-slot:default-header="prop">
               <div class="row items-center no-wrap" style="width:100%;padding:4px 6px;margin:-4px -6px"
                 :style="selectedFolder===prop.node.path ? 'background:var(--accent-dim);border-radius:4px' : ''">
                 <q-icon name="folder" size="16px" :color="selectedFolder===prop.node.path ? 'primary' : 'grey-6'" class="q-mr-xs"></q-icon>
                 <span class="folder-label" style="font-size:13px">{{ prop.node.label }}</span>
-                <q-space></q-space>
-                <span class="text-caption text-grey-6">{{ prop.node.totalCount || 0 }}</span>
+                <span class="text-caption text-grey-6" style="flex-shrink:0;margin-left:4px">{{ prop.node.totalCount || 0 }}</span>
                 <q-tooltip :delay="1000" v-if="prop.node.label.length > 10">{{ prop.node.label }}</q-tooltip>
               </div>
             </template>
           </q-tree>
-        </q-expansion-item>
+        </div>
         <q-item clickable :active="route==='#/favorites'"
                 @click="nav('#/favorites')"
                 active-class="bg-primary text-white">
           <q-item-section avatar><q-icon name="favorite" size="18px"></q-icon></q-item-section>
-          <q-item-section>我的收藏</q-item-section>
+          <q-item-section>我的喜欢</q-item-section>
         </q-item>
         <q-item clickable :active="route==='#/duplicates'" @click="nav('#/duplicates')"
                 active-class="bg-primary text-white">
@@ -95,20 +96,11 @@
                 :active="route==='#/collections/'+c.id"
                 @click="nav('#/collections/'+c.id)"
                 active-class="bg-primary text-white">
-          <q-item-section avatar><q-icon name="folder" size="18px"></q-icon></q-item-section>
+          <q-item-section avatar><q-icon name="folder_special" size="18px"></q-icon></q-item-section>
           <q-item-section>{{ c.name }}</q-item-section>
           <q-item-section side><span class="text-caption text-grey-6">{{ c.item_count || 0 }}</span></q-item-section>
         </q-item>
         <q-item v-if="!collections.length"><q-item-section class="text-grey-7" style="font-size:11px">暂无收藏夹</q-item-section></q-item>
-      </q-list>
-      <q-separator></q-separator>
-      <q-list dense style="flex:1;overflow-y:auto">
-        <q-item-label header>标签</q-item-label>
-        <q-item v-for="t in tags" :key="t.id">
-          <q-item-section avatar><q-icon name="tag" size="18px"></q-icon></q-item-section>
-          <q-item-section># {{ t.name }}</q-item-section>
-          <q-item-section side><span class="text-caption text-grey-6">{{ t.usage_count }}</span></q-item-section>
-        </q-item>
       </q-list>
       <div style="padding:12px 14px">
         <q-btn v-if="!drawerMini" color="primary" class="full-width" icon="add_circle_outline" label="导入素材" @click="openImport"></q-btn>
@@ -225,7 +217,7 @@
         <div>
           <div class="text-subtitle2 q-mb-sm" style="padding-left:10px;border-left:3px solid var(--accent);line-height:1">素材库</div>
           <table style="width:100%;font-size:13px">
-            <tr v-for="s in [{k:'↑ ↓ ← →',d:'移动选中项'},{k:'Enter',d:'打开详情'},{k:'Delete',d:'删除选中项'},{k:'1-5',d:'给选中项评分'},{k:'0',d:'清除评分'},{k:'F',d:'切换收藏'},{k:'G',d:'切换网格/列表视图'},{k:'/',d:'聚焦搜索框'}]" style="height:28px">
+            <tr v-for="s in [{k:'↑ ↓ ← →',d:'移动选中项'},{k:'Enter',d:'打开详情'},{k:'Delete',d:'删除选中项'},{k:'1-5',d:'给选中项评分'},{k:'0',d:'清除评分'},{k:'F',d:'切换喜欢'},{k:'G',d:'切换网格/列表视图'},{k:'/',d:'聚焦搜索框'}]" style="height:28px">
               <td style="width:100px"><kbd style="background:var(--surface2);padding:2px 8px;border-radius:4px;font-family:inherit;font-size:12px">{{ s.k }}</kbd></td>
               <td style="color:var(--text2)">{{ s.d }}</td>
             </tr>
@@ -234,7 +226,7 @@
         <div>
           <div class="text-subtitle2 q-mb-sm" style="padding-left:10px;border-left:3px solid var(--accent);line-height:1">详情页</div>
           <table style="width:100%;font-size:13px">
-            <tr v-for="s in [{k:'← →',d:'上一个 / 下一个素材'},{k:'1-5',d:'评分 1-5 星'},{k:'0',d:'清除评分'},{k:'F',d:'切换收藏'},{k:'Space',d:'播放 / 暂停'},{k:'Backspace',d:'返回素材库'}]" style="height:28px">
+            <tr v-for="s in [{k:'← →',d:'上一个 / 下一个素材'},{k:'1-5',d:'评分 1-5 星'},{k:'0',d:'清除评分'},{k:'F',d:'切换喜欢'},{k:'Space',d:'播放 / 暂停'},{k:'Backspace',d:'返回素材库'}]" style="height:28px">
               <td style="width:100px"><kbd style="background:var(--surface2);padding:2px 8px;border-radius:4px;font-family:inherit;font-size:12px">{{ s.k }}</kbd></td>
               <td style="color:var(--text2)">{{ s.d }}</td>
             </tr>
@@ -447,9 +439,9 @@ const app = Vue.createApp({
       showFailedList: false,
       selectedPaths: [],
       collections: [],
-      tags: [],
       folderTree: [],
       selectedFolder: null,
+      expandedFolders: [],
       libraryExpanded: true,
       drawerOpen: true,
       drawerMini: false,
@@ -503,6 +495,12 @@ const app = Vue.createApp({
   methods: {
     API,
     nav(hash) { location.hash = hash; },
+    navToLibrary() {
+      this.selectedFolder = null;
+      this.favFilter = false;
+      this.collectionFilter = null;
+      location.hash = "#/gallery";
+    },
     startLongRefresh() {
       this._longTimer = setTimeout(() => {
         this._longFired = true;
@@ -557,17 +555,22 @@ const app = Vue.createApp({
           const parts = filePath.split("/");
           parts.pop();
           const dir = parts.join("/") || "/";
-          this._skipToggle = true;
           this.libraryExpanded = true;
-          setTimeout(() => {
-            this.selectedFolder = dir;
-            this.$nextTick(() => {
-              this._skipToggle = false;
-              const el = document.querySelector('.q-tree__node--selected') || document.querySelector('[data-path="' + CSS.escape(dir) + '"]');
-              console.log("[detail] selected:", this.selectedFolder, "DOM found:", !!el);
-              if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-            });
-          }, 100);
+          // Expand only the ancestor path to the target folder
+          const ancestors = [];
+          let cur = "";
+          for (const p of dir.split("/").filter(Boolean)) {
+            cur += "/" + p;
+            ancestors.push(cur);
+          }
+          const expanded = new Set(this.expandedFolders);
+          for (const a of ancestors) expanded.add(a);
+          this.expandedFolders = [...expanded];
+          this.selectedFolder = dir;
+          this.$nextTick(() => {
+            const el = document.querySelector('.q-tree__node--selected');
+            if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          });
         };
         const m = this.galleryItems.find(i => i.id === this.detailId);
         if (m && m.file_path) {
@@ -610,9 +613,8 @@ const app = Vue.createApp({
     },
     async loadSidebar() {
       try {
-        const [colRes, tagRes, folderRes] = await Promise.all([API.getCollections(), API.getTags(), API.getFolders()]);
+        const [colRes, folderRes] = await Promise.all([API.getCollections(), API.getFolders()]);
         this.collections = colRes.data || [];
-        this.tags = tagRes.data || [];
         this.folderTree = folderRes.data || [];
       } catch (e) { console.error(e); }
     },
@@ -656,19 +658,6 @@ const app = Vue.createApp({
         location.hash = "#/gallery";
       } else {
         this.$refs.gallery?.load();
-      }
-    },
-    onLibraryToggle(v) {
-      if (this._skipToggle) return;
-      if (v) {
-        this.selectedFolder = null;
-        this.favFilter = false;
-        this.collectionFilter = null;
-        if (this.route !== "#/gallery") {
-          location.hash = "#/gallery";
-        } else {
-          this.$refs.gallery?.load();
-        }
       }
     },
     openImport() {

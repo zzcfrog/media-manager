@@ -11,7 +11,7 @@ const DetailPage = {
         <span v-for="c in colors" :key="c" class="color-swatch" :class="['bg-'+c, {active: media?.color_label===c, dim: media?.color_label && media?.color_label!==c}]" @click="setColor(media?.color_label === c ? null : c)"></span>
       </div>
       <q-btn flat round dense :color="media?.favorite ? 'red' : 'grey-6'" icon="favorite" size="sm" style="margin-left:10px" @click="toggleFav">
-        <q-tooltip :delay="1000">收藏</q-tooltip>
+        <q-tooltip :delay="1000">喜欢</q-tooltip>
       </q-btn>
       <q-btn v-if="media?.media_type==='image' && analysis.status==='done'" flat round dense size="sm" style="margin-left:6px" @click="doWriteXmp">
         <img :src="media?.has_xmp ? '/static/img/xmp-refresh.svg' : '/static/img/xmp-write.svg'" style="width:18px;height:18px" :style="{opacity: media?.has_xmp ? 1 : 0.45}">
@@ -707,7 +707,7 @@ const DetailPage = {
       const fav = this.media.favorite ? 0 : 1;
       await API.updateMedia(this.media.id, { favorite: fav });
       this.media.favorite = fav;
-      Quasar.Notify.create({ message: fav ? '已收藏' : '已取消收藏', position: 'top', timeout: 1200 });
+      Quasar.Notify.create({ message: fav ? '已喜欢' : '已取消喜欢', position: 'top', timeout: 1200 });
     },
     openInFinder() {
       if (window.electronAPI?.openInFinder) window.electronAPI.openInFinder(this.media.file_path);
