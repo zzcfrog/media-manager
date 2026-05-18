@@ -553,20 +553,21 @@ const app = Vue.createApp({
         if (this.$refs.gallery?.items) this.galleryItems = [...this.$refs.gallery.items];
         this.currentView = "detail";
         this.detailId = parseInt(hash.split("/")[2]);
+        const setFolder = (filePath) => {
+          const parts = filePath.split("/");
+          parts.pop();
+          const dir = parts.join("/") || "/";
+          this.$nextTick(() => {
+            this.selectedFolder = dir;
+            this.libraryExpanded = true;
+          });
+        };
         const m = this.galleryItems.find(i => i.id === this.detailId);
         if (m && m.file_path) {
-          const parts = m.file_path.split("/");
-          parts.pop();
-          this.selectedFolder = parts.join("/") || "/";
-          this.libraryExpanded = true;
+          setFolder(m.file_path);
         } else {
           API.getMedia(this.detailId).then(media => {
-            if (media && media.file_path) {
-              const parts = media.file_path.split("/");
-              parts.pop();
-              this.selectedFolder = parts.join("/") || "/";
-              this.libraryExpanded = true;
-            }
+            if (media && media.file_path) setFolder(media.file_path);
           }).catch(() => {});
         }
       } else if (hash === "#/favorites") {
