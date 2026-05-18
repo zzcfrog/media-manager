@@ -555,8 +555,19 @@ const app = Vue.createApp({
         this.detailId = parseInt(hash.split("/")[2]);
         const m = this.galleryItems.find(i => i.id === this.detailId);
         if (m && m.file_path) {
-          this.selectedFolder = m.file_path.substring(0, m.file_path.lastIndexOf("/"));
+          const parts = m.file_path.split("/");
+          parts.pop();
+          this.selectedFolder = parts.join("/") || "/";
           this.libraryExpanded = true;
+        } else {
+          API.getMedia(this.detailId).then(media => {
+            if (media && media.file_path) {
+              const parts = media.file_path.split("/");
+              parts.pop();
+              this.selectedFolder = parts.join("/") || "/";
+              this.libraryExpanded = true;
+            }
+          }).catch(() => {});
         }
       } else if (hash === "#/favorites") {
         this.currentView = "gallery";
