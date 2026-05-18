@@ -261,7 +261,7 @@ def find_duplicates():
         n = len(vecs)
         sim_matrix = vecs @ vecs.T
 
-        THRESHOLD = 0.98
+        THRESHOLD = 0.96
         parent = list(range(n))
 
         def find(x):
