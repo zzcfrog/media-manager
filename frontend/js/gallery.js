@@ -240,7 +240,7 @@ const GalleryPage = {
           <q-item-section>在文件夹中显示</q-item-section>
         </q-item>
         <q-separator style="background:var(--border)"></q-separator>
-        <q-item clickable @click="ctxMenu.show = false; findSimilar()" :disable="selArr.length !== 1 || selArr[0].media_type === 'video'" style="padding-left:8px;padding-right:12px">
+        <q-item v-if="selArr.length === 1 && selArr[0].media_type !== 'video'" clickable @click="ctxMenu.show = false; findSimilar()" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="content_copy" size="14px" color="grey-6"></q-icon></q-item-section>
           <q-item-section>查找相似</q-item-section>
         </q-item>
