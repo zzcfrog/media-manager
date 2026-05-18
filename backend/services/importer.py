@@ -1,5 +1,4 @@
 import json
-import hashlib
 import logging
 import shutil
 import subprocess
@@ -84,10 +83,6 @@ def _import_one(db, filepath: Path) -> dict | None:
     if thumb:
         meta["thumbnail_path"] = thumb
 
-    file_hash = _compute_file_hash(filepath)
-    phash = _compute_phash(filepath, media_type, meta.get("duration"))
-
-    # Compute embedding for images only
     embedding = None
     if media_type == "image":
         try:
@@ -102,8 +97,8 @@ def _import_one(db, filepath: Path) -> dict | None:
         "INSERT INTO media (file_path, file_name, media_type, file_size, duration, width, height, fps, "
         "video_codec, video_profile, bit_rate, audio_codec, audio_sample_rate, audio_channels, "
         "color_space, color_range, pix_fmt, camera_make, camera_model, lens_model, date_taken, thumbnail_path, "
-        "file_hash, phash, has_xmp, picture_control, embedding) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "has_xmp, picture_control, embedding) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             str(filepath), filepath.name, media_type,
             filepath.stat().st_size,
@@ -113,7 +108,7 @@ def _import_one(db, filepath: Path) -> dict | None:
             meta.get("audio_channels"), meta.get("color_space"), meta.get("color_range"),
             meta.get("pix_fmt"), meta.get("camera_make"), meta.get("camera_model"),
             meta.get("lens_model"), meta.get("date_taken"), meta.get("thumbnail_path"),
-            file_hash, phash, xmp_exists, meta.get("picture_control"), embedding,
+            xmp_exists, meta.get("picture_control"), embedding,
         ),
     )
     media_id = cur.lastrowid
@@ -315,63 +310,3 @@ def _extract_exif_thumbnail(filepath: Path, thumb_path: Path, thumb_name: str) -
     return None
 
 
-def _compute_file_hash(filepath: Path) -> str:
-    h = hashlib.sha256()
-    with open(filepath, "rb") as f:
-        while chunk := f.read(65536):
-            h.update(chunk)
-    return h.hexdigest()
-
-
-def _compute_phash(filepath: Path, media_type: str, duration: float = None) -> str | None:
-    try:
-        import imagehash
-        from PIL import Image
-    except ImportError:
-        return None
-
-    try:
-        img = None
-        if media_type == "video" and shutil.which("ffmpeg"):
-            ss = str(duration / 2) if duration else "1"
-            cmd = ["ffmpeg", "-i", str(filepath), "-ss", ss, "-frames:v", "1",
-                   "-vf", "scale=128:-1", "-f", "image2pipe", "-vcodec", "png", "-"]
-            result = subprocess.run(cmd, capture_output=True, timeout=FFMPEG_TIMEOUT)
-            if result.returncode == 0 and result.stdout:
-                import io
-                img = Image.open(io.BytesIO(result.stdout))
-        elif media_type == "image":
-            ext = filepath.suffix.lower()
-            try:
-                if ext in RAW_EXTS:
-                    import rawpy
-                    with rawpy.imread(str(filepath)) as raw:
-                        rgb = raw.postprocess(use_camera_wb=True, output_color=rawpy.ColorSpace.sRGB)
-                        img = Image.fromarray(rgb)
-                elif ext in (".heic", ".heif", ".hif", ".avif"):
-                    try:
-                        from pillow_heif import register_heif_opener
-                        register_heif_opener()
-                    except ImportError:
-                        pass
-                    img = Image.open(filepath)
-                    if img.mode in ("I", "I;16", "I;16L", "I;16B", "CMYK", "YCbCr"):
-                        img = img.convert("RGB")
-                else:
-                    img = Image.open(filepath)
-                    if img.mode in ("I", "I;16", "I;16L", "I;16B", "CMYK", "YCbCr"):
-                        img = img.convert("RGB")
-            except Exception:
-                if shutil.which("ffmpeg"):
-                    cmd = ["ffmpeg", "-i", str(filepath), "-vf", "scale=128:-1",
-                           "-f", "image2pipe", "-vcodec", "png", "-"]
-                    result = subprocess.run(cmd, capture_output=True, timeout=FFMPEG_TIMEOUT)
-                    if result.returncode == 0 and result.stdout:
-                        import io
-                        img = Image.open(io.BytesIO(result.stdout))
-
-        if img:
-            return str(imagehash.phash(img))
-    except Exception:
-        pass
-    return None

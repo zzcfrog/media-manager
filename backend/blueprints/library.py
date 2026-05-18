@@ -1,8 +1,9 @@
+import json
 import os
 from collections import defaultdict
 
 import numpy as np
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, Response
 import jieba
 
 from ..db import get_db
@@ -173,6 +174,46 @@ def import_one():
     return jsonify({"data": None})
 
 
+@bp.route("/import-batch", methods=["POST"])
+def import_batch():
+    from ..services.importer import import_single_file
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    data = request.get_json()
+    paths = data.get("paths", [])
+    if not paths:
+        return jsonify({"error": "No paths"}), 400
+
+    def generate():
+        imported = []
+        failed = []
+
+        def do_import(p):
+            try:
+                return import_single_file(p)
+            except Exception as e:
+                return ("fail", p, str(e))
+
+        with ThreadPoolExecutor(max_workers=5) as pool:
+            futures = {pool.submit(do_import, p): p for p in paths}
+            done_count = 0
+            for fut in as_completed(futures):
+                done_count += 1
+                res = fut.result()
+                if isinstance(res, tuple) and res[0] == "fail":
+                    failed.append({"file_path": res[1], "error": res[2]})
+                    yield f"data: {json.dumps({'type': 'fail', 'file_path': res[1], 'error': res[2], 'done': done_count, 'total': len(paths)})}\n\n"
+                elif res:
+                    imported.append(res)
+                    yield f"data: {json.dumps({'type': 'ok', 'data': res, 'done': done_count, 'total': len(paths)})}\n\n"
+                else:
+                    yield f"data: {json.dumps({'type': 'skip', 'done': done_count, 'total': len(paths)})}\n\n"
+
+        yield f"data: {json.dumps({'type': 'done', 'imported': len(imported), 'failed': len(failed)})}\n\n"
+
+    return Response(generate(), mimetype="text/event-stream")
+
+
 @bp.route("/<int:media_id>/reveal", methods=["POST"])
 def reveal_file(media_id):
     import subprocess, sys
@@ -202,25 +243,26 @@ def scan_paths():
     return jsonify({"data": result, "skipped": skipped})
 
 
-@bp.route("/backfill-hashes", methods=["POST"])
-def backfill_hashes():
-    from ..services.importer import _compute_file_hash, _compute_phash
+@bp.route("/backfill-embeddings", methods=["POST"])
+def backfill_embeddings():
     from ..services.embedding import compute_embedding
     from pathlib import Path
     db = get_db()
     db.execute("PRAGMA busy_timeout = 30000")
-    rows = db.execute("SELECT id, file_path, media_type, duration, file_hash, phash, embedding FROM media WHERE file_hash IS NULL OR phash IS NULL OR (embedding IS NULL AND media_type = 'image')").fetchall()
+    rows = db.execute(
+        "SELECT id, file_path, media_type, duration, embedding FROM media "
+        "WHERE embedding IS NULL AND media_type = 'image'"
+    ).fetchall()
     count = 0
     for row in rows:
         fp = Path(row["file_path"])
         if not fp.exists():
             continue
-        fh = _compute_file_hash(fp) if row["file_hash"] is None else row["file_hash"]
-        ph = _compute_phash(fp, row["media_type"], row["duration"]) if row["phash"] is None else row["phash"]
-        emb = compute_embedding(fp, row["media_type"], row["duration"]) if row["media_type"] == "image" and row["embedding"] is None else row["embedding"]
-        db.execute("UPDATE media SET file_hash = ?, phash = ?, embedding = ? WHERE id = ?", (fh, ph, emb, row["id"]))
-        db.commit()
-        count += 1
+        emb = compute_embedding(fp, "image")
+        if emb:
+            db.execute("UPDATE media SET embedding = ? WHERE id = ?", (emb, row["id"]))
+            db.commit()
+            count += 1
     return jsonify({"ok": True, "count": count})
 
 
@@ -314,21 +356,13 @@ def find_duplicates():
     dup_type = request.args.get("type", "similar")
 
     if dup_type == "exact":
-        rows = db.execute(
-            "SELECT id, file_path, file_name, media_type, file_size, file_hash, thumbnail_path "
-            "FROM media WHERE file_hash IS NOT NULL AND file_hash IN "
-            "(SELECT file_hash FROM media WHERE file_hash IS NOT NULL GROUP BY file_hash HAVING COUNT(*) > 1) "
-            "ORDER BY file_hash, id"
-        ).fetchall()
-        groups = []
-        current = None
-        for r in rows:
-            if current is None or current["hash"] != r["file_hash"]:
-                current = {"hash": r["file_hash"], "items": []}
-                groups.append(current)
-            current["items"].append(dict(r))
-        groups.sort(key=lambda g: (-len(g["items"]),))
-        return jsonify({"groups": groups})
+        rows = _fetch_embedding_rows(db)
+        if not rows:
+            return jsonify({"groups": []})
+        vecs = np.array([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
+        sim_matrix = vecs @ vecs.T
+        indices_groups = _union_find_groups(sim_matrix, 0.999)
+        return jsonify({"groups": _rows_to_groups(rows, indices_groups, sim_matrix=sim_matrix)})
 
     rows = _fetch_embedding_rows(db)
     if not rows:

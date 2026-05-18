@@ -36,6 +36,9 @@ scanPaths(paths) {
   importOne(path) {
     return this._fetch(`/api/library/import-one`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) });
   },
+  importBatch(paths) {
+    return fetch(`/api/library/import-batch`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths }) });
+  },
   getCollections() {
     return this._fetch(`/api/collections/`);
   },
@@ -54,8 +57,8 @@ scanPaths(paths) {
   getDuplicates(type) {
     return this._fetch(`/api/library/duplicates?type=${type}`);
   },
-  backfillHashes() {
-    return this._fetch(`/api/library/backfill-hashes`, { method: "POST" });
+  backfillEmbeddings() {
+    return this._fetch(`/api/library/backfill-embeddings`, { method: "POST" });
   },
   getAnalysis(mediaId) {
     return this._fetch(`/api/analysis/${mediaId}`);

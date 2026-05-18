@@ -731,22 +731,24 @@ const app = Vue.createApp({
           return;
         }
 
-        // Concurrent import (3 at a time)
-        const CONCURRENT = 3;
-        let running = 0, idx = 0;
-        await new Promise(resolve => {
-          const next = () => {
-            while (running < CONCURRENT && idx < files.length) {
-              const f = files[idx++];
-              running++;
-              API.importOne(f.file_path)
-                .then(res => { if (res.data) this.importedItems.push(res.data); })
-                .catch(e => { this.failedItems.push({ file_name: f.file_name, file_path: f.file_path, error: e.message || String(e) }); })
-                .finally(() => { running--; next(); if (running === 0 && idx >= files.length) resolve(); });
-            }
-          };
-          next();
-        });
+        // SSE batch import — backend controls concurrency
+        const resp = await API.importBatch(files.map(f => f.file_path));
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop();
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const ev = JSON.parse(line.slice(6));
+            if (ev.type === "ok" && ev.data) this.importedItems.push(ev.data);
+            else if (ev.type === "fail") this.failedItems.push({ file_name: ev.file_path.split("/").pop(), file_path: ev.file_path, error: ev.error });
+          }
+        }
       } catch (e) {
         console.error(e);
       }

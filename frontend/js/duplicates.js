@@ -281,7 +281,7 @@ const DuplicatesPage = {
     },
     async checkBackfill() {
       try {
-        const res = await API.backfillHashes();
+        const res = await API.backfillEmbeddings();
         if (res.count > 0) {
           Quasar.Notify.create({ message: `已为 ${res.count} 个素材计算特征向量`, position: 'top', timeout: 2000 });
           await this.loadGroups();
@@ -293,7 +293,7 @@ const DuplicatesPage = {
     },
     async backfillAndReload() {
       try {
-        const res = await API.backfillHashes();
+        const res = await API.backfillEmbeddings();
         Quasar.Notify.create({ message: `已计算 ${res.count} 个素材的特征向量`, position: 'top', timeout: 2000 });
         await this.loadGroups();
       } catch (e) {

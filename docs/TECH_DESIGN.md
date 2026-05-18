@@ -14,7 +14,7 @@
 | RAW 解码 | rawpy + Pillow |
 | HEIC 解码 | pillow-heif |
 | 中文分词 | jieba（FTS5 索引） |
-| 哈希去重 | hashlib SHA256（完全重复） |
+| 哈希去重 | ResNet50 embedding 余弦相似度 ≥ 0.999（已移除 SHA256 + pHash） |
 | 相似检测 | ResNet50 ONNX + HDBSCAN（图片视觉相似） |
 | 端口 | 6622 |
 
@@ -105,7 +105,7 @@ media (id, file_path UNIQUE, file_name, media_type, file_size, duration,
        color_space, color_range, pix_fmt,
        camera_make, camera_model, lens_model, picture_control,
        date_taken, thumbnail_path,
-       file_hash, phash, embedding BLOB, has_xmp,
+       file_hash TEXT, phash TEXT, embedding BLOB, has_xmp,
        analysis_status, analysis_model, analysis_date,
        rating, color_label, favorite, notes,
        imported_at, updated_at)
@@ -202,13 +202,21 @@ _collect_files() — 递归扫描匹配文件，跳过 ._ 前缀
     ↓
 scan_only() — 返回文件列表 + 已存在列表
     ↓
-import_single_file() × 3 并发
+import_single_file() × 5 并发（ThreadPoolExecutor）
     ├── _import_one() — 检查重复（清理旧缩略图）
     ├── _probe() / _probe_image() — ffprobe + exiftool 元数据
     │   ├── 视频额外检测：DJI 文件名 _D 后缀推断 D-Log M
     │   └── 图片额外检测：XMP 侧车文件是否存在
-    ├── _compute_file_hash() — SHA256 文件哈希
-    ├── _compute_phash() — 感知哈希（pHash，已废弃，保留列）
+    ├── compute_embedding() — ResNet50 ONNX 特征向量（仅图片，2048 维 L2 归一化）
+    ├── _generate_thumbnail() — ffmpeg 截帧 / exiftool 提取（RAW 内嵌缩略图）
+    └── INSERT media + media_fts
+```
+
+**批量导入端点**：`POST /api/library/import-batch`（SSE 流，前端单次请求，后端 5 线程并发处理，实时推送 ok/fail/skip 事件）
+    ├── _import_one() — 检查重复（清理旧缩略图）
+    ├── _probe() / _probe_image() — ffprobe + exiftool 元数据
+    │   ├── 视频额外检测：DJI 文件名 _D 后缀推断 D-Log M
+    │   └── 图片额外检测：XMP 侧车文件是否存在
     ├── compute_embedding() — ResNet50 ONNX 特征向量（仅图片，2048 维 L2 归一化）
     ├── _generate_thumbnail() — ffmpeg 截帧 / exiftool 提取（RAW 内嵌缩略图）
     └── INSERT media + media_fts
