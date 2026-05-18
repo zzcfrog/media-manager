@@ -2,6 +2,7 @@ import json
 import logging
 import shutil
 import subprocess
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -70,12 +71,8 @@ def _import_one(db, filepath: Path) -> dict | None:
     ext = filepath.suffix.lower()
     media_type = "video" if ext in VIDEO_EXTS else "image"
 
-    existing = db.execute("SELECT id, thumbnail_path FROM media WHERE file_path = ?", (str(filepath),)).fetchone()
+    existing = db.execute("SELECT id FROM media WHERE file_path = ?", (str(filepath),)).fetchone()
     if existing:
-        if existing["thumbnail_path"]:
-            old_thumb = THUMB_DIR / existing["thumbnail_path"]
-            if old_thumb.exists():
-                old_thumb.unlink()
         return None
 
     meta = _probe(filepath, media_type) if media_type == "video" else _probe_image(filepath)
@@ -260,8 +257,7 @@ def _probe_image(filepath: Path) -> dict:
 
 
 def _generate_thumbnail(filepath: Path, media_type: str) -> str | None:
-    ts = datetime.now().strftime("%Y%m%d%H%M%S")
-    thumb_name = f"{filepath.stem}_{ts}.jpg"
+    thumb_name = f"{uuid.uuid4().hex}.jpg"
     thumb_path = THUMB_DIR / thumb_name
 
     # Try ffmpeg first

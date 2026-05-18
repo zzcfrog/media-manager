@@ -60,6 +60,9 @@ scanPaths(paths) {
   backfillEmbeddings() {
     return this._fetch(`/api/library/backfill-embeddings`, { method: "POST" });
   },
+  backfillThumbnails() {
+    return this._fetch(`/api/library/backfill-thumbnails`, { method: "POST" });
+  },
   addDupExclusions(pairs, dupType) {
     return this._fetch(`/api/library/dup-exclusions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pairs, dup_type: dupType }) });
   },

@@ -266,7 +266,40 @@ def backfill_embeddings():
     return jsonify({"ok": True, "count": count})
 
 
-@bp.route("/backfill-picture-control", methods=["POST"])
+@bp.route("/backfill-thumbnails", methods=["POST"])
+def backfill_thumbnails():
+    from ..services.importer import _generate_thumbnail
+    from ..config import THUMB_DIR
+    from pathlib import Path
+    db = get_db()
+    rows = db.execute(
+        "SELECT id, file_path, media_type, thumbnail_path FROM media "
+        "WHERE thumbnail_path IS NULL OR thumbnail_path = ''"
+    ).fetchall()
+    # Also check rows where file is missing on disk
+    count = 0
+    for row in list(rows):
+        fp = Path(row["file_path"])
+        if not fp.exists():
+            continue
+        thumb = _generate_thumbnail(fp, row["media_type"])
+        if thumb:
+            db.execute("UPDATE media SET thumbnail_path = ? WHERE id = ?", (thumb, row["id"]))
+            count += 1
+    # Check existing thumbnail_path pointing to missing files
+    all_rows = db.execute("SELECT id, file_path, media_type, thumbnail_path FROM media WHERE thumbnail_path IS NOT NULL").fetchall()
+    for row in all_rows:
+        thumb_path = THUMB_DIR / row["thumbnail_path"]
+        if not thumb_path.exists():
+            fp = Path(row["file_path"])
+            if not fp.exists():
+                continue
+            thumb = _generate_thumbnail(fp, row["media_type"])
+            if thumb:
+                db.execute("UPDATE media SET thumbnail_path = ? WHERE id = ?", (thumb, row["id"]))
+                count += 1
+    db.commit()
+    return jsonify({"ok": True, "count": count})
 def backfill_picture_control():
     from ..services.importer import _run_exiftool, _apply_exif_tags
     from pathlib import Path

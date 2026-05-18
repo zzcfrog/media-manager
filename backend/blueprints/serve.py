@@ -157,12 +157,27 @@ def serve_image(media_id):
 @bp.route("/media/thumbnail/<int:media_id>")
 def serve_thumbnail(media_id):
     db = get_db()
-    row = db.execute("SELECT thumbnail_path FROM media WHERE id = ?", (media_id,)).fetchone()
-    if not row or not row["thumbnail_path"]:
+    row = db.execute("SELECT id, file_path, media_type, thumbnail_path FROM media WHERE id = ?", (media_id,)).fetchone()
+    if not row:
         from flask import abort
         abort(404)
-    path = THUMB_DIR / row["thumbnail_path"]
-    if not path.exists():
-        from flask import abort
-        abort(404)
-    return send_file(path, mimetype="image/jpeg")
+
+    # Try existing thumbnail
+    if row["thumbnail_path"]:
+        path = THUMB_DIR / row["thumbnail_path"]
+        if path.exists():
+            return send_file(path, mimetype="image/jpeg")
+
+    # Thumbnail missing — regenerate on the fly
+    from pathlib import Path
+    from ..services.importer import _generate_thumbnail
+    fp = Path(row["file_path"])
+    if fp.exists():
+        thumb = _generate_thumbnail(fp, row["media_type"])
+        if thumb:
+            db.execute("UPDATE media SET thumbnail_path = ? WHERE id = ?", (thumb, row["id"]))
+            db.commit()
+            return send_file(THUMB_DIR / thumb, mimetype="image/jpeg")
+
+    from flask import abort
+    abort(404)

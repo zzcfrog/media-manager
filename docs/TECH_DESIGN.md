@@ -203,22 +203,22 @@ _collect_files() — 递归扫描匹配文件，跳过 ._ 前缀
 scan_only() — 返回文件列表 + 已存在列表
     ↓
 import_single_file() × 5 并发（ThreadPoolExecutor）
-    ├── _import_one() — 检查重复（清理旧缩略图）
+    ├── _import_one() — 检查重复（已存在则跳过，不删旧缩略图）
     ├── _probe() / _probe_image() — ffprobe + exiftool 元数据
     │   ├── 视频额外检测：DJI 文件名 _D 后缀推断 D-Log M
     │   └── 图片额外检测：XMP 侧车文件是否存在
     ├── compute_embedding() — ResNet50 ONNX 特征向量（仅图片，2048 维 L2 归一化）
-    ├── _generate_thumbnail() — ffmpeg 截帧 / exiftool 提取（RAW 内嵌缩略图）
+    ├── _generate_thumbnail() — ffmpeg 截帧 / exiftool 提取（RAW 内嵌缩略图），UUID 随机文件名
     └── INSERT media + media_fts
 ```
 
 **批量导入端点**：`POST /api/library/import-batch`（SSE 流，前端单次请求，后端 5 线程并发处理，实时推送 ok/fail/skip 事件）
-    ├── _import_one() — 检查重复（清理旧缩略图）
+    ├── _import_one() — 检查重复（已存在则跳过，不删旧缩略图）
     ├── _probe() / _probe_image() — ffprobe + exiftool 元数据
     │   ├── 视频额外检测：DJI 文件名 _D 后缀推断 D-Log M
     │   └── 图片额外检测：XMP 侧车文件是否存在
     ├── compute_embedding() — ResNet50 ONNX 特征向量（仅图片，2048 维 L2 归一化）
-    ├── _generate_thumbnail() — ffmpeg 截帧 / exiftool 提取（RAW 内嵌缩略图）
+    ├── _generate_thumbnail() — ffmpeg 截帧 / exiftool 提取（RAW 内嵌缩略图），UUID 随机文件名
     └── INSERT media + media_fts
 ```
 
@@ -378,7 +378,7 @@ hdbscan>=0.8.0      # HDBSCAN 聚类（图片相似检测）
 |------|------|
 | `/media/video/<id>` | 原生格式（mp4/m4v/webm/mov）直接发送（支持 Range）；其他格式实时 ffmpeg 转码为 H.264 |
 | `/media/image/<id>` | JPG/PNG 等直接发送；RAW 用 rawpy 解码为 JPEG；HEIC/AVIF 用 pillow-heif 解码 |
-| `/media/thumbnail/<id>` | 从 DB 查 thumbnail_path，与 THUMB_DIR 拼接后发送 |
+| `/media/thumbnail/<id>` | 从 DB 查 thumbnail_path，与 THUMB_DIR 拼接后发送；文件不存在时自动重新生成 |
 
 ## 8. 图片相似检测
 
