@@ -557,10 +557,15 @@ const app = Vue.createApp({
           const parts = filePath.split("/");
           parts.pop();
           const dir = parts.join("/") || "/";
+          console.log("[detail] file_path:", filePath, "→ dir:", dir);
+          console.log("[detail] libraryExpanded before:", this.libraryExpanded);
+          console.log("[detail] folderTree paths:", JSON.stringify(this.folderTree.map(n => n.path)));
+          console.log("[detail] selectedFolder before:", this.selectedFolder);
           this._skipToggle = true;
           this.libraryExpanded = true;
           this.$nextTick(() => {
             this.selectedFolder = dir;
+            console.log("[detail] selectedFolder after:", this.selectedFolder, "libraryExpanded:", this.libraryExpanded);
             this._skipToggle = false;
           });
         };
