@@ -5,12 +5,24 @@ const DuplicatesPage = {
       <q-btn flat dense icon="arrow_back" label="返回" color="grey-6" style="border-radius:6px;padding:3px 6px;font-size:13px" @click="goBack"></q-btn>
       <q-btn-group unelevated style="border-radius:6px;overflow:hidden">
         <q-btn unelevated dense :color="dupType==='exact'?'primary':'grey-9'" :text-color="dupType==='exact'?'white':'grey-6'" icon="content_copy" size="sm" label="重复" @click="switchType('exact')">
-          <q-tooltip :delay="1000">完全相同文件</q-tooltip>
+          <q-tooltip :delay="1000">文件内容完全相同</q-tooltip>
         </q-btn>
         <q-btn unelevated dense :color="dupType==='similar'?'primary':'grey-9'" :text-color="dupType==='similar'?'white':'grey-6'" icon="difference" size="sm" label="相似" @click="switchType('similar')">
-          <q-tooltip :delay="1000">视觉相似内容</q-tooltip>
+          <q-tooltip :delay="1000">余弦相似度 ≥ 90%</q-tooltip>
+        </q-btn>
+        <q-btn unelevated dense :color="dupType==='cluster'?'primary':'grey-9'" :text-color="dupType==='cluster'?'white':'grey-6'" icon="bubble_chart" size="sm" label="聚类" @click="switchType('cluster')">
+          <q-tooltip :delay="1000">HDBSCAN 密度聚类</q-tooltip>
         </q-btn>
       </q-btn-group>
+      <q-icon name="help_outline" size="16px" color="grey-6" style="cursor:help">
+        <q-tooltip :delay="300" max-width="280px">
+          <div style="font-size:12px;line-height:1.6">
+            <b>重复</b>：文件内容完全相同（SHA256 哈希）<br>
+            <b>相似</b>：余弦相似度 ≥ 90%，检测连拍、同照片不同格式等近重复图片<br>
+            <b>聚类</b>：HDBSCAN 密度聚类，自动发现视觉主题相近的图片组
+          </div>
+        </q-tooltip>
+      </q-icon>
       <div style="flex:1"></div>
       <q-btn v-if="needBackfill" flat dense no-caps icon="sync" label="计算特征向量" color="grey-6" size="sm" @click="backfillAndReload" style="border:1px solid var(--border);border-radius:6px"></q-btn>
     </div>
@@ -19,7 +31,7 @@ const DuplicatesPage = {
     </div>
     <div v-else-if="!groups.length" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text3);gap:8px">
       <q-icon name="check_circle" size="36px" style="opacity:0.3"></q-icon>
-      <span>没有发现{{ dupType === 'exact' ? '重复' : '相似' }}素材</span>
+      <span>没有发现{{ typeLabel }}素材</span>
     </div>
     <q-scroll-area v-else style="flex:1">
       <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
@@ -27,9 +39,9 @@ const DuplicatesPage = {
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
             <div style="display:flex;align-items:center;gap:8px">
               <span class="dup-badge">{{ g.items.length }}</span>
-              <span style="font-size:12px;color:var(--text2)">个{{ dupType === 'exact' ? '重复' : '相似' }}文件</span>
+              <span style="font-size:12px;color:var(--text2)">个{{ typeLabel }}文件</span>
             </div>
-            <span v-if="dupType === 'similar' && g.similarity != null" style="font-size:11px;color:var(--accent)">相似度 {{ g.similarity }}%</span>
+            <span v-if="dupType !== 'exact' && g.similarity != null" style="font-size:11px;color:var(--accent)">相似度 {{ g.similarity }}%</span>
           </div>
           <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px">
             <div v-for="item in g.items" :key="item.id" class="dup-thumb" @click="openDetail(item.id)">
@@ -42,7 +54,7 @@ const DuplicatesPage = {
       </div>
     </q-scroll-area>
     <div style="flex-shrink:0;padding:6px 20px;font-size:12px;color:var(--text3);border-top:1px solid var(--border);text-align:center">
-      共 {{ groups.length }} 组{{ dupType === 'exact' ? '重复' : '相似' }}素材
+      共 {{ groups.length }} 组{{ typeLabel }}素材
     </div>
   </div>
   `,
@@ -53,6 +65,11 @@ const DuplicatesPage = {
       loading: false,
       needBackfill: false,
     };
+  },
+  computed: {
+    typeLabel() {
+      return { exact: "重复", similar: "相似", cluster: "聚类" }[this.dupType] || "相似";
+    },
   },
   methods: {
     API,

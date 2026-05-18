@@ -226,9 +226,10 @@ def backfill_picture_control():
 @bp.route("/duplicates")
 def find_duplicates():
     db = get_db()
-    dup_type = request.args.get("type", "exact")
+    dup_type = request.args.get("type", "similar")
 
     if dup_type == "exact":
+        # file_hash byte-identical detection
         rows = db.execute(
             "SELECT id, file_path, file_name, media_type, file_size, file_hash, thumbnail_path "
             "FROM media WHERE file_hash IS NOT NULL AND file_hash IN "
@@ -245,7 +246,44 @@ def find_duplicates():
         groups.sort(key=lambda g: (-len(g["items"]),))
         return jsonify({"groups": groups})
 
-    else:  # similar — pairwise cosine similarity on ResNet50 embeddings
+    elif dup_type == "cluster":
+        # HDBSCAN density clustering
+        import numpy as np
+        import hdbscan
+
+        rows = db.execute(
+            "SELECT id, file_path, file_name, media_type, file_size, embedding, thumbnail_path "
+            "FROM media WHERE embedding IS NOT NULL"
+        ).fetchall()
+        if not rows:
+            return jsonify({"groups": []})
+
+        vecs = np.array([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
+        clusterer = hdbscan.HDBSCAN(min_cluster_size=2, metric="euclidean")
+        labels = clusterer.fit_predict(vecs)
+
+        groups = []
+        for label in set(labels):
+            if label == -1:
+                continue
+            indices = [i for i, l in enumerate(labels) if l == label]
+            cluster_vecs = vecs[indices]
+            k = len(indices)
+            sims = cluster_vecs @ cluster_vecs.T
+            avg_sim = float((sims.sum() - k) / (k * (k - 1))) if k > 1 else 1.0
+            items = []
+            for i in indices:
+                d = dict(rows[i])
+                d.pop("embedding", None)
+                items.append(d)
+            groups.append({
+                "similarity": round(avg_sim * 100),
+                "items": items,
+            })
+        groups.sort(key=lambda g: (-len(g["items"]), -g["similarity"]))
+        return jsonify({"groups": groups})
+
+    else:  # similar — pairwise cosine similarity
         import numpy as np
 
         rows = db.execute(
@@ -257,7 +295,7 @@ def find_duplicates():
 
         vecs = np.array([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
         n = len(vecs)
-        sim_matrix = vecs @ vecs.T  # cosine similarity (vectors are L2-normalized)
+        sim_matrix = vecs @ vecs.T
 
         THRESHOLD = 0.90
         parent = list(range(n))
