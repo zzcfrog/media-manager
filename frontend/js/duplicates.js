@@ -46,7 +46,7 @@ const DuplicatesPage = {
             <span v-if="dupType !== 'exact' && g.similarity != null" style="font-size:11px;color:var(--accent)">相似度 {{ g.similarity }}%</span>
           </div>
           <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px">
-            <div v-for="item in g.items" :key="item.id" class="dup-thumb" @click="openDetail(item.id)" @contextmenu.prevent="showCtx($event, item)">
+            <div v-for="item in g.items" :key="item.id" class="dup-thumb" @click.stop="openDetail(item.id)" @contextmenu.prevent="showCtx($event, item)">
               <img :src="'/media/thumbnail/' + item.id" draggable="false">
               <div class="dup-thumb-name">{{ item.file_name }}</div>
               <div style="font-size:10px;color:var(--text3)">{{ item.media_type === 'video' ? '视频' : '图片' }} · {{ (item.file_size / 1048576).toFixed(1) }}MB</div>
