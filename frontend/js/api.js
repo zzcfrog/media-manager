@@ -96,6 +96,9 @@ scanPaths(paths) {
   writeXmp(id) {
     return this._fetch(`/api/library/${id}/write-xmp`, { method: "POST" });
   },
+  revealFile(id) {
+    return this._fetch(`/api/library/${id}/reveal`, { method: "POST" });
+  },
   batchWriteXmp(ids) {
     return this._fetch(`/api/library/batch-write-xmp`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) });
   },

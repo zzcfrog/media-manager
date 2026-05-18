@@ -169,6 +169,26 @@ def import_one():
     return jsonify({"data": None})
 
 
+@bp.route("/<int:media_id>/reveal", methods=["POST"])
+def reveal_file(media_id):
+    import subprocess, sys
+    db = get_db()
+    row = db.execute("SELECT file_path FROM media WHERE id = ?", (media_id,)).fetchone()
+    if not row:
+        return jsonify({"error": "Not found"}), 404
+    path = row["file_path"]
+    try:
+        if sys.platform == "darwin":
+            subprocess.Popen(["open", "-R", path])
+        elif sys.platform == "win32":
+            subprocess.Popen(["explorer", "/select,", path])
+        else:
+            subprocess.Popen(["xdg-open", os.path.dirname(path)])
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @bp.route("/scan", methods=["POST"])
 def scan_paths():
     from ..services.importer import scan_only

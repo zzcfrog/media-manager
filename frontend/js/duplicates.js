@@ -75,13 +75,14 @@ const DuplicatesPage = {
           <q-item-section>查看详情</q-item-section>
           <q-item-section side style="flex-shrink:0;white-space:nowrap;display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--text3)">↵</span></q-item-section>
         </q-item>
-        <q-item clickable @click="closeCtx(); revealFile(ctxMenu.item.file_path)" style="padding-left:8px;padding-right:12px">
+        <q-item clickable @click="closeCtx(); API.revealFile(ctxMenu.item.id)" :disable="selArr.length !== 1" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="folder_open" size="14px" color="grey-6"></q-icon></q-item-section>
           <q-item-section>在文件夹中显示</q-item-section>
         </q-item>
+        <q-separator style="background:var(--border)"></q-separator>
         <q-item clickable @click="closeCtx(); deleteCtx()" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="delete_outline" size="14px" color="grey-6"></q-icon></q-item-section>
-          <q-item-section>{{ selArr.length > 1 ? '移出 ' + selArr.length + ' 个素材' : '移出素材库' }}</q-item-section>
+          <q-item-section style="color:var(--negative)">{{ selArr.length > 1 ? '移出 ' + selArr.length + ' 个素材' : '移出素材库' }}</q-item-section>
           <q-item-section side style="flex-shrink:0;white-space:nowrap;display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--text3)">⌘+⌫</span></q-item-section>
         </q-item>
       </q-list>
@@ -189,11 +190,6 @@ const DuplicatesPage = {
         await this.loadGroups();
       } catch (e) {
         Quasar.Notify.create({ message: '移除失败: ' + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
-      }
-    },
-    revealFile(path) {
-      if (window.electronAPI && window.electronAPI.showInFolder) {
-        window.electronAPI.showInFolder(path);
       }
     },
     startLasso(e) {
