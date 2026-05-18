@@ -5,25 +5,25 @@ const DuplicatesPage = {
       <q-btn flat dense icon="arrow_back" label="返回" color="grey-6" style="border-radius:6px;padding:3px 6px;font-size:13px" @click="goBack"></q-btn>
       <q-btn-group unelevated style="border-radius:6px;overflow:hidden">
         <q-btn unelevated dense :color="dupType==='exact'?'primary':'grey-9'" :text-color="dupType==='exact'?'white':'grey-6'" icon="content_copy" size="sm" label="重复" @click="switchType('exact')">
-          <q-tooltip :delay="1000">文件内容完全相同</q-tooltip>
+          <q-tooltip :delay="1000">同一个文件出现了多次</q-tooltip>
         </q-btn>
         <q-btn unelevated dense :color="dupType==='near'?'primary':'grey-9'" :text-color="dupType==='near'?'white':'grey-6'" icon="filter_none" size="sm" label="酷似" @click="switchType('near')">
-          <q-tooltip :delay="1000">余弦相似度 ≥ 98%</q-tooltip>
+          <q-tooltip :delay="1000">几乎一模一样的照片</q-tooltip>
         </q-btn>
         <q-btn unelevated dense :color="dupType==='similar'?'primary':'grey-9'" :text-color="dupType==='similar'?'white':'grey-6'" icon="difference" size="sm" label="相似" @click="switchType('similar')">
-          <q-tooltip :delay="1000">余弦相似度 ≥ 90%</q-tooltip>
+          <q-tooltip :delay="1000">画面非常接近的照片</q-tooltip>
         </q-btn>
         <q-btn unelevated dense :color="dupType==='cluster'?'primary':'grey-9'" :text-color="dupType==='cluster'?'white':'grey-6'" icon="bubble_chart" size="sm" label="聚类" @click="switchType('cluster')">
-          <q-tooltip :delay="1000">HDBSCAN 密度聚类</q-tooltip>
+          <q-tooltip :delay="1000">同场景不同角度或时间</q-tooltip>
         </q-btn>
       </q-btn-group>
       <q-icon name="help_outline" size="16px" color="grey-6">
-        <q-tooltip :delay="300" max-width="320px">
+        <q-tooltip :delay="300" max-width="400px">
           <div style="font-size:12px;line-height:1.8;white-space:nowrap">
             <b>重复</b>：同一个文件出现了多次<br>
             <b>酷似</b>：几乎一模一样的照片，比如同一张照片的 JPG 和 RAW<br>
             <b>相似</b>：画面非常接近，比如连拍的照片<br>
-            <b>聚类</b>：看起来像同一类场景或主题的照片
+            <b>聚类</b>：同一个场景的不同角度或不同时间拍的照片
           </div>
         </q-tooltip>
       </q-icon>
