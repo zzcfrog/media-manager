@@ -1,7 +1,8 @@
 const DuplicatesPage = {
   template: `
-  <div style="flex:1;display:flex;flex-direction:column;overflow:hidden" @click="closeCtx">
-    <div class="filter-bar">
+  <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative"
+       @mousedown="startLasso" @contextmenu.prevent>
+    <div class="filter-bar" @mousedown.stop>
       <q-btn flat dense icon="arrow_back" label="返回" color="grey-6" style="border-radius:6px;padding:3px 6px;font-size:13px" @click="goBack"></q-btn>
       <q-btn-group unelevated style="border-radius:6px;overflow:hidden">
         <q-btn unelevated dense :color="dupType==='exact'?'primary':'grey-9'" :text-color="dupType==='exact'?'white':'grey-6'" icon="content_copy" size="sm" label="重复" @click="switchType('exact')">
@@ -46,8 +47,16 @@ const DuplicatesPage = {
             <span v-if="dupType !== 'exact' && g.similarity != null" style="font-size:11px;color:var(--accent)">相似度 {{ g.similarity }}%</span>
           </div>
           <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px">
-            <div v-for="item in g.items" :key="item.id" class="dup-thumb" @click.stop="openDetail(item.id)" @contextmenu.prevent="showCtx($event, item)">
+            <div v-for="item in g.items" :key="item.id"
+                 class="dup-thumb"
+                 :class="{selected: selArr.includes(item.id)}"
+                 :data-id="item.id"
+                 @mousedown.stop
+                 @click="onThumbClick(item, $event)"
+                 @dblclick.stop="openDetail(item.id)"
+                 @contextmenu.prevent="showCtx($event, item)">
               <img :src="'/media/thumbnail/' + item.id" draggable="false">
+              <div v-if="selArr.includes(item.id)" class="sel-overlay"></div>
               <div class="dup-thumb-name">{{ item.file_name }}</div>
               <div style="font-size:10px;color:var(--text3)">{{ item.media_type === 'video' ? '视频' : '图片' }} · {{ (item.file_size / 1048576).toFixed(1) }}MB</div>
               <q-tooltip :delay="800" :offset="[0, 4]">{{ item.file_path }}</q-tooltip>
@@ -59,7 +68,7 @@ const DuplicatesPage = {
     <div style="flex-shrink:0;padding:6px 20px;font-size:12px;color:var(--text3);border-top:1px solid var(--border);text-align:center">
       共 {{ groups.length }} 组{{ typeLabel }}素材
     </div>
-    <div v-if="ctxMenu.show" class="ctx-menu-popup" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }">
+    <div v-if="ctxMenu.show" class="ctx-menu-popup" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }" @mousedown.stop>
       <q-list dense style="min-width:120px">
         <q-item clickable @click="closeCtx(); openDetail(ctxMenu.item.id)" style="padding-left:10px;padding-right:14px">
           <q-item-section side style="padding:0"><q-icon name="visibility" size="15px" color="grey-6"></q-icon></q-item-section>
@@ -71,6 +80,7 @@ const DuplicatesPage = {
         </q-item>
       </q-list>
     </div>
+    <div v-if="lasso" class="lasso" :style="lassoStyle"></div>
   </div>
   `,
   data() {
@@ -79,12 +89,26 @@ const DuplicatesPage = {
       groups: [],
       loading: false,
       needBackfill: false,
+      selArr: [],
+      lastClickIdx: -1,
       ctxMenu: { show: false, item: null, x: 0, y: 0 },
+      lasso: null,
+      lassoStyle: {},
+      _lassoStart: null,
     };
   },
   computed: {
     typeLabel() {
       return { exact: "重复", near: "酷似", similar: "相似", cluster: "聚类" }[this.dupType] || "相似";
+    },
+    flatItems() {
+      const items = [];
+      for (const g of this.groups) {
+        for (const item of g.items) {
+          items.push(item);
+        }
+      }
+      return items;
     },
   },
   methods: {
@@ -93,9 +117,28 @@ const DuplicatesPage = {
     openDetail(id) { location.hash = "#/detail/" + id; },
     switchType(type) {
       this.dupType = type;
+      this.selArr = [];
       this.loadGroups();
     },
+    onThumbClick(item, e) {
+      const idx = this.flatItems.findIndex(i => i.id === item.id);
+      if (e.shiftKey && this.lastClickIdx >= 0) {
+        const from = Math.min(this.lastClickIdx, idx);
+        const to = Math.max(this.lastClickIdx, idx);
+        this.selArr = this.flatItems.slice(from, to + 1).map(i => i.id);
+      } else if (e.ctrlKey || e.metaKey) {
+        const arr = [...this.selArr];
+        const i = arr.indexOf(item.id);
+        if (i >= 0) arr.splice(i, 1); else arr.push(item.id);
+        this.selArr = arr;
+        this.lastClickIdx = idx;
+      } else {
+        this.selArr = [item.id];
+        this.lastClickIdx = idx;
+      }
+    },
     showCtx(e, item) {
+      if (!this.selArr.includes(item.id)) this.selArr = [item.id];
       this.ctxMenu.item = item;
       this.ctxMenu.x = e.clientX;
       this.ctxMenu.y = e.clientY;
@@ -107,6 +150,83 @@ const DuplicatesPage = {
     revealFile(path) {
       if (window.electronAPI && window.electronAPI.showInFolder) {
         window.electronAPI.showInFolder(path);
+      }
+    },
+    startLasso(e) {
+      if (e.button !== 0) return;
+      this.closeCtx();
+      this._lassoStart = { x: e.clientX, y: e.clientY };
+      this._onLassoMove = (ev) => this.onLassoMove(ev);
+      this._onLassoUp = (ev) => this.onLassoUp(ev);
+      document.addEventListener("mousemove", this._onLassoMove);
+      document.addEventListener("mouseup", this._onLassoUp);
+    },
+    onLassoMove(e) {
+      if (!this._lassoStart) return;
+      const dx = e.clientX - this._lassoStart.x;
+      const dy = e.clientY - this._lassoStart.y;
+      if (!this.lasso && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+      if (!this.lasso) this.lasso = true;
+      const l = Math.min(this._lassoStart.x, e.clientX);
+      const t = Math.min(this._lassoStart.y, e.clientY);
+      this.lassoStyle = {
+        left: l + "px", top: t + "px",
+        width: Math.abs(dx) + "px", height: Math.abs(dy) + "px",
+      };
+    },
+    onLassoUp(e) {
+      document.removeEventListener("mousemove", this._onLassoMove);
+      document.removeEventListener("mouseup", this._onLassoUp);
+      if (!this.lasso) {
+        this.selArr = [];
+      } else {
+        const r = { l: Math.min(this._lassoStart.x, e.clientX), t: Math.min(this._lassoStart.y, e.clientY),
+                    r: Math.max(this._lassoStart.x, e.clientX), b: Math.max(this._lassoStart.y, e.clientY) };
+        const ids = [];
+        const thumbs = document.querySelectorAll(".dup-thumb[data-id]");
+        thumbs.forEach(el => {
+          const br = el.getBoundingClientRect();
+          if (br.left < r.r && br.right > r.l && br.top < r.b && br.bottom > r.t) {
+            ids.push(parseInt(el.dataset.id));
+          }
+        });
+        this.selArr = ids;
+      }
+      this.lasso = null;
+      this.lassoStyle = {};
+      this._lassoStart = null;
+    },
+    handleKey(e) {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable) return;
+      if (this.$root.currentView !== "duplicates") return;
+      const key = e.key;
+      if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(key)) {
+        e.preventDefault(); e.stopPropagation();
+        if (!this.flatItems.length) return;
+        if (!this.selArr.length) { this.selArr = [this.flatItems[0].id]; return; }
+        const lastId = this.selArr[this.selArr.length - 1];
+        const idx = this.flatItems.findIndex(i => i.id === lastId);
+        let ni = idx;
+        if (key === "ArrowRight") ni = Math.min(idx + 1, this.flatItems.length - 1);
+        else if (key === "ArrowLeft") ni = Math.max(idx - 1, 0);
+        else if (key === "ArrowDown") ni = Math.min(idx + 1, this.flatItems.length - 1);
+        else if (key === "ArrowUp") ni = Math.max(idx - 1, 0);
+        if (ni !== idx) this.selArr = [this.flatItems[ni].id];
+        this.$nextTick(() => {
+          const el = document.querySelector(`.dup-thumb[data-id="${this.flatItems[ni]?.id}"]`);
+          el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        });
+        return;
+      }
+      if (key === "Enter" && this.selArr.length === 1) {
+        e.preventDefault(); e.stopPropagation();
+        this.openDetail(this.selArr[0]);
+        return;
+      }
+      if (key === "Backspace") {
+        e.preventDefault(); e.stopPropagation();
+        this.goBack();
+        return;
       }
     },
     async loadGroups() {
@@ -144,5 +264,17 @@ const DuplicatesPage = {
   created() {
     this.checkBackfill();
     this.loadGroups();
+    this._onKey = (e) => this.handleKey(e);
+    document.addEventListener("keydown", this._onKey);
+    this._onCloseCtx = (e) => {
+      if (!this.ctxMenu.show) return;
+      if (e.target.closest(".ctx-menu-popup")) return;
+      this.ctxMenu.show = false;
+    };
+    document.addEventListener("mousedown", this._onCloseCtx);
+  },
+  beforeUnmount() {
+    if (this._onKey) document.removeEventListener("keydown", this._onKey);
+    if (this._onCloseCtx) document.removeEventListener("mousedown", this._onCloseCtx);
   },
 };
