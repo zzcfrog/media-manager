@@ -118,6 +118,36 @@
 - 视觉相似：pHash 汉明距离 ≤ 10（同一照片不同分辨率/压缩版本）
 - 相似模式不提供删除按钮，用户在画廊手动选中删除
 
+## 已完成：ResNet50 + HDBSCAN 替代 pHash 相似检测（2026-05-18）
+
+pHash 方案无法准确识别视觉相似照片（不同内容因亮度分布接近被错误匹配），改用 ResNet50 深度学习特征 + HDBSCAN 聚类。仅对图片做向量化，视频不参与相似检测。
+
+**改动文件：**
+- `backend/services/embedding.py` — **新建**：ResNet50 ONNX 特征提取模块
+  - 加载 ResNet50 ONNX 模型（去掉最后 FC 层，输出 2048 维向量）
+  - 支持 RAW（rawpy）、HEIF（pillow-heif）、标准图片格式
+  - Singleton ONNX Session（CoreML + CPU 提供者）
+  - L2 归一化后存为 SQLite BLOB（8KB/张）
+- `backend/db.py` — `_MIGRATIONS` 新增 `embedding BLOB` 列
+- `backend/services/importer.py` — 图片导入时调用 `compute_embedding()` 计算 embedding；视频不计算（存 NULL）；INSERT 扩展 `embedding` 列
+- `backend/blueprints/library.py` — 相似检测改用 HDBSCAN（`metric="euclidean"`，对 L2 归一化向量等价余弦距离）；backfill 端点补算 embedding；移除 threshold 参数
+- `frontend/js/gallery.js` — 视频右键菜单"查找相似"禁用（`:disable` 检测 `media_type === 'video'`）
+- `frontend/js/api.js` — `getDuplicates(type)` 去掉 threshold 参数
+- `frontend/js/duplicates.js` — 适配新接口（similarity 字段由后端计算）；backfill 按钮文案改为"计算特征向量"；默认展示"相似"
+- `requirements.txt` — 新增 `onnxruntime>=1.17.0`、`scikit-learn>=1.3.0`、`hdbscan>=0.8.0`
+- `.gitignore` — 新增 `backend/models/`（ONNX 模型文件 ~89.6MB）
+
+**相似检测逻辑：**
+- 完全重复：SHA256 文件哈希（不变）
+- 视觉相似：ResNet50 提取 2048 维特征 → L2 归一化 → HDBSCAN 自动聚类（无需手动阈值）
+- 仅图片参与相似检测，视频排除
+- 每组显示平均余弦相似度百分比
+
+**性能数据：**
+- 428 张图片 → 55 个聚类 + 91 个噪声点，耗时 0.4 秒
+- 同场景 JPG+NEF 配对正确分组
+- 模型文件 `backend/models/resnet50.onnx`（89.6MB，首次用 `backend/export_model.py` 从 PyTorch 导出，运行时仅需 onnxruntime）
+
 ## 已完成：分析进度优化 + 硬件加速压缩 + ASR 修复（2026-05-18）
 
 分析进度条从 0→100 瞬间跳变改为真实进度反馈，新增硬件加速压缩，修复 ASR 时间戳匹配问题。
@@ -147,7 +177,7 @@
 ### 功能完善
 - [ ] **智能相册** — 按拍摄日期、相机型号、分辨率等自动分组
 - [x] ~~**视频播放器集成**~~ — 已实现
-- [x] ~~**重复素材检测**~~ — 已实现：文件哈希去重 + 感知哈希查找相似
+- [x] ~~**重复素材检测**~~ — 已实现：文件哈希去重 + ResNet50 + HDBSCAN 相似检测
 
 ### 导出与分享
 - [ ] **分析报告导出** — 导出 AI 分析结果为 PDF/文本

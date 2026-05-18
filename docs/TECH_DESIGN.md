@@ -14,7 +14,8 @@
 | RAW 解码 | rawpy + Pillow |
 | HEIC 解码 | pillow-heif |
 | 中文分词 | jieba（FTS5 索引） |
-| 哈希去重 | hashlib SHA256 + imagehash pHash |
+| 哈希去重 | hashlib SHA256（完全重复） |
+| 相似检测 | ResNet50 ONNX + HDBSCAN（图片视觉相似） |
 | 端口 | 6622 |
 
 ## 2. 项目结构
@@ -46,6 +47,7 @@ video_analyzer/
 │   │   └── settings.py        # 全局设置 CRUD
 │   └── services/
 │       ├── importer.py        # 文件扫描、元数据提取、缩略图生成
+│       ├── embedding.py       # ResNet50 ONNX 特征提取（图片相似检测）
 │       └── xmp_writer.py     # XMP 侧车文件写入（仅照片）
 ├── frontend/
 │   ├── index.html             # SPA 主页面（Vue app + 路由 + 弹窗）
@@ -54,6 +56,7 @@ video_analyzer/
 │       ├── api.js             # API 客户端
 │       ├── gallery.js         # Gallery 页组件
 │       └── detail.js          # Detail 页组件
+│       └── duplicates.js      # 查找重复页组件
 ├── electron/
 │   ├── main.js                # Electron 主进程（启动 Python 后端）
 │   ├── preload.js             # 文件选择、Finder 集成 API
@@ -102,7 +105,7 @@ media (id, file_path UNIQUE, file_name, media_type, file_size, duration,
        color_space, color_range, pix_fmt,
        camera_make, camera_model, lens_model, picture_control,
        date_taken, thumbnail_path,
-       file_hash, phash, has_xmp,
+       file_hash, phash, embedding BLOB, has_xmp,
        analysis_status, analysis_model, analysis_date,
        rating, color_label, favorite, notes,
        imported_at, updated_at)
@@ -205,7 +208,8 @@ import_single_file() × 3 并发
     │   ├── 视频额外检测：DJI 文件名 _D 后缀推断 D-Log M
     │   └── 图片额外检测：XMP 侧车文件是否存在
     ├── _compute_file_hash() — SHA256 文件哈希
-    ├── _compute_phash() — 感知哈希（pHash，用于相似检测）
+    ├── _compute_phash() — 感知哈希（pHash，已废弃，保留列）
+    ├── compute_embedding() — ResNet50 ONNX 特征向量（仅图片，2048 维 L2 归一化）
     ├── _generate_thumbnail() — ffmpeg 截帧 / exiftool 提取（RAW 内嵌缩略图）
     └── INSERT media + media_fts
 ```
@@ -348,7 +352,9 @@ flask>=3.0
 Pillow>=10.0        # 图片处理 + 压缩
 faster-whisper>=1.0.0  # 本地 ASR
 rawpy>=0.20.0       # RAW 格式解码（NEF/DNG/CR2/ARW 等）
-imagehash           # 感知哈希（pHash）用于相似图片检测
+onnxruntime>=1.17.0 # ResNet50 ONNX 推理（图片特征提取）
+scikit-learn>=1.3.0 # PCA 降维（可选）
+hdbscan>=0.8.0      # HDBSCAN 聚类（图片相似检测）
 ```
 
 运行时额外依赖（非 requirements.txt）：`jieba`、`rawpy`、`pillow-heif`。
@@ -361,7 +367,42 @@ imagehash           # 感知哈希（pHash）用于相似图片检测
 | `/media/image/<id>` | JPG/PNG 等直接发送；RAW 用 rawpy 解码为 JPEG；HEIC/AVIF 用 pillow-heif 解码 |
 | `/media/thumbnail/<id>` | 从 DB 查 thumbnail_path，与 THUMB_DIR 拼接后发送 |
 
-## 8. 已知技术问题
+## 8. 图片相似检测
+
+### 8.1 特征提取
+
+使用 ResNet50 ONNX 模型（去掉最后 FC 层）提取 2048 维特征向量。
+
+- **模型**：`backend/models/resnet50.onnx`（~89.6MB，gitignored）
+- **导出**：`backend/export_model.py`（一次性脚本，需临时安装 torch + torchvision）
+- **运行时**：onnxruntime（CoreML + CPU 提供者），无需 PyTorch
+- **预处理**：Resize(256) → CenterCrop(224) → ToTensor → ImageNet Normalize
+- **输出**：2048 维向量 → L2 归一化 → float32 BLOB（8KB/张）
+- **支持格式**：标准图片（PIL）、RAW（rawpy）、HEIF（pillow-heif）
+- **仅图片**：视频不计算 embedding（存 NULL）
+
+### 8.2 相似聚类
+
+使用 HDBSCAN 密度聚类算法自动发现相似图片组，无需手动阈值。
+
+```
+查询所有 embedding 非 NULL 的图片
+  ↓
+构建 N×2048 向量矩阵
+  ↓
+HDBSCAN(min_cluster_size=2, metric="euclidean")
+  ↓
+按聚类标签分组，计算组内平均余弦相似度
+  ↓
+按组大小降序、相似度降序排列
+```
+
+- `metric="euclidean"`：对 L2 归一化向量等价于余弦距离
+- `min_cluster_size=2`：最少 2 张图片成组
+- 噪声点（label=-1）不输出
+- 性能：428 张图片 → 55 聚类，耗时 0.4 秒
+
+## 9. 已知技术问题
 
 详见 [docs/todo.md](todo.md)。
 
