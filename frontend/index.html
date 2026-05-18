@@ -553,6 +553,11 @@ const app = Vue.createApp({
         if (this.$refs.gallery?.items) this.galleryItems = [...this.$refs.gallery.items];
         this.currentView = "detail";
         this.detailId = parseInt(hash.split("/")[2]);
+        const m = this.galleryItems.find(i => i.id === this.detailId);
+        if (m && m.file_path) {
+          this.selectedFolder = m.file_path.substring(0, m.file_path.lastIndexOf("/"));
+          this.libraryExpanded = true;
+        }
       } else if (hash === "#/favorites") {
         this.currentView = "gallery";
         this.collectionFilter = null;
