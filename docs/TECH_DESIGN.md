@@ -29,7 +29,7 @@ video_analyzer/
 │   ├── config.py              # 路径、文件扩展名配置
 │   ├── db.py                  # SQLite schema、迁移、连接管理
 │   ├── analyzer.py            # VLM API 调用（视频/图片分析）
-│   ├── compressor.py          # ffmpeg 视频压缩 + temp 清理
+│   ├── compressor.py          # ffmpeg 视频压缩（真实进度 + 硬件加速） + temp 清理
 │   ├── video_prompt.txt       # 视频分析提示词
 │   ├── img_prompt.txt         # 图片分析提示词
 │   ├── asr/
@@ -127,7 +127,7 @@ media_fts (FTS5: media_id UNINDEXED, file_name, visual, asr, subtitle,
 
 -- 全局设置
 settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)
--- 默认值: resolution, fps, vendor, model, use_multimodal, asr_engine, video_api_key, asr_api_key, image_resolution, image_api_key, image_model
+-- 默认值: resolution, fps, vendor, model, use_multimodal, asr_engine, video_api_key, asr_api_key, image_resolution, image_api_key, image_model, hw_accel
 ```
 
 **迁移系统**：`_MIGRATIONS` 列表 + `_migrate()` 函数，通过 `PRAGMA table_info` 检测缺失列并 ALTER TABLE。特殊情况（如 dialogue→asr 重命名 + FTS 重建）在 `_migrate()` 中硬编码处理。
@@ -219,39 +219,41 @@ import_single_file() × 3 并发
 ```
 POST /api/analysis/<id>
     ↓
-读取 settings（model, resolution, fps, use_multimodal）
+读取 settings（model, resolution, fps, use_multimodal, hw_accel）
     ↓
-compress_video() — ffmpeg 压缩到 temp_video/
+compress_video() — ffmpeg 压缩到 temp_video/（线程运行，SSE 推送真实百分比）
+    │   硬件加速开启时：-hwaccel videotoolbox（GPU 解码）+ libx264（CPU 编码）
     ↓
-analyze_video(multimodal=True) — prompt 中恢复 ASR 指令，VLM 识别画面和语音
+analyze_video(multimodal=True, on_progress) — 线程运行，SSE 推送子步骤
+    │   子步骤：uploading → receiving (N 字符)
     ↓
 save_segments() → _refresh_fts() → call_on_close()
 ```
 
-**独立 ASR 模式**（`use_multimodal=false`）：VLM + ASR 并行，4 阶段。
+**独立 ASR 模式**（`use_multimodal=false`）：VLM + ASR 并行，VLM 完成立刻标记，ASR 独立推进。
 
 ```
 POST /api/analysis/<id>
     ↓
-读取 settings（model, resolution, fps, use_multimodal, asr_engine）
+读取 settings（model, resolution, fps, use_multimodal, asr_engine, hw_accel）
     ↓
-compress_video() — ffmpeg 压缩到 temp_video/
+compress_video() — ffmpeg 压缩（线程运行，SSE 推送真实百分比）
     ↓
-┌─────────────────────────┬──────────────────────┐
-│  analyze_video()        │  _run_asr()           │
-│  (base64 → VLM API)    │  (faster-whisper)     │  ← ThreadPoolExecutor 并行
-└─────────────────────────┴──────────────────────┘
+┌─────────────────────────┬──────────────────────────────┐
+│  analyze_video()        │  _run_asr()                   │
+│  (base64 → VLM API)    │  (faster-whisper, VAD+词级)   │  ← ThreadPoolExecutor 并行
+└─────────────────────────┴──────────────────────────────┘
+    ↓ VLM 完成 → SSE analyze_done（立即标记）
+    ↓ ASR 完成 → SSE asr_progress（加载模型 → 语音识别）
     ↓
-_merge_asr() — 按 time_start/time_end 重叠匹配，拼接 ASR 文本到 VLM 分段
+_merge_asr() — 最佳匹配：每段 ASR 只匹配重叠时间最长的 VLM 分段
     ↓
-save_segments() — DELETE 旧分段 → INSERT 新分段 → UPDATE status
-    ↓
-_refresh_fts() — DELETE 旧 FTS → jieba 分词 → INSERT 新 FTS
-    ↓
-call_on_close() — 清理 temp_video/
+save_segments() → _refresh_fts() → call_on_close()
 ```
 
-进度通过 **SSE（Server-Sent Events）** 实时推送到前端，事件类型：`progress`（步骤更新）、`done`（完成）、`error`（失败）。
+进度通过 **SSE（Server-Sent Events）** 实时推送到前端：
+- `progress` 事件包含 `step`（compressing/compressed/analyzing/analyze_done/asr_start/asr_progress）和可选的 `percent`/`substep`/`chars`/`size_bytes` 字段
+- `done`（完成）、`error`（失败）
 
 ### 4.3 ASR 插件架构
 
@@ -271,7 +273,10 @@ class AsrSegment:
 - `get_engine(name)` — 返回单例实例（`_INSTANCES` 缓存）
 - `_auto_register()` — 启动时 import `engines/whisper.py` 触发注册
 
-当前实现：`WhisperEngine`（faster-whisper large-v3, device=auto, 语言自动检测）。
+当前实现：`WhisperEngine`（faster-whisper large-v3, device=auto, 语言自动检测, vad_filter=True, word_timestamps=True）。
+- `vad_filter=True`：Silero VAD 过滤静默段，提升时间戳精度
+- `word_timestamps=True`：词级时间戳，用首词起始/末词结束替代段级时间
+- `on_progress` 回调报告 `loading`（模型加载）/ `transcribing`（语音识别）
 
 扩展方式：在 `engines/` 下新建文件，实现 `AsrEngine`，用 `@register_engine` 注册即可。
 
