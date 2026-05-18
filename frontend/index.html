@@ -169,6 +169,8 @@
               <q-select v-model="settingsForm.resolution" :options="settingResOptions" label="压缩分辨率" dense filled emit-value map-options class="col"></q-select>
               <q-select v-model="settingsForm.fps" :options="settingFpsOptions" label="帧率" dense filled emit-value map-options class="col"></q-select>
             </div>
+            <div style="font-size:11px;color:var(--text3);padding:0 4px">预估码率：{{ estimatedBitrate }}</div>
+            <q-toggle v-if="hwEncoderAvailable" v-model="settingsForm.hwAccel" label="硬件加速压缩"></q-toggle>
             <q-select v-model="settingsForm.model" :options="settingModelOptions" label="AI 模型" dense filled emit-value map-options></q-select>
             <q-input v-model="settingsForm.videoApiKey" :type="showVideoKey ? 'text' : 'password'" label="API Key" dense filled>
               <template v-slot:append>
@@ -394,7 +396,8 @@ const app = Vue.createApp({
       showImport: false,
       showSettings: false,
       showShortcuts: false,
-      settingsForm: { resolution: "480", fps: "30", model: "glm-4.6v", useMultimodal: true, asrEngine: "whisper", videoApiKey: "", asrApiKey: "", imageResolution: "1920", imageApiKey: "", imageModel: "glm-4.6v" },
+      settingsForm: { resolution: "480", fps: "30", model: "glm-4.6v", useMultimodal: true, asrEngine: "whisper", videoApiKey: "", asrApiKey: "", imageResolution: "1920", imageApiKey: "", imageModel: "glm-4.6v", hwAccel: false },
+      hwEncoderAvailable: false,
       showVideoKey: false,
       showAsrKey: false,
       showImgKey: false,
@@ -487,6 +490,14 @@ const app = Vue.createApp({
       if (this.themeMode === "dark") return "dark_mode";
       if (this.themeMode === "light") return "light_mode";
       return "brightness_medium";
+    },
+    estimatedBitrate() {
+      const resPixels = { "240": 426 * 240, "320": 640 * 360, "480": 854 * 480 };
+      const basePixels = 854 * 480, baseFps = 30, baseBps = 2_000_000;
+      const pixels = resPixels[this.settingsForm.resolution] || basePixels;
+      const fps = parseInt(this.settingsForm.fps) || 30;
+      const bps = baseBps * (pixels / basePixels) * (fps / baseFps);
+      return bps >= 1_000_000 ? (bps / 1_000_000).toFixed(2) + " Mbps" : (bps / 1_000).toFixed(0) + " Kbps";
     },
   },
   methods: {
@@ -656,6 +667,8 @@ const app = Vue.createApp({
         this.settingsForm.imageResolution = s.image_resolution || "1920";
         this.settingsForm.imageApiKey = s.image_api_key || "";
         this.settingsForm.imageModel = s.image_model || "glm-4.6v";
+        this.settingsForm.hwAccel = s.hw_accel === "true";
+        this.hwEncoderAvailable = !!s.hw_encoder;
       } catch (e) { console.error(e); }
     },
     async saveSettings() {
@@ -671,6 +684,7 @@ const app = Vue.createApp({
           image_resolution: this.settingsForm.imageResolution,
           image_api_key: this.settingsForm.imageApiKey,
           image_model: this.settingsForm.imageModel,
+          hw_accel: String(this.settingsForm.hwAccel),
         });
         Quasar.Notify.create({ message: "设置已保存", position: "top", timeout: 1500 });
       } catch (e) { console.error(e); }

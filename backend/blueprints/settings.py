@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 
 from ..db import get_db
+from ..compressor import detect_hw_encoder
 
 bp = Blueprint("settings", __name__)
 
@@ -9,7 +10,9 @@ bp = Blueprint("settings", __name__)
 def get_settings():
     db = get_db()
     rows = db.execute("SELECT key, value FROM settings").fetchall()
-    return jsonify({r["key"]: r["value"] for r in rows})
+    result = {r["key"]: r["value"] for r in rows}
+    result["hw_encoder"] = detect_hw_encoder() or ""
+    return jsonify(result)
 
 
 @bp.route("/", methods=["POST"])

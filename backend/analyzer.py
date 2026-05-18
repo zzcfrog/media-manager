@@ -39,7 +39,7 @@ _ASR_LINE_MULTIMODAL = "语音内容（识别说话人和内容，详细转写�
 
 def analyze_video(video_path: str | Path, api_key: str, model: str = "glm-4.6v",
                   base_url: str = CODING_BASE_URL, multimodal: bool = True,
-                  on_chunk=None) -> tuple[list[dict], float, dict | None]:
+                  on_chunk=None, on_progress=None) -> tuple[list[dict], float, dict | None]:
     video_url = encode_video_base64(video_path)
     prompt = load_prompt()
     if multimodal:
@@ -53,10 +53,14 @@ def analyze_video(video_path: str | Path, api_key: str, model: str = "glm-4.6v",
     if on_chunk:
         on_chunk(f"data: {json.dumps({'status': 'analyzing', 'model': model})}\n\n")
 
+    if on_progress:
+        on_progress("uploading")
+
     import time
     t0 = time.time()
     full_content = ""
     usage = None
+    first_token = True
     try:
         stream = client.chat.completions.create(
             model=model,
@@ -78,8 +82,14 @@ def analyze_video(video_path: str | Path, api_key: str, model: str = "glm-4.6v",
                 continue
             delta = chunk.choices[0].delta
             if delta.content:
+                if first_token:
+                    if on_progress:
+                        on_progress("first_token")
+                    first_token = False
                 print(delta.content, end="", flush=True)
                 full_content += delta.content
+                if on_progress:
+                    on_progress("receiving", chars=len(full_content))
                 if on_chunk:
                     on_chunk(f"data: {json.dumps({'content': delta.content}, ensure_ascii=False)}\n\n")
     except Exception as e:
@@ -117,16 +127,20 @@ def _parse_response(content: str) -> list[dict]:
 
 
 def analyze_image(image_path: str | Path, api_key: str, model: str = "glm-4.6v",
-                  base_url: str = CODING_BASE_URL) -> tuple[dict, float, dict | None]:
+                  base_url: str = CODING_BASE_URL, on_progress=None) -> tuple[dict, float, dict | None]:
     """Analyze a single image. Returns (result_dict, elapsed_seconds, usage_dict)."""
     import time
 
     image_url = encode_image_base64(image_path)
     client = OpenAI(api_key=api_key, base_url=base_url)
 
+    if on_progress:
+        on_progress("uploading")
+
     t0 = time.time()
     full_content = ""
     usage = None
+    first_token = True
 
     stream = client.chat.completions.create(
         model=model,
@@ -148,8 +162,14 @@ def analyze_image(image_path: str | Path, api_key: str, model: str = "glm-4.6v",
             continue
         delta = chunk.choices[0].delta
         if delta.content:
+            if first_token:
+                if on_progress:
+                    on_progress("first_token")
+                first_token = False
             print(delta.content, end="", flush=True)
             full_content += delta.content
+            if on_progress:
+                on_progress("receiving", chars=len(full_content))
 
     elapsed = time.time() - t0
     print("\n---")

@@ -170,7 +170,7 @@ const DetailPage = {
                   <div class="tl-body">
                     <div class="tl-title">{{ s.label }}<span v-if="s.status==='active' && s.key==='analyze' && analyzeTipText" class="tl-tip">{{ analyzeTipText }}<span class="tl-cursor">|</span></span></div>
                     <div class="tl-bar-track"><div class="tl-bar-fill" :style="{width: s.progress+'%'}"></div></div>
-                    <div class="tl-info"><span>{{ s.statusText }}<span v-if="s.extra" class="tl-extra">{{ s.extra }}</span></span><span v-if="s.duration" class="tl-time">{{ s.duration.toFixed(1) }}s</span></div>
+                    <div class="tl-info"><span>{{ s.substepText || s.statusText }}<span v-if="s.extra" class="tl-extra">{{ s.extra }}</span></span><span v-if="s.duration" class="tl-time">{{ s.duration.toFixed(1) }}s</span></div>
                   </div>
                 </div>
               </div>
@@ -231,7 +231,7 @@ const DetailPage = {
           <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
             <div v-if="media?.media_type==='video'" class="row items-center">
               <span class="text-grey-6" style="width:80px">压缩</span>
-              <span>{{ confirmInfo.resolution }} / {{ confirmInfo.fps }}fps</span>
+              <span>{{ confirmInfo.resolution }} / {{ confirmInfo.fps }}fps / {{ confirmInfo.bitrate }}</span>
             </div>
             <div class="row items-center">
               <span class="text-grey-6" style="width:80px">模型</span>
@@ -269,7 +269,7 @@ const DetailPage = {
       analysisStages: [], analyzeTipText: "",
       showAnalysisDialog: false, showClearDialog: false, showDeleteSegDialog: false,
       deleteSegInfo: null,
-      confirmInfo: { resolution: "480", fps: "30", modelLabel: "智谱 GLM-4.6V", useMultimodal: true, asrEngine: "Whisper" },
+      confirmInfo: { resolution: "480P", fps: "30", bitrate: "2.00 Mbps", modelLabel: "智谱 GLM-4.6V", useMultimodal: true, asrEngine: "Whisper" },
       camFields: [
         { key: "shot_type", label: "景别", cls: "shot" },
         { key: "focal_length", label: "焦段", cls: "lens" },
@@ -440,7 +440,7 @@ const DetailPage = {
         }
         if (newStatus === "done" && s.status === "active") {
           u.status = "done"; u.duration = (Date.now() - s.t0) / 1000; u.progress = 100;
-          u.statusText = s.doneText; u.extra = extra || "";
+          u.statusText = s.doneText; u.extra = extra || ""; u.substepText = "";
           this._stopStepTimer(key);
         }
         return u;
@@ -463,6 +463,28 @@ const DetailPage = {
     _stopAllStepTimers() {
       if (this._stepTimers) Object.values(this._stepTimers).forEach(t => clearInterval(t));
       this._stepTimers = {};
+    },
+    _setStageProgress(key, percent) {
+      this.analysisStages = this.analysisStages.map(s =>
+        s.key === key && s.status === "active" ? { ...s, progress: Math.min(percent, 99.9) } : s
+      );
+    },
+    _setAnalyzeSubstep(name, chars) {
+      this._analyzeSubstep = true;
+      this._stopAnalyzeTips();
+      const labels = { uploading: "上传至 AI 服务…", receiving: "接收结果…" };
+      const text = name === "receiving" && chars > 0
+        ? `接收结果 (${chars.toLocaleString()} 字)…`
+        : (labels[name] || "");
+      this.analyzeTipText = text;
+      this.analysisStages = this.analysisStages.map(s =>
+        s.key === "analyze" && s.status === "active" ? { ...s, substepText: text } : s
+      );
+    },
+    _setAsrSubstep(name, text) {
+      this.analysisStages = this.analysisStages.map(s =>
+        s.key === "asr" && s.status === "active" ? { ...s, substepText: text } : s
+      );
     },
     _startAnalyzeTips() {
       this._stopAnalyzeTips();
@@ -538,6 +560,11 @@ const DetailPage = {
         const modelLabels = { "glm-4v-plus": "智谱 GLM-4V-Plus", "glm-4.6v": "智谱 GLM-4.6V", "glm-4.6v-flash": "智谱 GLM-4.6V-Flash", "glm-4.6v-flashx": "智谱 GLM-4.6V-FlashX", "glm-4.5v": "智谱 GLM-4.5V" };
         this.confirmInfo.resolution = s.resolution === "320" ? "320P" : s.resolution === "240" ? "240P" : "480P";
         this.confirmInfo.fps = s.fps || "30";
+        const resPixels = { "240": 426 * 240, "320": 640 * 360, "480": 854 * 480 };
+        const rPx = resPixels[s.resolution] || 854 * 480;
+        const rFps = parseInt(s.fps) || 30;
+        const bps = 2_000_000 * (rPx / (854 * 480)) * (rFps / 30);
+        this.confirmInfo.bitrate = bps >= 1_000_000 ? (bps / 1_000_000).toFixed(2) + " Mbps" : (bps / 1_000).toFixed(0) + " Kbps";
         this.confirmInfo.modelLabel = modelLabels[s.model] || s.model;
         this.confirmInfo.useMultimodal = s.use_multimodal !== "false";
         this.confirmInfo.asrEngine = (s.asr_engine || "whisper") === "whisper" ? "Whisper" : s.asr_engine;
@@ -713,6 +740,7 @@ const DetailPage = {
         this.confirmInfo.useMultimodal = s.use_multimodal !== "false";
       } catch (e) {}
       this.analyzing = true;
+      this._analyzeSubstep = false;
       this.analysisProgress = "准备中…";
       this.analysis = { status: "processing", segments: [] };
       const isImage = this.media?.media_type === "image";
@@ -755,23 +783,49 @@ const DetailPage = {
             try { evt = JSON.parse(jsonStr); } catch { continue; }
             if (evt.type === "progress") {
               this.analysisProgress = evt.message;
-              if (evt.step === "compressing") { this._updateStage("compress", "active"); }
+              if (evt.step === "compressing") {
+                this._updateStage("compress", "active");
+                if (evt.percent != null) this._setStageProgress("compress", evt.percent);
+              }
               if (evt.step === "compressed") {
                 const res = (evt.width && evt.height) ? `${evt.width}×${evt.height}` : "";
                 const fps = evt.fps ? ` ${evt.fps}fps` : "";
                 this._updateStage("compress", "done", `${res}${fps}`);
+                this._compressedSize = evt.size_bytes;
                 this._updateStage("encode", "active");
               }
               if (evt.step === "analyzing") {
-                if (!isImage) this._updateStage("encode", "done", "Base64");
-                this._updateStage("analyze", "active");
-                if (evt.message && evt.message.includes("语音识别")) {
-                  this._updateStage("asr", "active");
+                if (!isImage) {
+                  const fmtSize = (b) => {
+                    if (!b) return "Base64";
+                    if (b >= 1073741824) return (b / 1073741824).toFixed(1) + " GB";
+                    if (b >= 1048576) return (b / 1048576).toFixed(1) + " MB";
+                    return (b / 1024).toFixed(0) + " KB";
+                  };
+                  this._updateStage("encode", "done", fmtSize(this._compressedSize));
                 }
-                this._startAnalyzeTips();
+                this._updateStage("analyze", "active");
+                if (evt.substep) {
+                  this._setAnalyzeSubstep(evt.substep, evt.chars || 0);
+                } else if (!this._analyzeSubstep) {
+                  this._startAnalyzeTips();
+                }
+              }
+              if (evt.step === "analyze_done") {
+                this._stopAnalyzeTips();
+                this._analyzeSubstep = false;
+                this._updateStage("analyze", "done");
+              }
+              if (evt.step === "asr_start") {
+                this._updateStage("asr", "active");
+              }
+              if (evt.step === "asr_progress") {
+                const asrLabels = { loading: "加载语音模型…", transcribing: "语音识别中…" };
+                this._setAsrSubstep(evt.substep, evt.message || asrLabels[evt.substep] || "");
               }
             } else if (evt.type === "done") {
               this._stopAnalyzeTips();
+              this._analyzeSubstep = false;
               this._updateStage("analyze", "done");
               const asrStage = this.analysisStages.find(s => s.key === "asr");
               if (asrStage) {

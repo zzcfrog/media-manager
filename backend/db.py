@@ -196,6 +196,7 @@ _DEFAULTS = {
     "image_resolution": "1920",
     "image_api_key": "",
     "image_model": "glm-4.6v",
+    "hw_accel": "false",
 }
 
 

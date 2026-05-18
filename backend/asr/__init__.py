@@ -21,7 +21,7 @@ class AsrEngine(ABC):
     name: str
 
     @abstractmethod
-    def transcribe(self, audio_path: str | Path) -> list[AsrSegment]:
+    def transcribe(self, audio_path: str | Path, on_progress=None) -> list[AsrSegment]:
         ...
 
 

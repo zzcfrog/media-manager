@@ -87,9 +87,27 @@ def _start_image_analysis(media_id, media, app):
 
                 yield f"data: {json.dumps({'type': 'progress', 'step': 'analyzing', 'message': f'调用 {model} 分析中...'}, ensure_ascii=False)}\n\n"
 
-                result, analyze_time, usage = analyze_image(
-                    analyze_path, image_api_key, model=model, base_url=CODING_BASE_URL,
+                substep = {"name": "uploading", "chars": 0}
+
+                def on_img_progress(status, chars=0):
+                    if status == "first_token":
+                        substep["name"] = "receiving"
+                    elif status == "receiving":
+                        substep["name"] = "receiving"
+                        substep["chars"] = chars
+
+                pool = ThreadPoolExecutor(max_workers=1)
+                future = pool.submit(
+                    analyze_image, analyze_path, image_api_key,
+                    model=model, base_url=CODING_BASE_URL, on_progress=on_img_progress,
                 )
+
+                while not future.done():
+                    yield f"data: {json.dumps({'type': 'progress', 'step': 'analyzing', 'substep': substep['name'], 'chars': substep['chars']}, ensure_ascii=False)}\n\n"
+                    time.sleep(0.5)
+
+                result, analyze_time, usage = future.result()
+                pool.shutdown(wait=False)
 
                 segments = [result]
                 save_segments(media_id, segments, model=model)
@@ -135,54 +153,130 @@ def _start_video_analysis(media_id, media, app):
     api_key = get_setting(db, "video_api_key", "")
     if not api_key:
         return jsonify({"error": "API Key 未设置，请在设置中配置"}), 400
+    hw_accel = get_setting(db, "hw_accel", "false") == "true"
     file_path = media["file_path"]
 
     def generate():
         compressed_path = None
         with app.app_context():
             try:
+                # --- 压缩阶段：线程运行，轮询真实进度 ---
+                compress_holder = [0.0]
+
+                def on_compress_progress(pct):
+                    compress_holder[0] = pct
+
                 yield f"data: {json.dumps({'type': 'progress', 'step': 'compressing', 'message': '压缩视频中...'}, ensure_ascii=False)}\n\n"
                 t0 = time.time()
-                compressed_path, compress_time, cw, ch, cfps = compress_video(file_path, resolution=resolution, fps=fps)
+
+                pool = ThreadPoolExecutor(max_workers=1)
+                c_future = pool.submit(
+                    compress_video, file_path,
+                    resolution=resolution, fps=fps,
+                    on_progress=on_compress_progress, hw_accel=hw_accel,
+                )
+
+                while not c_future.done():
+                    pct = compress_holder[0]
+                    yield f"data: {json.dumps({'type': 'progress', 'step': 'compressing', 'percent': round(pct, 1)}, ensure_ascii=False)}\n\n"
+                    time.sleep(0.3)
+
+                compressed_path, compress_time, cw, ch, cfps = c_future.result()
+                pool.shutdown(wait=False)
                 compressed_path_holder[0] = str(compressed_path)
                 size_mb = compressed_path.stat().st_size / (1024 * 1024)
-                yield f"data: {json.dumps({'type': 'progress', 'step': 'compressed', 'message': f'压缩完成: {size_mb:.1f}MB, 耗时 {compress_time:.1f}s', 'width': cw, 'height': ch, 'fps': cfps}, ensure_ascii=False)}\n\n"
+                size_bytes = compressed_path.stat().st_size
+                yield f"data: {json.dumps({'type': 'progress', 'step': 'compressed', 'message': f'压缩完成: {size_mb:.1f}MB, 耗时 {compress_time:.1f}s', 'width': cw, 'height': ch, 'fps': cfps, 'size_bytes': size_bytes}, ensure_ascii=False)}\n\n"
+
+                # --- 分析阶段：线程运行，轮询子步骤 ---
+                substep = {"name": "uploading", "chars": 0}
+
+                def on_analyze_progress(status, chars=0):
+                    if status == "first_token":
+                        substep["name"] = "receiving"
+                    elif status == "receiving":
+                        substep["name"] = "receiving"
+                        substep["chars"] = chars
 
                 if use_multimodal:
                     yield f"data: {json.dumps({'type': 'progress', 'step': 'analyzing', 'message': f'AI 综合分析中（{model}）...'}, ensure_ascii=False)}\n\n"
-                    segments, analyze_time, usage = analyze_video(
-                        compressed_path, api_key, model=model,
+
+                    pool2 = ThreadPoolExecutor(max_workers=1)
+                    vlm_future = pool2.submit(
+                        analyze_video, compressed_path, api_key, model=model,
                         base_url=CODING_BASE_URL, multimodal=True,
+                        on_progress=on_analyze_progress,
                     )
+
+                    while not vlm_future.done():
+                        yield f"data: {json.dumps({'type': 'progress', 'step': 'analyzing', 'substep': substep['name'], 'chars': substep['chars']}, ensure_ascii=False)}\n\n"
+                        time.sleep(0.5)
+
+                    segments, analyze_time, usage = vlm_future.result()
+                    pool2.shutdown(wait=False)
                 else:
                     asr_engine = get_asr_engine(asr_engine_name)
 
                     if asr_engine:
                         yield f"data: {json.dumps({'type': 'progress', 'step': 'analyzing', 'message': f'AI 分析 & 语音识别并行中...'}, ensure_ascii=False)}\n\n"
+                        yield f"data: {json.dumps({'type': 'progress', 'step': 'asr_start'}, ensure_ascii=False)}\n\n"
 
-                        pool = ThreadPoolExecutor(max_workers=2)
-                        vlm_future = pool.submit(analyze_video, compressed_path, api_key, model=model, base_url=CODING_BASE_URL, multimodal=False)
-                        asr_future = pool.submit(_run_asr, asr_engine, compressed_path)
+                        pool2 = ThreadPoolExecutor(max_workers=2)
+                        vlm_future = pool2.submit(
+                            analyze_video, compressed_path, api_key, model=model,
+                            base_url=CODING_BASE_URL, multimodal=False,
+                            on_progress=on_analyze_progress,
+                        )
 
-                        try:
-                            segments, analyze_time, usage = vlm_future.result()
-                        except Exception:
-                            asr_future.cancel()
-                            pool.shutdown(wait=False, cancel_futures=True)
-                            raise
+                        asr_substep = {"name": "loading"}
 
-                        asr_segments = asr_future.result()
-                        pool.shutdown(wait=False)
+                        def on_asr_progress(status):
+                            asr_substep["name"] = status
 
-                        if asr_segments:
-                            _merge_asr(segments, asr_segments)
+                        asr_future = pool2.submit(_run_asr, asr_engine, compressed_path, on_progress=on_asr_progress)
+
+                        # Poll both VLM and ASR
+                        vlm_done = False
+                        asr_done = False
+                        while not vlm_done or not asr_done:
+                            if not vlm_done and vlm_future.done():
+                                try:
+                                    segments, analyze_time, usage = vlm_future.result()
+                                except Exception:
+                                    asr_future.cancel()
+                                    pool2.shutdown(wait=False, cancel_futures=True)
+                                    raise
+                                vlm_done = True
+                                yield f"data: {json.dumps({'type': 'progress', 'step': 'analyze_done'}, ensure_ascii=False)}\n\n"
+                            if not asr_done and asr_future.done():
+                                asr_segments = asr_future.result()
+                                asr_done = True
+                                if asr_segments:
+                                    _merge_asr(segments, asr_segments)
+                            if not vlm_done:
+                                yield f"data: {json.dumps({'type': 'progress', 'step': 'analyzing', 'substep': substep['name'], 'chars': substep['chars']}, ensure_ascii=False)}\n\n"
+                            if not asr_done:
+                                asr_label = "加载语音模型…" if asr_substep["name"] == "loading" else "语音识别中…"
+                                yield f"data: {json.dumps({'type': 'progress', 'step': 'asr_progress', 'substep': asr_substep['name'], 'message': asr_label}, ensure_ascii=False)}\n\n"
+                            time.sleep(0.5)
+
+                        pool2.shutdown(wait=False)
                     else:
                         yield f"data: {json.dumps({'type': 'progress', 'step': 'analyzing', 'message': f'调用 {model} 分析中...'}, ensure_ascii=False)}\n\n"
 
-                        segments, analyze_time, usage = analyze_video(
-                            compressed_path, api_key, model=model,
+                        pool2 = ThreadPoolExecutor(max_workers=1)
+                        vlm_future = pool2.submit(
+                            analyze_video, compressed_path, api_key, model=model,
                             base_url=CODING_BASE_URL, multimodal=False,
+                            on_progress=on_analyze_progress,
                         )
+
+                        while not vlm_future.done():
+                            yield f"data: {json.dumps({'type': 'progress', 'step': 'analyzing', 'substep': substep['name'], 'chars': substep['chars']}, ensure_ascii=False)}\n\n"
+                            time.sleep(0.5)
+
+                        segments, analyze_time, usage = vlm_future.result()
+                        pool2.shutdown(wait=False)
 
                 save_segments(media_id, segments, model=model)
 
@@ -216,9 +310,9 @@ def _start_video_analysis(media_id, media, app):
     return resp
 
 
-def _run_asr(engine, audio_path):
+def _run_asr(engine, audio_path, on_progress=None):
     try:
-        return engine.transcribe(audio_path)
+        return engine.transcribe(audio_path, on_progress=on_progress)
     except Exception as e:
         print(f"ASR failed: {e}")
         return []
@@ -232,16 +326,29 @@ def _parse_time(ts: str) -> float:
 
 
 def _merge_asr(vlm_segments, asr_segments):
-    for seg in vlm_segments:
+    for asr in asr_segments:
         try:
-            start = _parse_time(seg.get("time_start", "0"))
-            end = _parse_time(seg.get("time_end", "0"))
+            asr_start = _parse_time(asr.time_start)
+            asr_end = _parse_time(asr.time_end)
         except (ValueError, IndexError):
             continue
-        texts = [a.text for a in asr_segments
-                 if _parse_time(a.time_start) < end and _parse_time(a.time_end) > start]
-        if texts:
-            seg["asr"] = "; ".join(texts)
+        best_seg = None
+        best_overlap = 0
+        for seg in vlm_segments:
+            try:
+                seg_start = _parse_time(seg.get("time_start", "0"))
+                seg_end = _parse_time(seg.get("time_end", "0"))
+            except (ValueError, IndexError):
+                continue
+            overlap = min(asr_end, seg_end) - max(asr_start, seg_start)
+            if overlap > best_overlap:
+                best_overlap = overlap
+                best_seg = seg
+        if best_seg and best_overlap > 0:
+            if best_seg.get("asr"):
+                best_seg["asr"] += "; " + asr.text
+            else:
+                best_seg["asr"] = asr.text
 
 
 def save_segments(media_id, segments, model=""):
