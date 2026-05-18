@@ -76,8 +76,14 @@ def list_media():
         params + [per_page, (page - 1) * per_page],
     ).fetchall()
 
+    data = []
+    for r in rows:
+        d = dict(r)
+        d.pop("embedding", None)
+        data.append(d)
+
     return jsonify({
-        "data": [dict(r) for r in rows],
+        "data": data,
         "pagination": {
             "page": page,
             "per_page": per_page,
@@ -177,7 +183,7 @@ def backfill_hashes():
     from ..services.embedding import compute_embedding
     from pathlib import Path
     db = get_db()
-    rows = db.execute("SELECT id, file_path, media_type, duration FROM media WHERE file_hash IS NULL OR phash IS NULL OR (embedding IS NULL AND media_type = 'image')").fetchall()
+    rows = db.execute("SELECT id, file_path, media_type, duration, file_hash, phash, embedding FROM media WHERE file_hash IS NULL OR phash IS NULL OR (embedding IS NULL AND media_type = 'image')").fetchall()
     count = 0
     for row in rows:
         fp = Path(row["file_path"])
@@ -264,9 +270,14 @@ def find_duplicates():
             n = len(indices)
             sims = cluster_vecs @ cluster_vecs.T
             avg_sim = float((sims.sum() - n) / (n * (n - 1))) if n > 1 else 1.0
+            items = []
+            for i in indices:
+                d = dict(rows[i])
+                d.pop("embedding", None)
+                items.append(d)
             groups.append({
                 "similarity": round(avg_sim * 100),
-                "items": [dict(rows[i]) for i in indices],
+                "items": items,
             })
         groups.sort(key=lambda g: (-len(g["items"]), -g["similarity"]))
         return jsonify({"groups": groups})
