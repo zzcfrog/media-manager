@@ -240,6 +240,10 @@ const GalleryPage = {
           <q-item-section>{{ selArr.length > 1 ? '移出 ' + selArr.length + ' 个素材' : '移出素材库' }}</q-item-section>
           <q-item-section side style="flex-shrink:0;white-space:nowrap;display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--text3)">⌘+⌫</span></q-item-section>
         </q-item>
+        <q-item clickable @click="ctxMenu.show = false; revealCtx()" :disable="selArr.length !== 1" style="padding-left:8px;padding-right:12px">
+          <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="folder_open" size="14px" color="grey-6"></q-icon></q-item-section>
+          <q-item-section>在文件夹中显示</q-item-section>
+        </q-item>
         <q-item clickable @click="ctxMenu.show = false; findSimilar()" :disable="selArr.length !== 1 || selArr[0].media_type === 'video'" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="content_copy" size="14px" color="grey-6"></q-icon></q-item-section>
           <q-item-section>查找相似</q-item-section>
@@ -706,6 +710,12 @@ const GalleryPage = {
     },
     findSimilar() {
       location.hash = '#/duplicates';
+    },
+    revealCtx() {
+      const m = this.items.find(i => i.id === this.selArr[0]);
+      if (m && window.electronAPI && window.electronAPI.showInFolder) {
+        window.electronAPI.showInFolder(m.file_path);
+      }
     },
     async doCtxWriteXmp() {
       const ids = this.selArr.filter(id => {

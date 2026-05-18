@@ -69,17 +69,39 @@ const DuplicatesPage = {
       共 {{ groups.length }} 组{{ typeLabel }}素材
     </div>
     <div v-if="ctxMenu.show" class="ctx-menu-popup" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }" @mousedown.stop>
-      <q-list dense style="min-width:120px">
-        <q-item clickable @click="closeCtx(); openDetail(ctxMenu.item.id)" style="padding-left:10px;padding-right:14px">
-          <q-item-section side style="padding:0"><q-icon name="visibility" size="15px" color="grey-6"></q-icon></q-item-section>
+      <q-list dense style="min-width:200px;border-radius:8px;overflow:hidden">
+        <q-item clickable @click="closeCtx(); openDetail(ctxMenu.item.id)" :disable="selArr.length > 1" style="padding-left:8px;padding-right:12px">
+          <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="visibility" size="14px" color="grey-6"></q-icon></q-item-section>
           <q-item-section>查看详情</q-item-section>
+          <q-item-section side style="flex-shrink:0;white-space:nowrap;display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--text3)">↵</span></q-item-section>
         </q-item>
-        <q-item clickable @click="closeCtx(); revealFile(ctxMenu.item.file_path)" style="padding-left:10px;padding-right:14px">
-          <q-item-section side style="padding:0"><q-icon name="folder_open" size="15px" color="grey-6"></q-icon></q-item-section>
+        <q-item clickable @click="closeCtx(); revealFile(ctxMenu.item.file_path)" style="padding-left:8px;padding-right:12px">
+          <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="folder_open" size="14px" color="grey-6"></q-icon></q-item-section>
           <q-item-section>在文件夹中显示</q-item-section>
+        </q-item>
+        <q-item clickable @click="closeCtx(); deleteCtx()" style="padding-left:8px;padding-right:12px">
+          <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="delete_outline" size="14px" color="grey-6"></q-icon></q-item-section>
+          <q-item-section>{{ selArr.length > 1 ? '移出 ' + selArr.length + ' 个素材' : '移出素材库' }}</q-item-section>
+          <q-item-section side style="flex-shrink:0;white-space:nowrap;display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--text3)">⌘+⌫</span></q-item-section>
         </q-item>
       </q-list>
     </div>
+    <q-dialog v-model="confirmDelete.show">
+      <q-card style="min-width:360px" class="dialog-card">
+        <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" v-close-popup></q-btn>
+        <q-card-section>
+          <div class="text-h6">确认移除</div>
+        </q-card-section>
+        <q-card-section>
+          <p class="text-body2">确定要移除「{{ confirmDelete.name }}」吗？</p>
+          <p class="text-caption text-grey-6">原文件不会被删除，仅清除库中的记录。</p>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="取消" @click="confirmDelete.show=false"></q-btn>
+          <q-btn color="red" label="确认移除" @click="doDelete"></q-btn>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
     <div v-if="lasso" class="lasso" :style="lassoStyle"></div>
   </div>
   `,
@@ -92,6 +114,7 @@ const DuplicatesPage = {
       selArr: [],
       lastClickIdx: -1,
       ctxMenu: { show: false, item: null, x: 0, y: 0 },
+      confirmDelete: { show: false, id: null, name: "" },
       lasso: null,
       lassoStyle: {},
       _lassoStart: null,
@@ -146,6 +169,27 @@ const DuplicatesPage = {
     },
     closeCtx() {
       this.ctxMenu.show = false;
+    },
+    deleteCtx() {
+      if (this.selArr.length > 1) {
+        this.confirmDelete = { show: true, id: null, name: this.selArr.length + ' 个素材' };
+      } else {
+        const id = this.selArr[0];
+        const m = this.flatItems.find(i => i.id === id);
+        this.confirmDelete = { show: true, id, name: m ? m.file_name : "" };
+      }
+    },
+    async doDelete() {
+      const ids = this.confirmDelete.id ? [this.confirmDelete.id] : [...this.selArr];
+      this.confirmDelete.show = false;
+      try {
+        await API.batchUpdate({ action: "delete", ids });
+        Quasar.Notify.create({ message: `已移除 ${ids.length} 个素材`, position: 'top', timeout: 1500 });
+        this.selArr = [];
+        await this.loadGroups();
+      } catch (e) {
+        Quasar.Notify.create({ message: '移除失败: ' + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
+      }
     },
     revealFile(path) {
       if (window.electronAPI && window.electronAPI.showInFolder) {
