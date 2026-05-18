@@ -557,17 +557,20 @@ const app = Vue.createApp({
           const parts = filePath.split("/");
           parts.pop();
           const dir = parts.join("/") || "/";
-          console.log("[detail] file_path:", filePath, "→ dir:", dir);
-          console.log("[detail] libraryExpanded before:", this.libraryExpanded);
-          console.log("[detail] folderTree paths:", JSON.stringify(this.folderTree.map(n => n.path)));
-          console.log("[detail] selectedFolder before:", this.selectedFolder);
+          const findPath = (nodes, target) => {
+            for (const n of nodes) {
+              if (n.path === target) return true;
+              if (n.children && findPath(n.children, target)) return true;
+            }
+            return false;
+          };
+          console.log("[detail] dir:", dir, "exists in tree:", findPath(this.folderTree, dir));
+          console.log("[detail] folderTree root nodes:", this.folderTree.map(n => n.path));
           this._skipToggle = true;
           this.libraryExpanded = true;
-          this.$nextTick(() => {
-            this.selectedFolder = dir;
-            console.log("[detail] selectedFolder after:", this.selectedFolder, "libraryExpanded:", this.libraryExpanded);
-            this._skipToggle = false;
-          });
+          this.selectedFolder = dir;
+          console.log("[detail] selectedFolder set to:", this.selectedFolder);
+          this.$nextTick(() => { this._skipToggle = false; });
         };
         const m = this.galleryItems.find(i => i.id === this.detailId);
         if (m && m.file_path) {
