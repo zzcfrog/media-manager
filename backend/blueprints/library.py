@@ -245,9 +245,8 @@ def find_duplicates():
         groups.sort(key=lambda g: (-len(g["items"]),))
         return jsonify({"groups": groups})
 
-    else:  # similar — HDBSCAN clustering on ResNet50 embeddings
+    else:  # similar — pairwise cosine similarity on ResNet50 embeddings
         import numpy as np
-        import hdbscan
 
         rows = db.execute(
             "SELECT id, file_path, file_name, media_type, file_size, embedding, thumbnail_path "
@@ -257,19 +256,40 @@ def find_duplicates():
             return jsonify({"groups": []})
 
         vecs = np.array([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
-        clusterer = hdbscan.HDBSCAN(min_cluster_size=2, metric="euclidean")
-        labels = clusterer.fit_predict(vecs)
+        n = len(vecs)
+        sim_matrix = vecs @ vecs.T  # cosine similarity (vectors are L2-normalized)
+
+        THRESHOLD = 0.90
+        parent = list(range(n))
+
+        def find(x):
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        def union(a, b):
+            a, b = find(a), find(b)
+            if a != b:
+                parent[a] = b
+
+        for i in range(n):
+            for j in range(i + 1, n):
+                if sim_matrix[i][j] >= THRESHOLD:
+                    union(i, j)
+
+        cluster_map = {}
+        for i in range(n):
+            root = find(i)
+            cluster_map.setdefault(root, []).append(i)
 
         groups = []
-        for label in set(labels):
-            if label == -1:
+        for indices in cluster_map.values():
+            if len(indices) < 2:
                 continue
-            indices = [i for i, l in enumerate(labels) if l == label]
-            # Compute average pairwise cosine similarity within cluster
-            cluster_vecs = vecs[indices]
-            n = len(indices)
-            sims = cluster_vecs @ cluster_vecs.T
-            avg_sim = float((sims.sum() - n) / (n * (n - 1))) if n > 1 else 1.0
+            k = len(indices)
+            sub = sim_matrix[np.ix_(indices, indices)]
+            avg_sim = float((sub.sum() - k) / (k * (k - 1)))
             items = []
             for i in indices:
                 d = dict(rows[i])
