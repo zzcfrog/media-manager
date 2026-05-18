@@ -168,11 +168,22 @@ def _migrate(db):
             "PRIMARY KEY (media_id_a, media_id_b, dup_type))"
         )
     else:
-        # Migrate: add dup_type column if missing
+        # Ensure PK includes dup_type — rebuild table if needed
         excl_cols = {r[1] for r in db.execute("PRAGMA table_info(dup_exclusions)").fetchall()}
         if "dup_type" not in excl_cols:
             db.execute("ALTER TABLE dup_exclusions ADD COLUMN dup_type TEXT NOT NULL DEFAULT 'similar'")
-            db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_dup_excl ON dup_exclusions (media_id_a, media_id_b, dup_type)")
+        # Check if PK already includes dup_type
+        pk_cols = [r for r in db.execute("PRAGMA table_info(dup_exclusions)").fetchall() if r[5]]
+        if len(pk_cols) < 3:
+            db.execute(
+                "CREATE TABLE dup_exclusions_new "
+                "(media_id_a INTEGER NOT NULL, media_id_b INTEGER NOT NULL, "
+                "dup_type TEXT NOT NULL DEFAULT 'similar', "
+                "PRIMARY KEY (media_id_a, media_id_b, dup_type))"
+            )
+            db.execute("INSERT OR IGNORE INTO dup_exclusions_new SELECT * FROM dup_exclusions")
+            db.execute("DROP TABLE dup_exclusions")
+            db.execute("ALTER TABLE dup_exclusions_new RENAME TO dup_exclusions")
 
     # dialogue → asr: rename column + rebuild FTS
     seg_cols = {r[1] for r in db.execute("PRAGMA table_info(media_segment)").fetchall()}
