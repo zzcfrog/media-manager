@@ -194,6 +194,9 @@ body:not(.body--dark) .q-dialog .q-card { box-shadow: 0 24px 80px rgba(255,255,2
 .dup-thumb img { width: 140px; height: 80px; object-fit: cover; border-radius: 6px; display: block; border: 1px solid var(--border); transition: border-color 0.15s; }
 .dup-thumb:hover img { border-color: var(--accent); }
 .dup-thumb-name { font-size: 11px; color: var(--text2); margin-top: 4px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dup-exclude-btn { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 50%; border: none; background: rgba(0,0,0,0.6); color: #fff; font-size: 11px; cursor: pointer; opacity: 0; transition: opacity .15s; display: flex; align-items: center; justify-content: center; z-index: 2; }
+.dup-thumb:hover .dup-exclude-btn { opacity: 1; }
+.dup-exclude-btn:hover { background: var(--negative); }
 .dim-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 6px; padding: 5px 8px; background: var(--surface2); border-radius: 5px; }
 .dim-pair { display: flex; align-items: center; gap: 3px; }
 .dim-label { font-size: 10px; color: var(--text3); }

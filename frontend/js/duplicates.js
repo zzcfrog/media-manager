@@ -57,6 +57,7 @@ const DuplicatesPage = {
                  @contextmenu.prevent="showCtx($event, item)">
               <img :src="'/media/thumbnail/' + item.id" draggable="false">
               <div v-if="selArr.includes(item.id)" class="sel-overlay"></div>
+              <button class="dup-exclude-btn" title="排除" @click.stop="openExcludeDialog(item, g)">✕</button>
               <div class="dup-thumb-name">{{ item.file_name }}</div>
               <div style="font-size:10px;color:var(--text3)">{{ item.media_type === 'video' ? '视频' : '图片' }} · {{ (item.file_size / 1048576).toFixed(1) }}MB</div>
               <q-tooltip :delay="800" :offset="[0, 4]">{{ item.file_path }}</q-tooltip>
@@ -80,6 +81,16 @@ const DuplicatesPage = {
           <q-item-section>在文件夹中显示</q-item-section>
         </q-item>
         <q-separator style="background:var(--border)"></q-separator>
+        <q-item clickable @click="closeCtx(); excludeCtx()" style="padding-left:8px;padding-right:12px">
+          <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="group_remove" size="14px" color="grey-6"></q-icon></q-item-section>
+          <q-item-section>排除本组</q-item-section>
+        </q-item>
+        <q-item clickable @click="closeCtx(); deleteCtx()" style="padding-left:8px;padding-right:12px">
+          <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="delete_outline" size="14px" color="negative"></q-icon></q-item-section>
+          <q-item-section style="color:var(--negative)">{{ selArr.length > 1 ? '移出 ' + selArr.length + ' 个素材' : '移出素材库' }}</q-item-section>
+          <q-item-section side style="flex-shrink:0;white-space:nowrap;display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--text3)">⌘+⌫</span></q-item-section>
+        </q-item>
+      </q-list>
         <q-item clickable @click="closeCtx(); deleteCtx()" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="delete_outline" size="14px" color="negative"></q-icon></q-item-section>
           <q-item-section style="color:var(--negative)">{{ selArr.length > 1 ? '移出 ' + selArr.length + ' 个素材' : '移出素材库' }}</q-item-section>
@@ -103,6 +114,44 @@ const DuplicatesPage = {
         </q-card-actions>
       </q-card>
     </q-dialog>
+    <q-dialog v-model="excludeDlg.show" persistent>
+      <q-card style="min-width:520px;max-width:640px" class="dialog-card">
+        <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" @click="excludeDlg.show=false"></q-btn>
+        <q-card-section>
+          <div class="text-h6" style="font-size:16px">排除相似分组</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:4px">选择与当前照片<b>不相似</b>的照片，排除后不会出现在同一分组中</div>
+        </q-card-section>
+        <q-card-section>
+          <div style="display:flex;gap:16px;align-items:flex-start">
+            <div style="flex-shrink:0;text-align:center">
+              <img :src="'/media/thumbnail/' + excludeDlg.item?.id"
+                   style="width:140px;height:140px;object-fit:cover;border-radius:8px;border:2px solid var(--accent)">
+              <div style="margin-top:6px;font-size:11px;color:var(--text2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ excludeDlg.item?.file_name }}</div>
+              <div style="font-size:10px;color:var(--text3)">当前照片</div>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <span style="font-size:12px;color:var(--text2)">以下哪些与它不相似？</span>
+                <q-btn flat dense size="xs" label="全选" color="primary" @click="excludeSelectAll"></q-btn>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;max-height:260px;overflow-y:auto;padding:4px">
+                <div v-for="c in excludeDlg.candidates" :key="c.item.id"
+                     style="cursor:pointer;border-radius:6px;overflow:hidden;border:2px solid transparent;transition:border-color .15s"
+                     :style="c.selected ? 'border-color:var(--negative)' : 'border-color:var(--border)'"
+                     @click="c.selected = !c.selected">
+                  <img :src="'/media/thumbnail/' + c.item.id" style="width:100%;aspect-ratio:1;object-fit:cover;display:block">
+                  <div style="font-size:10px;color:var(--text3);padding:2px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.item.file_name }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </q-card-section>
+        <q-card-actions align="right" style="padding:12px 16px">
+          <q-btn flat label="取消" @click="excludeDlg.show=false"></q-btn>
+          <q-btn color="primary" :label="'排除 ' + excludeSelectedCount + ' 张'" :disable="excludeSelectedCount === 0" @click="doExclude"></q-btn>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
     <div v-if="lasso" class="lasso" :style="lassoStyle"></div>
   </div>
   `,
@@ -119,6 +168,7 @@ const DuplicatesPage = {
       lasso: null,
       lassoStyle: {},
       _lassoStart: null,
+      excludeDlg: { show: false, item: null, group: null, candidates: [] },
     };
   },
   computed: {
@@ -133,6 +183,9 @@ const DuplicatesPage = {
         }
       }
       return items;
+    },
+    excludeSelectedCount() {
+      return this.excludeDlg.candidates.filter(c => c.selected).length;
     },
   },
   methods: {
@@ -178,6 +231,37 @@ const DuplicatesPage = {
         const id = this.selArr[0];
         const m = this.flatItems.find(i => i.id === id);
         this.confirmDelete = { show: true, id, name: m ? m.file_name : "" };
+      }
+    },
+    excludeCtx() {
+      // Find the group containing the selected item(s)
+      const id = this.ctxMenu.item.id;
+      const group = this.groups.find(g => g.items.some(i => i.id === id));
+      if (!group) return;
+      if (this.selArr.length === 1) {
+        // Single select → open the dialog for fine-grained selection
+        const item = group.items.find(i => i.id === id);
+        this.openExcludeDialog(item, group);
+      } else {
+        // Multi-select → directly exclude all selected items from the group
+        const otherIds = group.items.filter(i => !this.selArr.includes(i.id)).map(i => i.id);
+        const pairs = [];
+        for (const sid of this.selArr) {
+          for (const oid of otherIds) {
+            pairs.push([sid, oid]);
+          }
+        }
+        this._doExcludePairs(pairs);
+      }
+    },
+    async _doExcludePairs(pairs) {
+      try {
+        await API.addDupExclusions(pairs);
+        Quasar.Notify.create({ message: `已排除 ${pairs.length} 对相似关系`, position: 'top', timeout: 1500 });
+        this.selArr = [];
+        await this.loadGroups();
+      } catch (e) {
+        Quasar.Notify.create({ message: '排除失败: ' + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
       }
     },
     async doDelete() {
@@ -290,6 +374,24 @@ const DuplicatesPage = {
       } catch (e) {
         this.needBackfill = false;
       }
+    },
+    openExcludeDialog(item, group) {
+      const candidates = group.items
+        .filter(i => i.id !== item.id)
+        .map(i => ({ item: i, selected: false }));
+      this.excludeDlg = { show: true, item, group, candidates };
+    },
+    excludeSelectAll() {
+      const allSelected = this.excludeDlg.candidates.every(c => c.selected);
+      this.excludeDlg.candidates.forEach(c => { c.selected = !allSelected; });
+    },
+    async doExclude() {
+      const selectedIds = this.excludeDlg.candidates.filter(c => c.selected).map(c => c.item.id);
+      if (!selectedIds.length) return;
+      const sourceId = this.excludeDlg.item.id;
+      const pairs = selectedIds.map(id => [sourceId, id]);
+      this.excludeDlg.show = false;
+      await this._doExcludePairs(pairs);
     },
     async backfillAndReload() {
       try {

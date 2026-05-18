@@ -60,6 +60,12 @@ scanPaths(paths) {
   backfillEmbeddings() {
     return this._fetch(`/api/library/backfill-embeddings`, { method: "POST" });
   },
+  addDupExclusions(pairs) {
+    return this._fetch(`/api/library/dup-exclusions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pairs }) });
+  },
+  resetDupExclusions() {
+    return this._fetch(`/api/library/dup-exclusions`, { method: "DELETE" });
+  },
   getAnalysis(mediaId) {
     return this._fetch(`/api/analysis/${mediaId}`);
   },

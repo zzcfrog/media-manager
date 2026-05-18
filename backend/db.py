@@ -158,6 +158,15 @@ def _migrate(db):
             if sql:
                 db.execute(sql)
 
+    # dup_exclusions table (pair-level)
+    tables = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+    if "dup_exclusions" not in tables:
+        db.execute(
+            "CREATE TABLE dup_exclusions "
+            "(media_id_a INTEGER NOT NULL, media_id_b INTEGER NOT NULL, "
+            "PRIMARY KEY (media_id_a, media_id_b))"
+        )
+
     # dialogue → asr: rename column + rebuild FTS
     seg_cols = {r[1] for r in db.execute("PRAGMA table_info(media_segment)").fetchall()}
     if "dialogue" in seg_cols and "asr" not in seg_cols:

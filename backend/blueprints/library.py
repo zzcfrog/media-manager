@@ -324,7 +324,7 @@ def _rows_to_groups(rows, indices_groups, sim_matrix=None, vecs=None):
     return groups
 
 
-def _union_find_groups(sim_matrix, threshold):
+def _union_find_groups(sim_matrix, threshold, id_map=None, excluded_pairs=None):
     n = len(sim_matrix)
     parent = list(range(n))
 
@@ -342,6 +342,11 @@ def _union_find_groups(sim_matrix, threshold):
     for i in range(n):
         for j in range(i + 1, n):
             if sim_matrix[i][j] >= threshold:
+                if excluded_pairs and id_map:
+                    aid, bid = id_map[i], id_map[j]
+                    key = (min(aid, bid), max(aid, bid))
+                    if key in excluded_pairs:
+                        continue
                 union(i, j)
 
     cluster_map = {}
@@ -350,24 +355,28 @@ def _union_find_groups(sim_matrix, threshold):
     return [v for v in cluster_map.values() if len(v) >= 2]
 
 
+def _load_exclusions(db):
+    rows = db.execute("SELECT media_id_a, media_id_b FROM dup_exclusions").fetchall()
+    return {(r["media_id_a"], r["media_id_b"]) for r in rows}
+
+
 @bp.route("/duplicates")
 def find_duplicates():
     db = get_db()
     dup_type = request.args.get("type", "similar")
-
-    if dup_type == "exact":
-        rows = _fetch_embedding_rows(db)
-        if not rows:
-            return jsonify({"groups": []})
-        vecs = np.array([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
-        sim_matrix = vecs @ vecs.T
-        indices_groups = _union_find_groups(sim_matrix, 0.999)
-        return jsonify({"groups": _rows_to_groups(rows, indices_groups, sim_matrix=sim_matrix)})
+    excluded = _load_exclusions(db)
 
     rows = _fetch_embedding_rows(db)
     if not rows:
         return jsonify({"groups": []})
+
+    id_map = [r["id"] for r in rows]
     vecs = np.array([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
+
+    if dup_type == "exact":
+        sim_matrix = vecs @ vecs.T
+        indices_groups = _union_find_groups(sim_matrix, 0.999, id_map, excluded)
+        return jsonify({"groups": _rows_to_groups(rows, indices_groups, sim_matrix=sim_matrix)})
 
     if dup_type == "cluster":
         import hdbscan
@@ -376,13 +385,74 @@ def find_duplicates():
             [i for i, l in enumerate(labels) if l == label]
             for label in set(labels) if label != -1
         ]
+        # Post-process: split groups that contain excluded pairs
+        if excluded:
+            sim_matrix = vecs @ vecs.T
+            split_groups = []
+            for group in indices_groups:
+                if len(group) < 2:
+                    continue
+                sub_sim = sim_matrix[np.ix_(group, group)]
+                sub_ids = [id_map[i] for i in group]
+                sub_excl = set()
+                for ai in range(len(group)):
+                    for bi in range(ai + 1, len(group)):
+                        key = (min(sub_ids[ai], sub_ids[bi]), max(sub_ids[ai], sub_ids[bi]))
+                        if key in excluded:
+                            sub_excl.add((ai, bi))
+                if not sub_excl:
+                    split_groups.append(group)
+                else:
+                    # Re-run union-find on subgroup without excluded pairs
+                    sub_parent = list(range(len(group)))
+                    def sfind(x):
+                        while sub_parent[x] != x:
+                            sub_parent[x] = sub_parent[sub_parent[x]]
+                            x = sub_parent[x]
+                        return x
+                    for ai in range(len(group)):
+                        for bi in range(ai + 1, len(group)):
+                            if (ai, bi) in sub_excl:
+                                continue
+                            if sub_sim[ai][bi] >= 0.5:
+                                a, b = sfind(ai), sfind(bi)
+                                if a != b:
+                                    sub_parent[a] = b
+                    sub_map = {}
+                    for ai in range(len(group)):
+                        sub_map.setdefault(sfind(ai), []).append(group[ai])
+                    split_groups.extend(v for v in sub_map.values() if len(v) >= 2)
+            return jsonify({"groups": _rows_to_groups(rows, split_groups, vecs=vecs)})
+
         return jsonify({"groups": _rows_to_groups(rows, indices_groups, vecs=vecs)})
 
     # near (0.96) or similar (0.90) — union-find on cosine similarity
     threshold = 0.96 if dup_type == "near" else 0.90
     sim_matrix = vecs @ vecs.T
-    indices_groups = _union_find_groups(sim_matrix, threshold)
+    indices_groups = _union_find_groups(sim_matrix, threshold, id_map, excluded)
     return jsonify({"groups": _rows_to_groups(rows, indices_groups, sim_matrix=sim_matrix)})
+
+
+@bp.route("/dup-exclusions", methods=["POST"])
+def add_dup_exclusions():
+    data = request.get_json()
+    pairs = data.get("pairs", [])
+    if not pairs:
+        return jsonify({"error": "No pairs"}), 400
+    db = get_db()
+    for a, b in pairs:
+        lo, hi = min(a, b), max(a, b)
+        db.execute("INSERT OR IGNORE INTO dup_exclusions (media_id_a, media_id_b) VALUES (?, ?)", (lo, hi))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@bp.route("/dup-exclusions", methods=["DELETE"])
+def reset_dup_exclusions():
+    db = get_db()
+    db.execute("DELETE FROM dup_exclusions")
+    db.commit()
+    return jsonify({"ok": True})
 
 
 @bp.route("/<int:media_id>/write-xmp", methods=["POST"])
