@@ -81,9 +81,10 @@ const DuplicatesPage = {
           <q-item-section>在文件夹中显示</q-item-section>
         </q-item>
         <q-separator style="background:var(--border)"></q-separator>
-        <q-item clickable @click="closeCtx(); excludeCtx()" style="padding-left:8px;padding-right:12px">
-          <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="group_remove" size="14px" color="grey-6"></q-icon></q-item-section>
+        <q-item clickable @click="closeCtx(); excludeCtx()" :disable="!canExcludeFromGroup" style="padding-left:8px;padding-right:12px">
+          <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="group_remove" size="14px" :color="canExcludeFromGroup ? 'grey-6' : 'grey-9'"></q-icon></q-item-section>
           <q-item-section>排除本组</q-item-section>
+          <q-tooltip v-if="!canExcludeFromGroup" :delay="0">选中的素材不在同一分组</q-tooltip>
         </q-item>
         <q-item clickable @click="closeCtx(); deleteCtx()" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="delete_outline" size="14px" color="negative"></q-icon></q-item-section>
@@ -181,6 +182,16 @@ const DuplicatesPage = {
     excludeSelectedCount() {
       return this.excludeDlg.candidates.filter(c => c.selected).length;
     },
+    canExcludeFromGroup() {
+      if (!this.selArr.length) return false;
+      // All selected items must be in the same group
+      const ids = new Set(this.selArr);
+      for (const g of this.groups) {
+        const gids = new Set(g.items.map(i => i.id));
+        if ([...ids].every(id => gids.has(id))) return true;
+      }
+      return false;
+    },
   },
   methods: {
     API,
@@ -245,13 +256,13 @@ const DuplicatesPage = {
             pairs.push([sid, oid]);
           }
         }
-        this._doExcludePairs(pairs);
+        this._doExcludePairs(pairs, this.selArr.length);
       }
     },
-    async _doExcludePairs(pairs) {
+    async _doExcludePairs(pairs, count) {
       try {
         await API.addDupExclusions(pairs);
-        Quasar.Notify.create({ message: `已排除 ${pairs.length} 对相似关系`, position: 'top', timeout: 1500 });
+        Quasar.Notify.create({ message: `已排除 ${count} 张照片`, position: 'top', timeout: 1500 });
         this.selArr = [];
         await this.loadGroups();
       } catch (e) {
@@ -385,7 +396,7 @@ const DuplicatesPage = {
       const sourceId = this.excludeDlg.item.id;
       const pairs = selectedIds.map(id => [sourceId, id]);
       this.excludeDlg.show = false;
-      await this._doExcludePairs(pairs);
+      await this._doExcludePairs(pairs, 1);
     },
     async backfillAndReload() {
       try {
