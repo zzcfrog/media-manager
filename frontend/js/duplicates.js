@@ -1,6 +1,6 @@
 const DuplicatesPage = {
   template: `
-  <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+  <div style="flex:1;display:flex;flex-direction:column;overflow:hidden" @click="closeCtx">
     <div class="filter-bar">
       <q-btn flat dense icon="arrow_back" label="返回" color="grey-6" style="border-radius:6px;padding:3px 6px;font-size:13px" @click="goBack"></q-btn>
       <q-btn-group unelevated style="border-radius:6px;overflow:hidden">
@@ -40,18 +40,17 @@ const DuplicatesPage = {
     <q-scroll-area v-else style="flex:1">
       <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
         <div v-for="(g, gi) in groups" :key="gi" class="dup-group">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div style="display:flex;align-items:center;gap:8px">
-              <span class="dup-badge">{{ g.items.length }}</span>
-              <span style="font-size:12px;color:var(--text2)">个{{ typeLabel }}文件</span>
-            </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span class="dup-badge">{{ g.items.length }}</span>
+            <span style="font-size:12px;color:var(--text2)">个{{ typeLabel }}文件</span>
             <span v-if="dupType !== 'exact' && g.similarity != null" style="font-size:11px;color:var(--accent)">相似度 {{ g.similarity }}%</span>
           </div>
           <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px">
-            <div v-for="item in g.items" :key="item.id" class="dup-thumb" @click="openDetail(item.id)">
+            <div v-for="item in g.items" :key="item.id" class="dup-thumb" @dblclick="openDetail(item.id)" @contextmenu.prevent="showCtx($event, item)">
               <img :src="'/media/thumbnail/' + item.id">
               <div class="dup-thumb-name">{{ item.file_name }}</div>
               <div style="font-size:10px;color:var(--text3)">{{ item.media_type === 'video' ? '视频' : '图片' }} · {{ (item.file_size / 1048576).toFixed(1) }}MB</div>
+              <q-tooltip :delay="800" :offset="[0, 4]">{{ item.file_path }}</q-tooltip>
             </div>
           </div>
         </div>
@@ -59,6 +58,18 @@ const DuplicatesPage = {
     </q-scroll-area>
     <div style="flex-shrink:0;padding:6px 20px;font-size:12px;color:var(--text3);border-top:1px solid var(--border);text-align:center">
       共 {{ groups.length }} 组{{ typeLabel }}素材
+    </div>
+    <div v-if="ctxMenu.show" class="ctx-menu-popup" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }">
+      <q-list dense style="min-width:120px">
+        <q-item clickable @click="closeCtx(); openDetail(ctxMenu.item.id)" style="padding-left:10px;padding-right:14px">
+          <q-item-section side style="padding:0"><q-icon name="visibility" size="15px" color="grey-6"></q-icon></q-item-section>
+          <q-item-section>查看详情</q-item-section>
+        </q-item>
+        <q-item clickable @click="closeCtx(); revealFile(ctxMenu.item.file_path)" style="padding-left:10px;padding-right:14px">
+          <q-item-section side style="padding:0"><q-icon name="folder_open" size="15px" color="grey-6"></q-icon></q-item-section>
+          <q-item-section>在文件夹中显示</q-item-section>
+        </q-item>
+      </q-list>
     </div>
   </div>
   `,
@@ -68,6 +79,7 @@ const DuplicatesPage = {
       groups: [],
       loading: false,
       needBackfill: false,
+      ctxMenu: { show: false, item: null, x: 0, y: 0 },
     };
   },
   computed: {
@@ -82,6 +94,20 @@ const DuplicatesPage = {
     switchType(type) {
       this.dupType = type;
       this.loadGroups();
+    },
+    showCtx(e, item) {
+      this.ctxMenu.item = item;
+      this.ctxMenu.x = e.clientX;
+      this.ctxMenu.y = e.clientY;
+      this.ctxMenu.show = true;
+    },
+    closeCtx() {
+      this.ctxMenu.show = false;
+    },
+    revealFile(path) {
+      if (window.electronAPI && window.electronAPI.showInFolder) {
+        window.electronAPI.showInFolder(path);
+      }
     },
     async loadGroups() {
       this.loading = true;
