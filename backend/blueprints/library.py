@@ -152,6 +152,7 @@ def get_media(media_id):
         (media_id,),
     ).fetchall()
     media["tags"] = [dict(t) for t in tags]
+    media.pop("embedding", None)
     return jsonify(media)
 
 
