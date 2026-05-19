@@ -62,6 +62,9 @@ const GalleryPage = {
         <q-btn flat dense :color="viewMode==='masonry'?'primary':'grey-7'" icon="view_week" size="md" @click="viewMode='masonry'">
           <q-tooltip :delay="1000">瀑布流</q-tooltip>
         </q-btn>
+        <q-btn flat dense :color="viewMode==='justified'?'primary':'grey-7'" icon="view_stream" size="md" @click="viewMode='justified'">
+          <q-tooltip :delay="1000">等行高</q-tooltip>
+        </q-btn>
         <q-btn flat dense :color="viewMode==='list'?'primary':'grey-7'" icon="list" size="md" @click="viewMode='list'">
           <q-tooltip :delay="1000">列表视图</q-tooltip>
         </q-btn>
@@ -187,7 +190,55 @@ const GalleryPage = {
           </div>
         </div>
       </div>
-            <!-- List view: grouped with timeline -->
+      <!-- Justified view: grouped with timeline -->
+      <template v-if="items.length && viewMode==='justified' && groupedItems">
+        <q-timeline color="primary" layout="dense" style="padding-left:8px">
+          <q-timeline-entry v-for="g in groupedItems" :key="g.key"
+            :title="g.label + '  ·  ' + g.items.length + ' 个素材'"
+            tag="div" class="timeline-group">
+            <div v-for="(row, ri) in layoutJustified(g.items)" :key="ri" class="justified-row">
+              <div v-for="m in row.items" :key="m.id" class="justified-card"
+                   :style="{width: m._jw + 'px', height: row.height + 'px'}"
+                   :class="{selected: selArr.includes(m.id)}"
+                   :data-id="m.id"
+                   @click="onCardClick(m, $event)"
+                   @dblclick="openDetail(m.id)"
+                   @contextmenu.prevent="showCtx($event, m)">
+                <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
+                <img :src="API.thumbUrl(m.id)" loading="lazy">
+                <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
+                <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
+                <div class="justified-info">
+                  <span class="justified-name">{{ m.file_name }}</span>
+                  <span class="justified-size">{{ fmtSize(m.file_size) }}</span>
+                </div>
+              </div>
+            </div>
+          </q-timeline-entry>
+        </q-timeline>
+      </template>
+      <!-- Justified view: flat -->
+      <template v-if="items.length && viewMode==='justified' && !groupedItems">
+        <div v-for="(row, ri) in layoutJustified(items)" :key="ri" class="justified-row">
+          <div v-for="m in row.items" :key="m.id" class="justified-card"
+               :style="{width: m._jw + 'px', height: row.height + 'px'}"
+               :class="{selected: selArr.includes(m.id)}"
+               :data-id="m.id"
+               @click="onCardClick(m, $event)"
+               @dblclick="openDetail(m.id)"
+               @contextmenu.prevent="showCtx($event, m)">
+            <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
+            <img :src="API.thumbUrl(m.id)" loading="lazy">
+            <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
+            <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
+            <div class="justified-info">
+              <span class="justified-name">{{ m.file_name }}</span>
+              <span class="justified-size">{{ fmtSize(m.file_size) }}</span>
+            </div>
+          </div>
+        </div>
+      </template>
+                  <!-- List view: grouped with timeline -->
       <template v-if="items.length && viewMode==='list' && groupedItems">
         <q-timeline color="primary" layout="dense" style="padding-left:8px">
           <q-timeline-entry v-for="g in groupedItems" :key="g.key"
@@ -284,6 +335,11 @@ const GalleryPage = {
         <q-slider v-model="masonryCols" :min="3" :max="8" :step="1"
                   style="width:100px" color="primary"></q-slider>
       </template>
+      <template v-if="viewMode==='justified'">
+        <span class="text-caption text-grey-6 q-mr-sm">{{ justifiedRowH }}px</span>
+        <q-slider v-model="justifiedRowH" :min="120" :max="400" :step="10"
+                  style="width:100px" color="primary"></q-slider>
+      </template>
     </q-toolbar>
     <!-- Context menu: view detail, remove, find similar -->
     <div v-if="ctxMenu.show" class="ctx-menu-popup" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }">
@@ -356,7 +412,7 @@ const GalleryPage = {
   data() {
     return {
       items: [], total: 0, page: 1, perPage: 60, loading: false, loadingMore: false, allLoaded: false, viewMode: "grid", searchText: "",
-      sortBy: "imported_at", sortOrder: "desc", gridScale: 1, masonryCols: 5,
+      sortBy: "imported_at", sortOrder: "desc", gridScale: 1, masonryCols: 5, justifiedRowH: 220, galleryWidth: 0,
       selArr: [], lasso: null, lastClickIdx: -1,
       ctxMenu: { show: false, item: null, x: 0, y: 0 },
       confirmDelete: { show: false, id: null, name: "" },
@@ -456,11 +512,14 @@ const GalleryPage = {
     this.$nextTick(() => {
       if (this.$refs.sentinel) this._observer.observe(this.$refs.sentinel);
     });
+    this._ro = new ResizeObserver(() => { this.galleryWidth = this.$refs.galleryPage?.clientWidth || 0; });
+    if (this.$refs.galleryPage) this._ro.observe(this.$refs.galleryPage);
   },
   beforeUnmount() {
     document.removeEventListener("mousedown", this.closeCtx);
     document.removeEventListener("keydown", this.handleKey, true);
     if (this._observer) this._observer.disconnect();
+    if (this._ro) this._ro.disconnect();
   },
   // -- Methods: data loading, selection, keyboard, context menu, formatting --
   methods: {
@@ -742,7 +801,7 @@ const GalleryPage = {
       // G - toggle grid/list
       if (key === "g" || key === "G") {
         e.preventDefault(); e.stopPropagation();
-        this.viewMode = ({ grid: "masonry", masonry: "list", list: "grid" })[this.viewMode] || "grid";
+        this.viewMode = ({ grid: "masonry", masonry: "justified", justified: "list", list: "grid" })[this.viewMode] || "grid";
         return;
       }
       // / - focus search
@@ -817,6 +876,36 @@ const GalleryPage = {
     fmtDur,
     fmtSize,
     onThumbLoad,
+    layoutJustified(items) {
+      if (!items.length) return [];
+      const page = this.$refs.galleryPage;
+      const w = (page ? page.clientWidth : 800) - 32;
+      return this._calcRows(items, w, this.justifiedRowH);
+    },
+    _calcRows(items, containerW, targetH) {
+      const gap = 4, rows = [];
+      let row = [], rowAspect = 0;
+      for (const m of items) {
+        const w = m.width || 16, h = m.height || 9;
+        const ratio = w / h;
+        row.push(Object.assign({}, m, { _ratio: ratio }));
+        rowAspect += ratio;
+        if (rowAspect * targetH + (row.length - 1) * gap >= containerW && row.length >= 2) {
+          const rh = (containerW - (row.length - 1) * gap) / rowAspect;
+          const height = Math.round(Math.min(Math.max(rh, 80), targetH * 1.5));
+          let usedW = 0;
+          row.forEach((m, i) => { m._jw = Math.round(m._ratio * height); usedW += m._jw; });
+          row[row.length - 1]._jw += containerW - usedW - (row.length - 1) * gap;
+          rows.push({ items: row, height });
+          row = []; rowAspect = 0;
+        }
+      }
+      if (row.length) {
+        row.forEach(m => { m._jw = Math.round(m._ratio * targetH); });
+        rows.push({ items: row, height: targetH });
+      }
+      return rows;
+    },
     fmtListDate(d) {
       if (!d) return "-";
       const dt = new Date(d);
