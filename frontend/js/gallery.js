@@ -59,10 +59,12 @@ const GalleryPage = {
         <q-btn flat dense :color="viewMode==='grid'?'primary':'grey-7'" icon="apps" size="md" @click="viewMode='grid'">
           <q-tooltip :delay="1000">网格视图</q-tooltip>
         </q-btn>
-        <q-btn flat dense :color="viewMode==='masonry'?'primary':'grey-7'" icon="view_week" size="md" @click="viewMode='masonry'">
+        <q-btn flat dense size="md" @click="viewMode='masonry'">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" :style="{color: viewMode==='masonry' ? 'var(--q-primary)' : '#9e9e9e'}"><rect x="2" y="3" width="6" height="18" rx="1.5"/><rect x="9" y="3" width="6" height="18" rx="1.5"/><rect x="16" y="3" width="6" height="18" rx="1.5"/></svg>
           <q-tooltip :delay="1000">瀑布流</q-tooltip>
         </q-btn>
-        <q-btn flat dense :color="viewMode==='justified'?'primary':'grey-7'" icon="view_stream" size="md" @click="viewMode='justified'">
+        <q-btn flat dense size="md" @click="viewMode='justified'">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" :style="{color: viewMode==='justified' ? 'var(--q-primary)' : '#9e9e9e'}"><rect x="3" y="2" width="18" height="6" rx="1.5"/><rect x="3" y="9" width="18" height="6" rx="1.5"/><rect x="3" y="16" width="18" height="6" rx="1.5"/></svg>
           <q-tooltip :delay="1000">等行高</q-tooltip>
         </q-btn>
         <q-btn flat dense :color="viewMode==='list'?'primary':'grey-7'" icon="list" size="md" @click="viewMode='list'">
