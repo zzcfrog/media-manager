@@ -59,7 +59,7 @@ const GalleryPage = {
         <q-btn flat dense :color="viewMode==='grid'?'primary':'grey-7'" icon="apps" size="md" @click="viewMode='grid'">
           <q-tooltip :delay="1000">网格视图</q-tooltip>
         </q-btn>
-        <q-btn flat dense :color="viewMode==='masonry'?'primary':'grey-7'" icon="view_sidebar" size="md" @click="viewMode='masonry'">
+        <q-btn flat dense :color="viewMode==='masonry'?'primary':'grey-7'" icon="view_week" size="md" @click="viewMode='masonry'">
           <q-tooltip :delay="1000">瀑布流</q-tooltip>
         </q-btn>
         <q-btn flat dense :color="viewMode==='justified'?'primary':'grey-7'" icon="view_stream" size="md" @click="viewMode='justified'">
