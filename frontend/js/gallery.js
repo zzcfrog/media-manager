@@ -881,7 +881,7 @@ const GalleryPage = {
     layoutJustified(items) {
       if (!items.length) return [];
       const page = this.$refs.galleryPage;
-      const w = (page ? page.clientWidth : 800) - 32;
+      const w = (page ? page.clientWidth : 800) - 16;
       return this._calcRows(items, w, this.justifiedRowH);
     },
     _calcRows(items, containerW, targetH) {
