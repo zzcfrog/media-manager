@@ -922,6 +922,8 @@ def batch_update():
         db.execute(f"DELETE FROM collection_items WHERE media_id IN ({placeholders})", ids)
         db.execute(f"DELETE FROM media_segment WHERE media_id IN ({placeholders})", ids)
         db.execute(f"DELETE FROM media_fts WHERE media_id IN ({placeholders})", ids)
+        for mid in ids:
+            db.execute("DELETE FROM dup_exclusions WHERE media_id_a = ? OR media_id_b = ?", (mid, mid))
         db.execute(f"DELETE FROM media WHERE id IN ({placeholders})", ids)
 
     db.commit()

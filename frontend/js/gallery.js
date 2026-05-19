@@ -724,6 +724,7 @@ const GalleryPage = {
         if (this.filters.rating) params.rating = this.filters.rating;
         if (this.filters.color_label) params.color_label = this.filters.color_label;
         if (this.favOnly || this.$root.favFilter) params.favorite = "true";
+        if (this.analyzedOnly) params.analysis_status = "analyzed";
         const q = this.$root.searchQuery;
         if (q) params.q = q;
         const folder = this.$root.selectedFolder;
@@ -999,7 +1000,9 @@ const GalleryPage = {
     },
     closeSimilarCtx() { this.similarCtxMenu.show = false; },
     openSimilarExcludeDialog(item) {
+      const sourceId = this.similarDlg.source.id;
       const candidates = this.currentSimilarItems
+        .filter(i => i.id !== sourceId)
         .map(i => ({ item: i, selected: i.id === item.id }));
       this.similarExcludeDlg = { show: true, item: this.similarDlg.source, candidates };
     },

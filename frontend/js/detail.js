@@ -748,21 +748,33 @@ const DetailPage = {
     },
     goBack() { window.location.hash = "#/gallery"; },
     async setRating(val) {
-      await API.updateMedia(this.media.id, { rating: val });
-      this.media.rating = val;
-      Quasar.Notify.create({ message: val ? `已评为 ${'★'.repeat(val)}` : '已取消评分', position: 'top', timeout: 1200 });
+      try {
+        await API.updateMedia(this.media.id, { rating: val });
+        this.media.rating = val;
+        Quasar.Notify.create({ message: val ? `已评为 ${'★'.repeat(val)}` : '已取消评分', position: 'top', timeout: 1200 });
+      } catch (e) {
+        Quasar.Notify.create({ message: '评分失败', position: 'top', color: 'negative', timeout: 1500 });
+      }
     },
     async setColor(c) {
-      await API.updateMedia(this.media.id, { color_label: c });
-      this.media.color_label = c;
-      const names = { red: '红色', yellow: '黄色', green: '绿色', blue: '蓝色', purple: '紫色' };
-      Quasar.Notify.create({ message: c ? `已标记为${names[c] || c}` : '已取消颜色标记', position: 'top', timeout: 1200 });
+      try {
+        await API.updateMedia(this.media.id, { color_label: c });
+        this.media.color_label = c;
+        const names = { red: '红色', yellow: '黄色', green: '绿色', blue: '蓝色', purple: '紫色' };
+        Quasar.Notify.create({ message: c ? `已标记为${names[c] || c}` : '已取消颜色标记', position: 'top', timeout: 1200 });
+      } catch (e) {
+        Quasar.Notify.create({ message: '标记失败', position: 'top', color: 'negative', timeout: 1500 });
+      }
     },
     async toggleFav() {
-      const fav = this.media.favorite ? 0 : 1;
-      await API.updateMedia(this.media.id, { favorite: fav });
-      this.media.favorite = fav;
-      Quasar.Notify.create({ message: fav ? '已喜欢' : '已取消喜欢', position: 'top', timeout: 1200 });
+      try {
+        const fav = this.media.favorite ? 0 : 1;
+        await API.updateMedia(this.media.id, { favorite: fav });
+        this.media.favorite = fav;
+        Quasar.Notify.create({ message: fav ? '已喜欢' : '已取消喜欢', position: 'top', timeout: 1200 });
+      } catch (e) {
+        Quasar.Notify.create({ message: '操作失败', position: 'top', color: 'negative', timeout: 1500 });
+      }
     },
     openInFinder() {
       if (window.electronAPI?.openInFinder) window.electronAPI.openInFinder(this.media.file_path);

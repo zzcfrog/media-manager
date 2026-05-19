@@ -19,7 +19,7 @@ FFMPEG_TIMEOUT = 60
 
 
 def _delete_media_records(db, ids: list[int], thumb_paths: list[str | None] = None):
-    """Delete media records by IDs, including thumbnails, tags, segments, FTS, collections."""
+    """Delete media records by IDs, including thumbnails, tags, segments, FTS, collections, exclusion pairs."""
     for i, mid in enumerate(ids):
         tp = thumb_paths[i] if thumb_paths and i < len(thumb_paths) else None
         if tp:
@@ -30,6 +30,7 @@ def _delete_media_records(db, ids: list[int], thumb_paths: list[str | None] = No
         db.execute("DELETE FROM collection_items WHERE media_id = ?", (mid,))
         db.execute("DELETE FROM media_segment WHERE media_id = ?", (mid,))
         db.execute("DELETE FROM media_fts WHERE media_id = ?", (mid,))
+        db.execute("DELETE FROM dup_exclusions WHERE media_id_a = ? OR media_id_b = ?", (mid, mid))
         db.execute("DELETE FROM media WHERE id = ?", (mid,))
 
 

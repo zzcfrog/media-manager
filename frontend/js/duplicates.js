@@ -40,7 +40,7 @@ const DuplicatesPage = {
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
             <span class="dup-badge">{{ g.items.length }}</span>
             <span style="font-size:12px;color:var(--text2)">个{{ typeLabel }}文件</span>
-            <span v-if="dupType !== 'exact' && g.similarity != null" style="font-size:11px;color:var(--accent)">相似度 {{ g.similarity }}%</span>
+            <span v-if="g.similarity != null" style="font-size:11px;color:var(--accent)">相似度 {{ g.similarity }}%</span>
             <q-btn v-if="g.excluded?.length" flat dense no-caps icon="restore" :label="'恢复排除 (' + g.excluded.length + ')'" color="grey-6" size="sm" @click="openRestoreDialog(g)" style="font-size:11px;border:1px solid var(--border);border-radius:6px;margin-left:4px"></q-btn>
           </div>
           <div class="dup-grid">
@@ -386,7 +386,7 @@ const DuplicatesPage = {
         else if (key === "ArrowUp") ni = Math.max(idx - 1, 0);
         if (ni !== idx) this.selArr = [this.flatItems[ni].id];
         this.$nextTick(() => {
-          const el = document.querySelector(`.dup-thumb[data-id="${this.flatItems[ni]?.id}"]`);
+          const el = document.querySelector(`.dup-card[data-id="${this.flatItems[ni]?.id}"]`);
           el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
         });
         return;
