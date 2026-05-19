@@ -59,6 +59,9 @@ const GalleryPage = {
         <q-btn flat dense :color="viewMode==='grid'?'primary':'grey-7'" icon="apps" size="md" @click="viewMode='grid'">
           <q-tooltip :delay="1000">网格视图</q-tooltip>
         </q-btn>
+        <q-btn flat dense :color="viewMode==='masonry'?'primary':'grey-7'" icon="view_week" size="md" @click="viewMode='masonry'">
+          <q-tooltip :delay="1000">瀑布流</q-tooltip>
+        </q-btn>
         <q-btn flat dense :color="viewMode==='list'?'primary':'grey-7'" icon="list" size="md" @click="viewMode='list'">
           <q-tooltip :delay="1000">列表视图</q-tooltip>
         </q-btn>
@@ -134,7 +137,57 @@ const GalleryPage = {
           </div>
         </div>
       </div>
-      <!-- List view: grouped with timeline -->
+      <!-- Masonry view: grouped with timeline -->
+      <template v-if="items.length && viewMode==='masonry' && groupedItems">
+        <q-timeline color="primary" layout="dense" style="padding-left:8px">
+          <q-timeline-entry v-for="g in groupedItems" :key="g.key"
+            :title="g.label + '  ·  ' + g.items.length + ' 个素材'"
+            tag="div" class="timeline-group">
+            <div class="masonry" :style="{'--masonry-cols': masonryCols}">
+            <div class="masonry-card" v-for="m in g.items" :key="m.id"
+                 :class="{selected: selArr.includes(m.id)}"
+                 :data-id="m.id"
+                 @mousedown.stop
+                 @click="onCardClick(m, $event)"
+                 @dblclick="openDetail(m.id)"
+                 @contextmenu.prevent="showCtx($event, m)">
+              <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
+              <div class="masonry-img">
+                <img :src="API.thumbUrl(m.id)" loading="lazy" @load="onMasonryThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
+                <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
+                <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
+              </div>
+              <div class="masonry-info">
+                <span class="masonry-name" :title="m.file_name">{{ m.file_name }}</span>
+                <span class="masonry-size">{{ fmtSize(m.file_size) }}</span>
+              </div>
+            </div>
+          </div>
+        </q-timeline-entry>
+        </q-timeline>
+      </template>
+      <!-- Masonry view: flat -->
+      <div v-if="items.length && viewMode==='masonry' && !groupedItems" class="masonry" :style="{'--masonry-cols': masonryCols}">
+        <div class="masonry-card" v-for="m in items" :key="m.id"
+             :class="{selected: selArr.includes(m.id)}"
+             :data-id="m.id"
+             @mousedown.stop
+             @click="onCardClick(m, $event)"
+             @dblclick="openDetail(m.id)"
+             @contextmenu.prevent="showCtx($event, m)">
+          <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
+          <div class="masonry-img">
+            <img :src="API.thumbUrl(m.id)" loading="lazy" @load="onMasonryThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
+            <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
+            <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
+          </div>
+          <div class="masonry-info">
+            <span class="masonry-name" :title="m.file_name">{{ m.file_name }}</span>
+            <span class="masonry-size">{{ fmtSize(m.file_size) }}</span>
+          </div>
+        </div>
+      </div>
+            <!-- List view: grouped with timeline -->
       <template v-if="items.length && viewMode==='list' && groupedItems">
         <q-timeline color="primary" layout="dense" style="padding-left:8px">
           <q-timeline-entry v-for="g in groupedItems" :key="g.key"
@@ -226,6 +279,11 @@ const GalleryPage = {
         <q-slider v-model="gridScale" :min="0.5" :max="2" :step="0.25"
                   style="width:100px" color="primary"></q-slider>
       </template>
+      <template v-if="viewMode==='masonry'">
+        <span class="text-caption text-grey-6 q-mr-sm">{{ masonryCols }} 列</span>
+        <q-slider v-model="masonryCols" :min="3" :max="8" :step="1"
+                  style="width:100px" color="primary"></q-slider>
+      </template>
     </q-toolbar>
     <!-- Context menu: view detail, remove, find similar -->
     <div v-if="ctxMenu.show" class="ctx-menu-popup" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }">
@@ -298,7 +356,7 @@ const GalleryPage = {
   data() {
     return {
       items: [], total: 0, page: 1, perPage: 60, loading: false, loadingMore: false, allLoaded: false, viewMode: "grid", searchText: "",
-      sortBy: "imported_at", sortOrder: "desc", gridScale: 1,
+      sortBy: "imported_at", sortOrder: "desc", gridScale: 1, masonryCols: 5,
       selArr: [], lasso: null, lastClickIdx: -1,
       ctxMenu: { show: false, item: null, x: 0, y: 0 },
       confirmDelete: { show: false, id: null, name: "" },
@@ -684,7 +742,7 @@ const GalleryPage = {
       // G - toggle grid/list
       if (key === "g" || key === "G") {
         e.preventDefault(); e.stopPropagation();
-        this.viewMode = this.viewMode === "grid" ? "list" : "grid";
+        this.viewMode = ({ grid: "masonry", masonry: "list", list: "grid" })[this.viewMode] || "grid";
         return;
       }
       // / - focus search
@@ -759,6 +817,7 @@ const GalleryPage = {
     fmtDur,
     fmtSize,
     onThumbLoad,
+    onMasonryThumbLoad(e) { e.target.style.minHeight = '0'; },
     fmtListDate(d) {
       if (!d) return "-";
       const dt = new Date(d);

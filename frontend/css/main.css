@@ -33,6 +33,15 @@ body.body--dark input::placeholder { color: #555 !important; -webkit-text-fill-c
 .gallery-page::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
 .load-more-spinner { display: flex; justify-content: center; padding: 16px 0; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--card-w, 180px), 1fr)); gap: 12px; }
+.masonry { column-count: var(--masonry-cols, 5); column-gap: 12px; padding: 16px 0; }
+.masonry-card { break-inside: avoid; margin-bottom: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; cursor: pointer; transition: border-color 0.15s; position: relative; }
+.masonry-card:hover { border-color: var(--border2); }
+.masonry-card.selected { border-color: var(--accent); }
+.masonry-img { position: relative; }
+.masonry-img img { width: 100%; display: block; min-height: 80px; background: #111; }
+.masonry-info { padding: 5px 8px; display: flex; align-items: center; gap: 4px; }
+.masonry-name { font-size: 11px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.masonry-size { font-size: 10px; color: var(--text3); flex-shrink: 0; }
 .media-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; cursor: pointer; transition: border-color 0.15s, transform 0.1s; position: relative; }
 .media-card:hover { border-color: var(--border2); transform: translateY(-1px); }
 .media-card.selected { border-color: var(--accent); }
