@@ -37,9 +37,10 @@ body.body--dark input::placeholder { color: #555 !important; -webkit-text-fill-c
 .masonry-card.selected { border-color: var(--accent); }
 .masonry-img { position: relative; }
 .masonry-img img { width: 100%; display: block; background: #111; }
-.masonry-info { padding: 5px 8px; display: flex; align-items: center; gap: 4px; }
-.masonry-name { font-size: 11px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
-.masonry-size { font-size: 10px; color: var(--text3); flex-shrink: 0; }
+.masonry-info { position: absolute; bottom: 0; left: 0; right: 0; padding: 4px 8px; display: flex; align-items: center; gap: 4px; background: linear-gradient(transparent, rgba(0,0,0,0.7)); opacity: 0; transition: opacity 0.15s; }
+.masonry-card:hover .masonry-info { opacity: 1; }
+.masonry-name { font-size: 10px; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.masonry-size { font-size: 9px; color: rgba(255,255,255,0.7); flex-shrink: 0; }
 .justified-row { display: flex; gap: 8px; margin-bottom: 8px; }
 .justified-card { position: relative; overflow: hidden; border-radius: 4px; cursor: pointer; background: #111; }
 .justified-card:hover { filter: brightness(1.05); }
