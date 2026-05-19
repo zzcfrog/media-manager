@@ -58,12 +58,11 @@ const GalleryPage = {
         <q-btn flat dense icon="apps" size="md" @click="viewMode='grid'" :style="{color: viewMode==='grid' ? 'var(--q-primary)' : '#9e9e9e'}">
           <q-tooltip :delay="1000">{{ t('g.grid_view') }}</q-tooltip>
         </q-btn>
-        <q-btn flat dense size="md" @click="viewMode='masonry'">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" :style="{color: viewMode==='masonry' ? 'var(--q-primary)' : '#9e9e9e'}"><rect x="2" y="3" width="6" height="18" rx="1"/><rect x="9" y="3" width="6" height="18" rx="1"/><rect x="16" y="3" width="6" height="18" rx="1"/></svg>
+        <q-btn flat dense icon="view_column" size="md" @click="viewMode='masonry'" :style="{color: viewMode==='masonry' ? 'var(--q-primary)' : '#9e9e9e'}">
           <q-tooltip :delay="1000">{{ t('g.masonry_view') }}</q-tooltip>
         </q-btn>
-        <q-btn flat dense size="md" @click="viewMode='justified'">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" :style="{color: viewMode==='justified' ? 'var(--q-primary)' : '#9e9e9e'}"><rect x="3" y="2" width="18" height="6" rx="1"/><rect x="3" y="9" width="18" height="6" rx="1"/><rect x="3" y="16" width="18" height="6" rx="1"/></svg>
+        <q-btn flat dense size="md" @click="viewMode='justified'" :style="{color: viewMode==='justified' ? 'var(--q-primary)' : '#9e9e9e'}">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><rect x="1" y="3" width="18" height="4"/><rect x="1" y="8" width="18" height="4"/><rect x="1" y="13" width="18" height="4"/></svg>
           <q-tooltip :delay="1000">{{ t('g.justified_view') }}</q-tooltip>
         </q-btn>
         <q-btn flat dense icon="list" size="md" @click="viewMode='list'" :style="{color: viewMode==='list' ? 'var(--q-primary)' : '#9e9e9e'}">
