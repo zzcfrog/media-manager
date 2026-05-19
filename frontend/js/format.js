@@ -16,5 +16,5 @@ const fmtDur = (s) => {
 
 const onThumbLoad = (e) => {
   const img = e.target;
-  img.classList.toggle("portrait", img.naturalHeight > img.naturalWidth);
+  img.classList.toggle("portrait", img.naturalHeight >= img.naturalWidth);
 };
