@@ -82,7 +82,7 @@ const GalleryPage = {
                  @contextmenu.prevent="showCtx($event, m)">
               <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
               <div class="thumb-wrap">
-                <img class="thumb" :src="API.thumbUrl(m.id)" loading="lazy" @error="$event.target.src='/static/img/no-thumb.svg'">
+                <img class="thumb" :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
                 <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
                 <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
                 <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
@@ -115,7 +115,7 @@ const GalleryPage = {
              @contextmenu.prevent="showCtx($event, m)">
           <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
           <div class="thumb-wrap">
-            <img class="thumb" :src="API.thumbUrl(m.id)" loading="lazy" @error="$event.target.src='/static/img/no-thumb.svg'">
+            <img class="thumb" :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
             <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
             <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
             <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
@@ -758,6 +758,7 @@ const GalleryPage = {
     },
     fmtDur,
     fmtSize,
+    onThumbLoad,
     fmtListDate(d) {
       if (!d) return "-";
       const dt = new Date(d);

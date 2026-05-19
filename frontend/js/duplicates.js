@@ -53,7 +53,7 @@ const DuplicatesPage = {
                  @contextmenu.prevent="showCtx($event, item)">
               <div v-if="selArr.includes(item.id)" class="sel-overlay"></div>
               <div class="dup-card-img">
-                <img :src="'/media/thumbnail/' + item.id" draggable="false">
+                <img :src="'/media/thumbnail/' + item.id" draggable="false" @load="onThumbLoad">
                 <button class="dup-exclude-btn" title="排除" @click.stop="openExcludeDialog(item, g)">✕</button>
               </div>
               <div class="dup-card-info">
@@ -196,6 +196,7 @@ const DuplicatesPage = {
   methods: {
     API,
     fmtSize,
+    onThumbLoad,
     goBack() { location.hash = "#/gallery"; },
     openDetail(id) { location.hash = "#/detail/" + id; },
     switchType(type) {

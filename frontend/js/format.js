@@ -13,3 +13,8 @@ const fmtDur = (s) => {
   if (h) return `${h}:${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
   return `${m}:${sec.toString().padStart(2, "0")}`;
 };
+
+const onThumbLoad = (e) => {
+  const img = e.target;
+  img.classList.toggle("portrait", img.naturalHeight > img.naturalWidth);
+};
