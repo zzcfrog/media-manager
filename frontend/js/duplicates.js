@@ -35,14 +35,15 @@ const DuplicatesPage = {
       <span>没有发现{{ typeLabel }}素材</span>
     </div>
     <q-scroll-area v-else style="flex:1">
-      <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
+      <div ref="groupContainer" style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
         <div v-for="(g, gi) in groups" :key="gi" class="dup-group">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
             <span class="dup-badge">{{ g.items.length }}</span>
             <span style="font-size:12px;color:var(--text2)">个{{ typeLabel }}文件</span>
             <span v-if="dupType !== 'exact' && g.similarity != null" style="font-size:11px;color:var(--accent)">相似度 {{ g.similarity }}%</span>
+            <q-btn v-if="g.excluded?.length" flat dense no-caps icon="restore" :label="'恢复排除 (' + g.excluded.length + ')'" color="grey-6" size="sm" @click="openRestoreDialog(g)" style="font-size:11px;border:1px solid var(--border);border-radius:6px;margin-left:4px"></q-btn>
           </div>
-          <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px">
+          <div class="dup-grid">
             <div v-for="item in g.items" :key="item.id"
                  class="dup-card"
                  :class="{selected: selArr.includes(item.id)}"
@@ -66,6 +67,40 @@ const DuplicatesPage = {
         </div>
       </div>
     </q-scroll-area>
+    <q-dialog v-model="restoreDlg.show" persistent>
+      <q-card style="min-width:560px;max-width:780px" class="dialog-card">
+        <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" @click="restoreDlg.show=false"></q-btn>
+        <q-card-section>
+          <div class="text-h6" style="font-size:16px">恢复排除</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:4px">以下照片曾从本分组中排除，勾选需要恢复的配对</div>
+        </q-card-section>
+        <q-card-section style="max-height:480px;overflow-y:auto">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div v-for="(row, ri) in restoreDlg.items" :key="ri"
+                 style="display:flex;align-items:center;gap:14px;padding:10px 12px;border-radius:8px;border:1px solid var(--border)">
+              <img :src="'/media/thumbnail/' + row.excluded_id" style="width:86px;height:86px;object-fit:cover;border-radius:6px;flex-shrink:0">
+              <div style="flex:1;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                <div v-for="(p, pi) in row.pairs" :key="pi"
+                     style="position:relative;cursor:pointer"
+                     @click="p.selected = !p.selected">
+                  <img :src="'/media/thumbnail/' + p.with_id" class="restore-pair-thumb"
+                       :style="{ outline: p.selected ? '2px solid var(--accent)' : '2px solid transparent', outlineOffset: '-2px' }">
+                  <q-checkbox v-model="p.selected" dense style="position:absolute;bottom:-4px;left:0;transform:scale(0.7)" @click.stop></q-checkbox>
+                  <q-tooltip :delay="600" :offset="[0, 4]">{{ p.with_name }}</q-tooltip>
+                </div>
+              </div>
+              <q-btn flat dense no-caps icon="restore" label="恢复排重" color="primary" size="sm"
+                     :disable="!row.pairs.some(p => p.selected)"
+                     @click="doRestoreRow(row)"
+                     style="flex-shrink:0;font-size:11px;border:1px solid var(--border);border-radius:6px"></q-btn>
+            </div>
+          </div>
+        </q-card-section>
+        <q-card-actions align="right" style="padding:12px 16px">
+          <q-btn flat label="关闭" @click="restoreDlg.show=false"></q-btn>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
     <div style="flex-shrink:0;padding:6px 20px;font-size:12px;color:var(--text3);border-top:1px solid var(--border);text-align:center">
       共 {{ groups.length }} 组{{ typeLabel }}素材
     </div>
@@ -97,7 +132,7 @@ const DuplicatesPage = {
       <q-card style="min-width:360px" class="dialog-card">
         <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" v-close-popup></q-btn>
         <q-card-section>
-          <div class="text-h6">确认移除</div>
+          <div class="text-h6">确认移出素材库</div>
         </q-card-section>
         <q-card-section>
           <p class="text-body2">确定要移除「{{ confirmDelete.name }}」吗？</p>
@@ -105,15 +140,15 @@ const DuplicatesPage = {
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat label="取消" @click="confirmDelete.show=false"></q-btn>
-          <q-btn color="red" label="确认移除" @click="doDelete"></q-btn>
+          <q-btn color="red" label="移出素材库" @click="doDelete"></q-btn>
         </q-card-actions>
       </q-card>
     </q-dialog>
     <q-dialog v-model="excludeDlg.show" persistent>
-      <q-card style="min-width:520px;max-width:640px" class="dialog-card">
+      <q-card style="min-width:560px;max-width:700px" class="dialog-card">
         <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" @click="excludeDlg.show=false"></q-btn>
         <q-card-section>
-          <div class="text-h6" style="font-size:16px">排除相似分组</div>
+          <div class="text-h6" style="font-size:16px">移出本{{ typeLabel }}组</div>
           <div style="font-size:12px;color:var(--text3);margin-top:4px">选择与当前照片<b>不相似</b>的照片，排除后不会出现在同一分组中</div>
         </q-card-section>
         <q-card-section>
@@ -126,17 +161,20 @@ const DuplicatesPage = {
             </div>
             <div style="flex:1;min-width:0">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                <span style="font-size:12px;color:var(--text2)">以下哪些与它不相似？</span>
-                <q-btn flat dense size="xs" label="全选" color="primary" @click="excludeSelectAll"></q-btn>
+                <span style="font-size:12px;color:var(--text2)">以下哪些与它不相似？<span style="color:var(--text3);margin-left:4px">共 {{ excludeDlg.candidates.length }} 张</span></span>
+                <q-btn flat dense size="sm" :label="excludeDlg.candidates.every(c => c.selected) ? '取消全选' : '全选'" color="primary" no-caps @click="excludeSelectAll" style="font-size:12px"></q-btn>
               </div>
-              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;max-height:260px;overflow-y:auto;padding:4px">
-                <div v-for="c in excludeDlg.candidates" :key="c.item.id"
-                     style="cursor:pointer;border-radius:6px;overflow:hidden;border:2px solid transparent;transition:border-color .15s"
-                     :style="c.selected ? 'border-color:var(--negative)' : 'border-color:var(--border)'"
-                     @click="c.selected = !c.selected">
-                  <img :src="'/media/thumbnail/' + c.item.id" style="width:100%;aspect-ratio:1;object-fit:cover;display:block">
-                  <div style="font-size:10px;color:var(--text3);padding:2px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.item.file_name }}</div>
+              <div class="exclude-scroll-wrap">
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;padding:4px">
+                  <div v-for="c in excludeDlg.candidates" :key="c.item.id"
+                       style="cursor:pointer;border-radius:6px;overflow:hidden;border:2px solid transparent;transition:border-color .15s"
+                       :style="c.selected ? 'border-color:var(--negative)' : 'border-color:var(--border)'"
+                       @click="c.selected = !c.selected">
+                    <img :src="'/media/thumbnail/' + c.item.id" style="width:100%;aspect-ratio:1;object-fit:cover;display:block">
+                    <div style="font-size:10px;color:var(--text3);padding:2px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.item.file_name }}</div>
+                  </div>
                 </div>
+                <div v-if="excludeHasMore" class="exclude-scroll-hint">↓ 向下滚动查看更多</div>
               </div>
             </div>
           </div>
@@ -164,6 +202,7 @@ const DuplicatesPage = {
       lassoStyle: {},
       _lassoStart: null,
       excludeDlg: { show: false, item: null, group: null, candidates: [] },
+      restoreDlg: { show: false, group: null, items: [] },
     };
   },
   computed: {
@@ -181,6 +220,9 @@ const DuplicatesPage = {
     },
     excludeSelectedCount() {
       return this.excludeDlg.candidates.filter(c => c.selected).length;
+    },
+    excludeHasMore() {
+      return this.excludeDlg.candidates.length > 6;
     },
     canExcludeFromGroup() {
       if (!this.selArr.length) return false;
@@ -399,6 +441,34 @@ const DuplicatesPage = {
       const pairs = selectedIds.map(id => [sourceId, id]);
       this.excludeDlg.show = false;
       await this._doExcludePairs(pairs, 1);
+    },
+    openRestoreDialog(group) {
+      const idToName = {};
+      for (const item of group.items) idToName[item.id] = item.file_name;
+      const excludedMap = {};
+      for (const e of (group.excluded || [])) {
+        if (!excludedMap[e.id]) {
+          excludedMap[e.id] = { excluded_id: e.id, excluded_name: e.file_name, pairs: [] };
+        }
+        for (const withId of e.excluded_with) {
+          excludedMap[e.id].pairs.push({ with_id: withId, with_name: idToName[withId] || '', selected: true });
+        }
+      }
+      this.restoreDlg = { show: true, group, items: Object.values(excludedMap) };
+    },
+    async doRestoreRow(row) {
+      const selected = row.pairs.filter(p => p.selected);
+      if (!selected.length) return;
+      const pairs = selected.map(p => [row.excluded_id, p.with_id]);
+      try {
+        await API.removeDupExclusionPairs(pairs, this.dupType);
+        Quasar.Notify.create({ message: `已恢复 ${selected.length} 对排除`, position: 'top', timeout: 1500 });
+        this.restoreDlg.items = this.restoreDlg.items.filter(i => i !== row);
+        if (!this.restoreDlg.items.length) this.restoreDlg.show = false;
+        await this.loadGroups();
+      } catch (e) {
+        Quasar.Notify.create({ message: '恢复失败: ' + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
+      }
     },
     async backfillAndReload() {
       try {

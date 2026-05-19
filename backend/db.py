@@ -148,6 +148,7 @@ _MIGRATIONS = [
     ("has_xmp", "ALTER TABLE media ADD COLUMN has_xmp INTEGER DEFAULT 0"),
     ("picture_control", "ALTER TABLE media ADD COLUMN picture_control TEXT"),
     ("embedding", "ALTER TABLE media ADD COLUMN embedding BLOB"),
+    ("file_mtime", "ALTER TABLE media ADD COLUMN file_mtime REAL"),
 ]
 
 

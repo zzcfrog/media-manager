@@ -18,6 +18,21 @@ EXIFTOOL_TIMEOUT = 30
 FFMPEG_TIMEOUT = 60
 
 
+def _delete_media_records(db, ids: list[int], thumb_paths: list[str | None] = None):
+    """Delete media records by IDs, including thumbnails, tags, segments, FTS, collections."""
+    for i, mid in enumerate(ids):
+        tp = thumb_paths[i] if thumb_paths and i < len(thumb_paths) else None
+        if tp:
+            thumb = THUMB_DIR / tp
+            if thumb.exists():
+                thumb.unlink()
+        db.execute("DELETE FROM media_tags WHERE media_id = ?", (mid,))
+        db.execute("DELETE FROM collection_items WHERE media_id = ?", (mid,))
+        db.execute("DELETE FROM media_segment WHERE media_id = ?", (mid,))
+        db.execute("DELETE FROM media_fts WHERE media_id = ?", (mid,))
+        db.execute("DELETE FROM media WHERE id = ?", (mid,))
+
+
 def _collect_files(paths: list[str]) -> list[Path]:
     files = []
     for p in paths:
@@ -63,17 +78,28 @@ def import_single_file(file_path: str) -> dict | None:
     try:
         return _import_one(db, filepath)
     except Exception as e:
-        logger.warning(f"import failed: {filepath} — {e}")
-        return None
+        logger.error(f"import failed: {filepath} — {e}", exc_info=True)
+        raise
 
 
-def _import_one(db, filepath: Path) -> dict | None:
+def _import_one(db, filepath: Path, force_update: bool = False) -> dict | None:
     ext = filepath.suffix.lower()
     media_type = "video" if ext in VIDEO_EXTS else "image"
 
-    existing = db.execute("SELECT id FROM media WHERE file_path = ?", (str(filepath),)).fetchone()
+    stat = filepath.stat()
+    existing = db.execute(
+        "SELECT id, file_size, file_mtime, thumbnail_path FROM media WHERE file_path = ?",
+        (str(filepath),),
+    ).fetchone()
+
     if existing:
-        return None
+        if not force_update:
+            return None
+        # Skip if file hasn't changed (same size and mtime)
+        if existing["file_size"] == stat.st_size and existing["file_mtime"] == stat.st_mtime:
+            return None
+        # File changed — clean up old record and re-import
+        _delete_media_records(db, [existing["id"]], [existing["thumbnail_path"]])
 
     meta = _probe(filepath, media_type) if media_type == "video" else _probe_image(filepath)
     thumb = _generate_thumbnail(filepath, media_type)
@@ -91,14 +117,14 @@ def _import_one(db, filepath: Path) -> dict | None:
     xmp_exists = 1 if media_type == "image" and filepath.with_suffix(".xmp").exists() else 0
 
     cur = db.execute(
-        "INSERT INTO media (file_path, file_name, media_type, file_size, duration, width, height, fps, "
+        "INSERT INTO media (file_path, file_name, media_type, file_size, file_mtime, duration, width, height, fps, "
         "video_codec, video_profile, bit_rate, audio_codec, audio_sample_rate, audio_channels, "
         "color_space, color_range, pix_fmt, camera_make, camera_model, lens_model, date_taken, thumbnail_path, "
         "has_xmp, picture_control, embedding) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             str(filepath), filepath.name, media_type,
-            filepath.stat().st_size,
+            stat.st_size, stat.st_mtime,
             meta.get("duration"), meta.get("width"), meta.get("height"),
             meta.get("fps"), meta.get("video_codec"), meta.get("video_profile"),
             meta.get("bit_rate"), meta.get("audio_codec"), meta.get("audio_sample_rate"),
@@ -183,7 +209,7 @@ def _run_exiftool(filepath: Path) -> dict | None:
         "exiftool", "-json", "-a",
         "-Make", "-Model", "-CameraModelName", "-LensModel", "-Encoder",
         "-DateTimeOriginal", "-CreateDate",
-        "-ImageWidth", "-ImageHeight", "-FileType", "-ColorSpace", "-Compression", "-BitsPerSample",
+        "-ImageWidth", "-ImageHeight", "-Orientation", "-FileType", "-ColorSpace", "-Compression", "-BitsPerSample",
         "-PictureControlName",
         str(filepath),
     ]
@@ -218,6 +244,18 @@ def _apply_exif_tags(tags: dict, meta: dict):
         meta["width"] = int(tags["ImageWidth"])
     if tags.get("ImageHeight") and (not meta.get("height") or meta["height"] == 0):
         meta["height"] = int(tags["ImageHeight"])
+    # Swap width/height for 90°/270° EXIF orientations
+    orient = tags.get("Orientation")
+    if orient:
+        s = str(orient).strip()
+        if s.isdigit():
+            o = int(s)
+        elif "90" in s or "270" in s:
+            o = 6
+        else:
+            o = 1
+        if o in (5, 6, 7, 8) and meta.get("width") and meta.get("height"):
+            meta["width"], meta["height"] = meta["height"], meta["width"]
     if tags.get("FileType") and not meta.get("video_codec"):
         meta["video_codec"] = tags["FileType"]
     if tags.get("Compression") and not meta.get("video_profile"):
@@ -256,48 +294,116 @@ def _probe_image(filepath: Path) -> dict:
     return meta
 
 
+def _get_exif_orientation(filepath: Path) -> int:
+    """Read EXIF Orientation from file, return numeric value (1=normal)."""
+    if not shutil.which("exiftool"):
+        return 1
+    try:
+        cmd = ["exiftool", "-json", "-Orientation", str(filepath)]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=EXIFTOOL_TIMEOUT)
+        if result.returncode == 0:
+            data = json.loads(result.stdout)
+            if data and isinstance(data, list):
+                orient = data[0].get("Orientation", "")
+                s = str(orient).strip()
+                if s.isdigit():
+                    return int(s)
+                if "90" in s:
+                    return 6
+                if "180" in s:
+                    return 3
+                if "270" in s:
+                    return 8
+    except Exception:
+        pass
+    return 1
+
+
+def _rotate_thumbnail(thumb_path: Path, orient: int):
+    """Rotate an already-saved thumbnail JPEG according to EXIF orientation."""
+    if orient in (1, 2, 3, 4):
+        if orient == 3:
+            from PIL import Image
+            img = Image.open(thumb_path)
+            img = img.rotate(180, expand=True)
+            img.save(thumb_path, "JPEG", quality=85)
+    elif orient in (5, 6, 7, 8):
+        from PIL import Image
+        img = Image.open(thumb_path)
+        angle = 270 if orient in (5, 6) else 90
+        img = img.rotate(angle, expand=True)
+        img.save(thumb_path, "JPEG", quality=85)
+
+
 def _generate_thumbnail(filepath: Path, media_type: str) -> str | None:
     thumb_name = f"{uuid.uuid4().hex}.jpg"
     thumb_path = THUMB_DIR / thumb_name
 
-    # Try ffmpeg first
-    if shutil.which("ffmpeg"):
-        if media_type == "video":
+    if media_type == "video":
+        if shutil.which("ffmpeg"):
             cmd = [
                 "ffmpeg", "-i", str(filepath), "-ss", "1", "-frames:v", "1",
                 "-vf", "scale=320:-1", "-y", str(thumb_path),
             ]
-        else:
-            cmd = [
-                "ffmpeg", "-i", str(filepath),
-                "-vf", "scale=320:-1", "-y", str(thumb_path),
-            ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT)
-        if result.returncode == 0 and thumb_path.exists():
-            return thumb_name
-
-    # Fallback: extract embedded thumbnail via exiftool (for RAW files etc.)
-    if media_type == "image" and shutil.which("exiftool"):
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT)
+            if result.returncode == 0 and thumb_path.exists():
+                return thumb_name
+    else:
+        # PIL: apply EXIF auto-rotation from camera
         try:
-            return _extract_exif_thumbnail(filepath, thumb_path, thumb_name)
+            from PIL import Image, ImageOps
+            img = Image.open(filepath)
+            img = ImageOps.exif_transpose(img)
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+            w, h = img.size
+            tw, th = 320, round(320 * h / w)
+            img = img.resize((tw, th), Image.LANCZOS)
+            img.save(thumb_path, "JPEG", quality=85)
+            return thumb_name
         except Exception:
             pass
+
+        # Get orientation for fallback paths
+        orient = _get_exif_orientation(filepath)
+
+        # Fallback: ffmpeg (raw pixels, rotate afterwards)
+        if shutil.which("ffmpeg"):
+            cmd = [
+                "ffmpeg", "-noautorotate", "-i", str(filepath),
+                "-vf", "scale=320:-1", "-y", str(thumb_path),
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT)
+            if result.returncode == 0 and thumb_path.exists():
+                _rotate_thumbnail(thumb_path, orient)
+                return thumb_name
+
+        # Fallback: exiftool (RAW files)
+        if shutil.which("exiftool"):
+            try:
+                result = _extract_exif_thumbnail(filepath, thumb_path, thumb_name)
+                if result:
+                    _rotate_thumbnail(thumb_path, orient)
+                    return result
+            except Exception:
+                pass
 
     return None
 
 
 def _extract_exif_thumbnail(filepath: Path, thumb_path: Path, thumb_name: str) -> str | None:
-    for tag in ("ThumbnailImage", "JpgFromRaw", "PreviewImage"):
+    # Prefer full-resolution embedded JPEGs over tiny 4:3 ThumbnailImage
+    for tag in ("JpgFromRaw", "PreviewImage", "ThumbnailImage"):
         cmd = ["exiftool", "-b", f"-{tag}", str(filepath)]
         result = subprocess.run(cmd, capture_output=True, timeout=EXIFTOOL_TIMEOUT)
         if result.returncode == 0 and len(result.stdout) > 100:
             thumb_path.write_bytes(result.stdout)
             if thumb_path.exists():
-                # Resize to consistent width
                 if shutil.which("ffmpeg"):
                     tmp = thumb_path.with_suffix(".tmp.jpg")
                     subprocess.run(
-                        ["ffmpeg", "-i", str(thumb_path), "-vf", "scale=320:-1", "-y", str(tmp)],
+                        ["ffmpeg", "-noautorotate", "-i", str(thumb_path),
+                         "-vf", "scale=320:-1", "-y", str(tmp)],
                         capture_output=True, text=True, timeout=FFMPEG_TIMEOUT,
                     )
                     if tmp.exists():

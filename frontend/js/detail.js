@@ -109,7 +109,7 @@ const DetailPage = {
               </div>
             </div>
           </div>
-          <div ref="imgContainer" style="flex:1;display:flex;align-items:flex-start;justify-content:center;position:relative;min-height:0;overflow:hidden">
+          <div ref="imgContainer" class="img-view-area">
             <q-spinner-dots v-if="imgLoading" color="grey-6" size="40px" style="position:absolute;z-index:1"></q-spinner-dots>
             <div style="position:relative;display:inline-flex;max-width:100%;max-height:100%;line-height:0">
               <img ref="imgEl" :src="API.imageUrl(media.id)" @load="onImageLoaded" :style="{transform: 'scale(' + imgZoom + ') translate(' + imgPanX + 'px,' + imgPanY + 'px)', transformOrigin: 'center center', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', background: 'var(--surface2)', transition: imgZooming ? 'transform 0.15s ease' : 'none', cursor: imgZoom > 1 ? (imgDragging ? 'grabbing' : 'grab') : 'default'}" @wheel="onImgWheel" @mousedown="onImgMouseDown" @mousemove="onImgMouseMove" @mouseup="onImgMouseUp" @mouseleave="onImgMouseUp" @dragstart.prevent>
@@ -118,7 +118,12 @@ const DetailPage = {
                 <span style="font-size:11px;color:var(--text2);min-width:36px;text-align:center">{{ Math.round(imgZoom * 100) }}%</span>
                 <q-btn flat round dense icon="add" size="xs" color="grey-6" @click="imgZoomBy(0.25)"></q-btn>
                 <q-btn flat round dense icon="fit_screen" size="xs" color="grey-6" @click="imgZoom=1;imgPanX=0;imgPanY=0" v-if="imgZoom!==1"></q-btn>
+                <q-btn flat round dense :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'" size="xs" color="grey-6" @click="toggleFullscreen"><q-tooltip :delay="1000">全屏看图 (F)</q-tooltip></q-btn>
               </div>
+            </div>
+            <div v-if="imgZoom > 1" class="img-minimap" @click="onMinimapClick">
+              <img :src="API.imageUrl(media.id)" class="img-minimap-bg" draggable="false">
+              <div class="img-minimap-rect" :style="minimapRectStyle"></div>
             </div>
           </div>
           <div class="histogram-wrap" ref="histWrap"><canvas ref="histCanvas"></canvas></div>
@@ -265,6 +270,8 @@ const DetailPage = {
       imgZooming: false,
       imgPanX: 0, imgPanY: 0,
       imgDragging: false, imgDragStart: null,
+      imgNatW: 0, imgNatH: 0,
+      isFullscreen: false,
       analyzing: false, analysisProgress: "", activeSeg: -1,
       analysisStages: [], analyzeTipText: "",
       showAnalysisDialog: false, showClearDialog: false, showDeleteSegDialog: false,
@@ -286,8 +293,31 @@ const DetailPage = {
       colors: ["red", "yellow", "green", "blue", "purple"],
     };
   },
+  computed: {
+    minimapRectStyle() {
+      const Z = this.imgZoom;
+      const PX = this.imgPanX, PY = this.imgPanY;
+      const cont = this.$refs.imgContainer;
+      if (!cont || Z <= 1 || !this.imgNatW || !this.imgNatH) return {};
+      const contW = cont.clientWidth, contH = cont.clientHeight;
+      const fitScale = Math.min(contW / this.imgNatW, contH / this.imgNatH);
+      const fitW = this.imgNatW * fitScale, fitH = this.imgNatH * fitScale;
+      const mmW = 160, mmH = fitH / fitW * 160;
+      const mmScale = mmW / fitW;
+      const visW = contW / Z, visH = contH / Z;
+      let rx = (fitW / 2 - PX - visW / 2) * mmScale;
+      let ry = (fitH / 2 - PY - visH / 2) * mmScale;
+      let rw = visW * mmScale, rh = visH * mmScale;
+      rx = Math.max(0, Math.min(rx, mmW - rw));
+      ry = Math.max(0, Math.min(ry, mmH - rh));
+      rw = Math.min(rw, mmW);
+      rh = Math.min(rh, mmH);
+      return { left: rx + 'px', top: ry + 'px', width: rw + 'px', height: rh + 'px' };
+    },
+  },
   beforeUnmount() {
     if (this._onKey) document.removeEventListener("keydown", this._onKey, true);
+    if (this._onFsChange) document.removeEventListener("fullscreenchange", this._onFsChange);
     this.stopScopes();
     this.stopWaveformAnim();
     if (this._segTrackInterval) { clearInterval(this._segTrackInterval); this._segTrackInterval = null; }
@@ -298,6 +328,8 @@ const DetailPage = {
   async created() {
     this._onKey = (e) => this.handleKey(e);
     document.addEventListener("keydown", this._onKey, true);
+    this._onFsChange = () => { this.isFullscreen = !!document.fullscreenElement; };
+    document.addEventListener("fullscreenchange", this._onFsChange);
     const hash = location.hash || "";
     const id = parseInt(hash.split("/")[2]);
     try {
@@ -321,11 +353,13 @@ const DetailPage = {
   },
   methods: {
     API,
-    onImageLoaded() {
+    onImageLoaded(e) {
       this.imgLoading = false;
       this.imgZoom = 1;
       this.imgPanX = 0;
       this.imgPanY = 0;
+      this.imgNatW = e.target.naturalWidth;
+      this.imgNatH = e.target.naturalHeight;
       this.drawHistogram();
     },
     imgZoomBy(delta) {
@@ -368,6 +402,27 @@ const DetailPage = {
     },
     onImgMouseUp() {
       this.imgDragging = false;
+    },
+    toggleFullscreen() {
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      } else {
+        this.$refs.imgContainer.requestFullscreen();
+      }
+    },
+    onMinimapClick(e) {
+      const cont = this.$refs.imgContainer;
+      if (!cont || !this.imgNatW || !this.imgNatH) return;
+      const contW = cont.clientWidth, contH = cont.clientHeight;
+      const fitScale = Math.min(contW / this.imgNatW, contH / this.imgNatH);
+      const fitW = this.imgNatW * fitScale, fitH = this.imgNatH * fitScale;
+      const mmW = 160, mmH = fitH / fitW * 160;
+      const mmScale = mmW / fitW;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+      const imgCX = cx / mmScale, imgCY = cy / mmScale;
+      this.imgPanX = -(imgCX - fitW / 2);
+      this.imgPanY = -(imgCY - fitH / 2);
     },
     drawHistogram() {
       const img = this.$refs.imgEl;
@@ -671,10 +726,10 @@ const DetailPage = {
         this.setRating(parseInt(key));
         return;
       }
-      // F - toggle favorite
+      // F - toggle fullscreen
       if (key === "f" || key === "F") {
         e.preventDefault();
-        this.toggleFav();
+        if (this.media?.media_type === 'image') this.toggleFullscreen();
         return;
       }
       // Space - play/pause

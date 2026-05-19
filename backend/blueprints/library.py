@@ -130,6 +130,7 @@ def list_folders():
             "label": label,
             "path": d,
             "totalCount": total_counts.get(d, 0),
+            "directCount": dir_counts.get(d, 0),
             "children": [],
         }
 
@@ -176,42 +177,44 @@ def import_one():
 
 @bp.route("/import-batch", methods=["POST"])
 def import_batch():
-    from ..services.importer import import_single_file
-    from concurrent.futures import ThreadPoolExecutor, as_completed
+    import logging
+    from flask import stream_with_context
+    from ..services.importer import _import_one
+    from pathlib import Path
 
     data = request.get_json()
     paths = data.get("paths", [])
     if not paths:
         return jsonify({"error": "No paths"}), 400
 
+    log = logging.getLogger(__name__)
+
     def generate():
+        db = get_db()
         imported = []
         failed = []
+        done_count = 0
 
-        def do_import(p):
+        for p in paths:
+            done_count += 1
+            filepath = Path(p)
             try:
-                return import_single_file(p)
-            except Exception as e:
-                return ("fail", p, str(e))
-
-        with ThreadPoolExecutor(max_workers=5) as pool:
-            futures = {pool.submit(do_import, p): p for p in paths}
-            done_count = 0
-            for fut in as_completed(futures):
-                done_count += 1
-                res = fut.result()
-                if isinstance(res, tuple) and res[0] == "fail":
-                    failed.append({"file_path": res[1], "error": res[2]})
-                    yield f"data: {json.dumps({'type': 'fail', 'file_path': res[1], 'error': res[2], 'done': done_count, 'total': len(paths)})}\n\n"
-                elif res:
-                    imported.append(res)
-                    yield f"data: {json.dumps({'type': 'ok', 'data': res, 'done': done_count, 'total': len(paths)})}\n\n"
+                result = _import_one(db, filepath)
+                if result:
+                    result.pop("embedding", None)
+                    imported.append(result)
+                    yield f"data: {json.dumps({'type': 'ok', 'data': result, 'done': done_count, 'total': len(paths)})}\n\n"
                 else:
                     yield f"data: {json.dumps({'type': 'skip', 'done': done_count, 'total': len(paths)})}\n\n"
+            except Exception as e:
+                log.error(f"batch import failed: {p} — {e}", exc_info=True)
+                failed.append({"file_path": p, "error": str(e)})
+                yield f"data: {json.dumps({'type': 'fail', 'file_path': p, 'error': str(e), 'done': done_count, 'total': len(paths)})}\n\n"
 
+        db.commit()
         yield f"data: {json.dumps({'type': 'done', 'imported': len(imported), 'failed': len(failed)})}\n\n"
 
-    return Response(generate(), mimetype="text/event-stream")
+    return Response(stream_with_context(generate()), mimetype="text/event-stream")
 
 
 @bp.route("/<int:media_id>/reveal", methods=["POST"])
@@ -271,33 +274,74 @@ def backfill_thumbnails():
     from ..services.importer import _generate_thumbnail
     from ..config import THUMB_DIR
     from pathlib import Path
+    force = request.args.get("force") == "1" or request.get_json(silent=True, force=True) and request.get_json().get("force")
     db = get_db()
-    rows = db.execute(
-        "SELECT id, file_path, media_type, thumbnail_path FROM media "
-        "WHERE thumbnail_path IS NULL OR thumbnail_path = ''"
-    ).fetchall()
-    # Also check rows where file is missing on disk
+    if force:
+        rows = db.execute("SELECT id, file_path, media_type, thumbnail_path FROM media").fetchall()
+    else:
+        rows = db.execute(
+            "SELECT id, file_path, media_type, thumbnail_path FROM media "
+            "WHERE thumbnail_path IS NULL OR thumbnail_path = ''"
+        ).fetchall()
+        existing = db.execute("SELECT id, file_path, media_type, thumbnail_path FROM media WHERE thumbnail_path IS NOT NULL").fetchall()
+        for r in existing:
+            if r["thumbnail_path"] and not (THUMB_DIR / r["thumbnail_path"]).exists():
+                rows.append(r)
     count = 0
-    for row in list(rows):
+    for row in rows:
         fp = Path(row["file_path"])
         if not fp.exists():
             continue
         thumb = _generate_thumbnail(fp, row["media_type"])
         if thumb:
-            db.execute("UPDATE media SET thumbnail_path = ? WHERE id = ?", (thumb, row["id"]))
-            count += 1
-    # Check existing thumbnail_path pointing to missing files
-    all_rows = db.execute("SELECT id, file_path, media_type, thumbnail_path FROM media WHERE thumbnail_path IS NOT NULL").fetchall()
-    for row in all_rows:
-        thumb_path = THUMB_DIR / row["thumbnail_path"]
-        if not thumb_path.exists():
-            fp = Path(row["file_path"])
-            if not fp.exists():
-                continue
-            thumb = _generate_thumbnail(fp, row["media_type"])
-            if thumb:
+            if row["thumbnail_path"]:
+                old = THUMB_DIR / row["thumbnail_path"]
+                if old.exists():
+                    old.unlink(missing_ok=True)
+            # Fix width/height: read raw dimensions from exiftool, apply orientation swap
+            if row["media_type"] == "image":
+                import subprocess, json, shutil
+                w, h = None, None
+                orient = 1
+                if shutil.which("exiftool"):
+                    try:
+                        cmd = ["exiftool", "-json", "-ImageWidth", "-ImageHeight", "-Orientation", str(fp)]
+                        r = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                        if r.returncode == 0:
+                            data = json.loads(r.stdout)[0]
+                            w = int(data["ImageWidth"]) if data.get("ImageWidth") else None
+                            h = int(data["ImageHeight"]) if data.get("ImageHeight") else None
+                            o = data.get("Orientation", "")
+                            s = str(o).strip()
+                            if s.isdigit():
+                                orient = int(s)
+                            elif "90" in s:
+                                orient = 6
+                            elif "180" in s:
+                                orient = 3
+                            elif "270" in s:
+                                orient = 8
+                    except Exception:
+                        pass
+                # Fallback to ffprobe if exiftool didn't give dimensions
+                if not w or not h:
+                    cmd = ["ffprobe", "-v", "quiet", "-print_format", "json",
+                           "-show_streams", str(fp)]
+                    r = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                    if r.returncode == 0:
+                        vs = json.loads(r.stdout).get("streams", [{}])[0]
+                        w = vs.get("width")
+                        h = vs.get("height")
+                if w and h:
+                    if orient in (5, 6, 7, 8):
+                        w, h = h, w
+                    db.execute("UPDATE media SET thumbnail_path = ?, width = ?, height = ? WHERE id = ?",
+                               (thumb, w, h, row["id"]))
+                else:
+                    db.execute("UPDATE media SET thumbnail_path = ? WHERE id = ?", (thumb, row["id"]))
+            else:
                 db.execute("UPDATE media SET thumbnail_path = ? WHERE id = ?", (thumb, row["id"]))
-                count += 1
+            count += 1
     db.commit()
     return jsonify({"ok": True, "count": count})
 def backfill_picture_control():
@@ -357,6 +401,31 @@ def _rows_to_groups(rows, indices_groups, sim_matrix=None, vecs=None):
     return groups
 
 
+def _attach_excluded(groups, excluded_pairs, id_map, id_to_row):
+    """Attach excluded photo info to each group based on exclusion pairs."""
+    if not excluded_pairs:
+        return groups
+    for group in groups:
+        group_ids = set(item["id"] for item in group["items"])
+        excluded_map = {}  # excluded_id -> { ...item, excluded_with: [group_member_ids] }
+        for a, b in excluded_pairs:
+            in_a, in_b = a in group_ids, b in group_ids
+            if in_a and not in_b:
+                eid, with_id = b, a
+            elif in_b and not in_a:
+                eid, with_id = a, b
+            else:
+                continue
+            if eid not in excluded_map:
+                row = id_to_row.get(eid)
+                if row:
+                    excluded_map[eid] = {"id": eid, "file_name": row["file_name"], "excluded_with": [with_id]}
+            else:
+                excluded_map[eid]["excluded_with"].append(with_id)
+        group["excluded"] = list(excluded_map.values())
+    return groups
+
+
 def _union_find_groups(sim_matrix, threshold, id_map=None, excluded_pairs=None):
     n = len(sim_matrix)
     parent = list(range(n))
@@ -409,6 +478,13 @@ def find_duplicates():
     id_map = [r["id"] for r in rows]
     vecs = np.array([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
 
+    # Build id -> row mapping for excluded photo lookups
+    id_to_row = {}
+    for r in rows:
+        d = dict(r)
+        d.pop("embedding", None)
+        id_to_row[r["id"]] = d
+
     if dup_type == "cluster":
         import hdbscan
         labels = hdbscan.HDBSCAN(min_cluster_size=2, metric="euclidean").fit_predict(vecs)
@@ -453,15 +529,89 @@ def find_duplicates():
                     for ai in range(len(group)):
                         sub_map.setdefault(sfind(ai), []).append(group[ai])
                     split_groups.extend(v for v in sub_map.values() if len(v) >= 2)
-            return jsonify({"groups": _rows_to_groups(rows, split_groups, vecs=vecs)})
+            return jsonify({"groups": _attach_excluded(_rows_to_groups(rows, split_groups, vecs=vecs), excluded, id_map, id_to_row)})
 
-        return jsonify({"groups": _rows_to_groups(rows, indices_groups, vecs=vecs)})
+        return jsonify({"groups": _attach_excluded(_rows_to_groups(rows, indices_groups, vecs=vecs), excluded, id_map, id_to_row)})
 
     # near (0.96) or similar (0.90) — union-find on cosine similarity
     threshold = 0.96 if dup_type == "near" else 0.90
     sim_matrix = vecs @ vecs.T
     indices_groups = _union_find_groups(sim_matrix, threshold, id_map, excluded)
-    return jsonify({"groups": _rows_to_groups(rows, indices_groups, sim_matrix=sim_matrix)})
+    return jsonify({"groups": _attach_excluded(_rows_to_groups(rows, indices_groups, sim_matrix=sim_matrix), excluded, id_map, id_to_row)})
+
+
+@bp.route("/<int:media_id>/similar")
+def find_similar(media_id):
+    db = get_db()
+    source = db.execute("SELECT * FROM media WHERE id = ?", (media_id,)).fetchone()
+    if not source:
+        return jsonify({"error": "Not found"}), 404
+    if not source["embedding"]:
+        return jsonify({"source": dict(source), "near": [], "similar": [], "cluster": []})
+
+    rows = _fetch_embedding_rows(db)
+    id_list = [r["id"] for r in rows]
+    if media_id not in id_list:
+        return jsonify({"source": dict(source), "near": [], "similar": [], "cluster": []})
+
+    source_idx = id_list.index(media_id)
+    vecs = np.array([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
+    source_vec = vecs[source_idx]
+
+    excluded_near = _load_exclusions(db, "near")
+    excluded_similar = _load_exclusions(db, "similar")
+    excluded_cluster = _load_exclusions(db, "cluster")
+
+    def _item(row, similarity=None):
+        d = dict(row)
+        d.pop("embedding", None)
+        if similarity is not None:
+            d["similarity"] = round(float(similarity), 4)
+        return d
+
+    def _excluded(pair_set, a, b):
+        return (min(a, b), max(a, b)) in pair_set
+
+    # near (0.96) and similar (0.90)
+    sims = vecs @ source_vec
+    near_items, similar_items = [], []
+    for i in range(len(rows)):
+        if i == source_idx:
+            continue
+        sid = id_list[i]
+        s = float(sims[i])
+        if s >= 0.96 and not _excluded(excluded_near, media_id, sid):
+            near_items.append(_item(rows[i], s))
+        if s >= 0.90 and not _excluded(excluded_similar, media_id, sid):
+            similar_items.append(_item(rows[i], s))
+    near_items.sort(key=lambda x: -x.get("similarity", 0))
+    similar_items.sort(key=lambda x: -x.get("similarity", 0))
+
+    # cluster
+    cluster_items = []
+    try:
+        import hdbscan
+        labels = hdbscan.HDBSCAN(min_cluster_size=2, metric="euclidean").fit_predict(vecs)
+        src_label = labels[source_idx]
+        if src_label != -1:
+            for i in range(len(rows)):
+                if i == source_idx:
+                    continue
+                if labels[i] != src_label:
+                    continue
+                sid = id_list[i]
+                if _excluded(excluded_cluster, media_id, sid):
+                    continue
+                cluster_items.append(_item(rows[i]))
+    except Exception:
+        pass
+
+    return jsonify({
+        "source": _item(source),
+        "near": near_items,
+        "similar": similar_items,
+        "cluster": cluster_items,
+    })
 
 
 @bp.route("/dup-exclusions", methods=["POST"])
@@ -492,6 +642,20 @@ def reset_dup_exclusions():
         db.execute("DELETE FROM dup_exclusions")
     db.commit()
     return jsonify({"ok": True})
+
+
+@bp.route("/dup-exclusions/pairs", methods=["DELETE"])
+def remove_dup_exclusion_pairs():
+    data = request.get_json()
+    pairs = data.get("pairs", [])
+    dup_type = data.get("dup_type", "similar")
+    db = get_db()
+    for a, b in pairs:
+        lo, hi = min(a, b), max(a, b)
+        db.execute("DELETE FROM dup_exclusions WHERE media_id_a = ? AND media_id_b = ? AND dup_type = ?",
+                   (lo, hi, dup_type))
+    db.commit()
+    return jsonify({"ok": True, "count": len(pairs)})
 
 
 @bp.route("/<int:media_id>/write-xmp", methods=["POST"])
@@ -626,20 +790,106 @@ def update_media(media_id):
 
 @bp.route("/<int:media_id>", methods=["DELETE"])
 def delete_media(media_id):
+    from ..services.importer import _delete_media_records
     db = get_db()
     row = db.execute("SELECT thumbnail_path FROM media WHERE id = ?", (media_id,)).fetchone()
-    if row and row["thumbnail_path"]:
-        from ..config import THUMB_DIR
-        thumb = THUMB_DIR / row["thumbnail_path"]
-        if thumb.exists():
-            thumb.unlink()
-    db.execute("DELETE FROM media_tags WHERE media_id = ?", (media_id,))
-    db.execute("DELETE FROM collection_items WHERE media_id = ?", (media_id,))
-    db.execute("DELETE FROM media_segment WHERE media_id = ?", (media_id,))
-    db.execute("DELETE FROM media_fts WHERE media_id = ?", (media_id,))
-    db.execute("DELETE FROM media WHERE id = ?", (media_id,))
+    if not row:
+        return jsonify({"error": "Not found"}), 404
+    _delete_media_records(db, [media_id], [row["thumbnail_path"]])
     db.commit()
     return jsonify({"ok": True})
+
+
+@bp.route("/folder", methods=["DELETE"])
+def delete_folder():
+    """Remove all media under a folder path (including subfolders)."""
+    from ..services.importer import _delete_media_records
+    data = request.get_json()
+    path = data.get("path") if data else None
+    if not path:
+        return jsonify({"error": "Missing path"}), 400
+    db = get_db()
+    like = str(path) + "/%"
+    rows = db.execute(
+        "SELECT id, thumbnail_path FROM media WHERE file_path LIKE ? OR file_path = ?",
+        (like, str(path)),
+    ).fetchall()
+    _delete_media_records(db, [r["id"] for r in rows], [r["thumbnail_path"] for r in rows])
+    db.commit()
+    return jsonify({"ok": True, "count": len(rows)})
+
+
+@bp.route("/sync-folder", methods=["POST"])
+def sync_folder():
+    """Scan a folder: import new files, update changed files, remove deleted files. SSE stream."""
+    import logging
+    from flask import stream_with_context
+    from ..services.importer import _import_one, _collect_files, _delete_media_records, VIDEO_EXTS, IMAGE_EXTS
+    from pathlib import Path
+    import json as _json
+
+    data = request.get_json()
+    path = data.get("path") if data else None
+    if not path:
+        return jsonify({"error": "Missing path"}), 400
+    logging.getLogger(__name__).info(f"sync-folder: {path}")
+
+    # Scan disk files outside generator (no DB needed)
+    disk_files = set()
+    for f in _collect_files([path]):
+        if f.suffix.lower() in (VIDEO_EXTS | IMAGE_EXTS):
+            disk_files.add(str(f))
+    work = sorted(disk_files)
+
+    def generate():
+        db = get_db()
+
+        # Get all DB records for this folder
+        like = str(path) + "/%"
+        db_rows = db.execute(
+            "SELECT id, file_path, thumbnail_path FROM media WHERE file_path LIKE ? OR file_path = ?",
+            (like, str(path)),
+        ).fetchall()
+        db_paths = {r["file_path"]: r for r in db_rows}
+
+        # Remove records for files no longer on disk
+        removed_ids, removed_thumbs = [], []
+        for r in db_rows:
+            if r["file_path"] not in disk_files:
+                removed_ids.append(r["id"])
+                removed_thumbs.append(r["thumbnail_path"])
+        if removed_ids:
+            _delete_media_records(db, removed_ids, removed_thumbs)
+            db.commit()
+
+        new_count, updated_count, fail_count, skip_count = 0, 0, 0, 0
+        for fp_str in work:
+            filepath = Path(fp_str)
+            is_new = fp_str not in db_paths
+            try:
+                result = _import_one(db, filepath, force_update=True)
+                if result:
+                    row = db.execute("SELECT * FROM media WHERE id = ?", (result["id"],)).fetchone()
+                    item = dict(row) if row else {}
+                    item.pop("embedding", None)
+                    if is_new:
+                        new_count += 1
+                        yield f"data: {_json.dumps({'type': 'ok', 'item': item, 'status': 'new'})}\n\n"
+                    else:
+                        updated_count += 1
+                        yield f"data: {_json.dumps({'type': 'ok', 'item': item, 'status': 'updated'})}\n\n"
+                else:
+                    skip_count += 1
+                    yield f"data: {_json.dumps({'type': 'skip', 'file': filepath.name})}\n\n"
+            except Exception as e:
+                fail_count += 1
+                yield f"data: {_json.dumps({'type': 'fail', 'file': filepath.name, 'error': str(e)})}\n\n"
+        db.commit()
+        summary = {"added": new_count, "updated": updated_count, "removed": len(removed_ids), "skipped": skip_count, "failed": fail_count}
+        yield f"data: {_json.dumps({'type': 'done', 'summary': summary})}\n\n"
+
+    return Response(stream_with_context(generate()), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @bp.route("/batch", methods=["POST"])

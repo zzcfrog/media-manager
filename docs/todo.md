@@ -1,5 +1,79 @@
 # TODO
 
+## 已完成：全屏看图 + 导航缩略图（2026-05-19）
+
+图片详情页新增全屏看图功能和缩放导航缩略图。
+
+**改动文件：**
+- `frontend/js/detail.js` — 新增 `isFullscreen`/`imgNatW`/`imgNatH` 数据；`onImageLoaded` 记录图片自然尺寸；新增 `minimapRectStyle` 计算属性（根据 imgZoom/imgPanX/imgPanY 和容器尺寸计算视口矩形位置）；新增 `toggleFullscreen()` 方法（浏览器 Fullscreen API）；新增 `onMinimapClick()` 方法（点击 minimap 跳转到对应区域）；F 键从切换喜欢改为切换全屏；`created` 中注册 `fullscreenchange` 监听，`beforeUnmount` 中清理；imgContainer ref 添加 `.img-view-area` class
+- `frontend/css/main.css` — 新增 `.img-view-area` 样式（flex 容器 + `:fullscreen` 背景色）；`.img-minimap` 导航缩略图样式（160px 宽、半透明、悬停增强）；`.img-minimap-rect` 视口矩形样式
+
+**功能说明：**
+- 放大图片 > 100% 时，右下角出现半透明导航缩略图，蓝色矩形显示当前视口位置
+- 拖拽图片时矩形实时跟随，点击缩略图可跳转到对应区域
+- 缩放条新增全屏按钮（`fullscreen` 图标），按 F 键切换全屏
+- 全屏时 imgContainer 填充整个屏幕，只显示图片区域
+- F 键原功能（切换喜欢）已移除快捷键
+
+## 已完成：查找相似弹窗 + 画廊排除/删除（2026-05-19）
+
+画廊右键"查找相似"不再跳转到重复页，改为在弹窗中直接展示与当前照片相似的结果（酷似/相似/聚类三个标签页），支持排除和删除操作。
+
+**改动文件：**
+- `backend/blueprints/library.py` — 新增 `GET /<int:media_id>/similar` 端点：获取源图片 embedding，与所有图片计算余弦相似度，按阈值（酷似 0.96/相似 0.90）筛选并排除已排除的 pair，HDBSCAN 聚类取源图片所在聚类；返回 `{ source, near, similar, cluster }`
+- `frontend/js/api.js` — 新增 `getSimilar(mediaId)` 方法
+- `frontend/js/gallery.js` — `findSimilar()` 改为弹窗展示：头部显示源图片 + 三个标签按钮（与重复页样式一致），结果使用 `.dup-card` 网格；右键菜单支持查看详情、在文件夹中显示、排除、删除；排除弹窗复用排除模式（选择不相似的照片）；排除 pair 使用源图片 ID（`similarDlg.source.id`）；弹窗尺寸 `93vw × 92vh`
+- `frontend/js/gallery.js` — 画廊右键菜单移除"写入 XMP"选项（仅保留在详情页）
+
+**排除机制：**
+- 弹窗中排除的照片对会写入 `dup_exclusions` 表（与重复页共享）
+- 排除后该照片在对应类型（酷似/相似/聚类）中不再出现
+- 可在重复页通过"恢复排除"功能取消排除
+
+## 已完成：恢复排除功能（2026-05-19）
+
+重复页每个分组新增"恢复排除"功能，用户可查看被排除的照片并选择性恢复。
+
+**改动文件：**
+- `backend/blueprints/library.py` — 新增 `DELETE /dup-exclusions/pairs` 端点（按具体 pair 删除排除记录）；`find_duplicates` 返回数据中每个 group 附带 `excluded` 字段（被排除的照片 ID + file_name + excluded_with ID 列表），通过 `_attach_excluded()` 辅助函数实现
+- `frontend/js/api.js` — 新增 `removeDupExclusionPairs(pairs, dupType)` 方法
+- `frontend/js/duplicates.js` — 分组头右侧新增"恢复排除 (N)"按钮（仅在有排除记录时显示）；恢复排除弹窗按被排除照片分行，每行左侧显示被排除照片缩略图，中间显示其排除对象的小图标（可勾选），右侧"恢复排重"按钮；每行独立操作，恢复后该行消失
+- `frontend/css/main.css` — `.restore-pair-thumb` 样式（40px 小图标，悬停放大 3.5 倍）
+
+## 已完成：排除弹窗 UI 优化（2026-05-19）
+
+重复页排除弹窗多项交互改进。
+
+**改动文件：**
+- `frontend/js/duplicates.js` — 排除弹窗新增"全选/取消全选"切换按钮；底部显示"共 X 张"计数；滚动提示"↓ 向下滚动查看更多"（候选 > 6 张时显示）
+- `frontend/css/main.css` — `.exclude-scroll-wrap` 固定最大高度 300px + 滚动；`.exclude-scroll-hint` sticky 底部提示（暗色 `#1d1d1d` / 亮色 `#fff` 背景）
+
+## 已完成：重复页卡片流式布局（2026-05-19）
+
+重复页分组卡片从横向滚动改为 CSS Grid 自适应折行，撑满容器宽度。
+
+**改动文件：**
+- `frontend/js/duplicates.js` — 分组容器从 `display:flex;overflow-x:auto` 改为 CSS Grid class `.dup-grid`
+- `frontend/css/main.css` — `.dup-grid` 使用 `grid-template-columns: repeat(auto-fill, minmax(160px, 1fr))` 自动折行；`.dup-card` 在 grid 内 `width: auto`
+
+## 已完成：文件夹移除和重新扫描（2026-05-19）
+
+支持整个目录从库中移除，以及重新扫描目录（应对文件变化、移位、更名、子目录变更）。
+
+**改动文件：**
+- `backend/blueprints/library.py` — 新增 `DELETE /api/library/folder` 端点（按路径前缀删除所有媒体记录及其缩略图）；新增 `POST /api/library/sync-folder` 端点（SSE 流：扫描目录 → 导入新文件 → 删除已移走文件 → 报告结果）
+- `frontend/js/api.js` — 新增 `deleteFolder(path)` 和 `syncFolder(path)` 方法
+- `frontend/js/gallery.js` / `frontend/index.html` — 文件夹树右键菜单新增"移除文件夹"和"重新扫描"
+
+## 已完成：批量导入修复（2026-05-19）
+
+修复批量导入多个问题：ThreadPoolExecutor 与 Flask 上下文冲突、SSE 流数据库连接关闭、embedding JSON 序列化失败。
+
+**改动文件：**
+- `backend/blueprints/library.py` — `import_batch` 改为顺序导入（同一线程），使用 `stream_with_context` 包装 SSE 响应；结果中 pop embedding 字段避免 JSON 序列化失败
+- `backend/blueprints/library.py` — `sync_folder` 同样使用 `stream_with_context`，db 操作移入 generator 内部避免连接关闭
+- `backend/services/importer.py` — 修复 INSERT 语句 26 列 / 25 占位符不匹配；`import_single_file` 异常时 `raise` 而非 `return None`
+
 ## 已完成：移除"重复"检测标签（2026-05-19）
 
 移除 SHA256 级别的精确重复检测，仅保留视觉相似检测（酷似/相似/聚类），突出软件自身优势。
@@ -141,7 +215,7 @@
 | `Enter` | 打开详情 | - |
 | `Delete` | 删除选中 | - |
 | `1`-`5` | 评分 | 评分 |
-| `F` | 切换收藏 | 切换收藏 |
+| `F` | 切换喜欢 | 全屏看图 |
 | `G` | 切换网格/列表 | - |
 | `/` | 搜索聚焦 | - |
 | `Space` | - | 播放/暂停 |

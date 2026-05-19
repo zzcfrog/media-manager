@@ -57,11 +57,20 @@ scanPaths(paths) {
   getDuplicates(type) {
     return this._fetch(`/api/library/duplicates?type=${type}`);
   },
+  getSimilar(mediaId) {
+    return this._fetch(`/api/library/${mediaId}/similar`);
+  },
   backfillEmbeddings() {
     return this._fetch(`/api/library/backfill-embeddings`, { method: "POST" });
   },
   backfillThumbnails() {
     return this._fetch(`/api/library/backfill-thumbnails`, { method: "POST" });
+  },
+  deleteFolder(path) {
+    return this._fetch(`/api/library/folder`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) });
+  },
+  syncFolder(path) {
+    return fetch(`/api/library/sync-folder`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) });
   },
   addDupExclusions(pairs, dupType) {
     return this._fetch(`/api/library/dup-exclusions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pairs, dup_type: dupType }) });
@@ -69,6 +78,9 @@ scanPaths(paths) {
   resetDupExclusions(dupType) {
     const q = dupType ? `?dup_type=${dupType}` : "";
     return this._fetch(`/api/library/dup-exclusions${q}`, { method: "DELETE" });
+  },
+  removeDupExclusionPairs(pairs, dupType) {
+    return this._fetch(`/api/library/dup-exclusions/pairs`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pairs, dup_type: dupType }) });
   },
   getAnalysis(mediaId) {
     return this._fetch(`/api/analysis/${mediaId}`);

@@ -83,7 +83,7 @@ video_analyzer/
 | 蓝图 | 前缀 | 职责 |
 |------|------|------|
 | `serve` | 无 | 媒体文件服务 |
-| `library` | `/api/library` | 媒体库 CRUD、文件夹树 |
+| `library` | `/api/library` | 媒体库 CRUD、文件夹树、导入、相似检测、排除管理 |
 | `analysis` | `/api/analysis` | AI 分析 + 分段编辑 |
 | `collections` | `/api/collections` | 合集管理 |
 | `tags` | `/api/tags` | 标签管理（后端保留，前端已移除） |
@@ -131,6 +131,9 @@ media_fts (FTS5: media_id UNINDEXED, file_name, visual, asr, subtitle,
 -- 全局设置
 settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)
 -- 默认值: resolution, fps, vendor, model, use_multimodal, asr_engine, video_api_key, asr_api_key, image_resolution, image_api_key, image_model, hw_accel
+
+-- 排除对（重复/相似检测排除）
+dup_exclusions (media_id_a INTEGER, media_id_b INTEGER, dup_type TEXT, PRIMARY KEY(media_id_a, media_id_b, dup_type))
 ```
 
 **迁移系统**：`_MIGRATIONS` 列表 + `_migrate()` 函数，通过 `PRAGMA table_info` 检测缺失列并 ALTER TABLE。特殊情况（如 dialogue→asr 重命名 + FTS 重建）在 `_migrate()` 中硬编码处理。
@@ -145,6 +148,8 @@ settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)
 |------|------|------|
 | `/api/library/folders` | GET | 返回目录树结构 |
 | `/api/library/?folder=<path>` | GET | 按文件夹前缀筛选媒体列表 |
+| `/api/library/folder` | DELETE | 移除整个目录（按路径前缀删除所有媒体记录及缩略图文件） |
+| `/api/library/sync-folder` | POST | 重新扫描目录（SSE 流：导入新文件、删除已移走文件、报告变更） |
 
 **`/api/library/folders` 实现逻辑**：
 
@@ -171,7 +176,23 @@ settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)
 
 **`folder` 筛选参数**：在 `list_media` 中通过 `file_path LIKE '<folder>/%'` 实现，匹配目标文件夹及其所有子文件夹下的媒体。
 
-### 3.5 分段编辑 API
+### 3.5 相似检测与排除 API
+
+| 路由 | 方法 | 说明 |
+|------|------|------|
+| `/api/library/duplicates?type=<type>` | GET | 查找重复/相似分组（near/similar/cluster），返回 `groups` + 每组 `excluded` 排除信息 |
+| `/api/library/<id>/similar` | GET | 查找与指定图片相似的其他图片（near/similar/cluster），用于画廊单图查找相似弹窗 |
+| `/api/library/dup-exclusions` | POST | 添加排除对（`pairs: [[a,b], ...]`, `dup_type`） |
+| `/api/library/dup-exclusions` | DELETE | 按 `dup_type` 全量删除排除记录 |
+| `/api/library/dup-exclusions/pairs` | DELETE | 按具体 pair 删除排除记录（恢复排除功能使用） |
+
+**排除表 `dup_exclusions`**：`(media_id_a INTEGER, media_id_b INTEGER, dup_type TEXT, PRIMARY KEY(a, b, dup_type))`，其中 `a < b` 保证唯一。
+
+**`_attach_excluded()` 辅助函数**：在 `find_duplicates` 返回前，遍历每个 group 的成员，查找排除表中涉及该成员的 pair，将不在 group 内的被排除方信息（id/file_name/excluded_with）附加到 group。
+
+**`GET /<id>/similar` 实现**：获取源图片 embedding → 与所有图片计算余弦相似度 → 按阈值（near 0.96 / similar 0.90）筛选 → 排除已排除的 pair → HDBSCAN 聚类取源图片所在聚类 → 返回 `{ source, near, similar, cluster }`。
+
+### 3.6 分段编辑 API
 
 | 路由 | 方法 | 说明 |
 |------|------|------|
@@ -316,6 +337,10 @@ class AsrSegment:
 | 媒体类型筛选 | `q-btn-group` 包含独立 `q-btn`（带 `q-tooltip`），替代 `q-btn-toggle` |
 | 分段编辑 | `contenteditable` + `@blur` → `saveSegField()`（文本字段）；`×` 按钮 → `removeTag()`（标签字段） |
 | 键盘快捷键 | `document.addEventListener("keydown")` 全局监听，`created()` 注册 / `beforeUnmount()` 清理；`isContentEditable` 检测避免编辑冲突 |
+| 全屏看图 | 浏览器 Fullscreen API（`imgContainer.requestFullscreen()`），`fullscreenchange` 事件追踪状态；F 键切换，仅图片类型生效 |
+| 导航缩略图 | `computed: minimapRectStyle` 根据 imgZoom/imgPanX/imgPanY 和容器尺寸计算视口矩形（通过 `fitScale` 转换图片坐标到 minimap 坐标），`onMinimapClick` 反向映射点击位置到 pan 偏移 |
+| 重复页布局 | CSS Grid `repeat(auto-fill, minmax(160px, 1fr))` 替代横向滚动 |
+| 恢复排除 | 按被排除照片分行展示，每行左侧缩略图 + 中间排除对象小图标（可勾选）+ 右侧独立恢复按钮；`removeDupExclusionPairs` API 按 pair 删除 |
 
 ### 5.3 文件夹筛选数据流
 

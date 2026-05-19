@@ -45,6 +45,7 @@
           <q-tooltip :delay="1000">设置</q-tooltip>
         </q-btn>
       </q-toolbar>
+      <q-linear-progress v-if="syncInBackground && !syncSummary" indeterminate color="primary" size="3px" style="position:absolute;bottom:0;left:0;right:0"></q-linear-progress>
     </q-header>
 
     <!-- Sidebar -->
@@ -68,7 +69,8 @@
             :expanded="expandedFolders" @update:expanded="v => expandedFolders = v">
             <template v-slot:default-header="prop">
               <div class="row items-center no-wrap" style="width:100%;padding:4px 6px;margin:-4px -6px"
-                :style="selectedFolder===prop.node.path ? 'background:var(--accent-dim);border-radius:4px' : ''">
+                :style="selectedFolder===prop.node.path ? 'background:var(--accent-dim);border-radius:4px' : ''"
+                @contextmenu.prevent="showFolderCtx($event, prop.node)">
                 <q-icon name="folder" size="16px" :color="selectedFolder===prop.node.path ? 'primary' : 'grey-6'" class="q-mr-xs"></q-icon>
                 <span class="folder-label" style="font-size:13px">{{ prop.node.label }}</span>
                 <span class="text-caption text-grey-6" style="flex-shrink:0;margin-left:4px">{{ prop.node.totalCount || 0 }}</span>
@@ -108,6 +110,85 @@
         <q-btn v-else flat round dense icon="add" color="primary" @click="openImport"></q-btn>
       </div>
     </q-drawer>
+
+    <!-- Folder context menu -->
+    <div v-if="folderCtx.show" class="ctx-menu-popup" :style="{ left: folderCtx.x + 'px', top: folderCtx.y + 'px' }">
+      <q-list dense style="min-width:180px;border-radius:8px;overflow:hidden">
+        <q-item clickable :disable="!folderCtx.node?.directCount" @click="syncFolder" style="padding-left:8px;padding-right:12px">
+          <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="sync" size="14px" color="grey-6"></q-icon></q-item-section>
+          <q-item-section>同步文件夹</q-item-section>
+        </q-item>
+        <q-separator style="background:var(--border)"></q-separator>
+        <q-item clickable :disable="!folderCtx.node?.totalCount" @click="removeFolder" style="padding-left:8px;padding-right:12px">
+          <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="delete_outline" size="14px" color="negative"></q-icon></q-item-section>
+          <q-item-section style="color:var(--negative)">移出素材库</q-item-section>
+        </q-item>
+      </q-list>
+    </div>
+
+    <!-- Sync modal -->
+    <q-dialog v-model="showSyncModal" persistent>
+      <q-card style="min-width:440px;max-width:520px" class="dialog-card">
+        <template v-if="!syncSummary">
+          <q-card-section>
+            <div class="text-h6">正在同步</div>
+          </q-card-section>
+          <q-card-section>
+            <div class="row justify-between text-caption text-grey-6 q-mb-sm">
+              <span>{{ syncDone }} 已处理</span>
+            </div>
+            <q-linear-progress indeterminate color="primary" size="6px"></q-linear-progress>
+          </q-card-section>
+          <q-card-section style="max-height:260px;overflow-y:auto">
+            <q-list dense>
+              <q-item v-for="(item, i) in syncProgress" :key="i" style="padding:2px 8px;min-height:24px">
+                <q-item-section avatar style="min-width:20px;padding-right:6px">
+                  <q-icon :name="item.status==='fail' ? 'error_outline' : item.status==='skip' ? 'check_circle_outline' : 'check_circle'" size="14px"
+                    :color="item.status==='fail' ? 'negative' : item.status==='skip' ? 'grey-6' : 'positive'"></q-icon>
+                </q-item-section>
+                <q-item-section style="font-size:12px">{{ item.name }}</q-item-section>
+                <q-item-section side style="font-size:10px">
+                  <span :style="{color: item.status==='new' ? 'var(--accent)' : item.status==='updated' ? 'var(--yellow)' : 'var(--text3)'}">
+                    {{ item.status === 'new' ? '新增' : item.status === 'updated' ? '更新' : item.status === 'skip' ? '跳过' : '失败' }}
+                  </span>
+                </q-item-section>
+              </q-item>
+            </q-list>
+          </q-card-section>
+          <q-card-actions align="right">
+            <q-btn flat label="后台处理" @click="showSyncModal=false; syncInBackground=true"></q-btn>
+          </q-card-actions>
+        </template>
+        <template v-else>
+          <q-card-section>
+            <div class="text-h6">同步完成</div>
+          </q-card-section>
+          <q-card-section>
+            <div style="display:flex;justify-content:center;gap:28px;padding:12px 0">
+              <div class="text-center">
+                <div class="text-h4 text-primary text-weight-bold">{{ syncSummary.added }}</div>
+                <div class="text-caption text-grey-5" style="margin-top:4px">新增</div>
+              </div>
+              <div class="text-center">
+                <div class="text-h4 text-weight-bold" style="color:var(--yellow)">{{ syncSummary.updated }}</div>
+                <div class="text-caption text-grey-5" style="margin-top:4px">更新</div>
+              </div>
+              <div class="text-center">
+                <div class="text-h4 text-weight-bold" style="color:var(--negative)">{{ syncSummary.removed }}</div>
+                <div class="text-caption text-grey-5" style="margin-top:4px">移除</div>
+              </div>
+              <div class="text-center">
+                <div class="text-h4 text-grey-6 text-weight-bold">{{ syncSummary.skipped }}</div>
+                <div class="text-caption text-grey-5" style="margin-top:4px">跳过</div>
+              </div>
+            </div>
+          </q-card-section>
+          <q-card-actions align="right">
+            <q-btn flat label="关闭" @click="syncInBackground=false; showSyncModal=false; loadSidebar(); $nextTick(() => $refs.gallery?.load())"></q-btn>
+          </q-card-actions>
+        </template>
+      </q-card>
+    </q-dialog>
 
     <!-- Main content -->
     <q-page-container>
@@ -439,6 +520,13 @@ const app = Vue.createApp({
       selectedFolder: null,
       expandedFolders: [],
       libraryExpanded: true,
+      folderCtx: { show: false, node: null, x: 0, y: 0 },
+      showSyncModal: false,
+      syncProgress: [],
+      syncTotal: 0,
+      syncDone: 0,
+      syncSummary: null,
+      syncInBackground: false,
       drawerOpen: true,
       drawerMini: false,
       themeMode: localStorage.getItem("theme") || "dark",
@@ -462,10 +550,13 @@ const app = Vue.createApp({
     window.addEventListener("hashchange", () => this.resolveRoute());
     this._onKey = (e) => this.handleShortcut(e);
     document.addEventListener("keydown", this._onKey);
+    this._closeFolderCtx = (e) => this.closeFolderCtx(e);
+    document.addEventListener("click", this._closeFolderCtx);
     this.resolveRoute();
   },
   beforeUnmount() {
     if (this._onKey) document.removeEventListener("keydown", this._onKey);
+    if (this._closeFolderCtx) document.removeEventListener("click", this._closeFolderCtx);
   },
   updated() {
     if (this.importStep === "progress" && this.$refs.importListWrap) {
@@ -636,6 +727,88 @@ const app = Vue.createApp({
       } else {
         this.$refs.gallery?.load();
       }
+    },
+    showFolderCtx(e, node) {
+      this.folderCtx = { show: true, node, x: e.clientX, y: e.clientY };
+    },
+    closeFolderCtx(e) {
+      if (e && e.target && e.target.closest(".ctx-menu-popup")) return;
+      this.folderCtx.show = false;
+    },
+    async syncFolder() {
+      const node = this.folderCtx.node;
+      this.folderCtx.show = false;
+      this.$q.dialog({
+        title: "确认同步",
+        message: `将同步「${node.label}」下的所有素材。该文件夹下的所有媒体文件将被重新扫描，新增文件会导入，已变更的文件会更新，磁盘上已删除的文件会从库中移除。`,
+        cancel: true,
+        ok: { label: "确认同步", color: "primary" },
+      }).onOk(async () => {
+        this.syncProgress = [];
+        this.syncDone = 0;
+        this.syncSummary = null;
+        this.showSyncModal = true;
+        try {
+          const resp = await API.syncFolder(node.path);
+          const reader = resp.body.getReader();
+          const decoder = new TextDecoder();
+          let buf = "";
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            const lines = buf.split("\n");
+            buf = lines.pop();
+            for (const line of lines) {
+              if (!line.startsWith("data: ")) continue;
+              try {
+                const ev = JSON.parse(line.slice(6));
+                if (ev.type === "done") {
+                  this.syncSummary = ev.summary;
+                  if (this.syncInBackground) {
+                    this.syncInBackground = false;
+                    const s = ev.summary;
+                    this.$q.notify({ type: "positive", message: `同步完成：新增 ${s.added}，更新 ${s.updated}，移除 ${s.removed}`, timeout: 4000 });
+                    this.loadSidebar();
+                    this.$nextTick(() => this.$refs.gallery?.load());
+                  }
+                } else {
+                  const name = ev.item ? ev.item.file_name : ev.file;
+                  const status = ev.type === "ok" ? ev.status : ev.type;
+                  this.syncProgress.push({ name, status });
+                  this.syncDone++;
+                }
+              } catch {}
+            }
+          }
+        } catch (e) {
+          this.showSyncModal = false;
+          this.$q.notify({ type: "negative", message: "同步失败：" + e.message, timeout: 3000 });
+        }
+      });
+    },
+    async removeFolder() {
+      const node = this.folderCtx.node;
+      this.folderCtx.show = false;
+      this.$q.dialog({
+        title: "确认移除",
+        message: `确定要移除「${node.label}」下的所有素材吗？原文件不会被删除，仅清除库中的记录。`,
+        cancel: true,
+        ok: { label: "移除", color: "negative" },
+      }).onOk(async () => {
+        try {
+          const r = await API.deleteFolder(node.path);
+          const d = r.data || r;
+          this.$q.notify({ type: "positive", message: `已移除 ${d.count || 0} 个素材`, timeout: 3000 });
+          if (this.selectedFolder === node.path || (this.selectedFolder && this.selectedFolder.startsWith(node.path + "/"))) {
+            this.selectedFolder = null;
+          }
+        } catch (e) {
+          this.$q.notify({ type: "negative", message: "移除失败：" + e.message, timeout: 3000 });
+        }
+        this.loadSidebar();
+        this.$nextTick(() => this.$refs.gallery?.load());
+      });
     },
     openImport() {
       this.importStep = "select";

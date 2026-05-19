@@ -356,13 +356,9 @@ const GalleryPage = {
           <q-item-section>在文件夹中显示</q-item-section>
         </q-item>
         <q-separator style="background:var(--border)"></q-separator>
-        <q-item v-if="selArr.length === 1 && selArr[0].media_type !== 'video'" clickable @click="ctxMenu.show = false; findSimilar()" style="padding-left:8px;padding-right:12px">
+        <q-item v-if="selArr.length === 1 && ctxMenu.item && ctxMenu.item.media_type !== 'video'" clickable @click="ctxMenu.show = false; findSimilar()" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="content_copy" size="14px" color="grey-6"></q-icon></q-item-section>
           <q-item-section>查找相似</q-item-section>
-        </q-item>
-        <q-item clickable @click="ctxMenu.show = false; doCtxWriteXmp()" style="padding-left:8px;padding-right:12px">
-          <q-item-section avatar style="min-width:24px;padding-right:8px"><img src="/static/img/xmp-write.svg" style="width:14px;height:14px;opacity:0.6"></q-item-section>
-          <q-item-section>写入 XMP</q-item-section>
         </q-item>
         <q-separator style="background:var(--border)"></q-separator>
         <q-item clickable @click="ctxMenu.show = false; deleteCtx()" style="padding-left:8px;padding-right:12px">
@@ -406,6 +402,141 @@ const GalleryPage = {
         </q-card-actions>
       </q-card>
     </q-dialog>
+    <!-- Find Similar Modal -->
+    <q-dialog v-model="similarDlg.show" persistent transition-show="scale" transition-hide="scale">
+      <q-card class="dialog-card" style="width:93vw;max-width:1400px;height:92vh;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border)">
+          <img :src="'/media/thumbnail/' + similarDlg.source?.id" style="width:40px;height:40px;object-fit:cover;border-radius:6px">
+          <div style="min-width:0">
+            <div style="font-size:13px;font-weight:600">查找相似</div>
+            <div style="font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ similarDlg.source?.file_name }}</div>
+          </div>
+          <div style="flex:1"></div>
+          <q-btn-group unelevated class="sort-group" style="border-radius:6px;overflow:hidden;border:none;background:var(--surface2)">
+            <q-btn unelevated dense :color="similarDlg.similarType==='near'?'primary':'grey-9'" :text-color="similarDlg.similarType==='near'?'white':'grey-6'" icon="filter_none" label="酷似" @click="switchSimilarType('near')" style="padding:3px 10px;min-height:28px;font-size:13px">
+              <q-tooltip :delay="1000">几乎一模一样的照片</q-tooltip>
+            </q-btn>
+            <q-btn unelevated dense :color="similarDlg.similarType==='similar'?'primary':'grey-9'" :text-color="similarDlg.similarType==='similar'?'white':'grey-6'" icon="difference" label="相似" @click="switchSimilarType('similar')" style="padding:3px 10px;min-height:28px;font-size:13px">
+              <q-tooltip :delay="1000">画面非常接近的照片</q-tooltip>
+            </q-btn>
+            <q-btn unelevated dense :color="similarDlg.similarType==='cluster'?'primary':'grey-9'" :text-color="similarDlg.similarType==='cluster'?'white':'grey-6'" icon="bubble_chart" label="聚类" @click="switchSimilarType('cluster')" style="padding:3px 10px;min-height:28px;font-size:13px">
+              <q-tooltip :delay="1000">同场景不同角度或时间</q-tooltip>
+            </q-btn>
+          </q-btn-group>
+          <q-btn flat round dense icon="close" size="sm" color="grey-6" v-close-popup style="margin-left:8px"></q-btn>
+        </div>
+        <div v-if="similarDlg.loading" style="flex:1;display:flex;align-items:center;justify-content:center">
+          <q-spinner-dots color="grey-6" size="40px"></q-spinner-dots>
+        </div>
+        <div v-else-if="!currentSimilarItems.length" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text3);gap:8px">
+          <q-icon name="check_circle" size="36px" style="opacity:0.3"></q-icon>
+          <span>没有发现{{ similarTypeLabel }}素材</span>
+        </div>
+        <q-scroll-area v-else style="flex:1">
+          <div style="padding:16px 20px;display:flex;flex-wrap:wrap;gap:10px">
+            <div v-for="item in currentSimilarItems" :key="item.id"
+                 class="dup-card"
+                 @dblclick.stop="closeSimilarModal(); $root.openDetail(item.id)"
+                 @contextmenu.prevent="showSimilarCtx($event, item)">
+              <div class="dup-card-img">
+                <img :src="'/media/thumbnail/' + item.id" draggable="false" @load="onThumbLoad">
+                <button class="dup-exclude-btn" title="排除" @click.stop="openSimilarExcludeDialog(item)">✕</button>
+              </div>
+              <div class="dup-card-info">
+                <span class="dup-card-name" :title="item.file_name">{{ item.file_name }}</span>
+                <span v-if="item.similarity != null" style="font-size:10px;color:var(--accent);flex-shrink:0">{{ (item.similarity * 100).toFixed(0) }}%</span>
+                <span class="dup-card-size">{{ fmtSize(item.file_size) }}</span>
+              </div>
+              <q-tooltip :delay="800" :offset="[0, 4]">{{ item.file_path }}</q-tooltip>
+            </div>
+          </div>
+        </q-scroll-area>
+        <div style="flex-shrink:0;padding:6px 20px;font-size:12px;color:var(--text3);border-top:1px solid var(--border);text-align:center">
+          找到 {{ currentSimilarItems.length }} 个{{ similarTypeLabel }}素材
+        </div>
+        <!-- Similar item context menu -->
+        <div v-if="similarCtxMenu.show" class="ctx-menu-popup" :style="{ left: similarCtxMenu.x + 'px', top: similarCtxMenu.y + 'px' }" @mousedown.stop>
+          <q-list dense style="min-width:200px;border-radius:8px;overflow:hidden">
+            <q-item clickable @click="closeSimilarCtx(); closeSimilarModal(); $root.openDetail(similarCtxMenu.item.id)" style="padding-left:8px;padding-right:12px">
+              <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="visibility" size="14px" color="grey-6"></q-icon></q-item-section>
+              <q-item-section>查看详情</q-item-section>
+            </q-item>
+            <q-item clickable @click="closeSimilarCtx(); API.revealFile(similarCtxMenu.item.id)" style="padding-left:8px;padding-right:12px">
+              <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="folder_open" size="14px" color="grey-6"></q-icon></q-item-section>
+              <q-item-section>在文件夹中显示</q-item-section>
+            </q-item>
+            <q-separator style="background:var(--border)"></q-separator>
+            <q-item clickable @click="closeSimilarCtx(); openSimilarExcludeDialog(similarCtxMenu.item)" style="padding-left:8px;padding-right:12px">
+              <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="group_remove" size="14px" color="grey-6"></q-icon></q-item-section>
+              <q-item-section>移出本{{ similarTypeLabel }}组</q-item-section>
+            </q-item>
+            <q-item clickable @click="closeSimilarCtx(); similarDeleteConfirm = { show: true, id: similarCtxMenu.item.id, name: similarCtxMenu.item.file_name }" style="padding-left:8px;padding-right:12px">
+              <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="delete_outline" size="14px" color="negative"></q-icon></q-item-section>
+              <q-item-section style="color:var(--negative)">移出素材库</q-item-section>
+            </q-item>
+          </q-list>
+        </div>
+        <!-- Similar exclude dialog -->
+        <q-dialog v-model="similarExcludeDlg.show" persistent>
+          <q-card style="min-width:520px;max-width:640px" class="dialog-card">
+            <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" @click="similarExcludeDlg.show=false"></q-btn>
+            <q-card-section>
+              <div class="text-h6" style="font-size:16px">移出本{{ similarTypeLabel }}组</div>
+              <div style="font-size:12px;color:var(--text3);margin-top:4px">选择与当前照片<b>不相似</b>的照片，排除后不会出现在同一分组中</div>
+            </q-card-section>
+            <q-card-section>
+              <div style="display:flex;gap:16px;align-items:flex-start">
+                <div style="flex-shrink:0;text-align:center">
+                  <img :src="'/media/thumbnail/' + similarExcludeDlg.item?.id"
+                       style="width:140px;height:140px;object-fit:cover;border-radius:8px;border:2px solid var(--accent)">
+                  <div style="margin-top:6px;font-size:11px;color:var(--text2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ similarExcludeDlg.item?.file_name }}</div>
+                  <div style="font-size:10px;color:var(--text3)">当前照片</div>
+                </div>
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                    <span style="font-size:12px;color:var(--text2)">以下哪些与它不相似？<span style="color:var(--text3);margin-left:4px">共 {{ similarExcludeDlg.candidates.length }} 张</span></span>
+                    <q-btn flat dense size="sm" :label="similarExcludeDlg.candidates.every(c => c.selected) ? '取消全选' : '全选'" color="primary" no-caps @click="similarExcludeSelectAll" style="font-size:12px"></q-btn>
+                  </div>
+                  <div class="exclude-scroll-wrap">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;padding:4px">
+                      <div v-for="c in similarExcludeDlg.candidates" :key="c.item.id"
+                           style="cursor:pointer;border-radius:6px;overflow:hidden;border:2px solid transparent;transition:border-color .15s"
+                           :style="c.selected ? 'border-color:var(--negative)' : 'border-color:var(--border)'"
+                           @click="c.selected = !c.selected">
+                        <img :src="'/media/thumbnail/' + c.item.id" style="width:100%;aspect-ratio:1;object-fit:cover;display:block">
+                        <div style="font-size:10px;color:var(--text3);padding:2px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.item.file_name }}</div>
+                      </div>
+                    </div>
+                    <div v-if="similarExcludeDlg.candidates.length > 6" class="exclude-scroll-hint">↓ 向下滚动查看更多</div>
+                  </div>
+                </div>
+              </div>
+            </q-card-section>
+            <q-card-actions align="right" style="padding:12px 16px">
+              <q-btn flat label="取消" @click="similarExcludeDlg.show=false"></q-btn>
+              <q-btn color="primary" :label="'排除 ' + similarExcludeSelectedCount + ' 张'" :disable="similarExcludeSelectedCount === 0" @click="doSimilarExclude"></q-btn>
+            </q-card-actions>
+          </q-card>
+        </q-dialog>
+        <!-- Similar delete confirm -->
+        <q-dialog v-model="similarDeleteConfirm.show">
+          <q-card style="min-width:360px" class="dialog-card">
+            <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" v-close-popup></q-btn>
+            <q-card-section>
+              <div class="text-h6">确认移出素材库</div>
+            </q-card-section>
+            <q-card-section>
+              <p class="text-body2">确定要移除「{{ similarDeleteConfirm.name }}」吗？</p>
+              <p class="text-caption text-grey-6">原文件不会被删除，仅清除库中的记录。</p>
+            </q-card-section>
+            <q-card-actions align="right">
+              <q-btn flat label="取消" @click="similarDeleteConfirm.show=false"></q-btn>
+              <q-btn color="red" label="移出素材库" @click="doSimilarDelete"></q-btn>
+            </q-card-actions>
+          </q-card>
+        </q-dialog>
+      </q-card>
+    </q-dialog>
     <!-- Lasso overlay -->
     <div v-if="lasso" class="lasso" :style="lassoStyle"></div>
   </div>
@@ -419,6 +550,10 @@ const GalleryPage = {
       ctxMenu: { show: false, item: null, x: 0, y: 0 },
       confirmDelete: { show: false, id: null, name: "" },
       confirmBatch: { show: false },
+      similarDlg: { show: false, source: null, loading: false, similarType: 'near', near: [], similar: [], cluster: [] },
+      similarCtxMenu: { show: false, item: null, x: 0, y: 0 },
+      similarExcludeDlg: { show: false, item: null, candidates: [] },
+      similarDeleteConfirm: { show: false, id: null, name: "" },
       filters: { media_type: "all", rating: "", color_label: "" },
       favOnly: false,
       analyzedOnly: false,
@@ -455,6 +590,15 @@ const GalleryPage = {
     },
   },
   computed: {
+    similarTypeLabel() {
+      return { near: "酷似", similar: "相似", cluster: "聚类" }[this.similarDlg.similarType] || "相似";
+    },
+    currentSimilarItems() {
+      return this.similarDlg[this.similarDlg.similarType] || [];
+    },
+    similarExcludeSelectedCount() {
+      return this.similarExcludeDlg.candidates.filter(c => c.selected).length;
+    },
     hasFilters() {
       return this.filters.media_type !== "all" || this.filters.rating || this.filters.color_label || this.favOnly || this.analyzedOnly || this.searchText;
     },
@@ -506,6 +650,12 @@ const GalleryPage = {
     this.load();
     document.addEventListener("mousedown", this.closeCtx);
     document.addEventListener("keydown", this.handleKey, true);
+    this._closeSimilarCtx = (e) => {
+      if (!this.similarCtxMenu.show) return;
+      if (e.target.closest(".ctx-menu-popup")) return;
+      this.similarCtxMenu.show = false;
+    };
+    document.addEventListener("mousedown", this._closeSimilarCtx);
   },
   mounted() {
     this._observer = new IntersectionObserver(([entry]) => {
@@ -519,6 +669,7 @@ const GalleryPage = {
   },
   beforeUnmount() {
     document.removeEventListener("mousedown", this.closeCtx);
+    document.removeEventListener("mousedown", this._closeSimilarCtx);
     document.removeEventListener("keydown", this.handleKey, true);
     if (this._observer) this._observer.disconnect();
     if (this._ro) this._ro.disconnect();
@@ -827,7 +978,66 @@ const GalleryPage = {
       }
     },
     findSimilar() {
-      location.hash = '#/duplicates';
+      const id = this.selArr[0];
+      const m = this.items.find(i => i.id === id);
+      if (!m) return;
+      this.similarDlg = { show: true, source: m, loading: true, similarType: 'near', near: [], similar: [], cluster: [] };
+      API.getSimilar(id).then(res => {
+        this.similarDlg.near = res.near || [];
+        this.similarDlg.similar = res.similar || [];
+        this.similarDlg.cluster = res.cluster || [];
+        this.similarDlg.loading = false;
+      }).catch(e => {
+        Quasar.Notify.create({ message: '查找失败: ' + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
+        this.similarDlg.loading = false;
+      });
+    },
+    switchSimilarType(type) { this.similarDlg.similarType = type; },
+    closeSimilarModal() { this.similarDlg.show = false; },
+    showSimilarCtx(e, item) {
+      this.similarCtxMenu = { show: true, item, x: e.clientX, y: e.clientY };
+    },
+    closeSimilarCtx() { this.similarCtxMenu.show = false; },
+    openSimilarExcludeDialog(item) {
+      const candidates = this.currentSimilarItems
+        .map(i => ({ item: i, selected: i.id === item.id }));
+      this.similarExcludeDlg = { show: true, item: this.similarDlg.source, candidates };
+    },
+    similarExcludeSelectAll() {
+      const allSelected = this.similarExcludeDlg.candidates.every(c => c.selected);
+      this.similarExcludeDlg.candidates.forEach(c => { c.selected = !allSelected; });
+    },
+    async doSimilarExclude() {
+      const selectedIds = this.similarExcludeDlg.candidates.filter(c => c.selected).map(c => c.item.id);
+      if (!selectedIds.length) return;
+      const sourceId = this.similarDlg.source.id;
+      const pairs = selectedIds.map(id => [sourceId, id]);
+      const dupType = this.similarDlg.similarType;
+      this.similarExcludeDlg.show = false;
+      try {
+        await API.addDupExclusions(pairs, dupType);
+        const excludeSet = new Set(selectedIds);
+        this.similarDlg[dupType] = this.similarDlg[dupType].filter(i => !excludeSet.has(i.id));
+        Quasar.Notify.create({ message: `已排除 ${selectedIds.length} 张照片`, position: 'top', timeout: 1500 });
+      } catch (e) {
+        Quasar.Notify.create({ message: '排除失败: ' + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
+      }
+    },
+    async doSimilarDelete() {
+      const id = this.similarDeleteConfirm.id;
+      try {
+        await API.deleteMedia(id);
+        for (const key of ['near', 'similar', 'cluster']) {
+          this.similarDlg[key] = this.similarDlg[key].filter(i => i.id !== id);
+        }
+        this.items = this.items.filter(i => i.id !== id);
+        this.$root.galleryItems = this.items;
+        this.total--;
+        Quasar.Notify.create({ message: '已移除「' + this.similarDeleteConfirm.name + '」', position: 'top', timeout: 1500 });
+      } catch (e) {
+        Quasar.Notify.create({ message: '移除失败: ' + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
+      }
+      this.similarDeleteConfirm.show = false;
     },
     revealCtx() {
       API.revealFile(this.selArr[0]);
