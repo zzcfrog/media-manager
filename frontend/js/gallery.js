@@ -885,7 +885,7 @@ const GalleryPage = {
       return this._calcRows(items, w, this.justifiedRowH);
     },
     _calcRows(items, containerW, targetH) {
-      const gap = 4, rows = [];
+      const gap = 8, rows = [];
       let row = [], rowAspect = 0;
       for (const m of items) {
         const w = m.width || 16, h = m.height || 9;
