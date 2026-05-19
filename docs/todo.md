@@ -1,5 +1,13 @@
 # TODO
 
+## 已完成：移除"重复"检测标签（2026-05-19）
+
+移除 SHA256 级别的精确重复检测，仅保留视觉相似检测（酷似/相似/聚类），突出软件自身优势。
+
+**改动文件：**
+- `frontend/js/duplicates.js` — 删除"重复"按钮及帮助文案；默认标签从 `similar` 改为 `near`（酷似）；`typeLabel` 移除 `exact` 映射
+- `backend/blueprints/library.py` — 删除 `exact` 分支（余弦相似度 ≥ 0.999 的 union-find）
+
 ## 已完成：缩略图 Bug 修复 + UUID 随机命名（2026-05-19）
 
 修复缩略图丢失 Bug，缩略图文件名改为随机 UUID，新增缩略图自动补齐机制。

@@ -5,9 +5,6 @@ const DuplicatesPage = {
     <div class="filter-bar" @mousedown.stop>
       <q-btn flat dense icon="arrow_back" label="返回" color="grey-6" style="border-radius:6px;padding:3px 6px;font-size:13px" @click="goBack"></q-btn>
       <q-btn-group unelevated style="border-radius:6px;overflow:hidden">
-        <q-btn unelevated dense :color="dupType==='exact'?'primary':'grey-9'" :text-color="dupType==='exact'?'white':'grey-6'" icon="content_copy" size="sm" label="重复" @click="switchType('exact')">
-          <q-tooltip :delay="1000">同一个文件出现了多次</q-tooltip>
-        </q-btn>
         <q-btn unelevated dense :color="dupType==='near'?'primary':'grey-9'" :text-color="dupType==='near'?'white':'grey-6'" icon="filter_none" size="sm" label="酷似" @click="switchType('near')">
           <q-tooltip :delay="1000">几乎一模一样的照片</q-tooltip>
         </q-btn>
@@ -21,7 +18,6 @@ const DuplicatesPage = {
       <q-icon name="help_outline" size="16px" color="grey-6">
         <q-tooltip :delay="300" max-width="400px">
           <div style="font-size:12px;line-height:1.8;white-space:nowrap">
-            <b>重复</b>：同一个文件出现了多次<br>
             <b>酷似</b>：几乎一模一样的照片，比如同一张照片的 JPG 和 RAW<br>
             <b>相似</b>：画面非常接近，比如连拍的照片<br>
             <b>聚类</b>：同一个场景的不同角度或不同时间拍的照片
@@ -83,7 +79,7 @@ const DuplicatesPage = {
         <q-separator style="background:var(--border)"></q-separator>
         <q-item clickable @click="closeCtx(); excludeCtx()" :disable="!canExcludeFromGroup" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="group_remove" size="14px" :color="canExcludeFromGroup ? 'grey-6' : 'grey-9'"></q-icon></q-item-section>
-          <q-item-section>排除本组</q-item-section>
+          <q-item-section>移出本{{ typeLabel }}组</q-item-section>
           <q-tooltip v-if="!canExcludeFromGroup" :delay="0">选中的素材不在同一分组</q-tooltip>
         </q-item>
         <q-item clickable @click="closeCtx(); deleteCtx()" style="padding-left:8px;padding-right:12px">
@@ -152,7 +148,7 @@ const DuplicatesPage = {
   `,
   data() {
     return {
-      dupType: "similar",
+      dupType: "near",
       groups: [],
       loading: false,
       needBackfill: false,
@@ -168,7 +164,7 @@ const DuplicatesPage = {
   },
   computed: {
     typeLabel() {
-      return { exact: "重复", near: "酷似", similar: "相似", cluster: "聚类" }[this.dupType] || "相似";
+      return { near: "酷似", similar: "相似", cluster: "聚类" }[this.dupType] || "相似";
     },
     flatItems() {
       const items = [];

@@ -14,7 +14,7 @@
 | RAW 解码 | rawpy + Pillow |
 | HEIC 解码 | pillow-heif |
 | 中文分词 | jieba（FTS5 索引） |
-| 哈希去重 | ResNet50 embedding 余弦相似度 ≥ 0.999（已移除 SHA256 + pHash） |
+| 哈希去重 | 已移除 SHA256 级精确重复检测，仅保留视觉相似检测 |
 | 相似检测 | ResNet50 ONNX + HDBSCAN（图片视觉相似） |
 | 端口 | 6622 |
 

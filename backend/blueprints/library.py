@@ -409,11 +409,6 @@ def find_duplicates():
     id_map = [r["id"] for r in rows]
     vecs = np.array([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
 
-    if dup_type == "exact":
-        sim_matrix = vecs @ vecs.T
-        indices_groups = _union_find_groups(sim_matrix, 0.999, id_map, excluded)
-        return jsonify({"groups": _rows_to_groups(rows, indices_groups, sim_matrix=sim_matrix)})
-
     if dup_type == "cluster":
         import hdbscan
         labels = hdbscan.HDBSCAN(min_cluster_size=2, metric="euclidean").fit_predict(vecs)
