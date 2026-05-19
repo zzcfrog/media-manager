@@ -36,7 +36,7 @@ body.body--dark input::placeholder { color: #555 !important; -webkit-text-fill-c
 .masonry-card:hover { border-color: var(--border2); }
 .masonry-card.selected { border-color: var(--accent); }
 .masonry-img { position: relative; }
-.masonry-img img { width: 100%; display: block; background: #111; }
+.masonry-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .masonry-info { position: absolute; bottom: 0; left: 0; right: 0; padding: 4px 8px; display: flex; align-items: center; gap: 4px; background: linear-gradient(transparent, rgba(0,0,0,0.7)); opacity: 0; transition: opacity 0.15s; }
 .masonry-card:hover .masonry-info { opacity: 1; }
 .masonry-name { font-size: 10px; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
