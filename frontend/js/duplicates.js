@@ -44,18 +44,22 @@ const DuplicatesPage = {
           </div>
           <div style="display:flex;gap:10px;overflow-x:auto;padding-bottom:4px">
             <div v-for="item in g.items" :key="item.id"
-                 class="dup-thumb"
+                 class="dup-card"
                  :class="{selected: selArr.includes(item.id)}"
                  :data-id="item.id"
                  @mousedown.stop
                  @click="onThumbClick(item, $event)"
                  @dblclick.stop="openDetail(item.id)"
                  @contextmenu.prevent="showCtx($event, item)">
-              <img :src="'/media/thumbnail/' + item.id" draggable="false">
               <div v-if="selArr.includes(item.id)" class="sel-overlay"></div>
-              <button class="dup-exclude-btn" title="排除" @click.stop="openExcludeDialog(item, g)">✕</button>
-              <div class="dup-thumb-name">{{ item.file_name }}</div>
-              <div style="font-size:10px;color:var(--text3)">{{ item.media_type === 'video' ? '视频' : '图片' }} · {{ (item.file_size / 1048576).toFixed(1) }}MB</div>
+              <div class="dup-card-img">
+                <img :src="'/media/thumbnail/' + item.id" draggable="false">
+                <button class="dup-exclude-btn" title="排除" @click.stop="openExcludeDialog(item, g)">✕</button>
+              </div>
+              <div class="dup-card-info">
+                <span class="dup-card-name" :title="item.file_name">{{ item.file_name }}</span>
+                <span class="dup-card-size">{{ fmtSize(item.file_size) }}</span>
+              </div>
               <q-tooltip :delay="800" :offset="[0, 4]">{{ item.file_path }}</q-tooltip>
             </div>
           </div>
@@ -191,6 +195,7 @@ const DuplicatesPage = {
   },
   methods: {
     API,
+    fmtSize,
     goBack() { location.hash = "#/gallery"; },
     openDetail(id) { location.hash = "#/detail/" + id; },
     switchType(type) {
@@ -308,7 +313,7 @@ const DuplicatesPage = {
         const r = { l: Math.min(this._lassoStart.x, e.clientX), t: Math.min(this._lassoStart.y, e.clientY),
                     r: Math.max(this._lassoStart.x, e.clientX), b: Math.max(this._lassoStart.y, e.clientY) };
         const ids = [];
-        const thumbs = document.querySelectorAll(".dup-thumb[data-id]");
+        const thumbs = document.querySelectorAll(".dup-card[data-id]");
         thumbs.forEach(el => {
           const br = el.getBoundingClientRect();
           if (br.left < r.r && br.right > r.l && br.top < r.b && br.bottom > r.t) {
