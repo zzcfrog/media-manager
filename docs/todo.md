@@ -1,5 +1,26 @@
 # TODO
 
+## 已完成：i18n 国际化 + 设置页重构（2026-05-19）
+
+新增中英文国际化支持，设置页面重构为标签页布局。
+
+**改动文件：**
+- `frontend/js/i18n.js` — **新建**：轻量 i18n 模块，`t(key, params)` 翻译函数 + `Vue.reactive` 响应式 locale 状态；翻译键按前缀分组（`g.*` 通用、`d.*` 详情、`dup.*` 重复、`s.*` 设置、`side.*` 侧边栏、`imp.*` 导入、`kb.*` 快捷键等）；回退链：当前 locale → zh → key 本身
+- `frontend/index.html` — 设置弹窗从手风琴分区改为标签页（通用/图片/视频/音频 4 个标签）；通用标签新增语言选择器（中文/English）；所有 UI 文案改为 `t()` 调用；`<script>` 引入 `i18n.js`
+- `frontend/js/gallery.js` — 所有硬编码中文文案替换为 `t()` 调用（筛选标签、通知、右键菜单等）
+- `frontend/js/detail.js` — 所有 UI 文案替换为 `t()` 调用（元数据标签、分析维度、按钮、通知等）
+- `frontend/js/duplicates.js` — 所有 UI 文案替换为 `t()` 调用（标签页标题、按钮、通知等）
+- `frontend/css/main.css` — minimap 视口矩形背景色改为 `var(--accent)` 主题色（原硬编码蓝色）
+- `backend/db.py` — `_DEFAULTS` 新增 `language` 设置（默认 `zh`）
+- `backend/blueprints/settings.py` — GET/POST 接口同步 `language` 字段
+
+**功能说明：**
+- 支持中文（默认）和英文两种语言
+- 语言设置持久化到后端 settings 表，页面刷新后保持
+- 设置页重新组织为 4 个标签页：通用（语言/主题/强调色）、图片、视频、音频
+- 所有 UI 标签、工具提示、通知、对话框标题跟随语言设置
+- Minimap 视口矩形背景色使用 accent 主题色，跟随用户选择的主题色变化
+
 ## 已完成：全屏看图 + 导航缩略图（2026-05-19）
 
 图片详情页新增全屏看图功能和缩放导航缩略图。

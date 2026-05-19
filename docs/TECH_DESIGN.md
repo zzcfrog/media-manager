@@ -54,6 +54,7 @@ video_analyzer/
 │   ├── css/main.css           # 暗色/亮色主题
 │   └── js/
 │       ├── api.js             # API 客户端
+│       ├── i18n.js            # 轻量 i18n（t() 翻译 + Vue.reactive 状态）
 │       ├── gallery.js         # Gallery 页组件
 │       └── detail.js          # Detail 页组件
 │       └── duplicates.js      # 查找重复页组件
@@ -130,7 +131,7 @@ media_fts (FTS5: media_id UNINDEXED, file_name, visual, asr, subtitle,
 
 -- 全局设置
 settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)
--- 默认值: resolution, fps, vendor, model, use_multimodal, asr_engine, video_api_key, asr_api_key, image_resolution, image_api_key, image_model, hw_accel
+-- 默认值: resolution, fps, vendor, model, use_multimodal, asr_engine, video_api_key, asr_api_key, image_resolution, image_api_key, image_model, hw_accel, language
 
 -- 排除对（重复/相似检测排除）
 dup_exclusions (media_id_a INTEGER, media_id_b INTEGER, dup_type TEXT, PRIMARY KEY(media_id_a, media_id_b, dup_type))
@@ -372,6 +373,39 @@ Gallery.load() / Gallery.loadMore()
 ```
 
 `selectedFolder` 同时控制侧边栏"素材库"入口的高亮状态（`selectedFolder` 非空时不高亮），确保文件夹筛选和导航入口互斥。素材库菜单右侧独立箭头控制 `libraryExpanded`（`v-show` 控制目录树显隐），`expandedFolders` 数组通过 `:expanded` 属性响应式控制节点展开状态。
+
+### 5.4 国际化（i18n）
+
+**模块**：`frontend/js/i18n.js`
+
+**核心 API**：
+- `t(key, params)` — 翻译函数，支持插值参数（`{name}` 格式）
+- `locale` — `Vue.reactive` 响应式对象，`locale.value` 为当前语言代码（`'zh'` / `'en'`）
+- `setLocale(lang)` — 切换语言并保存到后端 settings
+
+**翻译键组织**：按前缀分组，每个前缀对应一个 UI 区域：
+
+| 前缀 | 覆盖范围 |
+|------|---------|
+| `g.*` | 通用（确认、取消、保存、删除等） |
+| `d.*` | 详情页（元数据标签、分析维度、按钮） |
+| `dup.*` | 重复页（标签页标题、操作按钮） |
+| `s.*` | 设置页（标签页标题、字段标签） |
+| `side.*` | 侧边栏（菜单项、收藏夹） |
+| `imp.*` | 导入弹窗（步骤、状态、结果） |
+| `kb.*` | 快捷键参考弹窗 |
+| `ctx.*` | 右键上下文菜单 |
+
+**回退链**：`translations[currentLocale][key]` → `translations['zh'][key]` → `key` 本身（开发时可见未翻译的键）。
+
+**响应式集成**：
+- Vue Options API 组件中通过 `computed` 属性访问翻译（如 `computed: { ratingLabel() { return t('d.rating') } }`），语言切换时自动更新
+- 下拉选项标签使用 computed 数组（如设置页的分辨率/帧率选项），切换语言后选项文本即时刷新
+
+**后端集成**：
+- `language` 设置存储在 `settings` 表（`db.py` 的 `_DEFAULTS`，默认 `'zh'`）
+- 前端 `mounted()` 时通过 `GET /api/settings` 获取语言设置，初始化 `locale.value`
+- `setLocale()` 调用 `POST /api/settings` 持久化语言偏好
 
 ## 6. 外部依赖
 

@@ -5,21 +5,21 @@ const GalleryPage = {
     <div class="filter-bar">
       <q-btn-group unelevated style="border-radius:6px;overflow:hidden">
         <q-btn unelevated dense :color="filters.media_type==='all'?'primary':'grey-9'" :text-color="filters.media_type==='all'?'white':'grey-6'" size="sm" label="ALL" @click="filters.media_type='all'; load()">
-          <q-tooltip :delay="1000">全部</q-tooltip>
+          <q-tooltip :delay="1000">{{ t('g.all') }}</q-tooltip>
         </q-btn>
         <q-btn unelevated dense :color="filters.media_type==='image'?'primary':'grey-9'" :text-color="filters.media_type==='image'?'white':'grey-6'" icon="image" size="sm" @click="filters.media_type='image'; load()">
-          <q-tooltip :delay="1000">图片</q-tooltip>
+          <q-tooltip :delay="1000">{{ t('g.images') }}</q-tooltip>
         </q-btn>
         <q-btn unelevated dense :color="filters.media_type==='video'?'primary':'grey-9'" :text-color="filters.media_type==='video'?'white':'grey-6'" icon="smart_display" size="sm" @click="filters.media_type='video'; load()">
-          <q-tooltip :delay="1000">视频</q-tooltip>
+          <q-tooltip :delay="1000">{{ t('g.videos') }}</q-tooltip>
         </q-btn>
       </q-btn-group>
       <div style="display:flex;gap:2px">
         <q-btn flat round dense :color="favOnly ? 'red' : 'grey-7'" icon="favorite" size="sm" @click="favOnly=!favOnly; showFilterToast(); load()">
-          <q-tooltip :delay="1000">只看喜欢</q-tooltip>
+          <q-tooltip :delay="1000">{{ t('g.fav_only') }}</q-tooltip>
         </q-btn>
         <q-btn flat round dense :color="analyzedOnly ? 'primary' : 'grey-7'" icon="auto_awesome" size="sm" @click="analyzedOnly=!analyzedOnly; showFilterToast(); load()">
-          <q-tooltip :delay="1000">只看已分析</q-tooltip>
+          <q-tooltip :delay="1000">{{ t('g.analyzed_only') }}</q-tooltip>
         </q-btn>
       </div>
       <div class="filter-stars">
@@ -30,10 +30,10 @@ const GalleryPage = {
       </div>
       <div style="width:30px;display:flex;align-items:center;justify-content:center">
         <q-btn v-if="hasFilters" flat round dense icon="filter_list_off" size="sm" color="grey-6" @click="resetFilters">
-          <q-tooltip :delay="1000">重置筛选</q-tooltip>
+          <q-tooltip :delay="1000">{{ t('g.reset_filter') }}</q-tooltip>
         </q-btn>
       </div>
-      <q-input v-model="searchText" dense filled placeholder="搜索文件名、分析内容…"
+      <q-input v-model="searchText" dense filled :placeholder="t('g.search_placeholder')"
                color="grey-5" style="width:220px" @keyup.enter="doSearch">
         <template v-slot:append>
           <q-icon v-if="searchText" name="close" size="14px" color="grey-6" style="cursor:pointer" @click="searchText=''; doSearch()"></q-icon>
@@ -54,21 +54,20 @@ const GalleryPage = {
       <q-select v-if="sortBy==='duration'" v-model="groupBy" dense filled options-dense
         :options="durGroupOptions" emit-value map-options
         style="min-width:100px" class="q-ml-xs"></q-select>
-      <div class="filter-sep"></div>
-      <q-btn-group flat>
-        <q-btn flat dense :color="viewMode==='grid'?'primary':'grey-7'" icon="apps" size="md" @click="viewMode='grid'">
-          <q-tooltip :delay="1000">网格视图</q-tooltip>
+      <q-btn-group flat style="flex-shrink:0">
+        <q-btn flat dense icon="apps" size="md" @click="viewMode='grid'" :style="{color: viewMode==='grid' ? 'var(--q-primary)' : '#9e9e9e'}">
+          <q-tooltip :delay="1000">{{ t('g.grid_view') }}</q-tooltip>
         </q-btn>
         <q-btn flat dense size="md" @click="viewMode='masonry'">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" :style="{color: viewMode==='masonry' ? 'var(--q-primary)' : '#9e9e9e'}"><rect x="2" y="3" width="6" height="18" rx="1"/><rect x="9" y="3" width="6" height="18" rx="1"/><rect x="16" y="3" width="6" height="18" rx="1"/></svg>
-          <q-tooltip :delay="1000">瀑布流</q-tooltip>
+          <q-tooltip :delay="1000">{{ t('g.masonry_view') }}</q-tooltip>
         </q-btn>
         <q-btn flat dense size="md" @click="viewMode='justified'">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" :style="{color: viewMode==='justified' ? 'var(--q-primary)' : '#9e9e9e'}"><rect x="3" y="2" width="18" height="6" rx="1"/><rect x="3" y="9" width="18" height="6" rx="1"/><rect x="3" y="16" width="18" height="6" rx="1"/></svg>
-          <q-tooltip :delay="1000">等行高</q-tooltip>
+          <q-tooltip :delay="1000">{{ t('g.justified_view') }}</q-tooltip>
         </q-btn>
-        <q-btn flat dense :color="viewMode==='list'?'primary':'grey-7'" icon="list" size="md" @click="viewMode='list'">
-          <q-tooltip :delay="1000">列表视图</q-tooltip>
+        <q-btn flat dense icon="list" size="md" @click="viewMode='list'" :style="{color: viewMode==='list' ? 'var(--q-primary)' : '#9e9e9e'}">
+          <q-tooltip :delay="1000">{{ t('g.list_view') }}</q-tooltip>
         </q-btn>
       </q-btn-group>
     </div>
@@ -78,7 +77,7 @@ const GalleryPage = {
       <template v-if="items.length && viewMode==='grid' && groupedItems">
         <q-timeline color="primary" layout="dense" style="padding-left:8px">
           <q-timeline-entry v-for="g in groupedItems" :key="g.key"
-            :title="g.label + '  ·  ' + g.items.length + ' 个素材'"
+            :title="t('g.timeline_label', {label: g.label, n: g.items.length})"
             tag="div" class="timeline-group">
             <div class="grid" :style="{'--card-w': (180*gridScale)+'px'}">
             <div class="media-card" v-for="m in g.items" :key="m.id"
@@ -146,7 +145,7 @@ const GalleryPage = {
       <template v-if="items.length && viewMode==='masonry' && groupedItems">
         <q-timeline color="primary" layout="dense" style="padding-left:8px">
           <q-timeline-entry v-for="g in groupedItems" :key="g.key"
-            :title="g.label + '  ·  ' + g.items.length + ' 个素材'"
+            :title="t('g.timeline_label', {label: g.label, n: g.items.length})"
             tag="div" class="timeline-group">
             <div class="masonry" :style="{'--masonry-cols': masonryCols}">
             <div class="masonry-card" v-for="m in g.items" :key="m.id"
@@ -196,7 +195,7 @@ const GalleryPage = {
       <template v-if="items.length && viewMode==='justified' && groupedItems">
         <q-timeline color="primary" layout="dense" style="padding-left:8px">
           <q-timeline-entry v-for="g in groupedItems" :key="g.key"
-            :title="g.label + '  ·  ' + g.items.length + ' 个素材'"
+            :title="t('g.timeline_label', {label: g.label, n: g.items.length})"
             tag="div" class="timeline-group">
             <div v-for="(row, ri) in layoutJustified(g.items)" :key="ri" class="justified-row">
               <div v-for="m in row.items" :key="m.id" class="justified-card"
@@ -244,7 +243,7 @@ const GalleryPage = {
       <template v-if="items.length && viewMode==='list' && groupedItems">
         <q-timeline color="primary" layout="dense" style="padding-left:8px">
           <q-timeline-entry v-for="g in groupedItems" :key="g.key"
-            :title="g.label + '  ·  ' + g.items.length + ' 个素材'"
+            :title="t('g.timeline_label', {label: g.label, n: g.items.length})"
             tag="div" class="timeline-group">
             <div class="list">
             <div class="media-row" v-for="m in g.items" :key="m.id"
@@ -279,13 +278,13 @@ const GalleryPage = {
       <div v-if="items.length && viewMode==='list' && !groupedItems" class="list">
         <div class="list-header">
           <span style="width:72px"></span>
-          <span class="lh-name lh-sort" @click="toggleSort('file_name')">文件名 <span v-if="sortBy==='file_name'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
-          <span class="lh-col lh-sort" @click="toggleSort('resolution')">分辨率 <span v-if="sortBy==='resolution'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
-          <span class="lh-col lh-sort" @click="toggleSort('duration')">时长 <span v-if="sortBy==='duration'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
-          <span class="lh-col lh-sort" @click="toggleSort('file_size')">大小 <span v-if="sortBy==='file_size'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
-          <span class="lh-col lh-sort" @click="toggleSort('date_taken')">拍摄时间 <span v-if="sortBy==='date_taken'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
-          <span class="lh-col lh-sort" @click="toggleSort('imported_at')">导入时间 <span v-if="sortBy==='imported_at'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
-          <span class="lh-col lh-sort" @click="toggleSort('rating')">评分 <span v-if="sortBy==='rating'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
+          <span class="lh-name lh-sort" @click="toggleSort('file_name')">{{ t('g.col_filename') }} <span v-if="sortBy==='file_name'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
+          <span class="lh-col lh-sort" @click="toggleSort('resolution')">{{ t('g.col_resolution') }} <span v-if="sortBy==='resolution'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
+          <span class="lh-col lh-sort" @click="toggleSort('duration')">{{ t('g.col_duration') }} <span v-if="sortBy==='duration'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
+          <span class="lh-col lh-sort" @click="toggleSort('file_size')">{{ t('g.col_size') }} <span v-if="sortBy==='file_size'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
+          <span class="lh-col lh-sort" @click="toggleSort('date_taken')">{{ t('g.col_date_taken') }} <span v-if="sortBy==='date_taken'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
+          <span class="lh-col lh-sort" @click="toggleSort('imported_at')">{{ t('g.col_imported_at') }} <span v-if="sortBy==='imported_at'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
+          <span class="lh-col lh-sort" @click="toggleSort('rating')">{{ t('g.col_rating') }} <span v-if="sortBy==='rating'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
           <span style="width:32px"></span>
         </div>
         <div class="media-row" v-for="m in items" :key="m.id"
@@ -315,7 +314,7 @@ const GalleryPage = {
       </div>
       <div v-if="!items.length && !loading" class="empty">
         <q-icon name="folder_open" size="40px" color="grey-7"></q-icon>
-        <p>暂无素材，点击左上角"导入"添加</p>
+        <p>{{ t('g.empty') }}</p>
       </div>
       <div ref="sentinel" style="height:1px;width:100%"></div>
       <div v-if="loadingMore" class="load-more-spinner">
@@ -323,8 +322,8 @@ const GalleryPage = {
       </div>
     </div>
     <q-toolbar class="gallery-footer" style="border-top:1px solid var(--border);min-height:36px;flex-shrink:0">
-      <span class="text-caption text-grey-6">{{ total }} 个素材
-        <span v-if="selArr.length" class="text-primary q-ml-sm">已选 {{ selArr.length }}</span>
+      <span class="text-caption text-grey-6">{{ t('g.total', {n: total}) }}
+        <span v-if="selArr.length" class="text-primary q-ml-sm">{{ t('g.selected', {n: selArr.length}) }}</span>
       </span>
       <q-space></q-space>
       <template v-if="viewMode==='grid'">
@@ -333,12 +332,12 @@ const GalleryPage = {
                   style="width:100px" color="primary"></q-slider>
       </template>
       <template v-if="viewMode==='masonry'">
-        <span class="text-caption text-grey-6 q-mr-sm">{{ masonryCols }} 列</span>
+        <span class="text-caption text-grey-6 q-mr-sm">{{ t('g.masonry_cols', {n: masonryCols}) }}</span>
         <q-slider v-model="masonryCols" :min="3" :max="8" :step="1"
                   style="width:100px" color="primary"></q-slider>
       </template>
       <template v-if="viewMode==='justified'">
-        <span class="text-caption text-grey-6 q-mr-sm">{{ justifiedRowH }}px</span>
+        <span class="text-caption text-grey-6 q-mr-sm">{{ t('g.row_height', {n: justifiedRowH}) }}</span>
         <q-slider v-model="justifiedRowH" :min="120" :max="400" :step="10"
                   style="width:100px" color="primary"></q-slider>
       </template>
@@ -348,22 +347,22 @@ const GalleryPage = {
       <q-list dense style="min-width:200px;border-radius:8px;overflow:hidden">
         <q-item clickable @click="ctxMenu.show = false; openDetail(selArr[0])" :disable="selArr.length > 1" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="visibility" size="14px" color="grey-6"></q-icon></q-item-section>
-          <q-item-section>查看详情</q-item-section>
+          <q-item-section>{{ t('g.ctx_view_detail') }}</q-item-section>
           <q-item-section side style="flex-shrink:0;white-space:nowrap;display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--text3)">↵</span></q-item-section>
         </q-item>
         <q-item clickable @click="ctxMenu.show = false; revealCtx()" :disable="selArr.length !== 1" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="folder_open" size="14px" color="grey-6"></q-icon></q-item-section>
-          <q-item-section>在文件夹中显示</q-item-section>
+          <q-item-section>{{ t('g.ctx_reveal') }}</q-item-section>
         </q-item>
         <q-separator style="background:var(--border)"></q-separator>
         <q-item v-if="selArr.length === 1 && ctxMenu.item && ctxMenu.item.media_type !== 'video'" clickable @click="ctxMenu.show = false; findSimilar()" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="content_copy" size="14px" color="grey-6"></q-icon></q-item-section>
-          <q-item-section>查找相似</q-item-section>
+          <q-item-section>{{ t('g.ctx_find_similar') }}</q-item-section>
         </q-item>
         <q-separator style="background:var(--border)"></q-separator>
         <q-item clickable @click="ctxMenu.show = false; deleteCtx()" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="delete_outline" size="14px" color="negative"></q-icon></q-item-section>
-          <q-item-section style="color:var(--negative)">{{ selArr.length > 1 ? '移出 ' + selArr.length + ' 个素材' : '移出素材库' }}</q-item-section>
+          <q-item-section style="color:var(--negative)">{{ selArr.length > 1 ? t('g.ctx_remove_n', {n: selArr.length}) : t('g.ctx_remove') }}</q-item-section>
           <q-item-section side style="flex-shrink:0;white-space:nowrap;display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--text3)">⌘+⌫</span></q-item-section>
         </q-item>
       </q-list>
@@ -373,15 +372,15 @@ const GalleryPage = {
       <q-card style="min-width:360px" class="dialog-card">
         <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" v-close-popup></q-btn>
         <q-card-section>
-          <div class="text-h6">确认移除</div>
+          <div class="text-h6">{{ t('g.confirm_remove') }}</div>
         </q-card-section>
         <q-card-section>
-          <p class="text-body2">确定要移除「{{ confirmDelete.name }}」吗？</p>
-          <p class="text-caption text-grey-6">原文件不会被删除，仅清除库中的记录。</p>
+          <p class="text-body2">{{ t('g.confirm_remove_msg', {name: confirmDelete.name}) }}</p>
+          <p class="text-caption text-grey-6">{{ t('g.remove_note') }}</p>
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat label="取消" @click="confirmDelete.show=false"></q-btn>
-          <q-btn color="red" label="确认移除" @click="doDelete"></q-btn>
+          <q-btn flat :label="t('g.cancel')" @click="confirmDelete.show=false"></q-btn>
+          <q-btn color="red" :label="t('g.confirm_remove')" @click="doDelete"></q-btn>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -390,15 +389,15 @@ const GalleryPage = {
       <q-card style="min-width:360px" class="dialog-card">
         <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" v-close-popup></q-btn>
         <q-card-section>
-          <div class="text-h6">批量移除</div>
+          <div class="text-h6">{{ t('g.batch_remove') }}</div>
         </q-card-section>
         <q-card-section>
-          <p class="text-body2">确定要移除选中的 {{ selArr.length }} 个素材吗？</p>
-          <p class="text-caption text-grey-6">原文件不会被删除，仅清除库中的记录。</p>
+          <p class="text-body2">{{ t('g.batch_remove_msg', {n: selArr.length}) }}</p>
+          <p class="text-caption text-grey-6">{{ t('g.remove_note') }}</p>
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat label="取消" @click="confirmBatch.show=false"></q-btn>
-          <q-btn color="red" label="确认移除" @click="doBatchDelete"></q-btn>
+          <q-btn flat :label="t('g.cancel')" @click="confirmBatch.show=false"></q-btn>
+          <q-btn color="red" :label="t('g.confirm_remove')" @click="doBatchDelete"></q-btn>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -408,19 +407,19 @@ const GalleryPage = {
         <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border)">
           <img :src="'/media/thumbnail/' + similarDlg.source?.id" style="width:40px;height:40px;object-fit:cover;border-radius:6px">
           <div style="min-width:0">
-            <div style="font-size:13px;font-weight:600">查找相似</div>
+            <div style="font-size:13px;font-weight:600">{{ t('g.find_similar') }}</div>
             <div style="font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ similarDlg.source?.file_name }}</div>
           </div>
           <div style="flex:1"></div>
           <q-btn-group unelevated class="sort-group" style="border-radius:6px;overflow:hidden;border:none;background:var(--surface2)">
-            <q-btn unelevated dense :color="similarDlg.similarType==='near'?'primary':'grey-9'" :text-color="similarDlg.similarType==='near'?'white':'grey-6'" icon="filter_none" label="酷似" @click="switchSimilarType('near')" style="padding:3px 10px;min-height:28px;font-size:13px">
-              <q-tooltip :delay="1000">几乎一模一样的照片</q-tooltip>
+            <q-btn unelevated dense :color="similarDlg.similarType==='near'?'primary':'grey-9'" :text-color="similarDlg.similarType==='near'?'white':'grey-6'" icon="filter_none" :label="t('dup.near')" @click="switchSimilarType('near')" style="padding:3px 10px;min-height:28px;font-size:13px">
+              <q-tooltip :delay="1000">{{ t('dup.near_tip') }}</q-tooltip>
             </q-btn>
-            <q-btn unelevated dense :color="similarDlg.similarType==='similar'?'primary':'grey-9'" :text-color="similarDlg.similarType==='similar'?'white':'grey-6'" icon="difference" label="相似" @click="switchSimilarType('similar')" style="padding:3px 10px;min-height:28px;font-size:13px">
-              <q-tooltip :delay="1000">画面非常接近的照片</q-tooltip>
+            <q-btn unelevated dense :color="similarDlg.similarType==='similar'?'primary':'grey-9'" :text-color="similarDlg.similarType==='similar'?'white':'grey-6'" icon="difference" :label="t('dup.similar')" @click="switchSimilarType('similar')" style="padding:3px 10px;min-height:28px;font-size:13px">
+              <q-tooltip :delay="1000">{{ t('dup.similar_tip') }}</q-tooltip>
             </q-btn>
-            <q-btn unelevated dense :color="similarDlg.similarType==='cluster'?'primary':'grey-9'" :text-color="similarDlg.similarType==='cluster'?'white':'grey-6'" icon="bubble_chart" label="聚类" @click="switchSimilarType('cluster')" style="padding:3px 10px;min-height:28px;font-size:13px">
-              <q-tooltip :delay="1000">同场景不同角度或时间</q-tooltip>
+            <q-btn unelevated dense :color="similarDlg.similarType==='cluster'?'primary':'grey-9'" :text-color="similarDlg.similarType==='cluster'?'white':'grey-6'" icon="bubble_chart" :label="t('dup.cluster')" @click="switchSimilarType('cluster')" style="padding:3px 10px;min-height:28px;font-size:13px">
+              <q-tooltip :delay="1000">{{ t('dup.cluster_tip') }}</q-tooltip>
             </q-btn>
           </q-btn-group>
           <q-btn flat round dense icon="close" size="sm" color="grey-6" v-close-popup style="margin-left:8px"></q-btn>
@@ -430,7 +429,7 @@ const GalleryPage = {
         </div>
         <div v-else-if="!currentSimilarItems.length" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text3);gap:8px">
           <q-icon name="check_circle" size="36px" style="opacity:0.3"></q-icon>
-          <span>没有发现{{ similarTypeLabel }}素材</span>
+          <span>{{ t('g.no_similar_found', {type: similarTypeLabel}) }}</span>
         </div>
         <q-scroll-area v-else style="flex:1">
           <div style="padding:16px 20px;display:flex;flex-wrap:wrap;gap:10px">
@@ -440,7 +439,7 @@ const GalleryPage = {
                  @contextmenu.prevent="showSimilarCtx($event, item)">
               <div class="dup-card-img">
                 <img :src="'/media/thumbnail/' + item.id" draggable="false" @load="onThumbLoad">
-                <button class="dup-exclude-btn" title="排除" @click.stop="openSimilarExcludeDialog(item)">✕</button>
+                <button class="dup-exclude-btn" :title="t('g.exclude')" @click.stop="openSimilarExcludeDialog(item)">✕</button>
               </div>
               <div class="dup-card-info">
                 <span class="dup-card-name" :title="item.file_name">{{ item.file_name }}</span>
@@ -452,27 +451,27 @@ const GalleryPage = {
           </div>
         </q-scroll-area>
         <div style="flex-shrink:0;padding:6px 20px;font-size:12px;color:var(--text3);border-top:1px solid var(--border);text-align:center">
-          找到 {{ currentSimilarItems.length }} 个{{ similarTypeLabel }}素材
+          {{ t('g.found_similar', {n: currentSimilarItems.length, type: similarTypeLabel}) }}
         </div>
         <!-- Similar item context menu -->
         <div v-if="similarCtxMenu.show" class="ctx-menu-popup" :style="{ left: similarCtxMenu.x + 'px', top: similarCtxMenu.y + 'px' }" @mousedown.stop>
           <q-list dense style="min-width:200px;border-radius:8px;overflow:hidden">
             <q-item clickable @click="closeSimilarCtx(); closeSimilarModal(); $root.openDetail(similarCtxMenu.item.id)" style="padding-left:8px;padding-right:12px">
               <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="visibility" size="14px" color="grey-6"></q-icon></q-item-section>
-              <q-item-section>查看详情</q-item-section>
+              <q-item-section>{{ t('g.ctx_view_detail') }}</q-item-section>
             </q-item>
             <q-item clickable @click="closeSimilarCtx(); API.revealFile(similarCtxMenu.item.id)" style="padding-left:8px;padding-right:12px">
               <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="folder_open" size="14px" color="grey-6"></q-icon></q-item-section>
-              <q-item-section>在文件夹中显示</q-item-section>
+              <q-item-section>{{ t('g.ctx_reveal') }}</q-item-section>
             </q-item>
             <q-separator style="background:var(--border)"></q-separator>
             <q-item clickable @click="closeSimilarCtx(); openSimilarExcludeDialog(similarCtxMenu.item)" style="padding-left:8px;padding-right:12px">
               <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="group_remove" size="14px" color="grey-6"></q-icon></q-item-section>
-              <q-item-section>移出本{{ similarTypeLabel }}组</q-item-section>
+              <q-item-section>{{ t('g.remove_from_group', {type: similarTypeLabel}) }}</q-item-section>
             </q-item>
             <q-item clickable @click="closeSimilarCtx(); similarDeleteConfirm = { show: true, id: similarCtxMenu.item.id, name: similarCtxMenu.item.file_name }" style="padding-left:8px;padding-right:12px">
               <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="delete_outline" size="14px" color="negative"></q-icon></q-item-section>
-              <q-item-section style="color:var(--negative)">移出素材库</q-item-section>
+              <q-item-section style="color:var(--negative)">{{ t('g.ctx_remove') }}</q-item-section>
             </q-item>
           </q-list>
         </div>
@@ -481,8 +480,8 @@ const GalleryPage = {
           <q-card style="min-width:520px;max-width:640px" class="dialog-card">
             <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" @click="similarExcludeDlg.show=false"></q-btn>
             <q-card-section>
-              <div class="text-h6" style="font-size:16px">移出本{{ similarTypeLabel }}组</div>
-              <div style="font-size:12px;color:var(--text3);margin-top:4px">选择与当前照片<b>不相似</b>的照片，排除后不会出现在同一分组中</div>
+              <div class="text-h6" style="font-size:16px">{{ t('g.remove_from_group', {type: similarTypeLabel}) }}</div>
+              <div style="font-size:12px;color:var(--text3);margin-top:4px">{{ t('g.exclude_desc') }}</div>
             </q-card-section>
             <q-card-section>
               <div style="display:flex;gap:16px;align-items:flex-start">
@@ -490,12 +489,12 @@ const GalleryPage = {
                   <img :src="'/media/thumbnail/' + similarExcludeDlg.item?.id"
                        style="width:140px;height:140px;object-fit:cover;border-radius:8px;border:2px solid var(--accent)">
                   <div style="margin-top:6px;font-size:11px;color:var(--text2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ similarExcludeDlg.item?.file_name }}</div>
-                  <div style="font-size:10px;color:var(--text3)">当前照片</div>
+                  <div style="font-size:10px;color:var(--text3)">{{ t('g.current_photo') }}</div>
                 </div>
                 <div style="flex:1;min-width:0">
                   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                    <span style="font-size:12px;color:var(--text2)">以下哪些与它不相似？<span style="color:var(--text3);margin-left:4px">共 {{ similarExcludeDlg.candidates.length }} 张</span></span>
-                    <q-btn flat dense size="sm" :label="similarExcludeDlg.candidates.every(c => c.selected) ? '取消全选' : '全选'" color="primary" no-caps @click="similarExcludeSelectAll" style="font-size:12px"></q-btn>
+                    <span style="font-size:12px;color:var(--text2)">{{ t('g.which_not_similar') }}<span style="color:var(--text3);margin-left:4px">{{ t('g.total_photos', {n: similarExcludeDlg.candidates.length}) }}</span></span>
+                    <q-btn flat dense size="sm" :label="similarExcludeDlg.candidates.every(c => c.selected) ? t('g.deselect_all') : t('g.select_all')" color="primary" no-caps @click="similarExcludeSelectAll" style="font-size:12px"></q-btn>
                   </div>
                   <div class="exclude-scroll-wrap">
                     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;padding:4px">
@@ -507,14 +506,14 @@ const GalleryPage = {
                         <div style="font-size:10px;color:var(--text3);padding:2px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.item.file_name }}</div>
                       </div>
                     </div>
-                    <div v-if="similarExcludeDlg.candidates.length > 6" class="exclude-scroll-hint">↓ 向下滚动查看更多</div>
+                    <div v-if="similarExcludeDlg.candidates.length > 6" class="exclude-scroll-hint">{{ t('g.scroll_down_more') }}</div>
                   </div>
                 </div>
               </div>
             </q-card-section>
             <q-card-actions align="right" style="padding:12px 16px">
-              <q-btn flat label="取消" @click="similarExcludeDlg.show=false"></q-btn>
-              <q-btn color="primary" :label="'排除 ' + similarExcludeSelectedCount + ' 张'" :disable="similarExcludeSelectedCount === 0" @click="doSimilarExclude"></q-btn>
+              <q-btn flat :label="t('g.cancel')" @click="similarExcludeDlg.show=false"></q-btn>
+              <q-btn color="primary" :label="t('g.exclude_n', {n: similarExcludeSelectedCount})" :disable="similarExcludeSelectedCount === 0" @click="doSimilarExclude"></q-btn>
             </q-card-actions>
           </q-card>
         </q-dialog>
@@ -523,15 +522,15 @@ const GalleryPage = {
           <q-card style="min-width:360px" class="dialog-card">
             <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" v-close-popup></q-btn>
             <q-card-section>
-              <div class="text-h6">确认移出素材库</div>
+              <div class="text-h6">{{ t('g.confirm_remove_library') }}</div>
             </q-card-section>
             <q-card-section>
-              <p class="text-body2">确定要移除「{{ similarDeleteConfirm.name }}」吗？</p>
-              <p class="text-caption text-grey-6">原文件不会被删除，仅清除库中的记录。</p>
+              <p class="text-body2">{{ t('g.confirm_remove_msg', {name: similarDeleteConfirm.name}) }}</p>
+              <p class="text-caption text-grey-6">{{ t('g.remove_note') }}</p>
             </q-card-section>
             <q-card-actions align="right">
-              <q-btn flat label="取消" @click="similarDeleteConfirm.show=false"></q-btn>
-              <q-btn color="red" label="移出素材库" @click="doSimilarDelete"></q-btn>
+              <q-btn flat :label="t('g.cancel')" @click="similarDeleteConfirm.show=false"></q-btn>
+              <q-btn color="red" :label="t('g.ctx_remove')" @click="doSimilarDelete"></q-btn>
             </q-card-actions>
           </q-card>
         </q-dialog>
@@ -561,27 +560,6 @@ const GalleryPage = {
       colorOptions: [
         { value: "red" }, { value: "yellow" }, { value: "green" }, { value: "blue" }, { value: "purple" },
       ],
-      sortOptions: [
-        { label: "导入时间", value: "imported_at" },
-        { label: "拍摄时间", value: "date_taken" },
-        { label: "名称", value: "file_name" },
-        { label: "分辨率", value: "resolution" },
-        { label: "时长", value: "duration" },
-        { label: "大小", value: "file_size" },
-        { label: "评分", value: "rating" },
-      ],
-      timeGroupOptions: [
-        { label: "不分组", value: "" },
-        { label: "按日", value: "day" },
-        { label: "按周", value: "week" },
-        { label: "按月", value: "month" },
-        { label: "按季度", value: "quarter" },
-        { label: "按年", value: "year" },
-      ],
-      durGroupOptions: [
-        { label: "不分组", value: "" },
-        { label: "按时长", value: "dur_seg" },
-      ],
     };
   },
   watch: {
@@ -590,8 +568,35 @@ const GalleryPage = {
     },
   },
   computed: {
+    sortOptions() {
+      return [
+        { label: this.t('g.sort_imported_at'), value: "imported_at" },
+        { label: this.t('g.sort_date_taken'), value: "date_taken" },
+        { label: this.t('g.sort_file_name'), value: "file_name" },
+        { label: this.t('g.sort_resolution'), value: "resolution" },
+        { label: this.t('g.sort_duration'), value: "duration" },
+        { label: this.t('g.sort_file_size'), value: "file_size" },
+        { label: this.t('g.sort_rating'), value: "rating" },
+      ];
+    },
+    timeGroupOptions() {
+      return [
+        { label: this.t('g.group_none'), value: "" },
+        { label: this.t('g.group_day'), value: "day" },
+        { label: this.t('g.group_week'), value: "week" },
+        { label: this.t('g.group_month'), value: "month" },
+        { label: this.t('g.group_quarter'), value: "quarter" },
+        { label: this.t('g.group_year'), value: "year" },
+      ];
+    },
+    durGroupOptions() {
+      return [
+        { label: this.t('g.group_none'), value: "" },
+        { label: this.t('g.group_by_duration'), value: "dur_seg" },
+      ];
+    },
     similarTypeLabel() {
-      return { near: "酷似", similar: "相似", cluster: "聚类" }[this.similarDlg.similarType] || "相似";
+      return this.t('dup.' + this.similarDlg.similarType);
     },
     currentSimilarItems() {
       return this.similarDlg[this.similarDlg.similarType] || [];
@@ -676,6 +681,7 @@ const GalleryPage = {
   },
   // -- Methods: data loading, selection, keyboard, context menu, formatting --
   methods: {
+    t,
     API,
     // Load first page, reset selection
     async load() {
@@ -765,16 +771,16 @@ const GalleryPage = {
     },
     showFilterToast() {
       const parts = [];
-      const typeMap = {image:"图片",video:"视频"};
+      const typeMap = {image: this.t('g.filter_image'), video: this.t('g.filter_video')};
       if (this.filters.media_type !== "all") parts.push(typeMap[this.filters.media_type]);
-      if (this.filters.rating) parts.push(`${this.filters.rating} 星以上`);
+      if (this.filters.rating) parts.push(this.t('g.filter_rating', {n: this.filters.rating}));
       if (this.filters.color_label) {
-        const cn = {red:"红色",yellow:"黄色",green:"绿色",blue:"蓝色",purple:"紫色"};
-        parts.push(cn[this.filters.color_label] + "标签");
+        const cn = {red: this.t('g.color_red'), yellow: this.t('g.color_yellow'), green: this.t('g.color_green'), blue: this.t('g.color_blue'), purple: this.t('g.color_purple')};
+        parts.push(cn[this.filters.color_label] + this.t('g.filter_tag_suffix'));
       }
-      if (this.favOnly) parts.push("已喜欢");
-      if (this.analyzedOnly) parts.push("已分析");
-      const msg = parts.length ? parts.join(" · ") : "已清除所有筛选";
+      if (this.favOnly) parts.push(this.t('g.filter_fav'));
+      if (this.analyzedOnly) parts.push(this.t('g.filter_analyzed'));
+      const msg = parts.length ? parts.join(" · ") : this.t('g.filter_cleared');
       Quasar.Notify.create({ message: msg, position: 'top', timeout: 1800 });
     },
     doSearch() {
@@ -989,7 +995,7 @@ const GalleryPage = {
         this.similarDlg.cluster = res.cluster || [];
         this.similarDlg.loading = false;
       }).catch(e => {
-        Quasar.Notify.create({ message: '查找失败: ' + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
+        Quasar.Notify.create({ message: this.t('g.find_similar_failed', {msg: e.message || e}), position: 'top', color: 'negative', timeout: 2000 });
         this.similarDlg.loading = false;
       });
     },
@@ -1021,9 +1027,9 @@ const GalleryPage = {
         await API.addDupExclusions(pairs, dupType);
         const excludeSet = new Set(selectedIds);
         this.similarDlg[dupType] = this.similarDlg[dupType].filter(i => !excludeSet.has(i.id));
-        Quasar.Notify.create({ message: `已排除 ${selectedIds.length} 张照片`, position: 'top', timeout: 1500 });
+        Quasar.Notify.create({ message: this.t('g.excluded_n', {n: selectedIds.length}), position: 'top', timeout: 1500 });
       } catch (e) {
-        Quasar.Notify.create({ message: '排除失败: ' + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
+        Quasar.Notify.create({ message: this.t('g.exclude_failed', {msg: e.message || e}), position: 'top', color: 'negative', timeout: 2000 });
       }
     },
     async doSimilarDelete() {
@@ -1036,9 +1042,9 @@ const GalleryPage = {
         this.items = this.items.filter(i => i.id !== id);
         this.$root.galleryItems = this.items;
         this.total--;
-        Quasar.Notify.create({ message: '已移除「' + this.similarDeleteConfirm.name + '」', position: 'top', timeout: 1500 });
+        Quasar.Notify.create({ message: this.t('g.n_removed', {name: this.similarDeleteConfirm.name}), position: 'top', timeout: 1500 });
       } catch (e) {
-        Quasar.Notify.create({ message: '移除失败: ' + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
+        Quasar.Notify.create({ message: this.t('g.remove_failed', {msg: e.message || e}), position: 'top', color: 'negative', timeout: 2000 });
       }
       this.similarDeleteConfirm.show = false;
     },
@@ -1051,15 +1057,15 @@ const GalleryPage = {
         return m && m.media_type === 'image';
       });
       if (!ids.length) {
-        Quasar.Notify.create({ message: '没有可写入的图片', position: 'top', timeout: 1500 });
+        Quasar.Notify.create({ message: this.t('g.no_images_to_write'), position: 'top', timeout: 1500 });
         return;
       }
       try {
         const res = await API.batchWriteXmp(ids);
         ids.forEach(id => { const m = this.items.find(i => i.id === id); if (m) m.has_xmp = 1; });
-        Quasar.Notify.create({ message: `已为 ${res.count} 张照片写入 XMP`, position: 'top', timeout: 1500 });
+        Quasar.Notify.create({ message: this.t('g.xmp_written', {n: res.count}), position: 'top', timeout: 1500 });
       } catch (e) {
-        Quasar.Notify.create({ message: '写入失败: ' + e.message, position: 'top', color: 'negative', timeout: 2000 });
+        Quasar.Notify.create({ message: this.t('g.write_failed', {msg: e.message}), position: 'top', color: 'negative', timeout: 2000 });
       }
     },
     async doDelete() {
@@ -1068,7 +1074,7 @@ const GalleryPage = {
         this.items = this.items.filter(i => i.id !== this.confirmDelete.id);
         this.$root.galleryItems = this.items;
         this.total--;
-        Quasar.Notify.create({ message: "已移除「" + this.confirmDelete.name + "」", position: 'top', color: 'dark', textColor: 'white', timeout: 1800 });
+        Quasar.Notify.create({ message: this.t('g.n_removed', {name: this.confirmDelete.name}), position: 'top', color: 'dark', textColor: 'white', timeout: 1800 });
       } catch (e) {
         console.error("delete error:", e);
       }
@@ -1083,7 +1089,7 @@ const GalleryPage = {
         this.items = this.items.filter(i => !set.has(i.id));
         this.$root.galleryItems = this.items;
         this.total -= ids.length;
-        Quasar.Notify.create({ message: `已移除 ${ids.length} 个素材`, position: 'top', color: 'dark', textColor: 'white', timeout: 1800 });
+        Quasar.Notify.create({ message: this.t('g.n_items_removed', {n: ids.length}), position: 'top', color: 'dark', textColor: 'white', timeout: 1800 });
       } catch (e) { console.error("batch delete error:", e); }
       this.selArr = [];
       this.confirmBatch.show = false;
@@ -1145,34 +1151,34 @@ const GalleryPage = {
       return "unknown";
     },
     fmtGroupLabel(key, mode) {
-      if (key === "unknown") return "未知日期";
-      const weekdays = ["周日","周一","周二","周三","周四","周五","周六"];
+      if (key === "unknown") return this.t('g.unknown_date');
+      const weekdays = this.t('g.weekdays').split(',');
       if (mode === "day") {
         const dt = new Date(key);
         return key + " " + (isNaN(dt) ? "" : weekdays[dt.getDay()]);
       }
-      if (mode === "week") return key.replace("W", " 第") + " 周";
+      if (mode === "week") return this.t('g.week_label', {key});
       if (mode === "month") {
         const [y, m] = key.split("-");
-        return `${y}年${parseInt(m)}月`;
+        return this.t('g.month_label', {y, m: parseInt(m)});
       }
       if (mode === "quarter") {
         const [y, q] = key.split("-Q");
-        return `${y}年 第${q}季度`;
+        return this.t('g.quarter_label', {y, q});
       }
-      if (mode === "year") return key + "年";
+      if (mode === "year") return this.t('g.year_label', {y: key});
       return key;
     },
     getDurKey(dur) {
-      if (!dur || dur <= 0) return "无时长";
+      if (!dur || dur <= 0) return this.t('g.dur_no_duration');
       const m = dur / 60;
-      if (m < 1) return "0-1 分钟";
-      if (m < 3) return "1-3 分钟";
-      if (m < 5) return "3-5 分钟";
-      if (m < 10) return "5-10 分钟";
-      if (m < 30) return "10-30 分钟";
-      if (m < 60) return "30-60 分钟";
-      return "60 分钟以上";
+      if (m < 1) return this.t('g.dur_0_1');
+      if (m < 3) return this.t('g.dur_1_3');
+      if (m < 5) return this.t('g.dur_3_5');
+      if (m < 10) return this.t('g.dur_5_10');
+      if (m < 30) return this.t('g.dur_10_30');
+      if (m < 60) return this.t('g.dur_30_60');
+      return this.t('g.dur_60_plus');
     },
   },
 };

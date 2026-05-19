@@ -3,45 +3,45 @@ const DuplicatesPage = {
   <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative"
        @mousedown="startLasso" @contextmenu.prevent>
     <div class="filter-bar" @mousedown.stop>
-      <q-btn flat dense icon="arrow_back" label="返回" color="grey-6" style="border-radius:6px;padding:3px 6px;font-size:13px" @click="goBack"></q-btn>
+      <q-btn flat dense icon="arrow_back" :label="t('dup.back')" color="grey-6" style="border-radius:6px;padding:3px 6px;font-size:13px" @click="goBack"></q-btn>
       <q-btn-group unelevated style="border-radius:6px;overflow:hidden">
-        <q-btn unelevated dense :color="dupType==='near'?'primary':'grey-9'" :text-color="dupType==='near'?'white':'grey-6'" icon="filter_none" size="sm" label="酷似" @click="switchType('near')">
-          <q-tooltip :delay="1000">几乎一模一样的照片</q-tooltip>
+        <q-btn unelevated dense :color="dupType==='near'?'primary':'grey-9'" :text-color="dupType==='near'?'white':'grey-6'" icon="filter_none" size="sm" :label="t('dup.near')" @click="switchType('near')">
+          <q-tooltip :delay="1000">{{ t('dup.near_tip') }}</q-tooltip>
         </q-btn>
-        <q-btn unelevated dense :color="dupType==='similar'?'primary':'grey-9'" :text-color="dupType==='similar'?'white':'grey-6'" icon="difference" size="sm" label="相似" @click="switchType('similar')">
-          <q-tooltip :delay="1000">画面非常接近的照片</q-tooltip>
+        <q-btn unelevated dense :color="dupType==='similar'?'primary':'grey-9'" :text-color="dupType==='similar'?'white':'grey-6'" icon="difference" size="sm" :label="t('dup.similar')" @click="switchType('similar')">
+          <q-tooltip :delay="1000">{{ t('dup.similar_tip') }}</q-tooltip>
         </q-btn>
-        <q-btn unelevated dense :color="dupType==='cluster'?'primary':'grey-9'" :text-color="dupType==='cluster'?'white':'grey-6'" icon="bubble_chart" size="sm" label="聚类" @click="switchType('cluster')">
-          <q-tooltip :delay="1000">同场景不同角度或时间</q-tooltip>
+        <q-btn unelevated dense :color="dupType==='cluster'?'primary':'grey-9'" :text-color="dupType==='cluster'?'white':'grey-6'" icon="bubble_chart" size="sm" :label="t('dup.cluster')" @click="switchType('cluster')">
+          <q-tooltip :delay="1000">{{ t('dup.cluster_tip') }}</q-tooltip>
         </q-btn>
       </q-btn-group>
       <q-icon name="help_outline" size="16px" color="grey-6">
         <q-tooltip :delay="300" max-width="400px">
           <div style="font-size:12px;line-height:1.8;white-space:nowrap">
-            <b>酷似</b>：几乎一模一样的照片，比如同一张照片的 JPG 和 RAW<br>
-            <b>相似</b>：画面非常接近，比如连拍的照片<br>
-            <b>聚类</b>：同一个场景的不同角度或不同时间拍的照片
+            <b>{{ t('dup.near') }}</b>：{{ t('dup.near_desc') }}<br>
+            <b>{{ t('dup.similar') }}</b>：{{ t('dup.similar_desc') }}<br>
+            <b>{{ t('dup.cluster') }}</b>：{{ t('dup.cluster_desc') }}
           </div>
         </q-tooltip>
       </q-icon>
       <div style="flex:1"></div>
-      <q-btn v-if="needBackfill" flat dense no-caps icon="sync" label="计算特征向量" color="grey-6" size="sm" @click="backfillAndReload" style="border:1px solid var(--border);border-radius:6px"></q-btn>
+      <q-btn v-if="needBackfill" flat dense no-caps icon="sync" :label="t('dup.compute_vectors')" color="grey-6" size="sm" @click="backfillAndReload" style="border:1px solid var(--border);border-radius:6px"></q-btn>
     </div>
     <div v-if="loading" style="flex:1;display:flex;align-items:center;justify-content:center">
       <q-spinner-dots color="grey-6" size="40px"></q-spinner-dots>
     </div>
     <div v-else-if="!groups.length" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text3);gap:8px">
       <q-icon name="check_circle" size="36px" style="opacity:0.3"></q-icon>
-      <span>没有发现{{ typeLabel }}素材</span>
+      <span>{{ t('dup.no_dup', {type: t('dup.' + dupType)}) }}</span>
     </div>
     <q-scroll-area v-else style="flex:1">
       <div ref="groupContainer" style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
         <div v-for="(g, gi) in groups" :key="gi" class="dup-group">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
             <span class="dup-badge">{{ g.items.length }}</span>
-            <span style="font-size:12px;color:var(--text2)">个{{ typeLabel }}文件</span>
-            <span v-if="g.similarity != null" style="font-size:11px;color:var(--accent)">相似度 {{ g.similarity }}%</span>
-            <q-btn v-if="g.excluded?.length" flat dense no-caps icon="restore" :label="'恢复排除 (' + g.excluded.length + ')'" color="grey-6" size="sm" @click="openRestoreDialog(g)" style="font-size:11px;border:1px solid var(--border);border-radius:6px;margin-left:4px"></q-btn>
+            <span style="font-size:12px;color:var(--text2)">{{ t('dup.dup_files', {type: t('dup.' + dupType)}) }}</span>
+            <span v-if="g.similarity != null" style="font-size:11px;color:var(--accent)">{{ t('dup.similarity', {n: g.similarity}) }}</span>
+            <q-btn v-if="g.excluded?.length" flat dense no-caps icon="restore" :label="t('dup.restore_excluded', {n: g.excluded.length})" color="grey-6" size="sm" @click="openRestoreDialog(g)" style="font-size:11px;border:1px solid var(--border);border-radius:6px;margin-left:4px"></q-btn>
           </div>
           <div class="dup-grid">
             <div v-for="item in g.items" :key="item.id"
@@ -55,7 +55,7 @@ const DuplicatesPage = {
               <div v-if="selArr.includes(item.id)" class="sel-overlay"></div>
               <div class="dup-card-img">
                 <img :src="'/media/thumbnail/' + item.id" draggable="false" @load="onThumbLoad">
-                <button class="dup-exclude-btn" title="排除" @click.stop="openExcludeDialog(item, g)">✕</button>
+                <button class="dup-exclude-btn" :title="t('dup.exclude')" @click.stop="openExcludeDialog(item, g)">✕</button>
               </div>
               <div class="dup-card-info">
                 <span class="dup-card-name" :title="item.file_name">{{ item.file_name }}</span>
@@ -71,8 +71,8 @@ const DuplicatesPage = {
       <q-card style="min-width:560px;max-width:780px" class="dialog-card">
         <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" @click="restoreDlg.show=false"></q-btn>
         <q-card-section>
-          <div class="text-h6" style="font-size:16px">恢复排除</div>
-          <div style="font-size:12px;color:var(--text3);margin-top:4px">以下照片曾从本分组中排除，勾选需要恢复的配对</div>
+          <div class="text-h6" style="font-size:16px">{{ t('dup.restore_title') }}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:4px">{{ t('dup.restore_hint') }}</div>
         </q-card-section>
         <q-card-section style="max-height:480px;overflow-y:auto">
           <div style="display:flex;flex-direction:column;gap:10px">
@@ -89,7 +89,7 @@ const DuplicatesPage = {
                   <q-tooltip :delay="600" :offset="[0, 4]">{{ p.with_name }}</q-tooltip>
                 </div>
               </div>
-              <q-btn flat dense no-caps icon="restore" label="恢复排重" color="primary" size="sm"
+              <q-btn flat dense no-caps icon="restore" :label="t('dup.restore_btn')" color="primary" size="sm"
                      :disable="!row.pairs.some(p => p.selected)"
                      @click="doRestoreRow(row)"
                      style="flex-shrink:0;font-size:11px;border:1px solid var(--border);border-radius:6px"></q-btn>
@@ -97,33 +97,33 @@ const DuplicatesPage = {
           </div>
         </q-card-section>
         <q-card-actions align="right" style="padding:12px 16px">
-          <q-btn flat label="关闭" @click="restoreDlg.show=false"></q-btn>
+          <q-btn flat :label="t('dup.close')" @click="restoreDlg.show=false"></q-btn>
         </q-card-actions>
       </q-card>
     </q-dialog>
     <div style="flex-shrink:0;padding:6px 20px;font-size:12px;color:var(--text3);border-top:1px solid var(--border);text-align:center">
-      共 {{ groups.length }} 组{{ typeLabel }}素材
+      {{ t('dup.total', {n: groups.length, type: t('dup.' + dupType)}) }}
     </div>
     <div v-if="ctxMenu.show" class="ctx-menu-popup" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }" @mousedown.stop>
       <q-list dense style="min-width:200px;border-radius:8px;overflow:hidden">
         <q-item clickable @click="closeCtx(); openDetail(ctxMenu.item.id)" :disable="selArr.length > 1" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="visibility" size="14px" color="grey-6"></q-icon></q-item-section>
-          <q-item-section>查看详情</q-item-section>
+          <q-item-section>{{ t('dup.ctx_detail') }}</q-item-section>
           <q-item-section side style="flex-shrink:0;white-space:nowrap;display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--text3)">↵</span></q-item-section>
         </q-item>
         <q-item clickable @click="closeCtx(); API.revealFile(ctxMenu.item.id)" :disable="selArr.length !== 1" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="folder_open" size="14px" color="grey-6"></q-icon></q-item-section>
-          <q-item-section>在文件夹中显示</q-item-section>
+          <q-item-section>{{ t('dup.ctx_reveal') }}</q-item-section>
         </q-item>
         <q-separator style="background:var(--border)"></q-separator>
         <q-item clickable @click="closeCtx(); excludeCtx()" :disable="!canExcludeFromGroup" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="group_remove" size="14px" :color="canExcludeFromGroup ? 'grey-6' : 'grey-9'"></q-icon></q-item-section>
-          <q-item-section>移出本{{ typeLabel }}组</q-item-section>
-          <q-tooltip v-if="!canExcludeFromGroup" :delay="0">选中的素材不在同一分组</q-tooltip>
+          <q-item-section>{{ t('dup.ctx_remove_group', {type: t('dup.' + dupType)}) }}</q-item-section>
+          <q-tooltip v-if="!canExcludeFromGroup" :delay="0">{{ t('dup.ctx_not_same_group') }}</q-tooltip>
         </q-item>
         <q-item clickable @click="closeCtx(); deleteCtx()" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="delete_outline" size="14px" color="negative"></q-icon></q-item-section>
-          <q-item-section style="color:var(--negative)">{{ selArr.length > 1 ? '移出 ' + selArr.length + ' 个素材' : '移出素材库' }}</q-item-section>
+          <q-item-section style="color:var(--negative)">{{ selArr.length > 1 ? t('dup.ctx_remove_n', {n: selArr.length}) : t('dup.ctx_remove') }}</q-item-section>
           <q-item-section side style="flex-shrink:0;white-space:nowrap;display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--text3)">⌘+⌫</span></q-item-section>
         </q-item>
       </q-list>
@@ -132,15 +132,15 @@ const DuplicatesPage = {
       <q-card style="min-width:360px" class="dialog-card">
         <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" v-close-popup></q-btn>
         <q-card-section>
-          <div class="text-h6">确认移出素材库</div>
+          <div class="text-h6">{{ t('dup.confirm_remove_title') }}</div>
         </q-card-section>
         <q-card-section>
-          <p class="text-body2">确定要移除「{{ confirmDelete.name }}」吗？</p>
-          <p class="text-caption text-grey-6">原文件不会被删除，仅清除库中的记录。</p>
+          <p class="text-body2">{{ t('dup.confirm_remove_msg', {name: confirmDelete.name}) }}</p>
+          <p class="text-caption text-grey-6">{{ t('dup.confirm_remove_hint') }}</p>
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat label="取消" @click="confirmDelete.show=false"></q-btn>
-          <q-btn color="red" label="移出素材库" @click="doDelete"></q-btn>
+          <q-btn flat :label="t('g.cancel')" @click="confirmDelete.show=false"></q-btn>
+          <q-btn color="red" :label="t('dup.remove_from_lib')" @click="doDelete"></q-btn>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -148,8 +148,8 @@ const DuplicatesPage = {
       <q-card style="min-width:560px;max-width:700px" class="dialog-card">
         <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" @click="excludeDlg.show=false"></q-btn>
         <q-card-section>
-          <div class="text-h6" style="font-size:16px">移出本{{ typeLabel }}组</div>
-          <div style="font-size:12px;color:var(--text3);margin-top:4px">选择与当前照片<b>不相似</b>的照片，排除后不会出现在同一分组中</div>
+          <div class="text-h6" style="font-size:16px">{{ t('dup.ctx_remove_group', {type: t('dup.' + dupType)}) }}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:4px" v-html="t('dup.exclude_hint')"></div>
         </q-card-section>
         <q-card-section>
           <div style="display:flex;gap:16px;align-items:flex-start">
@@ -157,12 +157,12 @@ const DuplicatesPage = {
               <img :src="'/media/thumbnail/' + excludeDlg.item?.id"
                    style="width:140px;height:140px;object-fit:cover;border-radius:8px;border:2px solid var(--accent)">
               <div style="margin-top:6px;font-size:11px;color:var(--text2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ excludeDlg.item?.file_name }}</div>
-              <div style="font-size:10px;color:var(--text3)">当前照片</div>
+              <div style="font-size:10px;color:var(--text3)">{{ t('dup.current_photo') }}</div>
             </div>
             <div style="flex:1;min-width:0">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                <span style="font-size:12px;color:var(--text2)">以下哪些与它不相似？<span style="color:var(--text3);margin-left:4px">共 {{ excludeDlg.candidates.length }} 张</span></span>
-                <q-btn flat dense size="sm" :label="excludeDlg.candidates.every(c => c.selected) ? '取消全选' : '全选'" color="primary" no-caps @click="excludeSelectAll" style="font-size:12px"></q-btn>
+                <span style="font-size:12px;color:var(--text2)">{{ t('dup.exclude_which') }}<span style="color:var(--text3);margin-left:4px">{{ t('dup.exclude_total', {n: excludeDlg.candidates.length}) }}</span></span>
+                <q-btn flat dense size="sm" :label="excludeDlg.candidates.every(c => c.selected) ? t('dup.deselect_all') : t('dup.select_all')" color="primary" no-caps @click="excludeSelectAll" style="font-size:12px"></q-btn>
               </div>
               <div class="exclude-scroll-wrap">
                 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;padding:4px">
@@ -174,14 +174,14 @@ const DuplicatesPage = {
                     <div style="font-size:10px;color:var(--text3);padding:2px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.item.file_name }}</div>
                   </div>
                 </div>
-                <div v-if="excludeHasMore" class="exclude-scroll-hint">↓ 向下滚动查看更多</div>
+                <div v-if="excludeHasMore" class="exclude-scroll-hint">{{ t('dup.scroll_more') }}</div>
               </div>
             </div>
           </div>
         </q-card-section>
         <q-card-actions align="right" style="padding:12px 16px">
-          <q-btn flat label="取消" @click="excludeDlg.show=false"></q-btn>
-          <q-btn color="primary" :label="'排除 ' + excludeSelectedCount + ' 张'" :disable="excludeSelectedCount === 0" @click="doExclude"></q-btn>
+          <q-btn flat :label="t('g.cancel')" @click="excludeDlg.show=false"></q-btn>
+          <q-btn color="primary" :label="t('dup.exclude_n', {n: excludeSelectedCount})" :disable="excludeSelectedCount === 0" @click="doExclude"></q-btn>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -206,9 +206,6 @@ const DuplicatesPage = {
     };
   },
   computed: {
-    typeLabel() {
-      return { near: "酷似", similar: "相似", cluster: "聚类" }[this.dupType] || "相似";
-    },
     flatItems() {
       const items = [];
       for (const g of this.groups) {
@@ -236,6 +233,7 @@ const DuplicatesPage = {
     },
   },
   methods: {
+    t,
     API,
     fmtSize,
     onThumbLoad,
@@ -275,7 +273,7 @@ const DuplicatesPage = {
     },
     deleteCtx() {
       if (this.selArr.length > 1) {
-        this.confirmDelete = { show: true, id: null, name: this.selArr.length + ' 个素材' };
+        this.confirmDelete = { show: true, id: null, name: t('dup.ctx_remove_n', {n: this.selArr.length}) };
       } else {
         const id = this.selArr[0];
         const m = this.flatItems.find(i => i.id === id);
@@ -306,11 +304,11 @@ const DuplicatesPage = {
     async _doExcludePairs(pairs, count) {
       try {
         await API.addDupExclusions(pairs, this.dupType);
-        Quasar.Notify.create({ message: `已排除 ${count} 张照片`, position: 'top', timeout: 1500 });
+        Quasar.Notify.create({ message: t('dup.n_excluded', {n: count}), position: 'top', timeout: 1500 });
         this.selArr = [];
         await this.loadGroups();
       } catch (e) {
-        Quasar.Notify.create({ message: '排除失败: ' + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
+        Quasar.Notify.create({ message: t('dup.n_exclude_fail', {err: e.message || e}), position: 'top', color: 'negative', timeout: 2000 });
       }
     },
     async doDelete() {
@@ -318,11 +316,11 @@ const DuplicatesPage = {
       this.confirmDelete.show = false;
       try {
         await API.batchUpdate({ action: "delete", ids });
-        Quasar.Notify.create({ message: `已移除 ${ids.length} 个素材`, position: 'top', timeout: 1500 });
+        Quasar.Notify.create({ message: t('dup.n_removed', {n: ids.length}), position: 'top', timeout: 1500 });
         this.selArr = [];
         await this.loadGroups();
       } catch (e) {
-        Quasar.Notify.create({ message: '移除失败: ' + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
+        Quasar.Notify.create({ message: t('dup.n_remove_fail', {err: e.message || e}), position: 'top', color: 'negative', timeout: 2000 });
       }
     },
     startLasso(e) {
@@ -416,7 +414,7 @@ const DuplicatesPage = {
       try {
         const res = await API.backfillEmbeddings();
         if (res.count > 0) {
-          Quasar.Notify.create({ message: `已为 ${res.count} 个素材计算特征向量`, position: 'top', timeout: 2000 });
+          Quasar.Notify.create({ message: t('dup.n_backfill', {n: res.count}), position: 'top', timeout: 2000 });
           await this.loadGroups();
         }
         this.needBackfill = false;
@@ -462,21 +460,21 @@ const DuplicatesPage = {
       const pairs = selected.map(p => [row.excluded_id, p.with_id]);
       try {
         await API.removeDupExclusionPairs(pairs, this.dupType);
-        Quasar.Notify.create({ message: `已恢复 ${selected.length} 对排除`, position: 'top', timeout: 1500 });
+        Quasar.Notify.create({ message: t('dup.restore_ok', {n: selected.length}), position: 'top', timeout: 1500 });
         this.restoreDlg.items = this.restoreDlg.items.filter(i => i !== row);
         if (!this.restoreDlg.items.length) this.restoreDlg.show = false;
         await this.loadGroups();
       } catch (e) {
-        Quasar.Notify.create({ message: '恢复失败: ' + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
+        Quasar.Notify.create({ message: t('dup.restore_fail', {err: e.message || e}), position: 'top', color: 'negative', timeout: 2000 });
       }
     },
     async backfillAndReload() {
       try {
         const res = await API.backfillEmbeddings();
-        Quasar.Notify.create({ message: `已计算 ${res.count} 个素材的特征向量`, position: 'top', timeout: 2000 });
+        Quasar.Notify.create({ message: t('dup.n_backfill_done', {n: res.count}), position: 'top', timeout: 2000 });
         await this.loadGroups();
       } catch (e) {
-        Quasar.Notify.create({ message: '计算失败: ' + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
+        Quasar.Notify.create({ message: t('dup.n_backfill_fail', {err: e.message || e}), position: 'top', color: 'negative', timeout: 2000 });
       }
     },
   },

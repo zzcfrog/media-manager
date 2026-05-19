@@ -2,7 +2,7 @@ const DetailPage = {
   template: `
   <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
     <q-toolbar style="border-bottom:1px solid var(--border);min-height:40px">
-      <q-btn flat dense icon="arrow_back" label="返回" color="grey-6" style="margin-right:6px;border-radius:6px;padding:3px 6px;font-size:13px" @click="goBack"></q-btn>
+      <q-btn flat dense icon="arrow_back" :label="t('d.back')" color="grey-6" style="margin-right:6px;border-radius:6px;padding:3px 6px;font-size:13px" @click="goBack"></q-btn>
       <q-toolbar-title class="text-body2 text-weight-bold" style="font-size:13px">{{ media?.file_name || '' }}</q-toolbar-title>
       <div class="filter-stars" style="margin-left:16px">
         <span v-for="n in 5" :key="n" class="star-btn" :class="{lit: media?.rating && n <= media.rating}" @click="setRating(media?.rating === n ? 0 : n)">★</span>
@@ -11,11 +11,11 @@ const DetailPage = {
         <span v-for="c in colors" :key="c" class="color-swatch" :class="['bg-'+c, {active: media?.color_label===c, dim: media?.color_label && media?.color_label!==c}]" @click="setColor(media?.color_label === c ? null : c)"></span>
       </div>
       <q-btn flat round dense :color="media?.favorite ? 'red' : 'grey-6'" icon="favorite" size="sm" style="margin-left:10px" @click="toggleFav">
-        <q-tooltip :delay="1000">喜欢</q-tooltip>
+        <q-tooltip :delay="1000">{{ t('d.favorite') }}</q-tooltip>
       </q-btn>
       <q-btn v-if="media?.media_type==='image' && analysis.status==='done'" flat round dense size="sm" style="margin-left:6px" @click="doWriteXmp">
         <img :src="media?.has_xmp ? '/static/img/xmp-refresh.svg' : '/static/img/xmp-write.svg'" style="width:18px;height:18px" :style="{opacity: media?.has_xmp ? 1 : 0.45}">
-        <q-tooltip :delay="1000">{{ media?.has_xmp ? '已写入 XMP（点击更新）' : '写入 XMP' }}</q-tooltip>
+        <q-tooltip :delay="1000">{{ media?.has_xmp ? t('d.xmp_update') : t('d.xmp_write') }}</q-tooltip>
       </q-btn>
     </q-toolbar>
     <div style="flex:1;display:flex;overflow:hidden">
@@ -23,48 +23,48 @@ const DetailPage = {
         <div v-if="media?.media_type==='video'" style="flex:1;display:flex;flex-direction:column;min-height:0">
           <div v-if="media" class="img-meta-bar">
             <div class="img-meta-block">
-              <div class="img-meta-title">视频</div>
+              <div class="img-meta-title">{{ t('d.video') }}</div>
               <div style="display:flex;gap:14px;align-items:flex-start">
                 <div class="meta-grid" style="gap:4px 14px">
-                  <span class="meta-label">分辨率</span><span>{{ media.width }}x{{ media.height }}</span>
-                  <span class="meta-label">时长</span><span>{{ fmtDur(media.duration) }}</span>
-                  <span class="meta-label">编码</span><span>{{ media.video_codec }}<template v-if="media.video_profile"> ({{ media.video_profile }})</template></span>
+                  <span class="meta-label">{{ t('d.resolution') }}</span><span>{{ media.width }}x{{ media.height }}</span>
+                  <span class="meta-label">{{ t('d.duration') }}</span><span>{{ fmtDur(media.duration) }}</span>
+                  <span class="meta-label">{{ t('d.codec') }}</span><span>{{ media.video_codec }}<template v-if="media.video_profile"> ({{ media.video_profile }})</template></span>
                 </div>
                 <div class="meta-grid" style="gap:4px 14px">
-                  <span class="meta-label">帧率</span><span>{{ fmtFps(media.fps) }}</span>
-                  <span class="meta-label">码流</span><span v-if="media.bit_rate">{{ (media.bit_rate / 1000000).toFixed(1) }} Mbps</span><span v-else>-</span>
-                  <span class="meta-label">色彩空间</span><span>{{ media.color_space || '-' }}</span>
-                  <span v-if="media.picture_control" class="meta-label">色彩曲线</span><span v-if="media.picture_control" style="display:inline-flex;align-items:center;gap:3px">{{ media.picture_control }}<q-icon name="help_outline" size="12px" color="grey-6"><q-tooltip :delay="500" style="max-width:280px">尼康的 N-Log 取自 EXIF 元数据（PictureControlName），较为准确。大疆的 D-Log M 根据文件命名后缀 _D 推断，可能存在不准确的情况。</q-tooltip></q-icon></span>
+                  <span class="meta-label">{{ t('d.fps') }}</span><span>{{ fmtFps(media.fps) }}</span>
+                  <span class="meta-label">{{ t('d.bitrate') }}</span><span v-if="media.bit_rate">{{ (media.bit_rate / 1000000).toFixed(1) }} Mbps</span><span v-else>-</span>
+                  <span class="meta-label">{{ t('d.color_space') }}</span><span>{{ media.color_space || '-' }}</span>
+                  <span v-if="media.picture_control" class="meta-label">{{ t('d.color_curve') }}</span><span v-if="media.picture_control" style="display:inline-flex;align-items:center;gap:3px">{{ media.picture_control }}<q-icon name="help_outline" size="12px" color="grey-6"><q-tooltip :delay="500" style="max-width:280px">{{ t('d.color_curve_tip') }}</q-tooltip></q-icon></span>
                 </div>
               </div>
             </div>
             <div class="img-meta-block">
-              <div class="img-meta-title">音频</div>
+              <div class="img-meta-title">{{ t('d.audio') }}</div>
               <div class="meta-grid" style="gap:4px 14px">
                 <template v-if="media.audio_codec">
-                  <span class="meta-label">编码</span><span>{{ media.audio_codec }}</span>
-                  <span class="meta-label">采样率</span><span v-if="media.audio_sample_rate">{{ (media.audio_sample_rate / 1000).toFixed(1) }} kHz</span><span v-else>-</span>
-                  <span class="meta-label">声道</span><span>{{ media.audio_channels === 1 ? '单声道' : media.audio_channels === 2 ? '立体声' : (media.audio_channels || '-') + ' 声道' }}</span>
+                  <span class="meta-label">{{ t('d.codec') }}</span><span>{{ media.audio_codec }}</span>
+                  <span class="meta-label">{{ t('d.sample_rate') }}</span><span v-if="media.audio_sample_rate">{{ (media.audio_sample_rate / 1000).toFixed(1) }} kHz</span><span v-else>-</span>
+                  <span class="meta-label">{{ t('d.channels') }}</span><span>{{ media.audio_channels === 1 ? t('d.mono') : media.audio_channels === 2 ? t('d.stereo') : t('d.ch_n', {n: media.audio_channels || '-'}) }}</span>
                 </template>
                 <template v-else>
-                  <span style="color:var(--text3)">无音频</span>
+                  <span style="color:var(--text3)">{{ t('d.no_audio') }}</span>
                 </template>
               </div>
             </div>
             <div class="img-meta-block">
-              <div class="img-meta-title">拍摄设备</div>
+              <div class="img-meta-title">{{ t('d.camera_info') }}</div>
               <div class="meta-grid" style="gap:4px 14px">
-                <span class="meta-label">制造商</span><span>{{ media.camera_make || '-' }}</span>
-                <span class="meta-label">机型</span><span>{{ media.camera_model || '-' }}</span>
-                <span class="meta-label">镜头</span><span>{{ media.lens_model || '-' }}</span>
+                <span class="meta-label">{{ t('d.make') }}</span><span>{{ media.camera_make || '-' }}</span>
+                <span class="meta-label">{{ t('d.model') }}</span><span>{{ media.camera_model || '-' }}</span>
+                <span class="meta-label">{{ t('d.lens') }}</span><span>{{ media.lens_model || '-' }}</span>
               </div>
             </div>
             <div class="img-meta-block" style="flex:1 1 0;min-width:0;overflow:hidden">
-              <div class="img-meta-title">文件信息</div>
+              <div class="img-meta-title">{{ t('d.file_info') }}</div>
               <div class="meta-grid" style="gap:4px 14px">
-                <span class="meta-label">拍摄时间</span><span>{{ fmtDate(media.date_taken) }}</span>
-                <span class="meta-label">大小</span><span>{{ fmtSize(media.file_size) }}</span>
-                <span class="meta-label">位置</span><span style="display:flex;align-items:center;gap:4px"><span class="meta-path" style="cursor:default"><q-tooltip :delay="1000">{{ media.file_path }}</q-tooltip>{{ media.file_path }}</span><q-icon name="folder_open" size="13px" color="grey-6" style="cursor:pointer;flex-shrink:0" @click="openInFinder"></q-icon></span>
+                <span class="meta-label">{{ t('d.date_taken') }}</span><span>{{ fmtDate(media.date_taken) }}</span>
+                <span class="meta-label">{{ t('d.size') }}</span><span>{{ fmtSize(media.file_size) }}</span>
+                <span class="meta-label">{{ t('d.location') }}</span><span style="display:flex;align-items:center;gap:4px"><span class="meta-path" style="cursor:default"><q-tooltip :delay="1000">{{ media.file_path }}</q-tooltip>{{ media.file_path }}</span><q-icon name="folder_open" size="13px" color="grey-6" style="cursor:pointer;flex-shrink:0" @click="openInFinder"></q-icon></span>
               </div>
             </div>
           </div>
@@ -85,27 +85,27 @@ const DetailPage = {
         <div v-else-if="media?.media_type==='image'" style="flex:1;display:flex;flex-direction:column;min-height:0">
           <div v-if="media" class="img-meta-bar">
             <div class="img-meta-block">
-              <div class="img-meta-title">图像</div>
+              <div class="img-meta-title">{{ t('d.image') }}</div>
               <div class="meta-grid" style="gap:4px 14px">
-                <span class="meta-label">分辨率</span><span>{{ media.width }}x{{ media.height }}</span>
-                <span class="meta-label">编码</span><span>{{ media.video_codec || '-' }}</span>
-                <span class="meta-label">色彩空间</span><span>{{ media.color_space || '-' }}</span>
-                <span class="meta-label">位深度</span><span>{{ media.pix_fmt || '-' }}</span>
+                <span class="meta-label">{{ t('d.resolution') }}</span><span>{{ media.width }}x{{ media.height }}</span>
+                <span class="meta-label">{{ t('d.codec') }}</span><span>{{ media.video_codec || '-' }}</span>
+                <span class="meta-label">{{ t('d.color_space') }}</span><span>{{ media.color_space || '-' }}</span>
+                <span class="meta-label">{{ t('d.bit_depth') }}</span><span>{{ media.pix_fmt || '-' }}</span>
               </div>
             </div>
             <div class="img-meta-block">
-              <div class="img-meta-title">拍摄设备</div>
+              <div class="img-meta-title">{{ t('d.camera_info') }}</div>
               <div class="meta-grid" style="gap:4px 14px">
-                <span class="meta-label">机型</span><span>{{ media.camera_model || '-' }}</span>
-                <span class="meta-label">镜头</span><span>{{ media.lens_model || '-' }}</span>
+                <span class="meta-label">{{ t('d.model') }}</span><span>{{ media.camera_model || '-' }}</span>
+                <span class="meta-label">{{ t('d.lens') }}</span><span>{{ media.lens_model || '-' }}</span>
               </div>
             </div>
             <div class="img-meta-block" style="flex:1 1 0;min-width:0;overflow:hidden">
-              <div class="img-meta-title">文件信息</div>
+              <div class="img-meta-title">{{ t('d.file_info') }}</div>
               <div class="meta-grid" style="gap:4px 14px">
-                <span class="meta-label">拍摄时间</span><span>{{ fmtDate(media.date_taken) }}</span>
-                <span class="meta-label">大小</span><span>{{ fmtSize(media.file_size) }}</span>
-                <span class="meta-label">位置</span><span style="display:flex;align-items:center;gap:4px"><span class="meta-path" style="cursor:default"><q-tooltip :delay="1000">{{ media.file_path }}</q-tooltip>{{ media.file_path }}</span><q-icon name="folder_open" size="13px" color="grey-6" style="cursor:pointer;flex-shrink:0" @click="openInFinder"></q-icon><span v-if="media.has_xmp" style="display:inline-flex;cursor:default"><img src="/static/img/xmp-badge.svg" style="width:13px;height:13px"><q-tooltip :delay="1000">已写入 XMP</q-tooltip></span></span>
+                <span class="meta-label">{{ t('d.date_taken') }}</span><span>{{ fmtDate(media.date_taken) }}</span>
+                <span class="meta-label">{{ t('d.size') }}</span><span>{{ fmtSize(media.file_size) }}</span>
+                <span class="meta-label">{{ t('d.location') }}</span><span style="display:flex;align-items:center;gap:4px"><span class="meta-path" style="cursor:default"><q-tooltip :delay="1000">{{ media.file_path }}</q-tooltip>{{ media.file_path }}</span><q-icon name="folder_open" size="13px" color="grey-6" style="cursor:pointer;flex-shrink:0" @click="openInFinder"></q-icon><span v-if="media.has_xmp" style="display:inline-flex;cursor:default"><img src="/static/img/xmp-badge.svg" style="width:13px;height:13px"><q-tooltip :delay="1000">{{ t('d.xmp_badge') }}</q-tooltip></span></span>
               </div>
             </div>
           </div>
@@ -118,7 +118,7 @@ const DetailPage = {
                 <span style="font-size:11px;color:var(--text2);min-width:36px;text-align:center">{{ Math.round(imgZoom * 100) }}%</span>
                 <q-btn flat round dense icon="add" size="xs" color="grey-6" @click="imgZoomBy(0.25)"></q-btn>
                 <q-btn flat round dense icon="fit_screen" size="xs" color="grey-6" @click="imgZoom=1;imgPanX=0;imgPanY=0" v-if="imgZoom!==1"></q-btn>
-                <q-btn flat round dense :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'" size="xs" color="grey-6" @click="toggleFullscreen"><q-tooltip :delay="1000">全屏看图 (F)</q-tooltip></q-btn>
+                <q-btn flat round dense :icon="isFullscreen ? 'fullscreen_exit' : 'fullscreen'" size="xs" color="grey-6" @click="toggleFullscreen"><q-tooltip :delay="1000">{{ t('d.fullscreen') }}</q-tooltip></q-btn>
               </div>
             </div>
             <div v-if="imgZoom > 1" class="img-minimap" @click="onMinimapClick">
@@ -133,10 +133,10 @@ const DetailPage = {
         <!-- Analysis section -->
         <div v-if="analysis.status==='done' && analysis.segments?.length" style="border-top:1px solid var(--border);display:flex;flex-direction:column;flex:1;min-height:0">
           <div style="padding:10px 14px;font-size:12px;font-weight:600;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0">
-            <span v-if="media?.media_type==='video'" style="color:var(--accent)">◎ {{ analysis.segments.length }} 个片段</span>
+            <span v-if="media?.media_type==='video'" style="color:var(--accent)">◎ {{ t('d.seg_count', {n: analysis.segments.length}) }}</span>
             <div style="flex:1"></div>
-            <q-btn flat dense icon="delete_outline" label="清除分析" color="grey-6" size="sm" :disable="analyzing" @click="showClearDialog=true" style="font-size:11px"></q-btn>
-            <q-btn dense icon="auto_awesome" label="重新分析" color="primary" size="sm" :disable="analyzing" @click="openAnalysisConfirm" style="font-size:11px;border-radius:4px;padding-left:12px;padding-right:12px"></q-btn>
+            <q-btn flat dense icon="delete_outline" :label="t('d.clear_analysis')" color="grey-6" size="sm" :disable="analyzing" @click="showClearDialog=true" style="font-size:11px"></q-btn>
+            <q-btn dense icon="auto_awesome" :label="t('d.reanalyze')" color="primary" size="sm" :disable="analyzing" @click="openAnalysisConfirm" style="font-size:11px;border-radius:4px;padding-left:12px;padding-right:12px"></q-btn>
           </div>
           <q-scroll-area ref="segScroll" style="flex:1">
             <div v-for="(seg,i) in analysis.segments" :key="i" class="segment" :class="{active: activeSeg===i}" @click="seekTo(seg.time_start)">
@@ -144,22 +144,22 @@ const DetailPage = {
                 <template v-if="media?.media_type==='video'"><span class="seg-time"><span class="seg-editable" contenteditable @click.stop @blur="e => { saveSegField(seg, 'time_start', e.target.innerText.trim()) }" v-text="seg.time_start"></span> → <span class="seg-editable" contenteditable @click.stop @blur="e => { saveSegField(seg, 'time_end', e.target.innerText.trim()) }" v-text="seg.time_end"></span></span>
                 <div style="display:flex;align-items:center;gap:6px">
                   <span class="seg-dur">{{ fmtSegDur(seg.time_start, seg.time_end) }}</span>
-                  <q-btn flat round dense icon="delete_outline" size="xs" color="grey-6" class="seg-del-btn" @click.stop="confirmDeleteSeg(seg, i)"><q-tooltip :delay="800">删除片段</q-tooltip></q-btn>
+                  <q-btn flat round dense icon="delete_outline" size="xs" color="grey-6" class="seg-del-btn" @click.stop="confirmDeleteSeg(seg, i)"><q-tooltip :delay="800">{{ t('d.delete_seg') }}</q-tooltip></q-btn>
                 </div></template>
               </div>
               <div class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'visual', e.target.innerText)" v-text="seg.visual"></div>
-              <div v-if="seg.asr && seg.asr!=='无'" class="seg-text-line seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'asr', e.target.innerText)"><span class="prefix">💬 对话</span><span v-text="seg.asr"></span></div>
-              <div v-if="seg.subtitle && seg.subtitle!=='无'" class="seg-text-line seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'subtitle', e.target.innerText)"><span class="prefix">📝 字幕</span><span v-text="seg.subtitle"></span></div>
+              <div v-if="seg.asr && seg.asr!=='无'" class="seg-text-line seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'asr', e.target.innerText)"><span class="prefix">{{ t('d.dialog_asr') }}</span><span v-text="seg.asr"></span></div>
+              <div v-if="seg.subtitle && seg.subtitle!=='无'" class="seg-text-line seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'subtitle', e.target.innerText)"><span class="prefix">{{ t('d.dialog_subtitle') }}</span><span v-text="seg.subtitle"></span></div>
               <div v-if="dimRowCam(seg)" class="dim-row">
                 <span style="font-size:12px">🎥</span>
-                <template v-for="f in camFields" :key="f.key"><span v-if="seg[f.key]" class="dim-pair"><span class="dim-label">{{ f.label }}</span><span class="dim-value seg-editable" :class="f.cls" contenteditable @click.stop @blur="e => saveSegField(seg, f.key, e.target.innerText.trim())" v-text="seg[f.key]"></span></span></template>
+                <template v-for="f in camFields" :key="f.key"><span v-if="seg[f.key]" class="dim-pair"><span class="dim-label">{{ t('d.dim.' + f.key) }}</span><span class="dim-value seg-editable" :class="f.cls" contenteditable @click.stop @blur="e => saveSegField(seg, f.key, e.target.innerText.trim())" v-text="seg[f.key]"></span></span></template>
               </div>
               <div v-if="dimRowScene(seg)" class="dim-row">
                 <span style="font-size:12px">🌍</span>
-                <template v-for="f in sceneFields" :key="f.key"><span v-if="seg[f.key]" class="dim-pair"><span class="dim-label">{{ f.label }}</span><span class="dim-value seg-editable" :class="f.cls" contenteditable @click.stop @blur="e => saveSegField(seg, f.key, e.target.innerText.trim())" v-text="seg[f.key]"></span></span></template>
+                <template v-for="f in sceneFields" :key="f.key"><span v-if="seg[f.key]" class="dim-pair"><span class="dim-label">{{ t('d.dim.' + f.key) }}</span><span class="dim-value seg-editable" :class="f.cls" contenteditable @click.stop @blur="e => saveSegField(seg, f.key, e.target.innerText.trim())" v-text="seg[f.key]"></span></span></template>
               </div>
-              <div class="array-group"><span class="array-label">🎨 颜色</span><div class="array-pills"><span v-for="c in (seg.dominant_colors||[])" :key="c" class="pill color seg-editable-tag" @click.stop="removeTag(seg, 'dominant_colors', c)">{{ c }}<span style="margin-left:2px;opacity:0.5">×</span></span><input class="tag-add-input" placeholder="+" @click.stop @keydown.enter.stop.prevent="e => { addTag(seg, 'dominant_colors', e.target); e.target.value='' }" /></div></div>
-              <div class="array-group"><span class="array-label">🎬 主体</span><div class="array-pills"><span v-for="s in (seg.main_subjects||[])" :key="s" class="pill subject seg-editable-tag" @click.stop="removeTag(seg, 'main_subjects', s)">{{ s }}<span style="margin-left:2px;opacity:0.5">×</span></span><input class="tag-add-input" placeholder="+" @click.stop @keydown.enter.stop.prevent="e => { addTag(seg, 'main_subjects', e.target); e.target.value='' }" /></div></div>
+              <div class="array-group"><span class="array-label">{{ t('d.colors') }}</span><div class="array-pills"><span v-for="c in (seg.dominant_colors||[])" :key="c" class="pill color seg-editable-tag" @click.stop="removeTag(seg, 'dominant_colors', c)">{{ c }}<span style="margin-left:2px;opacity:0.5">×</span></span><input class="tag-add-input" placeholder="+" @click.stop @keydown.enter.stop.prevent="e => { addTag(seg, 'dominant_colors', e.target); e.target.value='' }" /></div></div>
+              <div class="array-group"><span class="array-label">{{ t('d.subjects') }}</span><div class="array-pills"><span v-for="s in (seg.main_subjects||[])" :key="s" class="pill subject seg-editable-tag" @click.stop="removeTag(seg, 'main_subjects', s)">{{ s }}<span style="margin-left:2px;opacity:0.5">×</span></span><input class="tag-add-input" placeholder="+" @click.stop @keydown.enter.stop.prevent="e => { addTag(seg, 'main_subjects', e.target); e.target.value='' }" /></div></div>
             </div>
           </q-scroll-area>
         </div>
@@ -183,7 +183,7 @@ const DetailPage = {
           </template>
           <template v-else>
             <div ref="aiLottieIdle" style="width:80px;height:80px"></div>
-            <q-btn color="primary" label="AI 分析" icon="auto_awesome" style="border-radius:6px;padding:6px 16px" @click="openAnalysisConfirm"></q-btn>
+            <q-btn color="primary" :label="t('d.ai_analyze')" icon="auto_awesome" style="border-radius:6px;padding:6px 16px" @click="openAnalysisConfirm"></q-btn>
           </template>
         </div>
       </div>
@@ -193,14 +193,14 @@ const DetailPage = {
     <q-dialog v-model="showClearDialog">
       <q-card style="min-width:320px" class="dialog-card">
         <q-card-section>
-          <div class="text-h6">清除分析</div>
+          <div class="text-h6">{{ t('d.clear_analysis') }}</div>
         </q-card-section>
         <q-card-section>
-          <p style="font-size:13px;color:var(--text2)">确定要清除该视频的所有分析结果吗？此操作不可撤销。</p>
+          <p style="font-size:13px;color:var(--text2)">{{ t('d.clear_confirm') }}</p>
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat label="取消" v-close-popup></q-btn>
-          <q-btn color="negative" label="清除" @click="showClearDialog=false; clearAnalysis()"></q-btn>
+          <q-btn flat :label="t('d.cancel')" v-close-popup></q-btn>
+          <q-btn color="negative" :label="t('d.clear')" @click="showClearDialog=false; clearAnalysis()"></q-btn>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -209,18 +209,18 @@ const DetailPage = {
     <q-dialog v-model="showDeleteSegDialog">
       <q-card style="min-width:320px" class="dialog-card">
         <q-card-section>
-          <div class="text-h6">删除片段</div>
+          <div class="text-h6">{{ t('d.delete_seg') }}</div>
         </q-card-section>
         <q-card-section>
-          <p style="font-size:13px;color:var(--text2)">删除此片段后，如何处理相邻片段的时间？</p>
+          <p style="font-size:13px;color:var(--text2)">{{ t('d.delete_seg_confirm') }}</p>
           <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
-            <q-btn v-if="deleteSegInfo && deleteSegInfo.hasPrev" outline color="primary" no-caps style="justify-content:flex-start;font-size:12px" @click="doDeleteSeg('prev')">前一个片段结束时间后移至 {{ deleteSegInfo.timeEnd }}</q-btn>
-            <q-btn v-if="deleteSegInfo && deleteSegInfo.hasNext" outline color="primary" no-caps style="justify-content:flex-start;font-size:12px" @click="doDeleteSeg('next')">后一个片段开始时间前移至 {{ deleteSegInfo.timeStart }}</q-btn>
-            <q-btn flat color="grey" no-caps style="font-size:12px" @click="doDeleteSeg('none')">直接删除（不调整时间）</q-btn>
+            <q-btn v-if="deleteSegInfo && deleteSegInfo.hasPrev" outline color="primary" no-caps style="justify-content:flex-start;font-size:12px" @click="doDeleteSeg('prev')">{{ t('d.seg_adj_prev', {time: deleteSegInfo.timeEnd}) }}</q-btn>
+            <q-btn v-if="deleteSegInfo && deleteSegInfo.hasNext" outline color="primary" no-caps style="justify-content:flex-start;font-size:12px" @click="doDeleteSeg('next')">{{ t('d.seg_adj_next', {time: deleteSegInfo.timeStart}) }}</q-btn>
+            <q-btn flat color="grey" no-caps style="font-size:12px" @click="doDeleteSeg('none')">{{ t('d.seg_adj_none') }}</q-btn>
           </div>
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat label="取消" v-close-popup></q-btn>
+          <q-btn flat :label="t('d.cancel')" v-close-popup></q-btn>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -230,31 +230,31 @@ const DetailPage = {
       <q-card style="min-width:360px" class="dialog-card">
         <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" v-close-popup></q-btn>
         <q-card-section>
-          <div class="text-h6">确认分析</div>
+          <div class="text-h6">{{ t('d.confirm_analysis') }}</div>
         </q-card-section>
         <q-card-section>
           <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
             <div v-if="media?.media_type==='video'" class="row items-center">
-              <span class="text-grey-6" style="width:80px">压缩</span>
+              <span class="text-grey-6" style="width:80px">{{ t('d.compress') }}</span>
               <span>{{ confirmInfo.resolution }} / {{ confirmInfo.fps }}fps / {{ confirmInfo.bitrate }}</span>
             </div>
             <div class="row items-center">
-              <span class="text-grey-6" style="width:80px">模型</span>
+              <span class="text-grey-6" style="width:80px">{{ t('d.model') }}</span>
               <span>{{ confirmInfo.modelLabel }}</span>
             </div>
             <div v-if="media?.media_type==='video'" class="row items-center">
-              <span class="text-grey-6" style="width:80px">音频</span>
-              <span>{{ confirmInfo.useMultimodal ? '多模态解析' : '独立 ASR (' + confirmInfo.asrEngine + ')' }}</span>
+              <span class="text-grey-6" style="width:80px">{{ t('d.audio') }}</span>
+              <span>{{ confirmInfo.useMultimodal ? t('d.multimodal') : t('d.independent_asr', {engine: confirmInfo.asrEngine}) }}</span>
             </div>
           </div>
           <div style="margin-top:16px;padding:8px 12px;border-radius:6px;background:var(--surface2);font-size:12px;color:var(--text3)">
             <q-icon name="info" size="14px" style="margin-right:4px"></q-icon>
-            AI 模型分析可能会产生费用
+            {{ t('d.ai_cost_warning') }}
           </div>
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat label="取消" v-close-popup></q-btn>
-          <q-btn color="primary" label="开始分析" @click="showAnalysisDialog=false; doAnalysis()"></q-btn>
+          <q-btn flat :label="t('d.cancel')" v-close-popup></q-btn>
+          <q-btn color="primary" :label="t('d.start_analysis')" @click="showAnalysisDialog=false; doAnalysis()"></q-btn>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -278,17 +278,17 @@ const DetailPage = {
       deleteSegInfo: null,
       confirmInfo: { resolution: "480P", fps: "30", bitrate: "2.00 Mbps", modelLabel: "智谱 GLM-4.6V", useMultimodal: true, asrEngine: "Whisper" },
       camFields: [
-        { key: "shot_type", label: "景别", cls: "shot" },
-        { key: "focal_length", label: "焦段", cls: "lens" },
-        { key: "camera_angle", label: "视角", cls: "angle" },
-        { key: "camera_movement", label: "运镜", cls: "move" },
-        { key: "perspective", label: "透视", cls: "persp" },
+        { key: "shot_type", cls: "shot" },
+        { key: "focal_length", cls: "lens" },
+        { key: "camera_angle", cls: "angle" },
+        { key: "camera_movement", cls: "move" },
+        { key: "perspective", cls: "persp" },
       ],
       sceneFields: [
-        { key: "scene_type", label: "场景", cls: "scene" },
-        { key: "mood", label: "氛围", cls: "mood" },
-        { key: "lighting", label: "光线", cls: "light" },
-        { key: "weather", label: "天气", cls: "weather" },
+        { key: "scene_type", cls: "scene" },
+        { key: "mood", cls: "mood" },
+        { key: "lighting", cls: "light" },
+        { key: "weather", cls: "weather" },
       ],
       colors: ["red", "yellow", "green", "blue", "purple"],
     };
@@ -352,6 +352,7 @@ const DetailPage = {
     });
   },
   methods: {
+    t,
     API,
     onImageLoaded(e) {
       this.imgLoading = false;
@@ -371,18 +372,15 @@ const DetailPage = {
     onImgWheel(e) {
       e.preventDefault();
       if (e.ctrlKey) {
-        // 触控板双指张合 → 缩放
         this.imgZooming = false;
         const factor = 1 - e.deltaY * 0.005;
         this.imgZoom = Math.max(0.25, Math.min(5, Math.round(this.imgZoom * factor * 100) / 100));
       } else if (e.deltaMode === 0) {
-        // 触控板双指滑动 → 平移
         this.imgZooming = false;
         this.imgPanX -= e.deltaX;
         this.imgPanY -= e.deltaY;
         if (this.imgZoom <= 1) { this.imgPanX = 0; this.imgPanY = 0; }
       } else {
-        // 鼠标滚轮 → 缩放
         this.imgZooming = false;
         const delta = e.deltaY > 0 ? -0.1 : 0.1;
         this.imgZoom = Math.max(0.25, Math.min(5, Math.round((this.imgZoom + delta) * 100) / 100));
@@ -527,10 +525,9 @@ const DetailPage = {
     _setAnalyzeSubstep(name, chars) {
       this._analyzeSubstep = true;
       this._stopAnalyzeTips();
-      const labels = { uploading: "上传至 AI 服务…", receiving: "接收结果…" };
       const text = name === "receiving" && chars > 0
-        ? `接收结果 (${chars.toLocaleString()} 字)…`
-        : (labels[name] || "");
+        ? t('d.tip_receiving_chars', {n: chars.toLocaleString()})
+        : (name === "uploading" ? t('d.tip_uploading') : name === "receiving" ? t('d.tip_receiving') : "");
       this.analyzeTipText = text;
       this.analysisStages = this.analysisStages.map(s =>
         s.key === "analyze" && s.status === "active" ? { ...s, substepText: text } : s
@@ -543,28 +540,7 @@ const DetailPage = {
     },
     _startAnalyzeTips() {
       this._stopAnalyzeTips();
-      const tips = [
-        '正在逐帧扫描视频画面…',
-        '正在识别画面中的场景与人物…',
-        '正在分析画面内容与动作描述…',
-        '正在识别语音对话与说话人…',
-        '正在提取画面中的字幕文字…',
-        '正在分析主要颜色与色调分布…',
-        '正在识别画面中的主要主体…',
-        '正在判断镜头景别类型…',
-        '正在分析镜头焦段特征…',
-        '正在识别摄像机拍摄角度…',
-        '正在分析镜头运镜方式…',
-        '正在判断画面视角透视关系…',
-        '正在识别场景类型与环境…',
-        '正在分析画面情绪氛围…',
-        '正在判断光线类型与特征…',
-        '正在识别天气与环境条件…',
-        '正在检测场景转场与切镜点…',
-        '正在划分时间段落…',
-        '正在生成结构化分析报告…',
-        '正在整理分析结果并输出…',
-      ];
+      const tips = t('d.tips');
       const shuffled = [...tips].sort(() => Math.random() - 0.5);
       let idx = 0;
       this._tipTimers = [];
@@ -649,7 +625,7 @@ const DetailPage = {
         await API.updateSegment(seg.media_id, seg.id, { [field]: value });
       } catch (e) {
         seg[field] = old;
-        Quasar.Notify.create({ message: "保存失败: " + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
+        Quasar.Notify.create({ message: t('d.n_save_fail', {err: e.message || e}), position: 'top', color: 'negative', timeout: 2000 });
       }
     },
     async removeTag(seg, field, tag) {
@@ -662,7 +638,7 @@ const DetailPage = {
         await API.updateSegment(seg.media_id, seg.id, { [field]: newArr });
       } catch (e) {
         seg[field] = old;
-        Quasar.Notify.create({ message: "保存失败: " + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
+        Quasar.Notify.create({ message: t('d.n_save_fail', {err: e.message || e}), position: 'top', color: 'negative', timeout: 2000 });
       }
     },
     async addTag(seg, field, inputEl) {
@@ -677,7 +653,7 @@ const DetailPage = {
         await API.updateSegment(seg.media_id, seg.id, { [field]: arr });
       } catch (e) {
         seg[field] = old;
-        Quasar.Notify.create({ message: "保存失败: " + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
+        Quasar.Notify.create({ message: t('d.n_save_fail', {err: e.message || e}), position: 'top', color: 'negative', timeout: 2000 });
       }
     },
     confirmDeleteSeg(seg, index) {
@@ -703,9 +679,9 @@ const DetailPage = {
           this.analysis.segments[info.index + 1].time_start = info.timeStart;
         }
         this.analysis.segments.splice(info.index, 1);
-        Quasar.Notify.create({ message: '片段已删除', position: 'top', color: 'dark', textColor: 'white', timeout: 1500 });
+        Quasar.Notify.create({ message: t('d.seg_deleted'), position: 'top', color: 'dark', textColor: 'white', timeout: 1500 });
       } catch (e) {
-        Quasar.Notify.create({ message: '删除失败: ' + (e.message || e), position: 'top', color: 'negative', timeout: 2000 });
+        Quasar.Notify.create({ message: t('d.n_delete_fail', {err: e.message || e}), position: 'top', color: 'negative', timeout: 2000 });
       }
       this.deleteSegInfo = null;
     },
@@ -751,19 +727,19 @@ const DetailPage = {
       try {
         await API.updateMedia(this.media.id, { rating: val });
         this.media.rating = val;
-        Quasar.Notify.create({ message: val ? `已评为 ${'★'.repeat(val)}` : '已取消评分', position: 'top', timeout: 1200 });
+        Quasar.Notify.create({ message: val ? t('d.n_rated', {stars: '★'.repeat(val)}) : t('d.n_unrated'), position: 'top', timeout: 1200 });
       } catch (e) {
-        Quasar.Notify.create({ message: '评分失败', position: 'top', color: 'negative', timeout: 1500 });
+        Quasar.Notify.create({ message: t('d.n_rate_fail'), position: 'top', color: 'negative', timeout: 1500 });
       }
     },
     async setColor(c) {
       try {
         await API.updateMedia(this.media.id, { color_label: c });
         this.media.color_label = c;
-        const names = { red: '红色', yellow: '黄色', green: '绿色', blue: '蓝色', purple: '紫色' };
-        Quasar.Notify.create({ message: c ? `已标记为${names[c] || c}` : '已取消颜色标记', position: 'top', timeout: 1200 });
+        const names = { red: t('d.color.red'), yellow: t('d.color.yellow'), green: t('d.color.green'), blue: t('d.color.blue'), purple: t('d.color.purple') };
+        Quasar.Notify.create({ message: c ? t('d.n_color_set', {color: names[c] || c}) : t('d.n_color_clear'), position: 'top', timeout: 1200 });
       } catch (e) {
-        Quasar.Notify.create({ message: '标记失败', position: 'top', color: 'negative', timeout: 1500 });
+        Quasar.Notify.create({ message: t('d.n_rate_fail'), position: 'top', color: 'negative', timeout: 1500 });
       }
     },
     async toggleFav() {
@@ -771,9 +747,9 @@ const DetailPage = {
         const fav = this.media.favorite ? 0 : 1;
         await API.updateMedia(this.media.id, { favorite: fav });
         this.media.favorite = fav;
-        Quasar.Notify.create({ message: fav ? '已喜欢' : '已取消喜欢', position: 'top', timeout: 1200 });
+        Quasar.Notify.create({ message: fav ? t('d.n_fav') : t('d.n_unfav'), position: 'top', timeout: 1200 });
       } catch (e) {
-        Quasar.Notify.create({ message: '操作失败', position: 'top', color: 'negative', timeout: 1500 });
+        Quasar.Notify.create({ message: t('d.n_fav_fail'), position: 'top', color: 'negative', timeout: 1500 });
       }
     },
     openInFinder() {
@@ -784,12 +760,12 @@ const DetailPage = {
         const res = await API.writeXmp(this.media.id);
         if (res.ok) {
           this.media.has_xmp = 1;
-          Quasar.Notify.create({ message: '已写入 XMP', position: 'top', timeout: 1500 });
+          Quasar.Notify.create({ message: t('d.n_xmp_ok'), position: 'top', timeout: 1500 });
         } else {
-          Quasar.Notify.create({ message: '写入 XMP 失败', position: 'top', color: 'negative', timeout: 2000 });
+          Quasar.Notify.create({ message: t('d.n_xmp_fail'), position: 'top', color: 'negative', timeout: 2000 });
         }
       } catch (e) {
-        Quasar.Notify.create({ message: '写入失败: ' + e.message, position: 'top', color: 'negative', timeout: 2000 });
+        Quasar.Notify.create({ message: t('d.n_xmp_err', {err: e.message}), position: 'top', color: 'negative', timeout: 2000 });
       }
     },
     async clearAnalysis() {
@@ -798,7 +774,7 @@ const DetailPage = {
         this.analysis = { status: "none", segments: [] };
         this.$nextTick(() => this._initLottieIdle());
       } catch (e) {
-        Quasar.Notify.create({ message: "清除失败: " + e.message, position: "top", color: "negative", timeout: 2000 });
+        Quasar.Notify.create({ message: t('d.n_clear_fail', {err: e.message}), position: "top", color: "negative", timeout: 2000 });
       }
     },
     async doAnalysis() {
@@ -808,27 +784,27 @@ const DetailPage = {
       } catch (e) {}
       this.analyzing = true;
       this._analyzeSubstep = false;
-      this.analysisProgress = "准备中…";
+      this.analysisProgress = t('d.preparing');
       this.analysis = { status: "processing", segments: [] };
       const isImage = this.media?.media_type === "image";
       const useMultimodal = this.confirmInfo.useMultimodal;
       this.analysisStages = isImage ? [
-        { key: "analyze", label: "AI 图像分析", status: "pending", progress: 0, duration: null, t0: null, statusText: "等待中", activeText: "分析中…", doneText: "分析完成" },
+        { key: "analyze", label: t('d.img_analysis'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.analyzing'), doneText: t('d.analysis_done_short') },
       ] : useMultimodal ? [
-        { key: "compress", label: "视频压缩", status: "pending", progress: 0, duration: null, t0: null, statusText: "等待中", activeText: "压缩中…", doneText: "压缩完成" },
-        { key: "encode", label: "视频编码", status: "pending", progress: 0, duration: null, t0: null, statusText: "等待中", activeText: "编码中…", doneText: "编码完成" },
-        { key: "analyze", label: "AI 综合分析", status: "pending", progress: 0, duration: null, t0: null, statusText: "等待中", activeText: "分析中…", doneText: "分析完成" },
+        { key: "compress", label: t('d.video_compress'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.compressing'), doneText: t('d.compress_done') },
+        { key: "encode", label: t('d.video_encode'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.encoding'), doneText: t('d.encode_done') },
+        { key: "analyze", label: t('d.ai_comprehensive'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.analyzing'), doneText: t('d.analysis_done_short') },
       ] : [
-        { key: "compress", label: "视频压缩", status: "pending", progress: 0, duration: null, t0: null, statusText: "等待中", activeText: "压缩中…", doneText: "压缩完成" },
-        { key: "encode", label: "视频编码", status: "pending", progress: 0, duration: null, t0: null, statusText: "等待中", activeText: "编码中…", doneText: "编码完成" },
-        { key: "analyze", label: "AI 模型分析", status: "pending", progress: 0, duration: null, t0: null, statusText: "等待中", activeText: "分析中…", doneText: "分析完成" },
-        { key: "asr", label: "语音识别 (ASR)", status: "pending", progress: 0, duration: null, t0: null, statusText: "等待中", activeText: "识别中…", doneText: "识别完成" },
+        { key: "compress", label: t('d.video_compress'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.compressing'), doneText: t('d.compress_done') },
+        { key: "encode", label: t('d.video_encode'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.encoding'), doneText: t('d.encode_done') },
+        { key: "analyze", label: t('d.ai_model_analysis'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.analyzing'), doneText: t('d.analysis_done_short') },
+        { key: "asr", label: t('d.asr'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.transcribing'), doneText: t('d.transcribe_done') },
       ];
       this.$nextTick(() => this._initLottieBusy());
       try {
         const resp = await API.startAnalysis(this.media.id);
         if (!resp.ok) {
-          let msg = `请求失败 (${resp.status})`;
+          let msg = t('d.n_request_fail', {status: resp.status});
           try { const body = await resp.json(); if (body.error) msg = body.error; } catch {}
           throw new Error(msg);
         }
@@ -887,7 +863,7 @@ const DetailPage = {
                 this._updateStage("asr", "active");
               }
               if (evt.step === "asr_progress") {
-                const asrLabels = { loading: "加载语音模型…", transcribing: "语音识别中…" };
+                const asrLabels = { loading: t('d.asr_loading'), transcribing: t('d.asr_transcribing') };
                 this._setAsrSubstep(evt.substep, evt.message || asrLabels[evt.substep] || "");
               }
             } else if (evt.type === "done") {
@@ -900,7 +876,7 @@ const DetailPage = {
                   this._updateStage("asr", "done");
                 } else if (asrStage.status === "pending") {
                   this.analysisStages = this.analysisStages.map(s =>
-                    s.key === "asr" ? { ...s, status: "done", statusText: "未启用", progress: 100, extra: "需安装 faster-whisper" } : s
+                    s.key === "asr" ? { ...s, status: "done", statusText: t('d.asr_not_enabled'), progress: 100, extra: t('d.asr_install_hint') } : s
                   );
                 }
               }
@@ -915,29 +891,29 @@ const DetailPage = {
               if (evt.tokens) {
                 const fmt = v => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v;
                 Quasar.Dialog.create({
-                  title: '分析完成',
+                  title: t('d.analysis_done'),
                   message: `<div style="font-size:13px;line-height:1.8">
-                    <div>片段数：${evt.segments_count}</div>
-                    <div>分析耗时：${(evt.analyze_time || 0).toFixed(1)}s</div>
-                    ${evt.compress_time ? '<div>压缩耗时：' + evt.compress_time.toFixed(1) + 's</div>' : ''}
+                    <div>${t('d.segment_count', {n: evt.segments_count})}</div>
+                    <div>${t('d.analyze_time', {t: (evt.analyze_time || 0).toFixed(1)})}</div>
+                    ${evt.compress_time ? '<div>' + t('d.compress_time', {t: evt.compress_time.toFixed(1)}) + '</div>' : ''}
                     <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-                      <div>Prompt：${fmt(evt.tokens.prompt)} tokens</div>
-                      <div>Completion：${fmt(evt.tokens.completion)} tokens</div>
-                      <div style="font-weight:600">合计：${fmt(evt.tokens.total)} tokens</div>
+                      <div>${t('d.prompt_tokens', {n: fmt(evt.tokens.prompt)})}</div>
+                      <div>${t('d.completion_tokens', {n: fmt(evt.tokens.completion)})}</div>
+                      <div style="font-weight:600">${t('d.total_tokens', {n: fmt(evt.tokens.total)})}</div>
                     </div>
                   </div>`,
                   html: true,
-                  ok: { label: '确定', color: 'primary', flat: true },
+                  ok: { label: t('d.ok'), color: 'primary', flat: true },
                 });
               } else {
-                Quasar.Notify.create({ message: `分析完成，共 ${evt.segments_count} 个片段`, position: "top", timeout: 2500 });
+                Quasar.Notify.create({ message: t('d.analysis_done_n', {n: evt.segments_count}), position: "top", timeout: 2500 });
               }
             } else if (evt.type === "error") {
               this._stopAnalyzeTips();
               this._stopAllStepTimers();
               this.analysisProgress = "";
               this.analysis = { status: "none", segments: [] };
-              Quasar.Notify.create({ message: "分析失败: " + evt.message, position: "top", color: "negative", timeout: 3000 });
+              Quasar.Notify.create({ message: t('d.n_analysis_fail', {err: evt.message}), position: "top", color: "negative", timeout: 3000 });
             }
           }
         }
@@ -945,7 +921,7 @@ const DetailPage = {
         this._stopAnalyzeTips();
         this._stopAllStepTimers();
         this.analysis = { status: "none", segments: [] };
-        Quasar.Notify.create({ message: "分析失败: " + e.message, position: "top", color: "negative", timeout: 3000 });
+        Quasar.Notify.create({ message: t('d.n_analysis_fail', {err: e.message}), position: "top", color: "negative", timeout: 3000 });
       }
       this.analyzing = false;
     },
@@ -972,9 +948,9 @@ const DetailPage = {
     onVideoSeeked() { this.initScopes(); this.drawWaveform(); this.drawScopesOnce(); this.updateActiveSeg(); },
     onVideoError() {
       const player = this.$refs.player;
-      let msg = "视频加载失败";
+      let msg = t('d.video_load_fail');
       if (player?.error) {
-        const codes = { 1: "下载中止", 2: "网络错误", 3: "解码失败", 4: "格式不支持" };
+        const codes = { 1: t('d.err_aborted'), 2: t('d.err_network'), 3: t('d.err_decode'), 4: t('d.err_format') };
         msg = codes[player.error.code] || msg;
       }
       Quasar.Notify.create({ message: msg, position: "top", color: "negative", timeout: 4000 });

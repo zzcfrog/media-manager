@@ -18,10 +18,10 @@
         <span class="text-primary text-weight-bold" style="font-size:13px;margin:0 8px">MediaManager</span>
         <q-space></q-space>
         <q-btn flat round dense icon="palette" size="sm" color="grey-6">
-	          <q-tooltip :delay="1000">主题色</q-tooltip>
+	          <q-tooltip :delay="1000">{{ t('top.accent_color') }}</q-tooltip>
           <q-menu anchor="bottom right" self="top right">
             <div style="padding:12px;min-width:200px" class="bg-menu-popup">
-              <div class="text-caption text-grey-5 q-mb-sm">主题色</div>
+              <div class="text-caption text-grey-5 q-mb-sm">{{ t('s.accent') }}</div>
               <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <span v-for="c in skinColors" :key="c.value" class="skin-dot"
                       :style="{background: c.color}" :class="{active: accentColor===c.value}"
@@ -31,18 +31,18 @@
           </q-menu>
         </q-btn>
         <q-btn flat round dense :icon="themeIcon" size="sm" color="grey-6" @click="cycleTheme">
-          <q-tooltip :delay="1000">{{ themeMode === 'dark' ? '夜间模式' : themeMode === 'light' ? '日间模式' : '跟随系统' }}</q-tooltip>
+          <q-tooltip :delay="1000">{{ t('top.' + (themeMode === 'dark' ? 'dark_mode' : themeMode === 'light' ? 'light_mode' : 'auto_mode')) }}</q-tooltip>
         </q-btn>
         <q-btn flat round dense icon="refresh" size="sm" color="grey-6"
-               @mousedown="startLongRefresh" @mouseup="cancelLongRefresh" @mouseleave="cancelLongRefresh"
+               @mousedown="startLongRefresh" @mouseup="cancelLongRefresh" @mouseleave="endLongRefresh"
                @touchstart="startLongRefresh" @touchend="cancelLongRefresh">
-          <q-tooltip :delay="1000">刷新页面（长按强制刷新）</q-tooltip>
+          <q-tooltip :delay="1000">{{ t('top.refresh') }}</q-tooltip>
         </q-btn>
         <q-btn flat round dense icon="keyboard" size="sm" color="grey-6" @click="showShortcuts=true">
-          <q-tooltip :delay="1000">快捷键</q-tooltip>
+          <q-tooltip :delay="1000">{{ t('top.shortcuts') }}</q-tooltip>
         </q-btn>
         <q-btn flat round dense icon="settings" size="sm" color="grey-6" @click="showSettings=true">
-          <q-tooltip :delay="1000">设置</q-tooltip>
+          <q-tooltip :delay="1000">{{ t('top.settings') }}</q-tooltip>
         </q-btn>
       </q-toolbar>
       <q-linear-progress v-if="syncInBackground && !syncSummary" indeterminate color="primary" size="3px" style="position:absolute;bottom:0;left:0;right:0"></q-linear-progress>
@@ -51,12 +51,12 @@
     <!-- Sidebar -->
     <q-drawer v-model="drawerOpen" :width="260" :mini="drawerMini" :breakpoint="0" bordered style="display:flex;flex-direction:column" mini-width="56">
       <q-list dense>
-        <q-item-label header>浏览</q-item-label>
+        <q-item-label header>{{ t('side.browse') }}</q-item-label>
         <q-item clickable
           :style="route==='#/gallery' && !collectionFilter && !selectedFolder ? 'background:var(--accent-dim);border-radius:4px' : ''"
           @click="navToLibrary">
           <q-item-section avatar><q-icon name="movie" size="18px" :color="route==='#/gallery' && !collectionFilter && !selectedFolder ? 'primary' : 'grey-6'"></q-icon></q-item-section>
-          <q-item-section>素材库</q-item-section>
+          <q-item-section>{{ t('side.library') }}</q-item-section>
           <q-item-section v-if="!drawerMini" side style="padding-left:0;padding-right:4px">
             <q-btn flat round dense :icon="libraryExpanded ? 'expand_less' : 'expand_more'" size="xs" color="grey-6"
               @click.stop="libraryExpanded = !libraryExpanded"></q-btn>
@@ -83,17 +83,17 @@
                 @click="nav('#/favorites')"
                 active-class="bg-primary text-white">
           <q-item-section avatar><q-icon name="favorite" size="18px"></q-icon></q-item-section>
-          <q-item-section>我的喜欢</q-item-section>
+          <q-item-section>{{ t('side.favorites') }}</q-item-section>
         </q-item>
         <q-item clickable :active="route==='#/duplicates'" @click="nav('#/duplicates')"
                 active-class="bg-primary text-white">
           <q-item-section avatar><q-icon name="content_copy" size="18px"></q-icon></q-item-section>
-          <q-item-section>查找重复</q-item-section>
+          <q-item-section>{{ t('side.find_dup') }}</q-item-section>
         </q-item>
       </q-list>
       <q-separator></q-separator>
       <q-list dense>
-        <q-item-label header>收藏夹</q-item-label>
+        <q-item-label header>{{ t('side.collections') }}</q-item-label>
         <q-item v-for="c in collections" :key="c.id" clickable
                 :active="route==='#/collections/'+c.id"
                 @click="nav('#/collections/'+c.id)"
@@ -102,11 +102,11 @@
           <q-item-section>{{ c.name }}</q-item-section>
           <q-item-section side><span class="text-caption text-grey-6">{{ c.item_count || 0 }}</span></q-item-section>
         </q-item>
-        <q-item v-if="!collections.length"><q-item-section class="text-grey-7" style="font-size:11px">暂无收藏夹</q-item-section></q-item>
+        <q-item v-if="!collections.length"><q-item-section class="text-grey-7" style="font-size:11px">{{ t('side.no_collections') }}</q-item-section></q-item>
       </q-list>
       <q-space></q-space>
       <div style="padding:12px 14px;flex-shrink:0">
-        <q-btn v-if="!drawerMini" color="primary" class="full-width" icon="add_circle_outline" label="导入素材" @click="openImport"></q-btn>
+        <q-btn v-if="!drawerMini" color="primary" class="full-width" icon="add_circle_outline" :label="t('side.import')" @click="openImport"></q-btn>
         <q-btn v-else flat round dense icon="add" color="primary" @click="openImport"></q-btn>
       </div>
     </q-drawer>
@@ -116,12 +116,12 @@
       <q-list dense style="min-width:180px;border-radius:8px;overflow:hidden">
         <q-item clickable :disable="!folderCtx.node?.directCount" @click="syncFolder" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="sync" size="14px" color="grey-6"></q-icon></q-item-section>
-          <q-item-section>同步文件夹</q-item-section>
+          <q-item-section>{{ t('ctx.sync_folder') }}</q-item-section>
         </q-item>
         <q-separator style="background:var(--border)"></q-separator>
         <q-item clickable :disable="!folderCtx.node?.totalCount" @click="removeFolder" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="delete_outline" size="14px" color="negative"></q-icon></q-item-section>
-          <q-item-section style="color:var(--negative)">移出素材库</q-item-section>
+          <q-item-section style="color:var(--negative)">{{ t('ctx.remove_from_lib') }}</q-item-section>
         </q-item>
       </q-list>
     </div>
@@ -131,11 +131,11 @@
       <q-card style="min-width:440px;max-width:520px" class="dialog-card">
         <template v-if="!syncSummary">
           <q-card-section>
-            <div class="text-h6">正在同步</div>
+            <div class="text-h6">{{ t('sync.syncing') }}</div>
           </q-card-section>
           <q-card-section>
             <div class="row justify-between text-caption text-grey-6 q-mb-sm">
-              <span>{{ syncDone }} 已处理</span>
+              <span>{{ t('sync.processed', {n: syncDone}) }}</span>
             </div>
             <q-linear-progress indeterminate color="primary" size="6px"></q-linear-progress>
           </q-card-section>
@@ -149,42 +149,42 @@
                 <q-item-section style="font-size:12px">{{ item.name }}</q-item-section>
                 <q-item-section side style="font-size:10px">
                   <span :style="{color: item.status==='new' ? 'var(--accent)' : item.status==='updated' ? 'var(--yellow)' : 'var(--text3)'}">
-                    {{ item.status === 'new' ? '新增' : item.status === 'updated' ? '更新' : item.status === 'skip' ? '跳过' : '失败' }}
+                    {{ item.status === 'new' ? t('sync.added') : item.status === 'updated' ? t('sync.updated') : item.status === 'skip' ? t('sync.skipped') : t('imp.failed') }}
                   </span>
                 </q-item-section>
               </q-item>
             </q-list>
           </q-card-section>
           <q-card-actions align="right">
-            <q-btn flat label="后台处理" @click="showSyncModal=false; syncInBackground=true"></q-btn>
+            <q-btn flat :label="t('sync.background')" @click="showSyncModal=false; syncInBackground=true"></q-btn>
           </q-card-actions>
         </template>
         <template v-else>
           <q-card-section>
-            <div class="text-h6">同步完成</div>
+            <div class="text-h6">{{ t('sync.done') }}</div>
           </q-card-section>
           <q-card-section>
             <div style="display:flex;justify-content:center;gap:28px;padding:12px 0">
               <div class="text-center">
                 <div class="text-h4 text-primary text-weight-bold">{{ syncSummary.added }}</div>
-                <div class="text-caption text-grey-5" style="margin-top:4px">新增</div>
+                <div class="text-caption text-grey-5" style="margin-top:4px">{{ t('sync.added') }}</div>
               </div>
               <div class="text-center">
                 <div class="text-h4 text-weight-bold" style="color:var(--yellow)">{{ syncSummary.updated }}</div>
-                <div class="text-caption text-grey-5" style="margin-top:4px">更新</div>
+                <div class="text-caption text-grey-5" style="margin-top:4px">{{ t('sync.updated') }}</div>
               </div>
               <div class="text-center">
                 <div class="text-h4 text-weight-bold" style="color:var(--negative)">{{ syncSummary.removed }}</div>
-                <div class="text-caption text-grey-5" style="margin-top:4px">移除</div>
+                <div class="text-caption text-grey-5" style="margin-top:4px">{{ t('sync.removed') }}</div>
               </div>
               <div class="text-center">
                 <div class="text-h4 text-grey-6 text-weight-bold">{{ syncSummary.skipped }}</div>
-                <div class="text-caption text-grey-5" style="margin-top:4px">跳过</div>
+                <div class="text-caption text-grey-5" style="margin-top:4px">{{ t('sync.skipped') }}</div>
               </div>
             </div>
           </q-card-section>
           <q-card-actions align="right">
-            <q-btn flat label="关闭" @click="syncInBackground=false; showSyncModal=false; loadSidebar(); $nextTick(() => $refs.gallery?.load())"></q-btn>
+            <q-btn flat :label="t('sync.close')" @click="syncInBackground=false; showSyncModal=false; loadSidebar(); $nextTick(() => $refs.gallery?.load())"></q-btn>
           </q-card-actions>
         </template>
       </q-card>
@@ -206,7 +206,7 @@
   <q-btn flat round dense :icon="drawerMini ? 'chevron_right' : 'chevron_left'" size="xs" color="grey-6"
           class="drawer-toggle-btn" @click="drawerMini = !drawerMini"
           :style="{position:'fixed', left: (drawerMini ? 46 : 250) + 'px', top: '30px', zIndex: 2000}">
-    <q-tooltip :delay="1000">收起侧边栏</q-tooltip>
+    <q-tooltip :delay="1000">{{ t('side.collapse') }}</q-tooltip>
   </q-btn>
 
   <!-- Settings modal -->
@@ -214,65 +214,74 @@
     <q-card style="min-width:440px" class="dialog-card">
       <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" v-close-popup></q-btn>
       <q-card-section>
-        <div class="text-h6">设置</div>
+        <div class="text-h6">{{ t('s.title') }}</div>
       </q-card-section>
-      <q-card-section style="display:flex;flex-direction:column;gap:24px">
-        <!-- 图片分析 -->
-        <div>
-          <div class="text-subtitle2 q-mb-md" style="padding-left:10px;border-left:3px solid var(--accent);line-height:1">图片分析</div>
-          <div style="display:flex;flex-direction:column;gap:12px">
-            <q-select v-model="settingsForm.imageResolution" :options="settingImgResOptions" label="压缩尺寸" dense filled emit-value map-options></q-select>
-            <q-select v-model="settingsForm.imageModel" :options="settingImgModelOptions" label="AI 模型" dense filled emit-value map-options></q-select>
-            <q-input v-model="settingsForm.imageApiKey" :type="showImgKey ? 'text' : 'password'" label="API Key" dense filled>
-              <template v-slot:append>
-                <q-icon :name="showImgKey ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="showImgKey = !showImgKey"></q-icon>
-              </template>
-              <template v-slot:hint>
-                <span class="text-grey-6" style="font-size:11px">图片分析的 API Key（需单独设置）</span>
-              </template>
-            </q-input>
-          </div>
-        </div>
-        <!-- 视频分析 -->
-        <div>
-          <div class="text-subtitle2 q-mb-md" style="padding-left:10px;border-left:3px solid var(--accent);line-height:1">视频分析</div>
-          <div style="display:flex;flex-direction:column;gap:12px">
-            <div class="row q-col-gutter-sm">
-              <q-select v-model="settingsForm.resolution" :options="settingResOptions" label="压缩分辨率" dense filled emit-value map-options class="col"></q-select>
-              <q-select v-model="settingsForm.fps" :options="settingFpsOptions" label="帧率" dense filled emit-value map-options class="col"></q-select>
+      <q-tabs v-model="settingsTab" dense active-color="primary" indicator-color="primary" align="justify" narrow-indicator style="margin:0 16px">
+        <q-tab :name="'general'" :label="t('s.tab_general')" style="font-size:12px"></q-tab>
+        <q-tab :name="'image'" :label="t('s.tab_image')" style="font-size:12px"></q-tab>
+        <q-tab :name="'video'" :label="t('s.tab_video')" style="font-size:12px"></q-tab>
+        <q-tab v-if="!settingsForm.useMultimodal" :name="'audio'" :label="t('s.tab_audio')" style="font-size:12px"></q-tab>
+      </q-tabs>
+      <q-separator style="background:var(--border)"></q-separator>
+      <q-tab-panels v-model="settingsTab" animated style="min-height:200px">
+        <!-- General tab -->
+        <q-tab-panel :name="'general'" style="display:flex;flex-direction:column;gap:16px">
+          <q-select v-model="settingsForm.language" :options="settingLangOptions" :label="t('s.language')" dense filled emit-value map-options @update:model-value="onLanguageChange"></q-select>
+          <q-select v-model="themeMode" :options="settingThemeOptions" :label="t('s.theme')" dense filled emit-value map-options @update:model-value="applyTheme"></q-select>
+          <div>
+            <div class="text-caption text-grey-5 q-mb-sm">{{ t('s.accent') }}</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <span v-for="c in skinColors" :key="c.value" class="skin-dot" :style="{background: c.color}" :class="{active: accentColor===c.value}" @click="setAccentColor(c.value)"></span>
             </div>
-            <div style="font-size:11px;color:var(--text3);padding:0 4px">预估码率：{{ estimatedBitrate }}</div>
-            <q-toggle v-if="hwEncoderAvailable" v-model="settingsForm.hwAccel" label="硬件加速压缩"></q-toggle>
-            <q-select v-model="settingsForm.model" :options="settingModelOptions" label="AI 模型" dense filled emit-value map-options></q-select>
-            <q-input v-model="settingsForm.videoApiKey" :type="showVideoKey ? 'text' : 'password'" label="API Key" dense filled>
-              <template v-slot:append>
-                <q-icon :name="showVideoKey ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="showVideoKey = !showVideoKey"></q-icon>
-              </template>
-              <template v-slot:hint>
-                <span class="text-grey-6" style="font-size:11px">在 AI 平台获取的 API Key</span>
-              </template>
-            </q-input>
-            <q-toggle v-model="settingsForm.useMultimodal" label="由视频模型同时处理音频（无需独立 ASR）"></q-toggle>
           </div>
-        </div>
-        <!-- 音频分析（仅独立 ASR 模式显示） -->
-        <div v-if="!settingsForm.useMultimodal">
-          <div class="text-subtitle2 q-mb-md" style="padding-left:10px;border-left:3px solid var(--accent);line-height:1">音频分析</div>
-          <div style="display:flex;flex-direction:column;gap:12px">
-            <q-select v-model="settingsForm.asrEngine" :options="settingAsrOptions" label="ASR 引擎" dense filled emit-value map-options></q-select>
-            <q-input v-if="settingsForm.asrEngine !== 'whisper'" v-model="settingsForm.asrApiKey" :type="showAsrKey ? 'text' : 'password'" label="ASR API Key" dense filled>
-              <template v-slot:append>
-                <q-icon :name="showAsrKey ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="showAsrKey = !showAsrKey"></q-icon>
-              </template>
-              <template v-slot:hint>
-                <span class="text-grey-6" style="font-size:11px">云端 ASR 服务的 API Key</span>
-              </template>
-            </q-input>
+        </q-tab-panel>
+        <!-- Image tab -->
+        <q-tab-panel :name="'image'" style="display:flex;flex-direction:column;gap:12px">
+          <q-select v-model="settingsForm.imageResolution" :options="computedImgResOptions" :label="t('s.compress_size')" dense filled emit-value map-options></q-select>
+          <q-select v-model="settingsForm.imageModel" :options="computedImgModelOptions" :label="t('s.ai_model')" dense filled emit-value map-options></q-select>
+          <q-input v-model="settingsForm.imageApiKey" :type="showImgKey ? 'text' : 'password'" :label="t('s.api_key')" dense filled>
+            <template v-slot:append>
+              <q-icon :name="showImgKey ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="showImgKey = !showImgKey"></q-icon>
+            </template>
+            <template v-slot:hint>
+              <span class="text-grey-6" style="font-size:11px">{{ t('s.img_api_hint') }}</span>
+            </template>
+          </q-input>
+        </q-tab-panel>
+        <!-- Video tab -->
+        <q-tab-panel :name="'video'" style="display:flex;flex-direction:column;gap:12px">
+          <div class="row q-col-gutter-sm">
+            <q-select v-model="settingsForm.resolution" :options="computedResOptions" :label="t('s.compress_res')" dense filled emit-value map-options class="col"></q-select>
+            <q-select v-model="settingsForm.fps" :options="computedFpsOptions" :label="t('s.fps')" dense filled emit-value map-options class="col"></q-select>
           </div>
-        </div>
-      </q-card-section>
+          <div style="font-size:11px;color:var(--text3);padding:0 4px">{{ t('s.estimated_bitrate', {rate: estimatedBitrate}) }}</div>
+          <q-toggle v-if="hwEncoderAvailable" v-model="settingsForm.hwAccel" :label="t('s.hw_accel')"></q-toggle>
+          <q-select v-model="settingsForm.model" :options="computedModelOptions" :label="t('s.ai_model')" dense filled emit-value map-options></q-select>
+          <q-input v-model="settingsForm.videoApiKey" :type="showVideoKey ? 'text' : 'password'" :label="t('s.api_key')" dense filled>
+            <template v-slot:append>
+              <q-icon :name="showVideoKey ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="showVideoKey = !showVideoKey"></q-icon>
+            </template>
+            <template v-slot:hint>
+              <span class="text-grey-6" style="font-size:11px">{{ t('s.video_api_hint') }}</span>
+            </template>
+          </q-input>
+          <q-toggle v-model="settingsForm.useMultimodal" :label="t('s.multimodal')"></q-toggle>
+        </q-tab-panel>
+        <!-- Audio tab -->
+        <q-tab-panel :name="'audio'" style="display:flex;flex-direction:column;gap:12px">
+          <q-select v-model="settingsForm.asrEngine" :options="computedAsrOptions" :label="t('s.asr_engine')" dense filled emit-value map-options></q-select>
+          <q-input v-if="settingsForm.asrEngine !== 'whisper'" v-model="settingsForm.asrApiKey" :type="showAsrKey ? 'text' : 'password'" :label="t('s.asr_api_key')" dense filled>
+            <template v-slot:append>
+              <q-icon :name="showAsrKey ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="showAsrKey = !showAsrKey"></q-icon>
+            </template>
+            <template v-slot:hint>
+              <span class="text-grey-6" style="font-size:11px">{{ t('s.asr_api_hint') }}</span>
+            </template>
+          </q-input>
+        </q-tab-panel>
+      </q-tab-panels>
       <q-card-actions align="right">
-        <q-btn color="primary" label="确定" @click="saveSettings(); showSettings=false"></q-btn>
+        <q-btn color="primary" :label="t('s.ok')" @click="saveSettings(); showSettings=false"></q-btn>
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -282,31 +291,29 @@
     <q-card style="min-width:520px" class="dialog-card">
       <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" v-close-popup></q-btn>
       <q-card-section>
-        <div class="text-h6">键盘快捷键</div>
+        <div class="text-h6">{{ t('kb.title') }}</div>
       </q-card-section>
       <q-card-section style="display:flex;flex-direction:column;gap:20px">
         <div>
-          <div class="text-subtitle2 q-mb-sm" style="padding-left:10px;border-left:3px solid var(--accent);line-height:1">通用</div>
+          <div class="text-subtitle2 q-mb-sm" style="padding-left:10px;border-left:3px solid var(--accent);line-height:1">{{ t('kb.general') }}</div>
           <table style="width:100%;font-size:13px">
-            <tr v-for="s in [{k:'?',d:'打开快捷键弹窗'},{k:'Esc',d:'关闭弹窗 / 取消选择'}]" style="height:28px">
-              <td style="width:100px"><kbd style="background:var(--surface2);padding:2px 8px;border-radius:4px;font-family:inherit;font-size:12px">{{ s.k }}</kbd></td>
+            <tr v-for="s in shortcutGeneral" style="height:28px">              <td style="width:100px"><kbd style="background:var(--surface2);padding:2px 8px;border-radius:4px;font-family:inherit;font-size:12px">{{ s.k }}</kbd></td>
               <td style="color:var(--text2)">{{ s.d }}</td>
             </tr>
           </table>
         </div>
         <div>
-          <div class="text-subtitle2 q-mb-sm" style="padding-left:10px;border-left:3px solid var(--accent);line-height:1">素材库</div>
+          <div class="text-subtitle2 q-mb-sm" style="padding-left:10px;border-left:3px solid var(--accent);line-height:1">{{ t('kb.library') }}</div>
           <table style="width:100%;font-size:13px">
-            <tr v-for="s in [{k:'↑ ↓ ← →',d:'移动选中项'},{k:'Enter',d:'打开详情'},{k:'Delete',d:'删除选中项'},{k:'1-5',d:'给选中项评分'},{k:'0',d:'清除评分'},{k:'F',d:'切换喜欢'},{k:'G',d:'切换视图模式'},{k:'/',d:'聚焦搜索框'}]" style="height:28px">
-              <td style="width:100px"><kbd style="background:var(--surface2);padding:2px 8px;border-radius:4px;font-family:inherit;font-size:12px">{{ s.k }}</kbd></td>
+            <tr v-for="s in shortcutLibrary" style="height:28px">              <td style="width:100px"><kbd style="background:var(--surface2);padding:2px 8px;border-radius:4px;font-family:inherit;font-size:12px">{{ s.k }}</kbd></td>
               <td style="color:var(--text2)">{{ s.d }}</td>
             </tr>
           </table>
         </div>
         <div>
-          <div class="text-subtitle2 q-mb-sm" style="padding-left:10px;border-left:3px solid var(--accent);line-height:1">详情页</div>
+          <div class="text-subtitle2 q-mb-sm" style="padding-left:10px;border-left:3px solid var(--accent);line-height:1">{{ t('kb.detail') }}</div>
           <table style="width:100%;font-size:13px">
-            <tr v-for="s in [{k:'← →',d:'上一个 / 下一个素材'},{k:'1-5',d:'评分 1-5 星'},{k:'0',d:'清除评分'},{k:'F',d:'切换喜欢'},{k:'Space',d:'播放 / 暂停'},{k:'Backspace',d:'返回素材库'}]" style="height:28px">
+            <tr v-for="s in shortcutDetail" style="height:28px">
               <td style="width:100px"><kbd style="background:var(--surface2);padding:2px 8px;border-radius:4px;font-family:inherit;font-size:12px">{{ s.k }}</kbd></td>
               <td style="color:var(--text2)">{{ s.d }}</td>
             </tr>
@@ -323,15 +330,15 @@
       <!-- Step 1: Select -->
       <template v-if="importStep === 'select'">
         <q-card-section>
-          <div class="text-h6">导入素材</div>
+          <div class="text-h6">{{ t('imp.title') }}</div>
         </q-card-section>
         <q-card-section>
           <div class="import-drop-zone" @dragover.prevent="onDragOver" @dragleave="onDragLeave" @drop.prevent="onDrop">
             <q-icon name="cloud_upload" size="36px" color="grey-6"></q-icon>
-            <div class="text-grey-5 q-mt-sm" style="font-size:13px">拖入文件或文件夹</div>
+            <div class="text-grey-5 q-mt-sm" style="font-size:13px">{{ t('imp.drop_hint') }}</div>
             <div style="display:flex;gap:16px;margin-top:10px;font-size:12px">
-              <a href="#" class="import-link" @click.prevent="pickFiles">选择文件</a>
-              <a href="#" class="import-link" @click.prevent="pickDirectory">选择文件夹</a>
+              <a href="#" class="import-link" @click.prevent="pickFiles">{{ t('imp.select_files') }}</a>
+              <a href="#" class="import-link" @click.prevent="pickDirectory">{{ t('imp.select_folder') }}</a>
             </div>
           </div>
         </q-card-section>
@@ -345,27 +352,27 @@
               </q-item-section>
             </q-item>
           </q-list>
-          <div class="text-caption text-grey-6 q-mt-sm">已选 {{ selectedPaths.length }} 个路径</div>
+          <div class="text-caption text-grey-6 q-mt-sm">{{ t('imp.paths_count', {n: selectedPaths.length}) }}</div>
         </q-card-section>
         <q-card-section v-else>
           <div class="text-center text-grey-6" style="padding:20px">
             <q-icon name="folder_open" size="32px" color="grey-7"></q-icon>
-            <p class="q-mt-sm" style="font-size:12px">选择文件或文件夹开始导入</p>
+            <p class="q-mt-sm" style="font-size:12px">{{ t('imp.select_hint') }}</p>
           </div>
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn color="primary" label="确认导入" :disable="!selectedPaths.length || importing" @click="startImport"></q-btn>
+          <q-btn color="primary" :label="t('imp.confirm')" :disable="!selectedPaths.length || importing" @click="startImport"></q-btn>
         </q-card-actions>
       </template>
 
       <!-- Step 2: Progress -->
       <template v-if="importStep === 'progress'">
         <q-card-section>
-          <div class="text-h6">正在导入</div>
+          <div class="text-h6">{{ t('imp.importing') }}</div>
         </q-card-section>
         <q-card-section>
           <div class="row justify-between text-caption text-grey-6 q-mb-sm">
-            <span>{{ importedItems.length }} / {{ importTotal }} 已完成</span>
+            <span>{{ t('imp.progress', {done: importedItems.length, total: importTotal}) }}</span>
             <span>{{ Math.round(importedItems.length / Math.max(1, importTotal) * 100) }}%</span>
           </div>
           <q-linear-progress :value="importedItems.length / Math.max(1, importTotal)" color="primary" size="6px"></q-linear-progress>
@@ -388,27 +395,27 @@
       <!-- Step 3: Done -->
       <template v-if="importStep === 'done'">
         <q-card-section>
-          <div class="text-h6">导入完成</div>
+          <div class="text-h6">{{ t('imp.done') }}</div>
         </q-card-section>
         <q-card-section>
           <div style="display:flex;justify-content:center;gap:32px;padding:12px 0">
             <div class="text-center">
               <div class="text-h4 text-primary text-weight-bold">{{ importedItems.length }}</div>
-              <div class="text-caption text-grey-5" style="margin-top:4px">成功导入</div>
+              <div class="text-caption text-grey-5" style="margin-top:4px">{{ t('imp.success') }}</div>
             </div>
             <div class="text-center">
               <div style="display:flex;align-items:baseline;justify-content:center;gap:4px">
                 <span class="text-h4 text-weight-bold" :class="skippedItems.length ? 'text-orange' : 'text-grey-6'">{{ skippedItems.length }}</span>
                 <q-icon v-if="skippedItems.length" name="info" size="16px" color="orange" style="cursor:pointer" @click="showSkippedList=!showSkippedList; showFailedList=false"></q-icon>
               </div>
-              <div class="text-caption text-grey-5" style="margin-top:4px">跳过（重复）</div>
+              <div class="text-caption text-grey-5" style="margin-top:4px">{{ t('imp.skipped_dup') }}</div>
             </div>
             <div class="text-center">
               <div style="display:flex;align-items:baseline;justify-content:center;gap:4px">
                 <span class="text-h4 text-weight-bold" :class="failedItems.length ? 'text-negative' : 'text-grey-6'">{{ failedItems.length }}</span>
                 <q-icon v-if="failedItems.length" name="info" size="16px" color="negative" style="cursor:pointer" @click="showFailedList=!showFailedList; showSkippedList=false"></q-icon>
               </div>
-              <div class="text-caption text-grey-5" style="margin-top:4px">失败</div>
+              <div class="text-caption text-grey-5" style="margin-top:4px">{{ t('imp.failed') }}</div>
             </div>
           </div>
           <div v-if="showSkippedList && skippedItems.length" style="max-height:180px;overflow-y:auto;background:var(--surface2);border-radius:6px;padding:8px 12px;margin-top:4px">
@@ -437,8 +444,8 @@
           </div>
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn flat label="关闭" @click="showImport=false; loadSidebar(); $nextTick(() => $refs.gallery?.load())"></q-btn>
-          <q-btn color="primary" label="查看素材库" @click="showImport=false; loadSidebar(); $nextTick(() => $refs.gallery?.load())"></q-btn>
+          <q-btn flat :label="t('sync.close')" @click="showImport=false; loadSidebar(); $nextTick(() => $refs.gallery?.load())"></q-btn>
+          <q-btn color="primary" :label="t('imp.view_library')" @click="showImport=false; loadSidebar(); $nextTick(() => $refs.gallery?.load())"></q-btn>
         </q-card-actions>
       </template>
     </q-card>
@@ -450,6 +457,7 @@
 <script src="/static/js/lottie.min.js"></script>
 <script src="/static/js/api.js"></script>
 <script src="/static/js/format.js"></script>
+<script src="/static/js/i18n.js"></script>
 <script src="/static/js/gallery.js"></script>
 <script src="/static/js/detail.js"></script>
 <script src="/static/js/duplicates.js"></script>
@@ -467,45 +475,13 @@ const app = Vue.createApp({
       showImport: false,
       showSettings: false,
       showShortcuts: false,
-      settingsForm: { resolution: "480", fps: "30", model: "glm-4.6v", useMultimodal: true, asrEngine: "whisper", videoApiKey: "", asrApiKey: "", imageResolution: "1920", imageApiKey: "", imageModel: "glm-4.6v", hwAccel: false },
+      settingsForm: { resolution: "480", fps: "30", model: "glm-4.6v", useMultimodal: true, asrEngine: "whisper", videoApiKey: "", asrApiKey: "", imageResolution: "1920", imageApiKey: "", imageModel: "glm-4.6v", hwAccel: false, language: "zh" },
+      settingsTab: "general",
       hwEncoderAvailable: false,
       showVideoKey: false,
       showAsrKey: false,
       showImgKey: false,
-      settingResOptions: [
-        { label: "480P · 推荐", value: "480" },
-        { label: "320P · 省 Token", value: "320" },
-        { label: "240P · 最省", value: "240" },
-      ],
-      settingFpsOptions: [
-        { label: "30fps · 推荐", value: "30" },
-        { label: "20fps · 省 Token", value: "20" },
-        { label: "10fps · 最省", value: "10" },
-      ],
-      settingModelOptions: [
-        { label: "智谱 GLM-4V-Plus · 旗舰", value: "glm-4v-plus" },
-        { label: "智谱 GLM-4.6V · 性价比", value: "glm-4.6v" },
-        { label: "智谱 GLM-4.6V-Flash · 免费", value: "glm-4.6v-flash" },
-        { label: "智谱 GLM-4.6V-FlashX", value: "glm-4.6v-flashx" },
-        { label: "智谱 GLM-4.5V", value: "glm-4.5v" },
-      ],
-      settingAsrOptions: [
-        { label: "本地模型 (Whisper)", value: "whisper" },
-        { label: "智谱 AI (GLM-ASR)", value: "zhipu-asr" },
-      ],
-      settingImgResOptions: [
-        { label: "1920px · 推荐", value: "1920" },
-        { label: "1280px · 省Token", value: "1280" },
-        { label: "800px · 最省", value: "800" },
-        { label: "原图 · 不压缩", value: "original" },
-      ],
-      settingImgModelOptions: [
-        { label: "智谱 GLM-4V-Plus · 旗舰", value: "glm-4v-plus" },
-        { label: "智谱 GLM-4.6V · 性价比", value: "glm-4.6v" },
-        { label: "智谱 GLM-4.6V-Flash · 免费", value: "glm-4.6v-flash" },
-        { label: "智谱 GLM-4.6V-FlashX", value: "glm-4.6v-flashx" },
-        { label: "智谱 GLM-4.5V", value: "glm-4.5v" },
-      ],
+
       importStep: "select",
       importing: false,
       importTotal: 0,
@@ -545,6 +521,7 @@ const app = Vue.createApp({
   },
   created() {
     this.loadSidebar();
+    API.getSettings().then(s => { i18nState.locale = s.language || "zh"; }).catch(() => {});
     this.applyTheme();
     if (this.accentColor) this.setAccentColor(this.accentColor);
     window.addEventListener("hashchange", () => this.resolveRoute());
@@ -565,6 +542,7 @@ const app = Vue.createApp({
     }
   },
   computed: {
+    t() { return t; },
     themeIcon() {
       if (this.themeMode === "dark") return "dark_mode";
       if (this.themeMode === "light") return "light_mode";
@@ -577,6 +555,87 @@ const app = Vue.createApp({
       const fps = parseInt(this.settingsForm.fps) || 30;
       const bps = baseBps * (pixels / basePixels) * (fps / baseFps);
       return bps >= 1_000_000 ? (bps / 1_000_000).toFixed(2) + " Mbps" : (bps / 1_000).toFixed(0) + " Kbps";
+    },
+    settingLangOptions() {
+      return [
+        { label: t('s.lang_zh'), value: "zh" },
+        { label: t('s.lang_en'), value: "en" },
+      ];
+    },
+    settingThemeOptions() {
+      return [
+        { label: t('s.theme_dark'), value: "dark" },
+        { label: t('s.theme_light'), value: "light" },
+        { label: t('s.theme_auto'), value: "auto" },
+      ];
+    },
+    computedResOptions() {
+      return [
+        { label: t('s.res_480'), value: "480" },
+        { label: t('s.res_320'), value: "320" },
+        { label: t('s.res_240'), value: "240" },
+      ];
+    },
+    computedFpsOptions() {
+      return [
+        { label: t('s.fps_30'), value: "30" },
+        { label: t('s.fps_20'), value: "20" },
+        { label: t('s.fps_10'), value: "10" },
+      ];
+    },
+    computedModelOptions() {
+      return [
+        { label: t('s.model_glm4v_plus'), value: "glm-4v-plus" },
+        { label: t('s.model_glm46v'), value: "glm-4.6v" },
+        { label: t('s.model_glm46v_flash'), value: "glm-4.6v-flash" },
+        { label: t('s.model_glm46v_flashx'), value: "glm-4.6v-flashx" },
+        { label: t('s.model_glm45v'), value: "glm-4.5v" },
+      ];
+    },
+    computedAsrOptions() {
+      return [
+        { label: t('s.asr_whisper'), value: "whisper" },
+        { label: t('s.asr_zhipu'), value: "zhipu-asr" },
+      ];
+    },
+    computedImgResOptions() {
+      return [
+        { label: t('s.img_res_1920'), value: "1920" },
+        { label: t('s.img_res_1280'), value: "1280" },
+        { label: t('s.img_res_800'), value: "800" },
+        { label: t('s.img_res_original'), value: "original" },
+      ];
+    },
+    computedImgModelOptions() {
+      return this.computedModelOptions;
+    },
+    shortcutGeneral() {
+      return [
+        { k: '?', d: t('kb.open_shortcuts') },
+        { k: 'Esc', d: t('kb.close_esc') },
+      ];
+    },
+    shortcutLibrary() {
+      return [
+        { k: '↑ ↓ ← →', d: t('kb.move_sel') },
+        { k: 'Enter', d: t('kb.open_detail') },
+        { k: 'Delete', d: t('kb.delete_sel') },
+        { k: '1-5', d: t('kb.rate') },
+        { k: '0', d: t('kb.clear_rate') },
+        { k: 'F', d: t('kb.toggle_fav') },
+        { k: 'G', d: t('kb.toggle_view') },
+        { k: '/', d: t('kb.focus_search') },
+      ];
+    },
+    shortcutDetail() {
+      return [
+        { k: '← →', d: t('kb.prev_next') },
+        { k: '1-5', d: t('kb.rate_stars') },
+        { k: '0', d: t('kb.clear_rate') },
+        { k: 'F', d: t('kb.fullscreen') },
+        { k: 'Space', d: t('kb.play_pause') },
+        { k: 'Backspace', d: t('kb.back') },
+      ];
     },
   },
   methods: {
@@ -598,6 +657,10 @@ const app = Vue.createApp({
     cancelLongRefresh() {
       clearTimeout(this._longTimer);
       if (!this._longFired) location.reload();
+      this._longFired = false;
+    },
+    endLongRefresh() {
+      clearTimeout(this._longTimer);
       this._longFired = false;
     },
     cycleTheme() {
@@ -622,7 +685,7 @@ const app = Vue.createApp({
       localStorage.setItem("accent", color);
       document.documentElement.style.setProperty("--accent", color);
       document.documentElement.style.setProperty("--accent-dim", color + "26");
-      document.body.style.setProperty("--q-primary", color);
+      document.documentElement.style.setProperty("--q-primary", color);
     },
     openDetail(id) { this.showImport = false; location.hash = "#/detail/" + id; },
     resolveRoute() {
@@ -739,10 +802,10 @@ const app = Vue.createApp({
       const node = this.folderCtx.node;
       this.folderCtx.show = false;
       this.$q.dialog({
-        title: "确认同步",
-        message: `将同步「${node.label}」下的所有素材。该文件夹下的所有媒体文件将被重新扫描，新增文件会导入，已变更的文件会更新，磁盘上已删除的文件会从库中移除。`,
+        title: t('sync.confirm_title'),
+        message: t('sync.confirm_msg', {name: node.label}),
         cancel: true,
-        ok: { label: "确认同步", color: "primary" },
+        ok: { label: t('sync.confirm_ok'), color: "primary" },
       }).onOk(async () => {
         this.syncProgress = [];
         this.syncDone = 0;
@@ -768,7 +831,7 @@ const app = Vue.createApp({
                   if (this.syncInBackground) {
                     this.syncInBackground = false;
                     const s = ev.summary;
-                    this.$q.notify({ type: "positive", message: `同步完成：新增 ${s.added}，更新 ${s.updated}，移除 ${s.removed}`, timeout: 4000 });
+                    this.$q.notify({ type: "positive", message: t('sync.done') + '：' + t('sync.added') + ' ' + s.added + '，' + t('sync.updated') + ' ' + s.updated + '，' + t('sync.removed') + ' ' + s.removed, timeout: 4000 });
                     this.loadSidebar();
                     this.$nextTick(() => this.$refs.gallery?.load());
                   }
@@ -783,7 +846,7 @@ const app = Vue.createApp({
           }
         } catch (e) {
           this.showSyncModal = false;
-          this.$q.notify({ type: "negative", message: "同步失败：" + e.message, timeout: 3000 });
+          this.$q.notify({ type: "negative", message: t('sync.n_fail', {err: e.message}), timeout: 3000 });
         }
       });
     },
@@ -791,20 +854,20 @@ const app = Vue.createApp({
       const node = this.folderCtx.node;
       this.folderCtx.show = false;
       this.$q.dialog({
-        title: "确认移除",
-        message: `确定要移除「${node.label}」下的所有素材吗？原文件不会被删除，仅清除库中的记录。`,
+        title: t('sync.remove_title'),
+        message: t('sync.remove_msg', {name: node.label}),
         cancel: true,
-        ok: { label: "移除", color: "negative" },
+        ok: { label: t('sync.remove_ok'), color: "negative" },
       }).onOk(async () => {
         try {
           const r = await API.deleteFolder(node.path);
           const d = r.data || r;
-          this.$q.notify({ type: "positive", message: `已移除 ${d.count || 0} 个素材`, timeout: 3000 });
+          this.$q.notify({ type: "positive", message: t('g.n_removed_folder', {n: d.count || 0}), timeout: 3000 });
           if (this.selectedFolder === node.path || (this.selectedFolder && this.selectedFolder.startsWith(node.path + "/"))) {
             this.selectedFolder = null;
           }
         } catch (e) {
-          this.$q.notify({ type: "negative", message: "移除失败：" + e.message, timeout: 3000 });
+          this.$q.notify({ type: "negative", message: t('g.n_remove_fail', {err: e.message}), timeout: 3000 });
         }
         this.loadSidebar();
         this.$nextTick(() => this.$refs.gallery?.load());
@@ -830,7 +893,9 @@ const app = Vue.createApp({
         this.settingsForm.imageApiKey = s.image_api_key || "";
         this.settingsForm.imageModel = s.image_model || "glm-4.6v";
         this.settingsForm.hwAccel = s.hw_accel === "true";
+        this.settingsForm.language = s.language || "zh";
         this.hwEncoderAvailable = !!s.hw_encoder;
+        i18nState.locale = this.settingsForm.language;
       } catch (e) { console.error(e); }
     },
     async saveSettings() {
@@ -847,8 +912,9 @@ const app = Vue.createApp({
           image_api_key: this.settingsForm.imageApiKey,
           image_model: this.settingsForm.imageModel,
           hw_accel: String(this.settingsForm.hwAccel),
+          language: this.settingsForm.language,
         });
-        Quasar.Notify.create({ message: "设置已保存", position: "top", timeout: 1500 });
+        Quasar.Notify.create({ message: t('s.saved'), position: "top", timeout: 1500 });
       } catch (e) { console.error(e); }
     },
     fmtSize,
@@ -950,7 +1016,7 @@ Quasar.Dark.set(true);
 app.config.globalProperties.API = API;
 app.config.errorHandler = (err) => {
   console.error(err);
-  Quasar.Notify.create({ message: err.message || "发生错误", position: "top", color: "negative", timeout: 3000 });
+  Quasar.Notify.create({ message: err.message || t('g.n_error'), position: "top", color: "negative", timeout: 3000 });
 };
 app.component("gallery-page", GalleryPage);
 app.component("detail-page", DetailPage);

@@ -228,6 +228,7 @@ _DEFAULTS = {
     "image_api_key": "",
     "image_model": "glm-4.6v",
     "hw_accel": "false",
+    "language": "zh",
 }
 
 
