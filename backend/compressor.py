@@ -3,6 +3,8 @@ import subprocess
 import shutil
 from datetime import datetime
 from pathlib import Path
+
+from loguru import logger
 from PIL import Image
 from .config import RAW_EXTS
 
@@ -22,8 +24,8 @@ def cleanup_temp() -> None:
         if f.is_file():
             try:
                 f.unlink()
-            except OSError:
-                pass
+            except OSError as e:
+                logger.warning("Failed to delete temp file {}: {}", f, e)
 
 
 RES_MAP = {"480": 854, "320": 640, "240": 426}
@@ -47,7 +49,7 @@ def detect_hw_encoder() -> str | None:
                 _HW_ENCODER = enc
                 return enc
     except Exception:
-        pass
+        logger.warning("Failed to detect hardware encoder")
     _HW_ENCODER = ""
     return None
 
@@ -62,7 +64,8 @@ def _get_duration(path: Path) -> float | None:
             capture_output=True, text=True,
         )
         return float(r.stdout.strip())
-    except (ValueError, subprocess.CalledProcessError):
+    except (ValueError, subprocess.CalledProcessError) as e:
+        logger.warning("Failed to get video duration: {}", e)
         return None
 
 
@@ -123,7 +126,7 @@ def compress_video(input_path: str | Path, resolution: str = "480", fps: str = "
             str(output_path),
         ]
 
-    print(f"Compressing video to {resolution}p {fps}fps: {input_path.name} -> {output_path.name}")
+    logger.info("Compressing video to {}p {}fps: {} -> {}", resolution, fps, input_path.name, output_path.name)
     import time
     t0 = time.time()
 
@@ -141,7 +144,7 @@ def compress_video(input_path: str | Path, resolution: str = "480", fps: str = "
         raise RuntimeError(f"ffmpeg failed (exit {proc.returncode})")
 
     size_mb = output_path.stat().st_size / (1024 * 1024)
-    print(f"Compressed: {size_mb:.1f}MB")
+    logger.info("Compressed: {:.1f}MB", size_mb)
 
     return output_path, elapsed, w, h, fps
 
@@ -184,6 +187,6 @@ def compress_image(input_path: str | Path, max_long_edge: int = 1920) -> tuple[P
 
     elapsed = time.time() - t0
     size_kb = output_path.stat().st_size / 1024
-    print(f"Compressed image: {w}x{h} -> {new_w}x{new_h}, {size_kb:.0f}KB")
+    logger.info("Compressed image: {}x{} -> {}x{}, {:.0f}KB", w, h, new_w, new_h, size_kb)
 
     return output_path, elapsed

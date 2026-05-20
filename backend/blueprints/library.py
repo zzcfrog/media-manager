@@ -4,6 +4,7 @@ from collections import defaultdict
 
 import numpy as np
 from flask import Blueprint, request, jsonify, Response
+from loguru import logger
 import jieba
 
 from ..db import get_db
@@ -177,7 +178,6 @@ def import_one():
 
 @bp.route("/import-batch", methods=["POST"])
 def import_batch():
-    import logging
     from flask import stream_with_context
     from ..services.importer import _import_one
     from pathlib import Path
@@ -186,8 +186,6 @@ def import_batch():
     paths = data.get("paths", [])
     if not paths:
         return jsonify({"error": "No paths"}), 400
-
-    log = logging.getLogger(__name__)
 
     def generate():
         db = get_db()
@@ -207,10 +205,11 @@ def import_batch():
                 else:
                     yield f"data: {json.dumps({'type': 'skip', 'done': done_count, 'total': len(paths)})}\n\n"
             except Exception as e:
-                log.error(f"batch import failed: {p} — {e}", exc_info=True)
+                logger.exception("batch import failed: {} — {}", p, e)
                 failed.append({"file_path": p, "error": str(e)})
                 yield f"data: {json.dumps({'type': 'fail', 'file_path': p, 'error': str(e), 'done': done_count, 'total': len(paths)})}\n\n"
 
+        logger.info("batch import done: {} imported, {} failed", len(imported), len(failed))
         db.commit()
         yield f"data: {json.dumps({'type': 'done', 'imported': len(imported), 'failed': len(failed)})}\n\n"
 
@@ -703,11 +702,13 @@ def write_xmp(media_id):
             color_label=row["color_label"],
         )
     except Exception as e:
+        logger.error("XMP write failed: media_id={} — {}", media_id, e)
         return jsonify({"error": str(e)}), 500
 
     if ok:
         db.execute("UPDATE media SET has_xmp = 1 WHERE id = ?", (media_id,))
         db.commit()
+        logger.info("XMP written: media_id={}", media_id)
     return jsonify({"ok": ok})
 
 
@@ -766,6 +767,7 @@ def batch_write_xmp():
             continue
 
     db.commit()
+    logger.info("batch XMP written: {} images", count)
     return jsonify({"ok": True, "count": count})
 
 
@@ -822,7 +824,6 @@ def delete_folder():
 @bp.route("/sync-folder", methods=["POST"])
 def sync_folder():
     """Scan a folder: import new files, update changed files, remove deleted files. SSE stream."""
-    import logging
     from flask import stream_with_context
     from ..services.importer import _import_one, _collect_files, _delete_media_records, VIDEO_EXTS, IMAGE_EXTS
     from pathlib import Path
@@ -832,7 +833,7 @@ def sync_folder():
     path = data.get("path") if data else None
     if not path:
         return jsonify({"error": "Missing path"}), 400
-    logging.getLogger(__name__).info(f"sync-folder: {path}")
+    logger.info("sync-folder: {}", path)
 
     # Scan disk files outside generator (no DB needed)
     disk_files = set()
@@ -885,6 +886,7 @@ def sync_folder():
                 fail_count += 1
                 yield f"data: {_json.dumps({'type': 'fail', 'file': filepath.name, 'error': str(e)})}\n\n"
         db.commit()
+        logger.info("sync-folder done: added={}, updated={}, removed={}, failed={}", new_count, updated_count, len(removed_ids), fail_count)
         summary = {"added": new_count, "updated": updated_count, "removed": len(removed_ids), "skipped": skip_count, "failed": fail_count}
         yield f"data: {_json.dumps({'type': 'done', 'summary': summary})}\n\n"
 

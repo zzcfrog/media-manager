@@ -3,6 +3,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from loguru import logger
+
 
 def xmp_path(filepath: Path) -> Path:
     # Adobe/Lightroom standard: photo.xmp (replaces extension)
@@ -24,8 +26,8 @@ def _read_xmp_fields(xp: Path) -> dict:
         data = json.loads(r.stdout)
         if data and isinstance(data, list):
             return data[0]
-    except (json.JSONDecodeError, IndexError):
-        pass
+    except (json.JSONDecodeError, IndexError) as e:
+        logger.error("Failed to parse exiftool output: {}", e)
     return {}
 
 

@@ -1,4 +1,6 @@
 import sqlite3
+
+from loguru import logger
 from flask import g, current_app
 
 # SQLite connection management and schema bootstrap (auto-migrates on startup).
@@ -85,6 +87,11 @@ CREATE TABLE IF NOT EXISTS media_segment (
     mood            TEXT DEFAULT '',
     lighting        TEXT DEFAULT '',
     weather         TEXT DEFAULT '',
+    color_tone      TEXT DEFAULT '',
+    tone            TEXT DEFAULT '',
+    dof             TEXT DEFAULT '',
+    style           TEXT DEFAULT '',
+    composition     TEXT DEFAULT '',
     seq             INTEGER DEFAULT 0
 );
 
@@ -149,13 +156,20 @@ _MIGRATIONS = [
     ("picture_control", "ALTER TABLE media ADD COLUMN picture_control TEXT"),
     ("embedding", "ALTER TABLE media ADD COLUMN embedding BLOB"),
     ("file_mtime", "ALTER TABLE media ADD COLUMN file_mtime REAL"),
+    ("color_tone", "ALTER TABLE media_segment ADD COLUMN color_tone TEXT DEFAULT ''"),
+    ("tone", "ALTER TABLE media_segment ADD COLUMN tone TEXT DEFAULT ''"),
+    ("dof", "ALTER TABLE media_segment ADD COLUMN dof TEXT DEFAULT ''"),
+    ("style", "ALTER TABLE media_segment ADD COLUMN style TEXT DEFAULT ''"),
+    ("composition", "ALTER TABLE media_segment ADD COLUMN composition TEXT DEFAULT ''"),
 ]
 
 
 def _migrate(db):
     cols = {r[1] for r in db.execute("PRAGMA table_info(media)").fetchall()}
+    seg_cols = {r[1] for r in db.execute("PRAGMA table_info(media_segment)").fetchall()}
+    all_known = cols | seg_cols
     for name, sql in _MIGRATIONS:
-        if name not in cols:
+        if name not in all_known:
             if sql:
                 db.execute(sql)
 
@@ -214,6 +228,30 @@ def _migrate(db):
                 (r["media_id"], r["file_name"], r["visual"], r["asr"], r["subtitle"], r["main_subjects"], r["dominant_colors"], tags_str),
             )
 
+    # Convert segment time format from MM:SS.ss to HH:MM:SS.ss
+    if get_setting(db, "time_format_hms") != "1":
+        rows = db.execute("SELECT id, time_start, time_end FROM media_segment").fetchall()
+        for r in rows:
+            ns = _to_hms(r["time_start"])
+            ne = _to_hms(r["time_end"])
+            if ns != r["time_start"] or ne != r["time_end"]:
+                db.execute("UPDATE media_segment SET time_start=?, time_end=? WHERE id=?",
+                           (ns, ne, r["id"]))
+        db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('time_format_hms', '1')")
+
+    logger.info("DB migrations applied")
+
+
+def _to_hms(t):
+    if not t or ":" not in t:
+        return t
+    parts = t.split(":")
+    if len(parts) != 2:
+        return t
+    mm = int(parts[0])
+    hh, mm = divmod(mm, 60)
+    return f"{hh:02d}:{mm:02d}:{parts[1]}"
+
 
 _DEFAULTS = {
     "resolution": "480",
@@ -229,6 +267,7 @@ _DEFAULTS = {
     "image_model": "glm-4.6v",
     "hw_accel": "false",
     "language": "zh",
+    "asr_model": "large-v3",
 }
 
 
@@ -243,4 +282,5 @@ def init_db(app):
         db.commit()
         db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
         db.execute("VACUUM")
+        logger.info("Database initialized")
     app.teardown_appcontext(close_db)

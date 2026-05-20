@@ -2,18 +2,17 @@ from flask import Blueprint, request, jsonify, Response, current_app
 import json
 import time
 from concurrent.futures import ThreadPoolExecutor
-
-# Media analysis endpoints: start image/video VLM analysis via SSE, save results.
+from loguru import logger
 from pathlib import Path
 
 from ..db import get_db, get_setting
 from ..compressor import compress_video, compress_image
 from ..analyzer import analyze_video, analyze_image, CODING_BASE_URL
-from ..asr import get_engine as get_asr_engine
+from ..asr import get_engine as get_asr_engine, preload_all, reload_engine
 
 bp = Blueprint("analysis", __name__)
 
-_SEGMENT_COLS = "id, media_id, time_start, time_end, visual, asr, subtitle, dominant_colors, main_subjects, shot_type, focal_length, camera_angle, camera_movement, perspective, scene_type, mood, lighting, weather, seq"
+_SEGMENT_COLS = "id, media_id, time_start, time_end, visual, asr, subtitle, dominant_colors, main_subjects, shot_type, focal_length, camera_angle, camera_movement, perspective, scene_type, mood, lighting, weather, color_tone, tone, dof, style, composition, seq"
 
 
 def _cleanup_temp(path):
@@ -237,7 +236,8 @@ def _start_video_analysis(media_id, media, app):
                         def on_asr_progress(status):
                             asr_substep["name"] = status
 
-                        asr_future = pool2.submit(_run_asr, asr_engine, compressed_path, on_progress=on_asr_progress)
+                        asr_model_name = get_setting(db, "asr_model", "large-v3")
+                        asr_future = pool2.submit(_run_asr, asr_engine, compressed_path, on_progress=on_asr_progress, model_name=asr_model_name)
 
                         # Poll both VLM and ASR
                         vlm_done = False
@@ -307,16 +307,18 @@ def _start_video_analysis(media_id, media, app):
     return resp
 
 
-def _run_asr(engine, audio_path, on_progress=None):
+def _run_asr(engine, audio_path, on_progress=None, model_name=None):
     try:
-        return engine.transcribe(audio_path, on_progress=on_progress)
+        return engine.transcribe(audio_path, on_progress=on_progress, model_name=model_name)
     except Exception as e:
-        print(f"ASR failed: {e}")
+        logger.error("ASR failed: {}", e)
         return []
 
 
 def _parse_time(ts: str) -> float:
     parts = ts.split(":")
+    if len(parts) == 3:
+        return float(parts[0]) * 3600 + float(parts[1]) * 60 + float(parts[2])
     if len(parts) == 2:
         return float(parts[0]) * 60 + float(parts[1])
     return float(ts)
@@ -354,8 +356,8 @@ def save_segments(media_id, segments, model=""):
 
     for i, seg in enumerate(segments):
         db.execute(
-            "INSERT INTO media_segment (media_id, time_start, time_end, visual, asr, subtitle, dominant_colors, main_subjects, shot_type, focal_length, camera_angle, camera_movement, perspective, scene_type, mood, lighting, weather, seq) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO media_segment (media_id, time_start, time_end, visual, asr, subtitle, dominant_colors, main_subjects, shot_type, focal_length, camera_angle, camera_movement, perspective, scene_type, mood, lighting, weather, color_tone, tone, dof, style, composition, seq) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 media_id,
                 seg.get("time_start", ""),
@@ -374,6 +376,11 @@ def save_segments(media_id, segments, model=""):
                 seg.get("mood", ""),
                 seg.get("lighting", ""),
                 seg.get("weather", ""),
+                seg.get("color_tone", ""),
+                seg.get("tone", ""),
+                seg.get("dof", ""),
+                seg.get("style", ""),
+                seg.get("composition", ""),
                 i,
             ),
         )
@@ -434,7 +441,8 @@ def _segment_to_dict(row):
 _EDITABLE_COLS = {
     "time_start", "time_end", "visual", "asr", "subtitle", "shot_type", "focal_length",
     "camera_angle", "camera_movement", "perspective", "scene_type",
-    "mood", "lighting", "weather", "dominant_colors", "main_subjects",
+    "mood", "lighting", "weather", "color_tone", "tone", "dof", "style", "composition",
+    "dominant_colors", "main_subjects",
 }
 
 
@@ -452,7 +460,7 @@ def update_segment(media_id, seg_id):
             continue
         val = data[col]
         if col in ("dominant_colors", "main_subjects"):
-            val = json.dumps(val if isinstance(val, list) else [val])
+            val = json.dumps(val if isinstance(val, list) else [val], ensure_ascii=False)
         fields.append(f"{col} = ?")
         params.append(val)
 
@@ -492,3 +500,13 @@ def delete_segment(media_id, seg_id):
     _refresh_fts(db, media_id, segments)
     db.commit()
     return jsonify({"ok": True})
+
+
+@bp.route("/asr-reload", methods=["POST"])
+def asr_reload():
+    data = request.get_json(force=True)
+    model_name = data.get("asr_model", "large-v3")
+    engine_name = data.get("asr_engine", "whisper")
+    logger.info("ASR model reload requested: {} {}", engine_name, model_name)
+    reload_engine(engine_name, model_name)
+    return jsonify({"ok": True, "message": f"Reloading {engine_name} model: {model_name}"})

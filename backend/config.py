@@ -14,6 +14,7 @@ else:
     DATA_DIR = BASE_DIR / "data"
 THUMB_DIR = DATA_DIR / "thumbnails"
 DB_PATH = DATA_DIR / "media.db"
+LOG_DIR = DATA_DIR / "logs"
 
 VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v", ".flv", ".wmv", ".3gp", ".mts", ".m2ts"}
 IMAGE_EXTS = {

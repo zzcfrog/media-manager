@@ -1,15 +1,14 @@
 import json
-import logging
 import shutil
 import subprocess
 import uuid
 from datetime import datetime
 from pathlib import Path
 
+from loguru import logger
+
 from ..config import VIDEO_EXTS, IMAGE_EXTS, RAW_EXTS, THUMB_DIR
 from ..db import get_db
-
-logger = logging.getLogger(__name__)
 
 # Timeout for external tool calls (ffprobe/ffmpeg/exiftool)
 # External disks and large files need more time
@@ -79,7 +78,7 @@ def import_single_file(file_path: str) -> dict | None:
     try:
         return _import_one(db, filepath)
     except Exception as e:
-        logger.error(f"import failed: {filepath} — {e}", exc_info=True)
+        logger.exception("import failed: {} — {}", filepath, e)
         raise
 
 
@@ -144,7 +143,7 @@ def _import_one(db, filepath: Path, force_update: bool = False) -> dict | None:
     db.commit()
 
     row = db.execute("SELECT * FROM media WHERE id = ?", (media_id,)).fetchone()
-    logger.info(f"imported: {filepath.name} id={media_id}")
+    logger.info("imported: {} id={}", filepath.name, media_id)
     return dict(row)
 
 

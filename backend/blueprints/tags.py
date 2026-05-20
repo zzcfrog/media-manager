@@ -1,5 +1,7 @@
 from flask import Blueprint, request, jsonify
 
+from loguru import logger
+
 from ..db import get_db
 
 bp = Blueprint("tags", __name__)
@@ -25,7 +27,8 @@ def create_tag():
         cur = db.execute("INSERT INTO tags (name) VALUES (?)", (name,))
         db.commit()
         return jsonify({"id": cur.lastrowid, "name": name}), 201
-    except Exception:
+    except Exception as e:
+        logger.warning("Tag creation failed (duplicate?): {}", e)
         return jsonify({"error": "Tag already exists"}), 409
 
 

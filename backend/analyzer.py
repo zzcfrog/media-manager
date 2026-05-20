@@ -1,9 +1,9 @@
 import base64
 import json
-import sys
 import time
 from pathlib import Path
 
+from loguru import logger
 from openai import OpenAI
 
 # VLM (Vision Language Model) API calls for video/image analysis.
@@ -54,7 +54,7 @@ def analyze_video(video_path: str | Path, api_key: str, model: str = "glm-4.6v",
     )
 
     if on_chunk:
-        on_chunk(f"data: {json.dumps({'status': 'analyzing', 'model': model})}\n\n")
+        on_chunk(f"data: {json.dumps({'status': 'analyzing', 'model': model}, ensure_ascii=False)}\n\n")
 
     if on_progress:
         on_progress("uploading")
@@ -88,18 +88,17 @@ def analyze_video(video_path: str | Path, api_key: str, model: str = "glm-4.6v",
                     if on_progress:
                         on_progress("first_token")
                     first_token = False
-                print(delta.content, end="", flush=True)
+                logger.debug("stream chunk: {}", repr(delta.content))
                 full_content += delta.content
                 if on_progress:
                     on_progress("receiving", chars=len(full_content))
                 if on_chunk:
                     on_chunk(f"data: {json.dumps({'content': delta.content}, ensure_ascii=False)}\n\n")
     except Exception as e:
-        print(f"\nAPI call failed: {e}", file=sys.stderr)
+        logger.error("API call failed: {}", e)
         raise
 
     elapsed = time.time() - t0
-    print("\n---")
 
     usage_dict = None
     if usage:
@@ -120,11 +119,11 @@ def _parse_response(content: str) -> list[dict]:
     try:
         result = json.loads(content)
         if isinstance(result, list):
-            print(f"\nParsed {len(result)} time segments successfully.")
+            logger.info("Parsed {} segments", len(result))
             return result
         raise ValueError("Response is not a JSON array")
     except json.JSONDecodeError:
-        print("\nWarning: failed to parse JSON from response. Returning raw content.")
+        logger.warning("Failed to parse JSON from response")
         return [{"raw_response": content}]
 
 
@@ -167,13 +166,12 @@ def analyze_image(image_path: str | Path, api_key: str, model: str = "glm-4.6v",
                 if on_progress:
                     on_progress("first_token")
                 first_token = False
-            print(delta.content, end="", flush=True)
+            logger.debug(delta.content)
             full_content += delta.content
             if on_progress:
                 on_progress("receiving", chars=len(full_content))
 
     elapsed = time.time() - t0
-    print("\n---")
 
     usage_dict = None
     if usage:
@@ -194,8 +192,9 @@ def _parse_image_response(content: str) -> dict:
     try:
         result = json.loads(content)
         if isinstance(result, dict):
+            logger.info("Image analysis result: {}", json.dumps(result, ensure_ascii=False))
             return result
         raise ValueError("Response is not a JSON object")
     except json.JSONDecodeError:
-        print("\nWarning: failed to parse JSON from response. Returning raw content.")
+        logger.warning("Failed to parse JSON from response")
         return {"raw_response": content}

@@ -1,16 +1,16 @@
-import logging
-
 from flask import Flask, jsonify, request
 from werkzeug.exceptions import HTTPException
+from loguru import logger
 
 from .config import DB_PATH, DATA_DIR, THUMB_DIR
-from .db import init_db
+from .db import init_db, get_setting
 from .compressor import cleanup_temp
-
-logger = logging.getLogger(__name__)
+from .logger import setup_logging
 
 
 def create_app() -> Flask:
+    setup_logging()
+
     app = Flask(__name__, static_folder="../frontend", static_url_path="/static")
     app.config["DATABASE"] = str(DB_PATH)
 
@@ -32,6 +32,16 @@ def create_app() -> Flask:
     app.register_blueprint(collections_bp, url_prefix="/api/collections")
     app.register_blueprint(tags_bp, url_prefix="/api/tags")
     app.register_blueprint(settings_bp, url_prefix="/api/settings")
+
+    # Preload local ASR model in background (only for local engines like whisper)
+    with app.app_context():
+        from .asr import preload_all, available_engines
+        from .db import get_db
+        db = get_db()
+        asr_engine_name = get_setting(db, "asr_engine", "whisper")
+        if asr_engine_name in available_engines():
+            asr_model_name = get_setting(db, "asr_model", "large-v3")
+            preload_all(asr_engine_name, asr_model_name)
 
     @app.route("/")
     def index():

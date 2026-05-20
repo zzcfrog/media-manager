@@ -270,6 +270,7 @@
         <!-- Audio tab -->
         <q-tab-panel :name="'audio'" style="display:flex;flex-direction:column;gap:12px">
           <q-select v-model="settingsForm.asrEngine" :options="computedAsrOptions" :label="t('s.asr_engine')" dense filled emit-value map-options></q-select>
+          <q-select v-if="settingsForm.asrEngine === 'whisper'" v-model="settingsForm.asrModel" :options="computedAsrModelOptions" :label="t('s.asr_model')" dense filled emit-value map-options></q-select>
           <q-input v-if="settingsForm.asrEngine !== 'whisper'" v-model="settingsForm.asrApiKey" :type="showAsrKey ? 'text' : 'password'" :label="t('s.asr_api_key')" dense filled>
             <template v-slot:append>
               <q-icon :name="showAsrKey ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="showAsrKey = !showAsrKey"></q-icon>
@@ -475,7 +476,7 @@ const app = Vue.createApp({
       showImport: false,
       showSettings: false,
       showShortcuts: false,
-      settingsForm: { resolution: "480", fps: "30", model: "glm-4.6v", useMultimodal: true, asrEngine: "whisper", videoApiKey: "", asrApiKey: "", imageResolution: "1920", imageApiKey: "", imageModel: "glm-4.6v", hwAccel: false, language: "zh" },
+      settingsForm: { resolution: "480", fps: "30", model: "glm-4.6v", useMultimodal: true, asrEngine: "whisper", asrModel: "large-v3", videoApiKey: "", asrApiKey: "", imageResolution: "1920", imageApiKey: "", imageModel: "glm-4.6v", hwAccel: false, language: "zh" },
       settingsTab: "general",
       hwEncoderAvailable: false,
       showVideoKey: false,
@@ -598,6 +599,15 @@ const app = Vue.createApp({
         { label: t('s.asr_zhipu'), value: "zhipu-asr" },
       ];
     },
+    computedAsrModelOptions() {
+      return [
+        { label: t('s.asr_model_tiny'), value: "tiny" },
+        { label: t('s.asr_model_base'), value: "base" },
+        { label: t('s.asr_model_small'), value: "small" },
+        { label: t('s.asr_model_medium'), value: "medium" },
+        { label: t('s.asr_model_large'), value: "large-v3" },
+      ];
+    },
     computedImgResOptions() {
       return [
         { label: t('s.img_res_1920'), value: "1920" },
@@ -686,6 +696,9 @@ const app = Vue.createApp({
       document.documentElement.style.setProperty("--accent", color);
       document.documentElement.style.setProperty("--accent-dim", color + "26");
       document.documentElement.style.setProperty("--q-primary", color);
+    },
+    onLanguageChange(val) {
+      i18nState.locale = val;
     },
     openDetail(id) { this.showImport = false; location.hash = "#/detail/" + id; },
     resolveRoute() {
@@ -887,6 +900,7 @@ const app = Vue.createApp({
         this.settingsForm.model = s.model || "glm-4.6v";
         this.settingsForm.useMultimodal = s.use_multimodal !== "false";
         this.settingsForm.asrEngine = s.asr_engine || "whisper";
+        this.settingsForm.asrModel = s.asr_model || "large-v3";
         this.settingsForm.videoApiKey = s.video_api_key || "";
         this.settingsForm.asrApiKey = s.asr_api_key || "";
         this.settingsForm.imageResolution = s.image_resolution || "1920";
@@ -895,17 +909,20 @@ const app = Vue.createApp({
         this.settingsForm.hwAccel = s.hw_accel === "true";
         this.settingsForm.language = s.language || "zh";
         this.hwEncoderAvailable = !!s.hw_encoder;
+        this._prevAsrModel = this.settingsForm.asrModel;
         i18nState.locale = this.settingsForm.language;
       } catch (e) { console.error(e); }
     },
     async saveSettings() {
       try {
+        const prevAsrModel = this._prevAsrModel;
         await API.saveSettings({
           resolution: this.settingsForm.resolution,
           fps: this.settingsForm.fps,
           model: this.settingsForm.model,
           use_multimodal: String(this.settingsForm.useMultimodal),
           asr_engine: this.settingsForm.asrEngine,
+          asr_model: this.settingsForm.asrModel,
           video_api_key: this.settingsForm.videoApiKey,
           asr_api_key: this.settingsForm.asrApiKey,
           image_resolution: this.settingsForm.imageResolution,
@@ -914,6 +931,13 @@ const app = Vue.createApp({
           hw_accel: String(this.settingsForm.hwAccel),
           language: this.settingsForm.language,
         });
+        if (prevAsrModel && prevAsrModel !== this.settingsForm.asrModel) {
+          fetch("/api/analysis/asr-reload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ asr_model: this.settingsForm.asrModel, asr_engine: this.settingsForm.asrEngine }),
+          });
+        }
         Quasar.Notify.create({ message: t('s.saved'), position: "top", timeout: 1500 });
       } catch (e) { console.error(e); }
     },

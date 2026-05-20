@@ -1,15 +1,13 @@
 import io
-import logging
 import shutil
 import subprocess
 from pathlib import Path
 
+from loguru import logger
 from flask import Blueprint, Response, send_file, send_from_directory, current_app, request
 
 from ..db import get_db
 from ..config import THUMB_DIR, IMAGE_EXTS
-
-logger = logging.getLogger(__name__)
 
 bp = Blueprint("serve", __name__)
 
@@ -141,14 +139,14 @@ def serve_image(media_id):
         try:
             return send_file(_decode_raw(path), mimetype="image/jpeg")
         except Exception as e:
-            logger.warning(f"rawpy decode failed for {path}: {e}")
+            logger.warning("rawpy decode failed for {}: {}", path, e)
 
     # HEIC/HIF/AVIF: full-resolution decode via pillow-heif
     if ext in _HEIC_EXTS:
         try:
             return send_file(_decode_heif(path), mimetype="image/jpeg")
         except Exception as e:
-            logger.warning(f"heif decode failed for {path}: {e}")
+            logger.warning("heif decode failed for {}: {}", path, e)
 
     mime = MIME_MAP.get(ext, "image/jpeg")
     return send_file(path, mimetype=mime)

@@ -158,8 +158,12 @@ const DetailPage = {
                 <span style="font-size:12px">🌍</span>
                 <template v-for="f in sceneFields" :key="f.key"><span v-if="seg[f.key]" class="dim-pair"><span class="dim-label">{{ t('d.dim.' + f.key) }}</span><span class="dim-value seg-editable" :class="f.cls" contenteditable @click.stop @blur="e => saveSegField(seg, f.key, e.target.innerText.trim())" v-text="seg[f.key]"></span></span></template>
               </div>
-              <div class="array-group"><span class="array-label">{{ t('d.colors') }}</span><div class="array-pills"><span v-for="c in (seg.dominant_colors||[])" :key="c" class="pill color seg-editable-tag" @click.stop="removeTag(seg, 'dominant_colors', c)">{{ c }}<span style="margin-left:2px;opacity:0.5">×</span></span><input class="tag-add-input" placeholder="+" @click.stop @keydown.enter.stop.prevent="e => { addTag(seg, 'dominant_colors', e.target); e.target.value='' }" /></div></div>
-              <div class="array-group"><span class="array-label">{{ t('d.subjects') }}</span><div class="array-pills"><span v-for="s in (seg.main_subjects||[])" :key="s" class="pill subject seg-editable-tag" @click.stop="removeTag(seg, 'main_subjects', s)">{{ s }}<span style="margin-left:2px;opacity:0.5">×</span></span><input class="tag-add-input" placeholder="+" @click.stop @keydown.enter.stop.prevent="e => { addTag(seg, 'main_subjects', e.target); e.target.value='' }" /></div></div>
+              <div v-if="dimRowStyle(seg)" class="dim-row">
+                <span style="font-size:12px">🎨</span>
+                <template v-for="f in styleFields" :key="f.key"><span v-if="seg[f.key]" class="dim-pair"><span class="dim-label">{{ t('d.dim.' + f.key) }}</span><span class="dim-value seg-editable" :class="f.cls" contenteditable @click.stop @blur="e => saveSegField(seg, f.key, e.target.innerText.trim())" v-text="seg[f.key]"></span></span></template>
+              </div>
+              <div class="array-group"><span class="array-label icon-label"><span class="label-icon">🌈</span>{{ t('d.colors') }}</span><div class="array-pills"><span v-for="c in (seg.dominant_colors||[])" :key="c" class="pill color seg-editable-tag" @click.stop="removeTag(seg, 'dominant_colors', c)">{{ c }}<span style="margin-left:2px;opacity:0.5">×</span></span><input class="tag-add-input" placeholder="+" @click.stop @keydown.enter.stop.prevent="e => { addTag(seg, 'dominant_colors', e.target); e.target.value='' }" /></div></div>
+              <div class="array-group"><span class="array-label icon-label"><span class="label-icon">🏷️</span>{{ t('d.subjects') }}</span><div class="array-pills"><span v-for="s in (seg.main_subjects||[])" :key="s" class="pill subject seg-editable-tag" @click.stop="removeTag(seg, 'main_subjects', s)">{{ s }}<span style="margin-left:2px;opacity:0.5">×</span></span><input class="tag-add-input" placeholder="+" @click.stop @keydown.enter.stop.prevent="e => { addTag(seg, 'main_subjects', e.target); e.target.value='' }" /></div></div>
             </div>
           </q-scroll-area>
         </div>
@@ -289,6 +293,13 @@ const DetailPage = {
         { key: "mood", cls: "mood" },
         { key: "lighting", cls: "light" },
         { key: "weather", cls: "weather" },
+      ],
+      styleFields: [
+        { key: "style", cls: "style" },
+        { key: "color_tone", cls: "color" },
+        { key: "tone", cls: "tone" },
+        { key: "dof", cls: "dof" },
+        { key: "composition", cls: "comp" },
       ],
       colors: ["red", "yellow", "green", "blue", "purple"],
     };
@@ -596,7 +607,9 @@ const DetailPage = {
         const rFps = parseInt(s.fps) || 30;
         const bps = 2_000_000 * (rPx / (854 * 480)) * (rFps / 30);
         this.confirmInfo.bitrate = bps >= 1_000_000 ? (bps / 1_000_000).toFixed(2) + " Mbps" : (bps / 1_000).toFixed(0) + " Kbps";
-        this.confirmInfo.modelLabel = modelLabels[s.model] || s.model;
+        this.confirmInfo.modelLabel = this.media?.media_type === "image"
+          ? (modelLabels[s.image_model] || s.image_model)
+          : (modelLabels[s.model] || s.model);
         this.confirmInfo.useMultimodal = s.use_multimodal !== "false";
         this.confirmInfo.asrEngine = (s.asr_engine || "whisper") === "whisper" ? "Whisper" : s.asr_engine;
       } catch (e) { console.error(e); }
@@ -604,6 +617,7 @@ const DetailPage = {
     },
     dimRowCam(seg) { return this.camFields.some(f => seg[f.key]); },
     dimRowScene(seg) { return this.sceneFields.some(f => seg[f.key]); },
+    dimRowStyle(seg) { return this.styleFields.some(f => seg[f.key]); },
     fmtSegDur(start, end) {
       const s = this.parseTime(start), e = this.parseTime(end);
       if (isNaN(s) || isNaN(e)) return "";
@@ -965,14 +979,23 @@ const DetailPage = {
       if (!player || !segs?.length) return;
       const t = player.currentTime;
       let idx = segs.findIndex(s => t >= this.parseTime(s.time_start) && t < this.parseTime(s.time_end));
-      if (idx === -1) idx = segs.length - 1;
+      if (idx === -1) return;
       if (idx === this.activeSeg) return;
       this.activeSeg = idx;
       this.$nextTick(() => {
         const scroll = this.$refs.segScroll;
         if (!scroll) return;
-        const el = scroll.$el?.querySelector(`.segment:nth-child(${idx + 1})`);
-        if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        const container = scroll.getScrollTarget();
+        const content = container.firstElementChild;
+        const el = content?.children[idx];
+        if (!el) return;
+        const containerH = container.clientHeight;
+        const scrollTop = container.scrollTop;
+        const elTop = el.offsetTop;
+        const elH = el.offsetHeight;
+        if (elTop >= scrollTop && elTop + elH <= scrollTop + containerH) return;
+        const scrollTo = elTop - (containerH - elH) / 2;
+        scroll.setScrollPosition("vertical", Math.max(0, scrollTo), 200);
       });
     },
     async loadWaveform() {

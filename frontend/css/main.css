@@ -232,15 +232,19 @@ body:not(.body--dark) .q-dialog .q-card { box-shadow: 0 24px 80px rgba(255,255,2
 .exclude-scroll-hint { text-align: center; font-size: 11px; color: var(--accent); padding: 6px 0 4px; border-top: 1px dashed var(--border); position: sticky; bottom: 0; }
 body.body--dark .exclude-scroll-hint { background: #1d1d1d; }
 body:not(.body--dark) .exclude-scroll-hint { background: #fff; }
-.dim-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 6px; padding: 5px 8px; background: var(--surface2); border-radius: 5px; }
-.dim-pair { display: flex; align-items: center; gap: 3px; }
+.dim-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 6px; padding: 5px 8px; background: var(--surface2); border-radius: 5px; line-height: 1.5; }
+.dim-row > span:first-child { font-size: 12px; line-height: 1; display: inline-flex; align-items: center; }
+.dim-pair { display: inline-flex; align-items: baseline; gap: 3px; font-size: 11px; }
 .dim-label { font-size: 10px; color: var(--text3); }
 .dim-value { font-size: 11px; }
 .dim-value.shot { color: #81c784; } .dim-value.lens { color: #80deea; } .dim-value.angle { color: #f48fb1; }
 .dim-value.move { color: #a5d6a7; } .dim-value.persp { color: #ef9a9a; } .dim-value.scene { color: #64b5f6; }
 .dim-value.mood { color: #ce93d8; } .dim-value.light { color: #fff176; } .dim-value.weather { color: #ffb74d; }
-.array-group { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
-.array-label { font-size: 10px; color: var(--text3); white-space: nowrap; }
+.dim-value.color { color: #f48fb1; } .dim-value.tone { color: #b0bec5; } .dim-value.dof { color: #80cbc4; } .dim-value.style { color: #ce93d8; } .dim-value.comp { color: #a5d6a7; }
+.array-group { display: flex; align-items: center; gap: 8px; margin-top: 8px; line-height: 1.5; }
+.array-label { font-size: 10px; color: var(--text3); white-space: nowrap; min-width: 28px; }
+.array-label.icon-label { display: inline-flex; align-items: center; }
+.label-icon { margin-left: 10px; margin-right: 12px; }
 .array-pills { display: flex; flex-wrap: wrap; gap: 4px; }
 .array-pills .pill { font-size: 10px; padding: 2px 7px; border-radius: 10px; }
 .pill.color { background: rgba(144,164,174,0.12); color: #90a4ae; border: 1px solid rgba(144,164,174,0.2); }

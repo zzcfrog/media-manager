@@ -3,6 +3,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from loguru import logger
 import numpy as np
 import onnxruntime as ort
 from PIL import Image
@@ -70,8 +71,8 @@ def _load_image(filepath: Path, media_type: str, duration: float = None):
                     result = subprocess.run(cmd, capture_output=True, timeout=_FFMPEG_TIMEOUT)
                     if result.returncode == 0 and result.stdout:
                         img = Image.open(io.BytesIO(result.stdout))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error("Failed to load image: {}", filepath)
     return img
 
 
@@ -91,5 +92,6 @@ def compute_embedding(filepath, media_type: str = "image", duration: float = Non
         if norm > 0:
             vec = vec / norm
         return vec.astype(np.float32).tobytes()
-    except Exception:
+    except Exception as e:
+        logger.error("Embedding computation failed: {}", e)
         return None
