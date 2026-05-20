@@ -15,6 +15,7 @@
 | HEIC 解码 | pillow-heif |
 | 中文分词 | jieba（FTS5 索引） |
 | 哈希去重 | 已移除 SHA256 级精确重复检测，仅保留视觉相似检测 |
+| 日志 | loguru（文件输出 + 按天轮转 7 天保留） |
 | 相似检测 | ResNet50 ONNX + HDBSCAN（图片视觉相似） |
 | 端口 | 6622 |
 
@@ -28,6 +29,7 @@ video_analyzer/
 ├── backend/
 │   ├── __init__.py            # create_app() 工厂函数
 │   ├── config.py              # 路径、文件扩展名配置
+│   ├── logger.py              # loguru 日志配置（文件输出 + 按天轮转）
 │   ├── db.py                  # SQLite schema、迁移、连接管理
 │   ├── analyzer.py            # VLM API 调用（视频/图片分析）
 │   ├── compressor.py          # ffmpeg 视频压缩（真实进度 + 硬件加速） + temp 清理
@@ -77,7 +79,7 @@ video_analyzer/
 
 ### 3.1 应用启动
 
-`run.py` → `create_app()` → 初始化目录 → 清理 temp_video → 初始化数据库（schema + 迁移 + checkpoint + VACUUM）→ 注册蓝图。
+`run.py` → `create_app()` → loguru 日志初始化 → 初始化目录 → 清理 temp_video → 初始化数据库（schema + 迁移 + checkpoint + VACUUM）→ 注册蓝图 → 预加载本地 ASR 模型（仅本地引擎）。
 
 ### 3.2 蓝图路由
 
@@ -115,7 +117,8 @@ media (id, file_path UNIQUE, file_name, media_type, file_size, duration,
 media_segment (id, media_id, time_start, time_end,
                visual, asr, subtitle, dominant_colors, main_subjects,
                shot_type, focal_length, camera_angle, camera_movement,
-               perspective, scene_type, mood, lighting, weather, seq)
+               perspective, scene_type, mood, lighting, weather,
+               style, color_tone, tone, dof, composition, seq)
 
 -- 合集
 collections (id, name, cover_id FK→media.id, created_at)
@@ -137,7 +140,7 @@ settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)
 dup_exclusions (media_id_a INTEGER, media_id_b INTEGER, dup_type TEXT, PRIMARY KEY(media_id_a, media_id_b, dup_type))
 ```
 
-**迁移系统**：`_MIGRATIONS` 列表 + `_migrate()` 函数，通过 `PRAGMA table_info` 检测缺失列并 ALTER TABLE。特殊情况（如 dialogue→asr 重命名 + FTS 重建）在 `_migrate()` 中硬编码处理。
+**迁移系统**：`_MIGRATIONS` 列表 + `_migrate()` 函数，通过 `PRAGMA table_info` 检测 `media` 和 `media_segment` 两张表的缺失列并 ALTER TABLE。特殊情况（如 dialogue→asr 重命名 + FTS 重建）在 `_migrate()` 中硬编码处理。
 
 ### 3.4 文件夹树 API
 
@@ -199,7 +202,7 @@ dup_exclusions (media_id_a INTEGER, media_id_b INTEGER, dup_type TEXT, PRIMARY K
 |------|------|------|
 | `/api/analysis/<media_id>/segments/<seg_id>` | PATCH | 更新单个分段的部分字段 |
 
-**`_EDITABLE_COLS` 白名单**：`visual`, `asr`, `subtitle`, `shot_type`, `focal_length`, `camera_angle`, `camera_movement`, `perspective`, `scene_type`, `mood`, `lighting`, `weather`, `dominant_colors`, `main_subjects`
+**`_EDITABLE_COLS` 白名单**：`visual`, `asr`, `subtitle`, `shot_type`, `focal_length`, `camera_angle`, `camera_movement`, `perspective`, `scene_type`, `mood`, `lighting`, `weather`, `style`, `color_tone`, `tone`, `dof`, `composition`, `dominant_colors`, `main_subjects`
 
 **逻辑**：
 1. 验证 `seg_id` 和 `media_id` 匹配
@@ -417,8 +420,8 @@ Gallery.load() / Gallery.loadMore()
 
 ### Python 包
 
-```
 openai>=1.0.0       # 智谱 AI VLM API（OpenAI 兼容端点）
+loguru>=0.7.0       # 统一日志（文件输出 + 按天轮转）
 python-dotenv>=1.0.0
 flask>=3.0
 Pillow>=10.0        # 图片处理 + 压缩

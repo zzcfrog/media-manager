@@ -1,5 +1,40 @@
 # TODO
 
+## 已完成：loguru 统一日志 + 图片分析维度扩展 + UI 修复（2026-05-20）
+
+全后端迁移至 loguru 日志系统，图片分析新增 3 个专属维度，前端分析结果 UI 优化。
+
+**改动文件：**
+- `backend/logger.py` — **新建**：loguru 日志配置，文件输出至 `{DATA_DIR}/logs/app.log`，按天轮转保留 7 天，同时输出到终端；Werkzeug HTTP 日志静默（WARNING 级别）
+- `backend/__init__.py` — 启动时调用 `setup_logging()` 初始化日志；新增 ASR 预加载逻辑（仅本地引擎）
+- `backend/analyzer.py` — `print`/`logging` 全部替换为 `loguru.logger`；流式 chunk 调试日志用 `repr()` 包裹；图片分析结果完整 JSON 输出；修复 `ensure_ascii=False` 缺失
+- `backend/analyzer.py` — 全部 `print`/`logging` 替换为 loguru
+- `backend/asr/__init__.py` — `logging` 替换为 loguru
+- `backend/asr/engines/whisper.py` — `logging` 替换为 loguru；`preload()` 直接加载不再额外开线程，加载完成打日志含耗时
+- `backend/blueprints/analysis.py` — `logging` 替换为 loguru；`_SEGMENT_COLS` 新增 `color_tone, tone, dof, style, composition`；INSERT 扩展至 23 列；`_EDITABLE_COLS` 新增 5 个字段；修复 `ensure_ascii=False` 缺失；分析弹窗模型显示区分图片/视频
+- `backend/blueprints/library.py` — `logging` 替换为 loguru
+- `backend/blueprints/serve.py` — `logging` 替换为 loguru
+- `backend/blueprints/tags.py` — `logging` 替换为 loguru
+- `backend/compressor.py` — `print` 替换为 loguru
+- `backend/config.py` — 新增 `LOG_DIR`
+- `backend/db.py` — `media_segment` 表 schema 新增 `color_tone, tone, dof, style, composition` 列；`_MIGRATIONS` 新增对应迁移项；`_migrate()` 改为检查 `media` 和 `media_segment` 两张表
+- `backend/services/embedding.py` — `logging` 替换为 loguru
+- `backend/services/importer.py` — `logging` 替换为 loguru
+- `backend/services/xmp_writer.py` — `logging` 替换为 loguru
+- `backend/img_prompt.txt` — 枚举格式与 video_prompt.txt 对齐；`shot_type` 扩展；`mood` 新增壮丽/孤独/怀旧/梦幻；`weather` 新增多云；`scene_type` 新增晨昏/星空；`style` 扩展至 15 项；新增 `color_tone`（色调）、`tone`（影调）、`dof`（景深）3 个图片专属维度
+- `backend/video_prompt.txt` — `mood`/`weather` 枚举与 img_prompt 对齐；`scene_type` 新增晨昏；`weather` 移除晨昏
+- `frontend/js/detail.js` — 新增 `styleFields` 数组和 🎨 风格化 dim-row 分组；`dimRowStyle(seg)` 辅助方法；分析弹窗模型根据 media_type 区分 image_model/model；auto-scroll 修复（Quasar `setScrollPosition` 三参数）；颜色/主体标签图标拆分为独立 span（🌈/🏷️）
+- `frontend/js/i18n.js` — 新增翻译：`d.dim.color_tone`、`d.dim.tone`、`d.dim.dof`、`d.dim.style`、`d.dim.composition`；颜色/主体标签移除内嵌 emoji
+- `frontend/css/main.css` — 风格化维度颜色（`.dim-value.color/.tone/.dof/.style/.comp`）；`.array-label.icon-label` + `.label-icon` 图标间距控制
+- `frontend/index.html` — `onLanguageChange` 方法实现语言切换即时生效
+
+**功能说明：**
+- loguru 统一全后端日志，文件按天轮转保留 7 天，终端同步输出，Werkzeug HTTP 日志静默
+- 图片分析新增色调、影调、景深 3 个专属维度（共 16 维）
+- 风格(style)和构图(composition)字段完整链路存储（DB→后端→前端）
+- 前端分析结果新增 🎨 风格化独立分组，与 🌍 场景分组并列
+- 修复：auto-scroll、语言切换即时生效、分析弹框模型显示、ensure_ascii 缺失、composition 字段丢失
+
 ## 已完成：i18n 国际化 + 设置页重构（2026-05-19）
 
 新增中英文国际化支持，设置页面重构为标签页布局。
