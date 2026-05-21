@@ -156,10 +156,14 @@ const GalleryPage = {
                  @contextmenu.prevent="showCtx($event, m)">
               <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
               <div class="masonry-img">
-                <img :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad"@error="$event.target.src='/static/img/no-thumb.svg'">
+                <img :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
                 <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
                 <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
+                <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
+                <span v-if="m.analysis_status==='done'" class="ai-badge"><q-icon name="auto_awesome" size="10px" color="white"></q-icon></span>
+                <span v-if="m.has_xmp && m.media_type==='image'" class="xmp-badge" style="color:white;font-size:7px;font-weight:700">XMP</span>
               </div>
+              <div v-if="m.rating" class="rating">{{ '★'.repeat(m.rating) }}</div>
               <div class="masonry-info">
                 <span class="masonry-name" :title="m.file_name">{{ m.file_name }}</span>
                 <span class="masonry-size">{{ fmtSize(m.file_size) }}</span>
@@ -180,10 +184,14 @@ const GalleryPage = {
              @contextmenu.prevent="showCtx($event, m)">
           <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
           <div class="masonry-img">
-            <img :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad"@error="$event.target.src='/static/img/no-thumb.svg'">
+            <img :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
             <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
             <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
+            <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
+            <span v-if="m.analysis_status==='done'" class="ai-badge"><q-icon name="auto_awesome" size="10px" color="white"></q-icon></span>
+            <span v-if="m.has_xmp && m.media_type==='image'" class="xmp-badge" style="color:white;font-size:7px;font-weight:700">XMP</span>
           </div>
+          <div v-if="m.rating" class="rating">{{ '★'.repeat(m.rating) }}</div>
           <div class="masonry-info">
             <span class="masonry-name" :title="m.file_name">{{ m.file_name }}</span>
             <span class="masonry-size">{{ fmtSize(m.file_size) }}</span>
@@ -205,9 +213,13 @@ const GalleryPage = {
                    @dblclick="openDetail(m.id)"
                    @contextmenu.prevent="showCtx($event, m)">
                 <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
-                <img :src="API.thumbUrl(m.id)" loading="lazy">
+                <img :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
                 <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
                 <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
+                <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
+                <span v-if="m.analysis_status==='done'" class="ai-badge"><q-icon name="auto_awesome" size="10px" color="white"></q-icon></span>
+                <span v-if="m.has_xmp && m.media_type==='image'" class="xmp-badge" style="color:white;font-size:7px;font-weight:700">XMP</span>
+                <div v-if="m.rating" class="rating">{{ '★'.repeat(m.rating) }}</div>
                 <div class="justified-info">
                   <span class="justified-name">{{ m.file_name }}</span>
                   <span class="justified-size">{{ fmtSize(m.file_size) }}</span>
@@ -228,9 +240,13 @@ const GalleryPage = {
                @dblclick="openDetail(m.id)"
                @contextmenu.prevent="showCtx($event, m)">
             <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
-            <img :src="API.thumbUrl(m.id)" loading="lazy">
+            <img :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
             <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
             <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
+            <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
+            <span v-if="m.analysis_status==='done'" class="ai-badge"><q-icon name="auto_awesome" size="10px" color="white"></q-icon></span>
+            <span v-if="m.has_xmp && m.media_type==='image'" class="xmp-badge" style="color:white;font-size:7px;font-weight:700">XMP</span>
+            <div v-if="m.rating" class="rating">{{ '★'.repeat(m.rating) }}</div>
             <div class="justified-info">
               <span class="justified-name">{{ m.file_name }}</span>
               <span class="justified-size">{{ fmtSize(m.file_size) }}</span>
