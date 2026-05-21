@@ -279,6 +279,11 @@ def init_db(app):
         _migrate(db)
         for k, v in _DEFAULTS.items():
             db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
+        # Reset stale 'processing' status from previous interrupted runs
+        stale = db.execute("SELECT COUNT(*) FROM media WHERE analysis_status = 'processing'").fetchone()[0]
+        if stale:
+            db.execute("UPDATE media SET analysis_status = 'none' WHERE analysis_status = 'processing'")
+            logger.info("Reset {} stale 'processing' records to 'none'", stale)
         db.commit()
         db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
         db.execute("VACUUM")
