@@ -120,11 +120,17 @@ def _start_image_analysis(media_id, media, app):
                             substep["name"] = "receiving"
                             substep["chars"] = chars
 
+                    def _img_analyze_and_save():
+                        result, analyze_time, usage = analyze_image(
+                            analyze_path, image_api_key,
+                            model=model, base_url=CODING_BASE_URL, on_progress=on_img_progress,
+                        )
+                        segments = [result]
+                        save_segments(media_id, segments, model=model)
+                        return result, analyze_time, usage
+
                     pool = ThreadPoolExecutor(max_workers=1)
-                    future = pool.submit(
-                        analyze_image, analyze_path, image_api_key,
-                        model=model, base_url=CODING_BASE_URL, on_progress=on_img_progress,
-                    )
+                    future = pool.submit(_img_analyze_and_save)
 
                     while not future.done():
                         yield f"data: {json.dumps({'type': 'progress', 'step': 'analyzing', 'substep': substep['name'], 'chars': substep['chars']}, ensure_ascii=False)}\n\n"
@@ -132,9 +138,6 @@ def _start_image_analysis(media_id, media, app):
 
                     result, analyze_time, usage = future.result()
                     pool.shutdown(wait=False)
-
-                    segments = [result]
-                    save_segments(media_id, segments, model=model)
 
                     usage_dict = None
                     if usage:
@@ -160,17 +163,10 @@ def _start_image_analysis(media_id, media, app):
                 _analysis_lock_holder = None
                 logger.info("Image analysis lock released: file={}", Path(file_path).name)
 
-    def release_lock():
-        if not lock_released[0]:
-            _analysis_lock.release()
-            lock_released[0] = True
-            _analysis_lock_holder = None
-            logger.info("Image analysis lock released (conn closed): file={}", Path(file_path).name)
-
     lock_released = [False]
     compressed_path_holder = [None]
     resp = Response(generate(), mimetype="text/event-stream")
-    resp.call_on_close(lambda: (_cleanup_temp(compressed_path_holder[0]), release_lock()))
+    resp.call_on_close(lambda: _cleanup_temp(compressed_path_holder[0]))
     return resp
 
 
@@ -239,85 +235,21 @@ def _start_video_analysis(media_id, media, app):
 
                     if use_multimodal:
                         yield f"data: {json.dumps({'type': 'progress', 'step': 'analyzing', 'message': f'AI 综合分析中（{model}）...'}, ensure_ascii=False)}\n\n"
-
-                        pool2 = ThreadPoolExecutor(max_workers=1)
-                        vlm_future = pool2.submit(
-                            analyze_video, compressed_path, api_key, model=model,
-                            base_url=CODING_BASE_URL, multimodal=True,
-                            on_progress=on_analyze_progress,
-                        )
-
-                        while not vlm_future.done():
-                            yield f"data: {json.dumps({'type': 'progress', 'step': 'analyzing', 'substep': substep['name'], 'chars': substep['chars']}, ensure_ascii=False)}\n\n"
-                            time.sleep(0.5)
-
-                        segments, analyze_time, usage = vlm_future.result()
-                        pool2.shutdown(wait=False)
                     else:
-                        asr_engine = get_asr_engine(asr_engine_name)
+                        yield f"data: {json.dumps({'type': 'progress', 'step': 'analyzing', 'message': f'调用 {model} 分析中...'}, ensure_ascii=False)}\n\n"
 
-                        if asr_engine:
-                            yield f"data: {json.dumps({'type': 'progress', 'step': 'analyzing', 'message': f'AI 分析 & 语音识别并行中...'}, ensure_ascii=False)}\n\n"
-                            yield f"data: {json.dumps({'type': 'progress', 'step': 'asr_start'}, ensure_ascii=False)}\n\n"
+                    pool2 = ThreadPoolExecutor(max_workers=1)
+                    analyze_future = pool2.submit(
+                        _analyze_and_save, media_id, compressed_path, api_key, model,
+                        use_multimodal, asr_engine_name, on_analyze_progress,
+                    )
 
-                            pool2 = ThreadPoolExecutor(max_workers=2)
-                            vlm_future = pool2.submit(
-                                analyze_video, compressed_path, api_key, model=model,
-                                base_url=CODING_BASE_URL, multimodal=False,
-                                on_progress=on_analyze_progress,
-                            )
+                    while not analyze_future.done():
+                        yield f"data: {json.dumps({'type': 'progress', 'step': 'analyzing', 'substep': substep['name'], 'chars': substep['chars']}, ensure_ascii=False)}\n\n"
+                        time.sleep(0.5)
 
-                            asr_substep = {"name": "loading"}
-
-                            def on_asr_progress(status):
-                                asr_substep["name"] = status
-
-                            asr_model_name = get_setting(db, "asr_model", "large-v3")
-                            asr_future = pool2.submit(_run_asr, asr_engine, compressed_path, on_progress=on_asr_progress, model_name=asr_model_name)
-
-                            vlm_done = False
-                            asr_done = False
-                            while not vlm_done or not asr_done:
-                                if not vlm_done and vlm_future.done():
-                                    try:
-                                        segments, analyze_time, usage = vlm_future.result()
-                                    except Exception:
-                                        asr_future.cancel()
-                                        pool2.shutdown(wait=False, cancel_futures=True)
-                                        raise
-                                    vlm_done = True
-                                    yield f"data: {json.dumps({'type': 'progress', 'step': 'analyze_done'}, ensure_ascii=False)}\n\n"
-                                if not asr_done and asr_future.done():
-                                    asr_segments = asr_future.result()
-                                    asr_done = True
-                                    if asr_segments:
-                                        _merge_asr(segments, asr_segments)
-                                if not vlm_done:
-                                    yield f"data: {json.dumps({'type': 'progress', 'step': 'analyzing', 'substep': substep['name'], 'chars': substep['chars']}, ensure_ascii=False)}\n\n"
-                                if not asr_done:
-                                    asr_label = "加载语音模型…" if asr_substep["name"] == "loading" else "语音识别中…"
-                                    yield f"data: {json.dumps({'type': 'progress', 'step': 'asr_progress', 'substep': asr_substep['name'], 'message': asr_label}, ensure_ascii=False)}\n\n"
-                                time.sleep(0.5)
-
-                            pool2.shutdown(wait=False)
-                        else:
-                            yield f"data: {json.dumps({'type': 'progress', 'step': 'analyzing', 'message': f'调用 {model} 分析中...'}, ensure_ascii=False)}\n\n"
-
-                            pool2 = ThreadPoolExecutor(max_workers=1)
-                            vlm_future = pool2.submit(
-                                analyze_video, compressed_path, api_key, model=model,
-                                base_url=CODING_BASE_URL, multimodal=False,
-                                on_progress=on_analyze_progress,
-                            )
-
-                            while not vlm_future.done():
-                                yield f"data: {json.dumps({'type': 'progress', 'step': 'analyzing', 'substep': substep['name'], 'chars': substep['chars']}, ensure_ascii=False)}\n\n"
-                                time.sleep(0.5)
-
-                            segments, analyze_time, usage = vlm_future.result()
-                            pool2.shutdown(wait=False)
-
-                    save_segments(media_id, segments, model=model)
+                    segments, analyze_time, usage = analyze_future.result()
+                    pool2.shutdown(wait=False)
 
                     usage_dict = None
                     if usage:
@@ -342,18 +274,35 @@ def _start_video_analysis(media_id, media, app):
                 _analysis_lock_holder = None
                 logger.info("Video analysis lock released: file={}", Path(file_path).name)
 
-    def release_lock():
-        if not lock_released[0]:
-            _analysis_lock.release()
-            lock_released[0] = True
-            _analysis_lock_holder = None
-            logger.info("Video analysis lock released (conn closed): file={}", Path(file_path).name)
-
     lock_released = [False]
     compressed_path_holder = [None]
     resp = Response(generate(), mimetype="text/event-stream")
-    resp.call_on_close(lambda: (_cleanup_temp(compressed_path_holder[0]), release_lock()))
+    resp.call_on_close(lambda: _cleanup_temp(compressed_path_holder[0]))
     return resp
+
+
+def _analyze_and_save(media_id, compressed_path, api_key, model, use_multimodal, asr_engine_name, on_progress):
+    """Run VLM analysis (+ optional ASR) in a thread and save results immediately."""
+    db = get_db()
+    asr_engine = get_asr_engine(asr_engine_name) if asr_engine_name else None
+    asr_model_name = get_setting(db, "asr_model", "large-v3")
+
+    segments, analyze_time, usage = analyze_video(
+        compressed_path, api_key, model=model,
+        base_url=CODING_BASE_URL, multimodal=use_multimodal,
+        on_progress=on_progress,
+    )
+
+    if not use_multimodal and asr_engine:
+        try:
+            asr_segments = asr_engine.transcribe(compressed_path, model_name=asr_model_name)
+            if asr_segments:
+                _merge_asr(segments, asr_segments)
+        except Exception as e:
+            logger.error("ASR failed: {}", e)
+
+    save_segments(media_id, segments, model=model)
+    return segments, analyze_time, usage
 
 
 def _run_asr(engine, audio_path, on_progress=None, model_name=None):
