@@ -332,6 +332,7 @@ const DetailPage = {
     this.stopScopes();
     this.stopWaveformAnim();
     if (this._segTrackInterval) { clearInterval(this._segTrackInterval); this._segTrackInterval = null; }
+    if (this._bgPollTimer) { clearInterval(this._bgPollTimer); this._bgPollTimer = null; }
     if (this._lottie) { this._lottie.destroy(); this._lottie = null; }
     this._stopAnalyzeTips();
     this._stopAllStepTimers();
@@ -363,6 +364,38 @@ const DetailPage = {
     if (bgTask && bgTask.status === "running") {
       this.analyzing = true;
       this.analysis = { status: "processing", segments: [] };
+      const isImage = this.media.media_type === "image";
+      this.analysisStages = isImage ? [
+        { key: "analyze", label: t('d.img_analysis'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.analyzing'), doneText: t('d.analysis_done_short') },
+      ] : [
+        { key: "compress", label: t('d.video_compress'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.compressing'), doneText: t('d.compress_done') },
+        { key: "encode", label: t('d.video_encode'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.encoding'), doneText: t('d.encode_done') },
+        { key: "analyze", label: t('d.ai_model_analysis'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.analyzing'), doneText: t('d.analysis_done_short') },
+        { key: "asr", label: t('d.asr'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.transcribing'), doneText: t('d.transcribe_done') },
+      ];
+      this._applyBgTaskStep(bgTask);
+      this.$nextTick(() => this._initLottieBusy());
+      // Poll bgTask for progress updates
+      const pollId = id;
+      this._bgPollTimer = setInterval(() => {
+        const task = this.$root.bgTasks.find(t => t.id === pollId);
+        if (!task || task.status !== "running") {
+          clearInterval(this._bgPollTimer);
+          this._bgPollTimer = null;
+          if (task && task.status === "done") {
+            API.getAnalysis(pollId).then(res => {
+              this.analysis = res;
+              this.analyzing = false;
+              this._stopAnalyzeTips();
+              this._stopAllStepTimers();
+            }).catch(() => { this.analyzing = false; });
+          } else {
+            this.analyzing = false;
+          }
+          return;
+        }
+        this._applyBgTaskStep(task);
+      }, 500);
     } else if (bgTask && bgTask.status === "done") {
       // Task finished while we were away — reload results
       try {
@@ -371,13 +404,31 @@ const DetailPage = {
       } catch {}
     }
     this.$nextTick(() => {
-      if (this.analysis.status !== "done") this._initLottieIdle();
+      if (!this.analyzing && this.analysis.status !== "done") this._initLottieIdle();
       if (this.media?.media_type === "image") this.imgLoading = true;
     });
   },
   methods: {
     t,
     API,
+    _applyBgTaskStep(task) {
+      const step = task.step || "";
+      const stages = this.analysisStages;
+      const isImage = stages.length === 1 && stages[0].key === "analyze";
+      // Map SSE step names to stage index (images only have stage 0)
+      const stepMap = isImage
+        ? { queued: -1, compressing: -1, compressed: -1, analyzing: 0, analyze_done: 0 }
+        : { queued: -1, compressing: 0, compressed: 1, analyzing: 2, analyze_done: 2, asr_start: 3, asr_progress: 3 };
+      const currentIdx = stepMap[step] ?? -1;
+      for (let i = 0; i < stages.length; i++) {
+        if (i < currentIdx && stages[i].status !== "done") {
+          this._updateStage(stages[i].key, "done");
+        } else if (i === currentIdx && stages[i].status !== "active" && stages[i].status !== "done") {
+          this._updateStage(stages[i].key, "active");
+        }
+      }
+      this.analysisProgress = task.stageLabel || "";
+    },
     onImageLoaded(e) {
       this.imgLoading = false;
       this.imgZoom = 1;
@@ -865,7 +916,14 @@ const DetailPage = {
             let evt;
             try { evt = JSON.parse(jsonStr); } catch { continue; }
             if (evt.type === "progress") {
+              if (evt.step === "queued") {
+                task.step = "queued";
+                task.stageLabel = t('d.queued');
+                task.percent = 0;
+                if (isAlive()) self.analysisProgress = t('d.queued');
+              }
               if (evt.step === "compressing") {
+                task.step = "compressing";
                 task.stageLabel = t('d.compressing');
                 task.percent = (evt.percent || 0) * 0.4;
                 if (isAlive()) {
@@ -875,6 +933,7 @@ const DetailPage = {
                 }
               }
               if (evt.step === "compressed") {
+                task.step = "compressed";
                 task.stageLabel = t('d.encoding');
                 task.percent = 40;
                 if (isAlive()) {
@@ -886,6 +945,7 @@ const DetailPage = {
                 }
               }
               if (evt.step === "analyzing") {
+                task.step = "analyzing";
                 task.stageLabel = t('d.analyzing');
                 task.percent = 40 + (isImage ? 30 : 20);
                 if (isAlive()) {
@@ -907,6 +967,7 @@ const DetailPage = {
                 }
               }
               if (evt.step === "analyze_done") {
+                task.step = "analyze_done";
                 task.percent = 70;
                 if (isAlive()) {
                   self._stopAnalyzeTips();
@@ -915,6 +976,7 @@ const DetailPage = {
                 }
               }
               if (evt.step === "asr_start") {
+                task.step = "asr_start";
                 task.stageLabel = t('d.transcribing');
                 task.percent = 80;
                 if (isAlive()) self._updateStage("asr", "active");
@@ -926,6 +988,7 @@ const DetailPage = {
                 }
               }
             } else if (evt.type === "done") {
+              task.step = "done";
               task.status = "done";
               task.percent = 100;
               task.stageLabel = t('d.analysis_done_short');
@@ -976,6 +1039,7 @@ const DetailPage = {
                 // Component destroyed — just load results into DB, gallery will pick up on next visit
               }
             } else if (evt.type === "error") {
+              task.step = "error";
               task.status = "error";
               task.stageLabel = t('d.n_analysis_fail', {err: evt.message});
               if (isAlive()) {
@@ -990,6 +1054,7 @@ const DetailPage = {
           }
         }
       } catch (e) {
+        task.step = "error";
         task.status = "error";
         task.stageLabel = t('d.n_analysis_fail', {err: e.message});
         if (isAlive()) {

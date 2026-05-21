@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, Response, current_app
 import json
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from loguru import logger
@@ -11,6 +12,20 @@ from ..analyzer import analyze_video, analyze_image, CODING_BASE_URL
 from ..asr import get_engine as get_asr_engine, preload_all, reload_engine
 
 bp = Blueprint("analysis", __name__)
+
+# Serialize analysis requests to avoid concurrent API rate limits and duplicate ASR loading
+_analysis_lock = threading.Lock()
+
+
+def _queued_generate(inner):
+    """Wrap an SSE generator with queue serialization."""
+    while not _analysis_lock.acquire(timeout=0.5):
+        yield f"data: {json.dumps({'type': 'progress', 'step': 'queued', 'message': '排队等待中...'}, ensure_ascii=False)}\n\n"
+    try:
+        yield from inner
+    finally:
+        _analysis_lock.release()
+
 
 _SEGMENT_COLS = "id, media_id, time_start, time_end, visual, asr, subtitle, dominant_colors, main_subjects, shot_type, focal_length, camera_angle, camera_movement, perspective, scene_type, mood, lighting, weather, color_tone, tone, dof, style, composition, seq"
 
@@ -141,7 +156,7 @@ def _start_image_analysis(media_id, media, app):
                         pass
 
     compressed_path_holder = [None]
-    resp = Response(generate(), mimetype="text/event-stream")
+    resp = Response(_queued_generate(generate()), mimetype="text/event-stream")
     resp.call_on_close(lambda: _cleanup_temp(compressed_path_holder[0]))
     return resp
 
@@ -302,7 +317,7 @@ def _start_video_analysis(media_id, media, app):
                         pass
 
     compressed_path_holder = [None]
-    resp = Response(generate(), mimetype="text/event-stream")
+    resp = Response(_queued_generate(generate()), mimetype="text/event-stream")
     resp.call_on_close(lambda: _cleanup_temp(compressed_path_holder[0]))
     return resp
 
