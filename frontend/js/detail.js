@@ -361,6 +361,7 @@ const DetailPage = {
     }
     // Check if there's a running background task for this media
     const bgTask = this.$root.bgTasks.find(t => t.id === id);
+    console.log("[detail] created id=", id, "analysis=", this.analysis.status, "bgTask=", bgTask ? bgTask.status : "none");
     if (bgTask && bgTask.status === "running") {
       this.analyzing = true;
       this.analysis = { status: "processing", segments: [] };
@@ -562,12 +563,13 @@ const DetailPage = {
       this.analysisStages = this.analysisStages.map(s => {
         if (s.key !== key) return s;
         const u = { ...s };
-        if (newStatus === "active" && s.status === "pending") {
+        if (newStatus === "active" && s.status !== "active" && s.status !== "done") {
           u.status = "active"; u.t0 = Date.now(); u.statusText = s.activeText;
           this._startStepTimer(key);
         }
-        if (newStatus === "done" && s.status === "active") {
-          u.status = "done"; u.duration = (Date.now() - s.t0) / 1000; u.progress = 100;
+        if (newStatus === "done" && s.status !== "done") {
+          u.status = "done"; u.progress = 100;
+          u.duration = s.t0 ? (Date.now() - s.t0) / 1000 : null;
           u.statusText = s.doneText; u.extra = extra || ""; u.substepText = "";
           this._stopStepTimer(key);
         }

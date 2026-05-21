@@ -64,7 +64,7 @@ def analyze_video(video_path: str | Path, api_key: str, model: str = "glm-4.6v",
     usage = None
     first_token = True
     try:
-        logger.info("Video API call starting: model={}", model)
+        logger.info("Video API call starting: model={} file={}", model, Path(video_path).name)
         stream = client.chat.completions.create(
             model=model,
             messages=[{
@@ -96,11 +96,11 @@ def analyze_video(video_path: str | Path, api_key: str, model: str = "glm-4.6v",
                 if on_chunk:
                     on_chunk(f"data: {json.dumps({'content': delta.content}, ensure_ascii=False)}\n\n")
     except Exception as e:
-        logger.error("Video API call failed after {:.1f}s: {}", time.time() - t0, e)
+        logger.error("Video API call failed after {:.1f}s: {}, file={}", time.time() - t0, e, Path(video_path).name)
         raise
 
     elapsed = time.time() - t0
-    logger.info("Video API call done: {:.1f}s, {} chars", elapsed, len(full_content))
+    logger.info("Video API call done: {:.1f}s, {} chars, file={}", elapsed, len(full_content), Path(video_path).name)
 
     usage_dict = None
     if usage:
@@ -144,7 +144,7 @@ def analyze_image(image_path: str | Path, api_key: str, model: str = "glm-4.6v",
     usage = None
     first_token = True
 
-    logger.info("Image API call starting: model={}", model)
+    logger.info("Image API call starting: model={} file={}", model, Path(image_path).name)
     stream = client.chat.completions.create(
         model=model,
         messages=[{
@@ -175,7 +175,7 @@ def analyze_image(image_path: str | Path, api_key: str, model: str = "glm-4.6v",
                 on_progress("receiving", chars=len(full_content))
 
     elapsed = time.time() - t0
-    logger.info("Image API call done: {:.1f}s, {} chars", elapsed, len(full_content))
+    logger.info("Image API call done: {:.1f}s, {} chars, file={}", elapsed, len(full_content), Path(image_path).name)
 
     usage_dict = None
     if usage:

@@ -94,7 +94,7 @@ def _start_image_analysis(media_id, media, app):
         lock_released[0] = False
         global _analysis_lock_holder
         _analysis_lock_holder = threading.current_thread().ident
-        logger.info("Image analysis lock acquired for media_id={}", media_id)
+        logger.info("Image analysis lock acquired: media_id={} file={}", media_id, Path(file_path).name)
         try:
             with app.app_context():
                 try:
@@ -158,14 +158,14 @@ def _start_image_analysis(media_id, media, app):
                 _analysis_lock.release()
                 lock_released[0] = True
                 _analysis_lock_holder = None
-                logger.info("Image analysis lock released for media_id={}", media_id)
+                logger.info("Image analysis lock released: file={}", Path(file_path).name)
 
     def release_lock():
         if not lock_released[0]:
             _analysis_lock.release()
             lock_released[0] = True
             _analysis_lock_holder = None
-            logger.info("Image analysis lock released (connection closed) for media_id={}", media_id)
+            logger.info("Image analysis lock released (conn closed): file={}", Path(file_path).name)
 
     lock_released = [False]
     compressed_path_holder = [None]
@@ -194,7 +194,7 @@ def _start_video_analysis(media_id, media, app):
         lock_released[0] = False
         global _analysis_lock_holder
         _analysis_lock_holder = threading.current_thread().ident
-        logger.info("Video analysis lock acquired for media_id={}", media_id)
+        logger.info("Video analysis lock acquired: media_id={} file={}", media_id, Path(file_path).name)
         try:
             compressed_path = None
             with app.app_context():
@@ -340,14 +340,14 @@ def _start_video_analysis(media_id, media, app):
                 _analysis_lock.release()
                 lock_released[0] = True
                 _analysis_lock_holder = None
-                logger.info("Video analysis lock released for media_id={}", media_id)
+                logger.info("Video analysis lock released: file={}", Path(file_path).name)
 
     def release_lock():
         if not lock_released[0]:
             _analysis_lock.release()
             lock_released[0] = True
             _analysis_lock_holder = None
-            logger.info("Video analysis lock released (connection closed) for media_id={}", media_id)
+            logger.info("Video analysis lock released (conn closed): file={}", Path(file_path).name)
 
     lock_released = [False]
     compressed_path_holder = [None]
