@@ -51,6 +51,7 @@ def analyze_video(video_path: str | Path, api_key: str, model: str = "glm-4.6v",
     client = OpenAI(
         api_key=api_key,
         base_url=base_url,
+        timeout=600,
     )
 
     if on_chunk:
@@ -64,6 +65,7 @@ def analyze_video(video_path: str | Path, api_key: str, model: str = "glm-4.6v",
     usage = None
     first_token = True
     try:
+        logger.info("Video API call starting: model={}", model)
         stream = client.chat.completions.create(
             model=model,
             messages=[{
@@ -95,10 +97,11 @@ def analyze_video(video_path: str | Path, api_key: str, model: str = "glm-4.6v",
                 if on_chunk:
                     on_chunk(f"data: {json.dumps({'content': delta.content}, ensure_ascii=False)}\n\n")
     except Exception as e:
-        logger.error("API call failed: {}", e)
+        logger.error("Video API call failed after {:.1f}s: {}", time.time() - t0, e)
         raise
 
     elapsed = time.time() - t0
+    logger.info("Video API call done: {:.1f}s, {} chars", elapsed, len(full_content))
 
     usage_dict = None
     if usage:
@@ -132,7 +135,7 @@ def analyze_image(image_path: str | Path, api_key: str, model: str = "glm-4.6v",
     """Analyze a single image. Returns (result_dict, elapsed_seconds, usage_dict)."""
 
     image_url = encode_image_base64(image_path)
-    client = OpenAI(api_key=api_key, base_url=base_url)
+    client = OpenAI(api_key=api_key, base_url=base_url, timeout=600)
 
     if on_progress:
         on_progress("uploading")
@@ -142,6 +145,7 @@ def analyze_image(image_path: str | Path, api_key: str, model: str = "glm-4.6v",
     usage = None
     first_token = True
 
+    logger.info("Image API call starting: model={}", model)
     stream = client.chat.completions.create(
         model=model,
         messages=[{
@@ -172,6 +176,7 @@ def analyze_image(image_path: str | Path, api_key: str, model: str = "glm-4.6v",
                 on_progress("receiving", chars=len(full_content))
 
     elapsed = time.time() - t0
+    logger.info("Image API call done: {:.1f}s, {} chars", elapsed, len(full_content))
 
     usage_dict = None
     if usage:
