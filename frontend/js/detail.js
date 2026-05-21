@@ -335,6 +335,7 @@ const DetailPage = {
     if (this._lottie) { this._lottie.destroy(); this._lottie = null; }
     this._stopAnalyzeTips();
     this._stopAllStepTimers();
+    if (this._bgReader) { this._bgReader.cancel().catch(() => {}); this._bgReader = null; }
   },
   async created() {
     this._onKey = (e) => this.handleKey(e);
@@ -356,6 +357,18 @@ const DetailPage = {
       this.analysis = res;
     } catch (e) {
       this.analysis = { status: "none", segments: [] };
+    }
+    // Check if there's a running background task for this media
+    const bgTask = this.$root.bgTasks.find(t => t.id === id);
+    if (bgTask && bgTask.status === "running") {
+      this.analyzing = true;
+      this.analysis = { status: "processing", segments: [] };
+    } else if (bgTask && bgTask.status === "done") {
+      // Task finished while we were away — reload results
+      try {
+        const res = await API.getAnalysis(id);
+        this.analysis = res;
+      } catch {}
     }
     this.$nextTick(() => {
       if (this.analysis.status !== "done") this._initLottieIdle();
@@ -815,6 +828,16 @@ const DetailPage = {
         { key: "asr", label: t('d.asr'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.transcribing'), doneText: t('d.transcribe_done') },
       ];
       this.$nextTick(() => this._initLottieBusy());
+      // Register global background task (remove previous entry for same media if any)
+      const root = this.$root;
+      const oldIdx = root.bgTasks.findIndex(t => t.id === this.media.id);
+      if (oldIdx >= 0) root.bgTasks.splice(oldIdx, 1);
+      const task = { id: this.media.id, fileName: this.media.file_name, status: "running", percent: 0, stageLabel: t('d.preparing'), startTime: Date.now() };
+      root.bgTasks.push(task);
+      // Capture DetailPage reference for optional local updates
+      const self = this;
+      const isAlive = () => self.$el && self.$el.isConnected;
+      // Start analysis
       try {
         const resp = await API.startAnalysis(this.media.id);
         if (!resp.ok) {
@@ -822,9 +845,12 @@ const DetailPage = {
           try { const body = await resp.json(); if (body.error) msg = body.error; } catch {}
           throw new Error(msg);
         }
+        // SSE loop runs independently — does not depend on DetailPage being alive
         const reader = resp.body.getReader();
+        self._bgReader = reader;
         const decoder = new TextDecoder();
         let buf = "";
+        let _compressedSize = 0;
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -839,105 +865,145 @@ const DetailPage = {
             let evt;
             try { evt = JSON.parse(jsonStr); } catch { continue; }
             if (evt.type === "progress") {
-              this.analysisProgress = evt.message;
               if (evt.step === "compressing") {
-                this._updateStage("compress", "active");
-                if (evt.percent != null) this._setStageProgress("compress", evt.percent);
+                task.stageLabel = t('d.compressing');
+                task.percent = (evt.percent || 0) * 0.4;
+                if (isAlive()) {
+                  self.analysisProgress = evt.message;
+                  self._updateStage("compress", "active");
+                  if (evt.percent != null) self._setStageProgress("compress", evt.percent);
+                }
               }
               if (evt.step === "compressed") {
-                const res = (evt.width && evt.height) ? `${evt.width}×${evt.height}` : "";
-                const fps = evt.fps ? ` ${evt.fps}fps` : "";
-                this._updateStage("compress", "done", `${res}${fps}`);
-                this._compressedSize = evt.size_bytes;
-                this._updateStage("encode", "active");
+                task.stageLabel = t('d.encoding');
+                task.percent = 40;
+                if (isAlive()) {
+                  const res = (evt.width && evt.height) ? `${evt.width}×${evt.height}` : "";
+                  const fps = evt.fps ? ` ${evt.fps}fps` : "";
+                  self._updateStage("compress", "done", `${res}${fps}`);
+                  _compressedSize = evt.size_bytes;
+                  self._updateStage("encode", "active");
+                }
               }
               if (evt.step === "analyzing") {
-                if (!isImage) {
-                  const fmtSize = (b) => {
-                    if (!b) return "Base64";
-                    if (b >= 1073741824) return (b / 1073741824).toFixed(1) + " GB";
-                    if (b >= 1048576) return (b / 1048576).toFixed(1) + " MB";
-                    return (b / 1024).toFixed(0) + " KB";
-                  };
-                  this._updateStage("encode", "done", fmtSize(this._compressedSize));
-                }
-                this._updateStage("analyze", "active");
-                if (evt.substep) {
-                  this._setAnalyzeSubstep(evt.substep, evt.chars || 0);
-                } else if (!this._analyzeSubstep) {
-                  this._startAnalyzeTips();
+                task.stageLabel = t('d.analyzing');
+                task.percent = 40 + (isImage ? 30 : 20);
+                if (isAlive()) {
+                  if (!isImage) {
+                    const fmtSize = (b) => {
+                      if (!b) return "Base64";
+                      if (b >= 1073741824) return (b / 1073741824).toFixed(1) + " GB";
+                      if (b >= 1048576) return (b / 1048576).toFixed(1) + " MB";
+                      return (b / 1024).toFixed(0) + " KB";
+                    };
+                    self._updateStage("encode", "done", fmtSize(_compressedSize));
+                  }
+                  self._updateStage("analyze", "active");
+                  if (evt.substep) {
+                    self._setAnalyzeSubstep(evt.substep, evt.chars || 0);
+                  } else if (!self._analyzeSubstep) {
+                    self._startAnalyzeTips();
+                  }
                 }
               }
               if (evt.step === "analyze_done") {
-                this._stopAnalyzeTips();
-                this._analyzeSubstep = false;
-                this._updateStage("analyze", "done");
-              }
-              if (evt.step === "asr_start") {
-                this._updateStage("asr", "active");
-              }
-              if (evt.step === "asr_progress") {
-                const asrLabels = { loading: t('d.asr_loading'), transcribing: t('d.asr_transcribing') };
-                this._setAsrSubstep(evt.substep, evt.message || asrLabels[evt.substep] || "");
-              }
-            } else if (evt.type === "done") {
-              this._stopAnalyzeTips();
-              this._analyzeSubstep = false;
-              this._updateStage("analyze", "done");
-              const asrStage = this.analysisStages.find(s => s.key === "asr");
-              if (asrStage) {
-                if (asrStage.status === "active") {
-                  this._updateStage("asr", "done");
-                } else if (asrStage.status === "pending") {
-                  this.analysisStages = this.analysisStages.map(s =>
-                    s.key === "asr" ? { ...s, status: "done", statusText: t('d.asr_not_enabled'), progress: 100, extra: t('d.asr_install_hint') } : s
-                  );
+                task.percent = 70;
+                if (isAlive()) {
+                  self._stopAnalyzeTips();
+                  self._analyzeSubstep = false;
+                  self._updateStage("analyze", "done");
                 }
               }
-              this._stopAllStepTimers();
-              this.analysisProgress = "";
-              try {
-                const res = await API.getAnalysis(this.media.id);
-                this.analysis = res;
-              } catch {
-                this.analysis = { status: "done", segments: [] };
+              if (evt.step === "asr_start") {
+                task.stageLabel = t('d.transcribing');
+                task.percent = 80;
+                if (isAlive()) self._updateStage("asr", "active");
               }
-              if (evt.tokens) {
-                const fmt = v => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v;
-                Quasar.Dialog.create({
-                  title: t('d.analysis_done'),
-                  message: `<div style="font-size:13px;line-height:1.8">
-                    <div>${t('d.segment_count', {n: evt.segments_count})}</div>
-                    <div>${t('d.analyze_time', {t: (evt.analyze_time || 0).toFixed(1)})}</div>
-                    ${evt.compress_time ? '<div>' + t('d.compress_time', {t: evt.compress_time.toFixed(1)}) + '</div>' : ''}
-                    <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-                      <div>${t('d.prompt_tokens', {n: fmt(evt.tokens.prompt)})}</div>
-                      <div>${t('d.completion_tokens', {n: fmt(evt.tokens.completion)})}</div>
-                      <div style="font-weight:600">${t('d.total_tokens', {n: fmt(evt.tokens.total)})}</div>
-                    </div>
-                  </div>`,
-                  html: true,
-                  ok: { label: t('d.ok'), color: 'primary', flat: true },
-                });
+              if (evt.step === "asr_progress") {
+                if (isAlive()) {
+                  const asrLabels = { loading: t('d.asr_loading'), transcribing: t('d.asr_transcribing') };
+                  self._setAsrSubstep(evt.substep, evt.message || asrLabels[evt.substep] || "");
+                }
+              }
+            } else if (evt.type === "done") {
+              task.status = "done";
+              task.percent = 100;
+              task.stageLabel = t('d.analysis_done_short');
+              if (isAlive()) {
+                self._stopAnalyzeTips();
+                self._analyzeSubstep = false;
+                self._updateStage("analyze", "done");
+                const asrStage = self.analysisStages.find(s => s.key === "asr");
+                if (asrStage) {
+                  if (asrStage.status === "active") {
+                    self._updateStage("asr", "done");
+                  } else if (asrStage.status === "pending") {
+                    self.analysisStages = self.analysisStages.map(s =>
+                      s.key === "asr" ? { ...s, status: "done", statusText: t('d.asr_not_enabled'), progress: 100, extra: t('d.asr_install_hint') } : s
+                    );
+                  }
+                }
+                self._stopAllStepTimers();
+                self.analysisProgress = "";
+                try {
+                  const res = await API.getAnalysis(self.media.id);
+                  self.analysis = res;
+                } catch {
+                  self.analysis = { status: "done", segments: [] };
+                }
+                self.analyzing = false;
+                if (evt.tokens) {
+                  const fmt = v => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v;
+                  Quasar.Dialog.create({
+                    title: t('d.analysis_done'),
+                    message: `<div style="font-size:13px;line-height:1.8">
+                      <div>${t('d.segment_count', {n: evt.segments_count})}</div>
+                      <div>${t('d.analyze_time', {t: (evt.analyze_time || 0).toFixed(1)})}</div>
+                      ${evt.compress_time ? '<div>' + t('d.compress_time', {t: evt.compress_time.toFixed(1)}) + '</div>' : ''}
+                      <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+                        <div>${t('d.prompt_tokens', {n: fmt(evt.tokens.prompt)})}</div>
+                        <div>${t('d.completion_tokens', {n: fmt(evt.tokens.completion)})}</div>
+                        <div style="font-weight:600">${t('d.total_tokens', {n: fmt(evt.tokens.total)})}</div>
+                      </div>
+                    </div>`,
+                    html: true,
+                    ok: { label: t('d.ok'), color: 'primary', flat: true },
+                  });
+                } else {
+                  Quasar.Notify.create({ message: t('d.analysis_done_n', {n: evt.segments_count}), position: "top", timeout: 2500 });
+                }
               } else {
-                Quasar.Notify.create({ message: t('d.analysis_done_n', {n: evt.segments_count}), position: "top", timeout: 2500 });
+                // Component destroyed — just load results into DB, gallery will pick up on next visit
               }
             } else if (evt.type === "error") {
-              this._stopAnalyzeTips();
-              this._stopAllStepTimers();
-              this.analysisProgress = "";
-              this.analysis = { status: "none", segments: [] };
-              Quasar.Notify.create({ message: t('d.n_analysis_fail', {err: evt.message}), position: "top", color: "negative", timeout: 3000 });
+              task.status = "error";
+              task.stageLabel = t('d.n_analysis_fail', {err: evt.message});
+              if (isAlive()) {
+                self._stopAnalyzeTips();
+                self._stopAllStepTimers();
+                self.analysisProgress = "";
+                self.analysis = { status: "none", segments: [] };
+                self.analyzing = false;
+                Quasar.Notify.create({ message: t('d.n_analysis_fail', {err: evt.message}), position: "top", color: "negative", timeout: 3000 });
+              }
             }
           }
         }
       } catch (e) {
-        this._stopAnalyzeTips();
-        this._stopAllStepTimers();
-        this.analysis = { status: "none", segments: [] };
-        Quasar.Notify.create({ message: t('d.n_analysis_fail', {err: e.message}), position: "top", color: "negative", timeout: 3000 });
+        task.status = "error";
+        task.stageLabel = t('d.n_analysis_fail', {err: e.message});
+        if (isAlive()) {
+          self._stopAnalyzeTips();
+          self._stopAllStepTimers();
+          self.analysis = { status: "none", segments: [] };
+          self.analyzing = false;
+          Quasar.Notify.create({ message: t('d.n_analysis_fail', {err: e.message}), position: "top", color: "negative", timeout: 3000 });
+        }
       }
-      this.analyzing = false;
+      // Auto-remove completed/error tasks after 5 minutes
+      if (task.status !== "running") {
+        setTimeout(() => { const idx = root.bgTasks.indexOf(task); if (idx >= 0) root.bgTasks.splice(idx, 1); }, 300000);
+      }
     },
     seekTo(timeStr) {
       const player = this.$refs.player;

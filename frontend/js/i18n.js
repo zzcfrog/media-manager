@@ -521,6 +521,11 @@ zh: {
   "g.which_not_similar": "以下哪些与它不相似？",
   "g.write_failed": "写入失败：{msg}",
   "g.xmp_written": "已写入 {n} 张图片的 XMP",
+  "g.bg_tasks": "后台任务",
+  "g.bg_clear": "清除已完成",
+  "g.bg_done": "已完成",
+  "g.bg_error": "分析失败",
+  "g.bg_running": "分析中",
   "sync.n_fail": "同步失败：{err}",
 
 },
@@ -1047,6 +1052,11 @@ en: {
   "g.which_not_similar": "Which ones are not similar?",
   "g.write_failed": "Write failed: {msg}",
   "g.xmp_written": "XMP written for {n} images",
+  "g.bg_tasks": "Background",
+  "g.bg_clear": "Clear done",
+  "g.bg_done": "Done",
+  "g.bg_error": "Failed",
+  "g.bg_running": "Analyzing",
   "sync.n_fail": "Sync failed: {err}",
 }
 };

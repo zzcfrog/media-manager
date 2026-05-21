@@ -17,6 +17,32 @@
         <img src="/static/icon.png" style="width:24px;height:24px;border-radius:5px">
         <span class="text-primary text-weight-bold" style="font-size:13px;margin:0 8px">MediaManager</span>
         <q-space></q-space>
+        <template v-if="bgTasks.length">
+          <div class="bg-task-bar" @click="showBgTasks=!showBgTasks">
+            <q-spinner-dots size="14px" color="primary" v-if="bgTasks.some(t=>t.status==='running')"></q-spinner-dots>
+            <q-icon v-else name="check_circle" size="14px" color="positive"></q-icon>
+            <span class="bg-task-label">{{ t('g.bg_tasks') }} <b>{{ bgTasks.filter(t=>t.status==='running').length }}</b></span>
+            <q-linear-progress :value="bgTaskProgress" color="primary" size="3px" style="width:60px;border-radius:2px"></q-linear-progress>
+          </div>
+          <q-menu v-model="showBgTasks" anchor="bottom middle" self="top middle" :offset="[0,4]" style="min-width:280px">
+            <div style="padding:8px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <span class="text-caption text-grey-6">{{ t('g.bg_tasks') }}</span>
+                <q-btn v-if="bgTasks.some(t=>t.status!=='running')" flat dense size="xs" color="grey-6" :label="t('g.bg_clear')" @click="clearBgTasks"></q-btn>
+              </div>
+              <div v-for="task in bgTasks" :key="task.id" class="bg-task-item" @click="bgTaskGo(task.id)">
+                <q-icon :name="task.status==='done'?'check_circle':task.status==='error'?'error':'sync'" size="16px"
+                        :color="task.status==='done'?'positive':task.status==='error'?'negative':'primary'"
+                        style="flex-shrink:0"></q-icon>
+                <div style="flex:1;min-width:0">
+                  <div class="bg-task-name">{{ task.fileName }}</div>
+                  <div class="bg-task-stage">{{ task.stageLabel }}</div>
+                </div>
+                <span v-if="task.status==='running'" class="text-caption text-grey-6">{{ Math.round(task.percent) }}%</span>
+              </div>
+            </div>
+          </q-menu>
+        </template>
         <q-btn flat round dense icon="palette" size="sm" color="grey-6">
 	          <q-tooltip :delay="1000">{{ t('top.accent_color') }}</q-tooltip>
           <q-menu anchor="bottom right" self="top right">
@@ -504,6 +530,8 @@ const app = Vue.createApp({
       syncDone: 0,
       syncSummary: null,
       syncInBackground: false,
+      bgTasks: [],
+      showBgTasks: false,
       drawerOpen: true,
       drawerMini: false,
       themeMode: localStorage.getItem("theme") || "dark",
@@ -544,6 +572,11 @@ const app = Vue.createApp({
   },
   computed: {
     t() { return t; },
+    bgTaskProgress() {
+      const running = this.bgTasks.filter(t => t.status === "running");
+      if (!running.length) return 0;
+      return running.reduce((s, t) => s + t.percent, 0) / running.length / 100;
+    },
     themeIcon() {
       if (this.themeMode === "dark") return "dark_mode";
       if (this.themeMode === "light") return "light_mode";
@@ -699,6 +732,13 @@ const app = Vue.createApp({
     },
     onLanguageChange(val) {
       i18nState.locale = val;
+    },
+    clearBgTasks() {
+      this.bgTasks = this.bgTasks.filter(t => t.status === "running");
+    },
+    bgTaskGo(id) {
+      this.showBgTasks = false;
+      location.hash = "#/detail/" + id;
     },
     openDetail(id) { this.showImport = false; location.hash = "#/detail/" + id; },
     resolveRoute() {

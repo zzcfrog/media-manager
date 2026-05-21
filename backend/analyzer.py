@@ -88,7 +88,7 @@ def analyze_video(video_path: str | Path, api_key: str, model: str = "glm-4.6v",
                     if on_progress:
                         on_progress("first_token")
                     first_token = False
-                logger.debug("stream chunk: {}", repr(delta.content))
+                logger.trace("stream chunk: {}", repr(delta.content))
                 full_content += delta.content
                 if on_progress:
                     on_progress("receiving", chars=len(full_content))
@@ -119,7 +119,7 @@ def _parse_response(content: str) -> list[dict]:
     try:
         result = json.loads(content)
         if isinstance(result, list):
-            logger.info("Parsed {} segments", len(result))
+            logger.info("Video analysis result: {} segments, {}", len(result), json.dumps(result, ensure_ascii=False)[:2000])
             return result
         raise ValueError("Response is not a JSON array")
     except json.JSONDecodeError:
