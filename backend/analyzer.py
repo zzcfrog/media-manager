@@ -51,7 +51,6 @@ def analyze_video(video_path: str | Path, api_key: str, model: str = "glm-4.6v",
     client = OpenAI(
         api_key=api_key,
         base_url=base_url,
-        timeout=600,
     )
 
     if on_chunk:
@@ -135,7 +134,7 @@ def analyze_image(image_path: str | Path, api_key: str, model: str = "glm-4.6v",
     """Analyze a single image. Returns (result_dict, elapsed_seconds, usage_dict)."""
 
     image_url = encode_image_base64(image_path)
-    client = OpenAI(api_key=api_key, base_url=base_url, timeout=600)
+    client = OpenAI(api_key=api_key, base_url=base_url)
 
     if on_progress:
         on_progress("uploading")
