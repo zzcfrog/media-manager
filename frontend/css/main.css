@@ -62,7 +62,12 @@ body.body--dark input::placeholder { color: #555 !important; -webkit-text-fill-c
 .media-card .meta { font-size: 10px; color: var(--text3); margin-top: 1px; display: flex; align-items: center; gap: 6px; }
 .media-card .meta .spacer { flex: 1; }
 .media-card .dur-inline { font-size: 10px; color: var(--text3); }
-.color-dot { width: 8px; height: 8px; border-radius: 50%; position: absolute; top: 11px; right: 6px; }
+.color-dot { width: 8px; height: 8px; border-radius: 50%; position: absolute; top: 11px; right: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+.color-red { background: var(--red); }
+.color-yellow { background: var(--yellow); }
+.color-green { background: var(--green); }
+.color-blue { background: var(--blue); }
+.color-purple { background: var(--purple); }
 .fav-badge { position: absolute; top: 9px; right: 18px; line-height: 1; color: var(--red); display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)); }
 .rating { position: absolute; top: 6px; left: 8px; font-size: 10px; color: var(--yellow); text-shadow: 0 1px 3px rgba(0,0,0,0.8); z-index: 2; }
 .type-badge { position: absolute; bottom: 4px; right: 4px; display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 4px; background: rgba(0,0,0,0.6); color: rgba(255,255,255,0.8); backdrop-filter: blur(4px); }

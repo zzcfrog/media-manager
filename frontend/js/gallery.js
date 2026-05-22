@@ -646,7 +646,11 @@ const GalleryPage = {
   },
   watch: {
     sortBy(val) {
-      if (val !== "imported_at" && val !== "date_taken" && val !== "duration") this.groupBy = "";
+      const isTime = val === "imported_at" || val === "date_taken";
+      const isDur = val === "duration";
+      if (!isTime && !isDur) this.groupBy = "";
+      else if (val !== this._prevSortBy) this.groupBy = "";
+      this._prevSortBy = val;
     },
   },
   computed: {
@@ -1081,8 +1085,18 @@ const GalleryPage = {
         this.openDetail(this.selArr[0]);
         return;
       }
-      // Rating 0-5
-      if (key >= "0" && key <= "5" && this.selArr.length) {
+      // Color label 6-9,0 → red,yellow,green,blue,purple
+      const colorKeys = { "6": "red", "7": "yellow", "8": "green", "9": "blue", "0": "purple" };
+      if (colorKeys[key] && this.selArr.length) {
+        e.preventDefault(); e.stopPropagation();
+        const color = colorKeys[key];
+        API.batchUpdate({ action: "color_label", value: color, ids: [...this.selArr] }).then(() => {
+          this.selArr.forEach(id => { const m = this.items.find(i => i.id === id); if (m) m.color_label = color; });
+        });
+        return;
+      }
+      // Rating 1-5 (0 handled above as purple)
+      if (key >= "1" && key <= "5" && this.selArr.length) {
         e.preventDefault(); e.stopPropagation();
         API.batchUpdate({ action: "rate", value: parseInt(key), ids: [...this.selArr] }).then(() => {
           this.selArr.forEach(id => { const m = this.items.find(i => i.id === id); if (m) m.rating = parseInt(key); });

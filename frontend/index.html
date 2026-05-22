@@ -778,7 +778,11 @@ const app = Vue.createApp({
       this.selectedFolder = null;
       this.favFilter = false;
       this.collectionFilter = null;
-      location.hash = "#/gallery";
+      if (location.hash === "#/gallery") {
+        this.$nextTick(() => this.$refs.gallery?.load());
+      } else {
+        location.hash = "#/gallery";
+      }
     },
     startLongRefresh() {
       this._longTimer = setTimeout(() => {
