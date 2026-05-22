@@ -817,6 +817,12 @@ const DetailPage = {
         if (this.media?.media_type === 'image') this.toggleFullscreen();
         return;
       }
+      // L - toggle favorite
+      if (key === "l" || key === "L") {
+        e.preventDefault();
+        this.toggleFav();
+        return;
+      }
       // Space - play/pause
       if (key === " ") {
         e.preventDefault(); e.stopPropagation();

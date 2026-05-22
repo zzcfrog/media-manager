@@ -1103,8 +1103,8 @@ const GalleryPage = {
         });
         return;
       }
-      // F - toggle favorite
-      if (key === "f" || key === "F") {
+      // L - toggle favorite
+      if (key === "l" || key === "L") {
         if (!this.selArr.length) return;
         e.preventDefault(); e.stopPropagation();
         const id = this.selArr[0];
