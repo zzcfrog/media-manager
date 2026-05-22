@@ -87,7 +87,7 @@ video_analyzer/
 |------|------|------|
 | `serve` | 无 | 媒体文件服务 |
 | `library` | `/api/library` | 媒体库 CRUD、文件夹树、导入、相似检测、排除管理 |
-| `analysis` | `/api/analysis` | AI 分析 + 分段编辑 |
+| `analysis` | `/api/analysis` | AI 分析 + 批量分析 + 分段编辑 + 进度查询 |
 | `collections` | `/api/collections` | 合集管理 |
 | `tags` | `/api/tags` | 标签管理（后端保留，前端已移除） |
 | `settings` | `/api/settings` | 全局设置 CRUD |
@@ -251,6 +251,14 @@ import_single_file() × 5 并发（ThreadPoolExecutor）
 
 分析参数从 `settings` 表读取（非请求 body），通过 `get_setting(db, key)` 获取。
 
+**并发控制**：全局 `ThreadPoolExecutor(max_workers=5)` + `Semaphore(1)` 信号量。信号量仅在 VLM API 调用阶段获取（串行），压缩/ASR 阶段不持有信号量（可并行）。processing 状态的素材自动跳过，防止重复提交。
+
+**单条分析**：`POST /api/analysis/<id>` 返回 SSE 流，前端通过 SSE 跟踪进度。
+
+**批量分析**：`POST /api/analysis/batch` 接收 `{ ids: [...], skip_done: bool }`，返回 JSON `{ submitted: [...], skipped: N }`。不使用 SSE，前端通过全局轮询 `_bgPollTimer` 跟踪进度。
+
+**进度恢复**：`GET /api/analysis/progress` 返回所有活跃任务（含 `id`, `step`, `media_type`, `file_name`），前端页面刷新时调用恢复 `bgTasks`。
+
 **多模态模式**（`use_multimodal=true`，默认）：VLM 同时处理视觉和语音，3 阶段。
 
 ```
@@ -331,7 +339,9 @@ class AsrSegment:
 | 功能 | 技术 |
 |------|------|
 | 无限滚动 | IntersectionObserver，200px rootMargin |
-| 分析进度 | SSE → ReadableStream + TextDecoder → 逐行解析 JSON |
+| 分析进度 | SSE → ReadableStream + TextDecoder → 逐行解析 JSON；批量分析通过轮询 `getProgress()` 跟踪 |
+| 筛选持久化 | localStorage 保存/恢复所有筛选、排序、视图、文件夹状态 |
+| 任务恢复 | 页面刷新时调 `getProgress()` 从后端恢复运行中的 bgTasks |
 | 框选 | mousedown/mousemove/mouseup + `elementFromPoint` 命中测试 |
 | 音频波形 | Web Audio API 解码 → Canvas 绘制峰值 |
 | 视频示波器 | Canvas，0.2x 离屏缩放，~15fps requestAnimationFrame |
@@ -485,5 +495,5 @@ HDBSCAN(min_cluster_size=2, metric="euclidean")
 
 - **ASR 本地模型改云端**：faster-whisper 占用 3-6GB 内存，产品化后需切换为云端 API
 - **安全**：路径遍历、任意文件读取（A1/A2）发布前需修
-- **并发分析竞态**（A3）：同时分析同一视频会互相覆盖
+- **并发分析竞态**（A3）：processing 状态防重复提交已实现，信号量控制 VLM API 并发
 - **JSON 解析失败处理**（A13）：应标记为 error 而非 done
