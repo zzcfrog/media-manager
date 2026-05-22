@@ -797,8 +797,16 @@ const DetailPage = {
         if (adjId) location.hash = "#/detail/" + adjId;
         return;
       }
-      // Rating 0-5
-      if (key >= "0" && key <= "5") {
+      // Color labels 6/7/8/9/0
+      const colorKeys = { "6": "red", "7": "yellow", "8": "green", "9": "blue", "0": "purple" };
+      if (colorKeys[key]) {
+        e.preventDefault();
+        const c = colorKeys[key];
+        this.setColor(this.media?.color_label === c ? null : c);
+        return;
+      }
+      // Rating 1-5
+      if (key >= "1" && key <= "5") {
         e.preventDefault();
         this.setRating(parseInt(key));
         return;
