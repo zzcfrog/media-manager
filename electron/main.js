@@ -34,7 +34,7 @@ function waitForServer(url, cb, retries = 30) {
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 1400,
+    width: 1600,
     height: 900,
     minWidth: 1000,
     minHeight: 600,

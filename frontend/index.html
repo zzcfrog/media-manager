@@ -18,27 +18,26 @@
         <span class="text-primary text-weight-bold" style="font-size:13px;margin:0 8px">MediaManager</span>
         <q-space></q-space>
         <template v-if="bgTasks.length">
-          <div class="bg-task-bar" @click="showBgTasks=!showBgTasks">
-            <q-spinner-dots size="14px" color="primary" v-if="bgTasks.some(t=>t.status==='running')"></q-spinner-dots>
+          <div class="bg-task-bar">
+            <span class="bg-task-label">{{ bgTaskDoneCount }}/{{ bgTaskRealCount }}</span>
+            <div class="bg-progress-track"><div class="bg-progress-fill" :style="{width: (bgTaskProgress*100)+'%'}"></div></div>
+            <div v-if="bgTasks.some(t=>t.status==='running')" ref="bgTaskLottie" class="bg-task-lottie"></div>
             <q-icon v-else name="check_circle" size="14px" color="positive"></q-icon>
-            <span class="bg-task-label">{{ t('g.bg_tasks') }} <b>{{ bgTasks.filter(t=>t.status==='running').length }}</b></span>
-            <q-linear-progress :value="bgTaskProgress" color="primary" size="3px" style="width:60px;border-radius:2px"></q-linear-progress>
-          </div>
-          <q-menu v-model="showBgTasks" anchor="bottom middle" self="top middle" :offset="[0,4]" style="min-width:280px">
+            <q-menu anchor="bottom middle" self="top middle" :offset="[0,4]" style="min-width:300px">
             <div style="padding:8px">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
                 <span class="text-caption text-grey-6">{{ t('g.bg_tasks') }}</span>
                 <q-btn v-if="bgTasks.some(t=>t.status!=='running')" flat dense size="xs" color="grey-6" :label="t('g.bg_clear')" @click="clearBgTasks"></q-btn>
               </div>
-              <div v-for="task in bgTasks" :key="task.id" class="bg-task-item" @click="bgTaskGo(task.id)">
-                <q-icon :name="task.status==='done'?'check_circle':task.status==='error'?'error':'sync'" size="16px"
-                        :color="task.status==='done'?'positive':task.status==='error'?'negative':'primary'"
-                        style="flex-shrink:0"></q-icon>
+              <div v-for="task in bgTasks.filter(t => t.id !== '__placeholder__')" :key="task.id" class="bg-task-item" @click="bgTaskGo(task.id)">
+                <img :src="'/media/thumbnail/'+task.id" class="bg-task-thumb" />
                 <div style="flex:1;min-width:0">
                   <div class="bg-task-name">{{ task.fileName }}</div>
                   <div class="bg-task-stage">{{ task.stageLabel }}</div>
                 </div>
-                <span v-if="task.status==='running'" class="text-caption text-grey-6">{{ Math.round(task.percent) }}%</span>
+                <q-icon v-if="task.status==='done'" name="check_circle" size="16px" color="positive" style="flex-shrink:0"></q-icon>
+                <q-icon v-else-if="task.status==='error'" name="error" size="16px" color="negative" style="flex-shrink:0"></q-icon>
+                <span v-else class="text-caption text-grey-6">{{ Math.round(task.percent) }}%</span>
               </div>
             </div>
           </q-menu>
@@ -531,7 +530,6 @@ const app = Vue.createApp({
       syncSummary: null,
       syncInBackground: false,
       bgTasks: [],
-      showBgTasks: false,
       drawerOpen: true,
       drawerMini: false,
       themeMode: localStorage.getItem("theme") || "dark",
@@ -553,16 +551,101 @@ const app = Vue.createApp({
     API.getSettings().then(s => { i18nState.locale = s.language || "zh"; }).catch(() => {});
     this.applyTheme();
     if (this.accentColor) this.setAccentColor(this.accentColor);
+    // Restore selected folder
+    const savedFolder = localStorage.getItem('selectedFolder');
+    if (savedFolder) this.selectedFolder = savedFolder;
     window.addEventListener("hashchange", () => this.resolveRoute());
     this._onKey = (e) => this.handleShortcut(e);
     document.addEventListener("keydown", this._onKey);
     this._closeFolderCtx = (e) => this.closeFolderCtx(e);
     document.addEventListener("click", this._closeFolderCtx);
     this.resolveRoute();
+    // Restore bgTasks from backend (survives page refresh)
+    API.getProgress().then(tasks => {
+      if (tasks.length) {
+        for (const t of tasks) {
+          this.bgTasks.push({
+            id: t.id, fileName: t.file_name || '', mediaType: t.media_type || '',
+            status: 'running', percent: 0,
+            stageLabel: i18nState.locale === 'zh' ? '分析中' : 'Analyzing',
+            startTime: Date.now(),
+          });
+        }
+        this.bgTasks = [...this.bgTasks];
+      }
+    }).catch(() => {});
+    // Poll running bgTasks against DB (SSE may have disconnected)
+    this._bgPollTimer = setInterval(async () => {
+      const running = this.bgTasks.filter(t => t.status === "running");
+      if (!running.length) return;
+      // 1. Get real-time progress from active threads
+      let progressList = [];
+      try { progressList = await API.getProgress(); } catch {}
+      const progressMap = {};
+      for (const p of progressList) progressMap[p.id] = p;
+      // 2. Update each running task
+      let changed = false;
+      for (const task of running) {
+        const p = progressMap[task.id];
+        if (p) {
+          task.step = p.step;
+          if (p.step === "compressing") {
+            task.percent = (p.compress_pct || 0) * 0.4;
+            task.stageLabel = i18nState.locale === "zh" ? "压缩中" : "Compressing";
+          } else if (p.step === "analyzing") {
+            const isImage = task.mediaType === "image" || p.media_type === "image";
+            task.percent = isImage ? 70 : 60;
+            task.stageLabel = i18nState.locale === "zh" ? "AI 分析中" : "Analyzing";
+          }
+          changed = true;
+        } else {
+          // No active thread for this task → check DB for terminal state
+          try {
+            const res = await API.getAnalysis(task.id);
+            if (res.status === "done") {
+              task.status = "done"; task.step = "done"; task.percent = 100;
+              task.stageLabel = i18nState.locale === "zh" ? "分析完成" : "Done";
+              changed = true;
+            } else if (res.status === "error") {
+              task.status = "error";
+              task.stageLabel = i18nState.locale === "zh" ? "分析失败" : "Error";
+              changed = true;
+            }
+          } catch {}
+        }
+      }
+      // New array reference to force Vue computed re-evaluation
+      if (changed) this.bgTasks = [...this.bgTasks];
+    }, 3000);
   },
   beforeUnmount() {
     if (this._onKey) document.removeEventListener("keydown", this._onKey);
     if (this._closeFolderCtx) document.removeEventListener("click", this._closeFolderCtx);
+    if (this._bgPollTimer) clearInterval(this._bgPollTimer);
+    if (this._bgLottie) { this._bgLottie.destroy(); this._bgLottie = null; }
+  },
+  watch: {
+    selectedFolder(v) { localStorage.setItem('selectedFolder', v || ''); },
+    bgTasks: {
+      deep: true,
+      handler() {
+        this.$nextTick(() => {
+          const hasRunning = this.bgTasks.some(t => t.status === 'running');
+          const el = this.$refs.bgTaskLottie;
+          if (hasRunning && el && window.lottie && !this._bgLottie) {
+            el.innerHTML = '';
+            this._bgLottie = lottie.loadAnimation({ container: el, renderer: 'svg', loop: true, autoplay: true, path: '/static/img/ai-animation.json' });
+          } else if (!hasRunning && this._bgLottie) {
+            this._bgLottie.destroy();
+            this._bgLottie = null;
+          }
+          // All done → clear after a brief delay so user sees "2/2"
+          if (!hasRunning && this.bgTasks.length > 0) {
+            setTimeout(() => { this.bgTasks = []; }, 1500);
+          }
+        });
+      }
+    }
   },
   updated() {
     if (this.importStep === "progress" && this.$refs.importListWrap) {
@@ -573,9 +656,16 @@ const app = Vue.createApp({
   computed: {
     t() { return t; },
     bgTaskProgress() {
-      const running = this.bgTasks.filter(t => t.status === "running");
-      if (!running.length) return 0;
-      return running.reduce((s, t) => s + t.percent, 0) / running.length / 100;
+      const tasks = this.bgTasks.filter(t => t.id !== '__placeholder__');
+      if (!tasks.length) return 0;
+      const total = tasks.reduce((s, t) => s + t.percent, 0);
+      return total / tasks.length / 100;
+    },
+    bgTaskDoneCount() {
+      return this.bgTasks.filter(t => t.id !== '__placeholder__' && (t.status === "done" || t.status === "error")).length;
+    },
+    bgTaskRealCount() {
+      return this.bgTasks.filter(t => t.id !== '__placeholder__').length;
     },
     themeIcon() {
       if (this.themeMode === "dark") return "dark_mode";
@@ -737,7 +827,6 @@ const app = Vue.createApp({
       this.bgTasks = this.bgTasks.filter(t => t.status === "running");
     },
     bgTaskGo(id) {
-      this.showBgTasks = false;
       location.hash = "#/detail/" + id;
     },
     openDetail(id) { this.showImport = false; location.hash = "#/detail/" + id; },
@@ -784,7 +873,7 @@ const app = Vue.createApp({
         this.favFilter = true;
         this.selectedFolder = null;
         this.libraryExpanded = false;
-        this.$refs.gallery?.load();
+        this.$nextTick(() => this.$refs.gallery?.load());
       } else if (hash === "#/duplicates") {
         this.currentView = "duplicates";
       } else if (hash.startsWith("#/collections/")) {
@@ -793,14 +882,14 @@ const app = Vue.createApp({
         this.favFilter = false;
         this.selectedFolder = null;
         this.libraryExpanded = false;
-        this.$refs.gallery?.load();
+        this.$nextTick(() => this.$refs.gallery?.load());
       } else {
         this.currentView = "gallery";
         this.collectionFilter = null;
         this.favFilter = false;
-        this.selectedFolder = null;
+        if (!this.selectedFolder) this.selectedFolder = null;
         this.libraryExpanded = true;
-        this.$refs.gallery?.load();
+        this.$nextTick(() => this.$refs.gallery?.load());
       }
     },
     async loadSidebar() {
@@ -808,6 +897,16 @@ const app = Vue.createApp({
         const [colRes, folderRes] = await Promise.all([API.getCollections(), API.getFolders()]);
         this.collections = colRes.data || [];
         this.folderTree = folderRes.data || [];
+        // Expand ancestors of restored selectedFolder
+        if (this.selectedFolder) {
+          const expanded = new Set(this.expandedFolders);
+          let cur = "";
+          for (const p of this.selectedFolder.split("/").filter(Boolean)) {
+            cur += "/" + p;
+            expanded.add(cur);
+          }
+          this.expandedFolders = [...expanded];
+        }
       } catch (e) { console.error(e); }
     },
     handleShortcut(e) {

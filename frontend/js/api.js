@@ -85,10 +85,20 @@ scanPaths(paths) {
   getAnalysis(mediaId) {
     return this._fetch(`/api/analysis/${mediaId}`);
   },
+  getProgress() {
+    return this._fetch("/api/analysis/progress");
+  },
   startAnalysis(mediaId) {
     return fetch(`/api/analysis/${mediaId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+    });
+  },
+  startBatchAnalysis(ids, skipDone = false) {
+    return this._fetch("/api/analysis/batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, skip_done: skipDone }),
     });
   },
   getSettings() {

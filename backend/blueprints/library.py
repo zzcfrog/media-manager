@@ -58,8 +58,12 @@ def list_media():
         params.append(color_label)
     if favorite == "true":
         where_clauses.append("favorite = 1")
+    elif favorite == "false":
+        where_clauses.append("favorite = 0")
     if analysis_status == "analyzed":
         where_clauses.append("analysis_status = 'done'")
+    elif analysis_status == "not_analyzed":
+        where_clauses.append("(analysis_status IS NULL OR analysis_status != 'done')")
     if folder:
         where_clauses.append("file_path LIKE ?")
         params.append(folder.rstrip("/") + "/%")

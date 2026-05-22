@@ -378,9 +378,10 @@ const DetailPage = {
       this.$nextTick(() => this._initLottieBusy());
       // Poll bgTask for progress updates
       const pollId = id;
-      this._bgPollTimer = setInterval(() => {
+      this._bgPollTimer = setInterval(async () => {
         const task = this.$root.bgTasks.find(t => t.id === pollId);
         if (!task || task.status !== "running") {
+          // Already resolved by SSE
           clearInterval(this._bgPollTimer);
           this._bgPollTimer = null;
           if (task && task.status === "done") {
@@ -395,8 +396,28 @@ const DetailPage = {
           }
           return;
         }
+        // SSE may have disconnected — check DB directly
+        try {
+          const res = await API.getAnalysis(pollId);
+          if (res.status === "done") {
+            task.status = "done";
+            task.step = "done";
+            task.percent = 100;
+            this.analysis = res;
+            this.analyzing = false;
+            this._stopAnalyzeTips();
+            this._stopAllStepTimers();
+            clearInterval(this._bgPollTimer);
+            this._bgPollTimer = null;
+          } else if (res.status === "error") {
+            task.status = "error";
+            this.analyzing = false;
+            clearInterval(this._bgPollTimer);
+            this._bgPollTimer = null;
+          }
+        } catch {}
         this._applyBgTaskStep(task);
-      }, 500);
+      }, 2000);
     } else if (bgTask && bgTask.status === "done") {
       // Task finished while we were away — reload results
       try {
@@ -885,7 +906,7 @@ const DetailPage = {
       const root = this.$root;
       const oldIdx = root.bgTasks.findIndex(t => t.id === this.media.id);
       if (oldIdx >= 0) root.bgTasks.splice(oldIdx, 1);
-      const task = { id: this.media.id, fileName: this.media.file_name, status: "running", percent: 0, stageLabel: t('d.preparing'), startTime: Date.now() };
+      const task = { id: this.media.id, fileName: this.media.file_name, mediaType: this.media.media_type, status: "running", percent: 0, stageLabel: t('d.preparing'), startTime: Date.now() };
       root.bgTasks.push(task);
       // Capture DetailPage reference for optional local updates
       const self = this;
@@ -994,6 +1015,8 @@ const DetailPage = {
               task.status = "done";
               task.percent = 100;
               task.stageLabel = t('d.analysis_done_short');
+              // Force Vue reactivity — new array reference triggers computed re-evaluation
+              root.bgTasks = [...root.bgTasks];
               if (isAlive()) {
                 self._stopAnalyzeTips();
                 self._analyzeSubstep = false;
@@ -1044,6 +1067,7 @@ const DetailPage = {
               task.step = "error";
               task.status = "error";
               task.stageLabel = t('d.n_analysis_fail', {err: evt.message});
+              root.bgTasks = [...root.bgTasks];
               if (isAlive()) {
                 self._stopAnalyzeTips();
                 self._stopAllStepTimers();

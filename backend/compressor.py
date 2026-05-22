@@ -6,7 +6,7 @@ from pathlib import Path
 
 from loguru import logger
 from PIL import Image
-from .config import RAW_EXTS
+from .config import RAW_EXTS, HEIF_EXTS
 
 # Video/image compression for analysis: reduces media before sending to VLM.
 
@@ -163,6 +163,12 @@ def compress_image(input_path: str | Path, max_long_edge: int = 1920) -> tuple[P
         with rawpy.imread(str(input_path)) as raw:
             rgb = raw.postprocess(use_camera_wb=True, output_color=rawpy.ColorSpace.sRGB)
             img = Image.fromarray(rgb)
+    elif ext in HEIF_EXTS:
+        from pillow_heif import register_heif_opener
+        register_heif_opener()
+        img = Image.open(str(input_path))
+        if img.mode != "RGB":
+            img = img.convert("RGB")
     else:
         img = Image.open(input_path)
         if img.mode in ("I", "I;16", "I;16L", "I;16B", "CMYK", "YCbCr"):

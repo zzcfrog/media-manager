@@ -407,12 +407,45 @@ body:not(.body--dark) .fav-badge { filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3)
 }
 .bg-task-bar:hover { background: var(--surface3); }
 .bg-task-label { font-size: 11px; color: var(--text2); white-space: nowrap; }
+.bg-task-lottie { width: 24px; height: 24px; flex-shrink: 0; }
+.bg-progress-track { width: 60px; height: 3px; border-radius: 2px; background: var(--border); overflow: hidden; }
+.bg-progress-fill { height: 100%; border-radius: 2px; background: var(--accent); transition: width 0.3s ease; }
 .bg-task-item {
   display: flex; align-items: center; gap: 8px;
   padding: 6px 4px; border-radius: 4px; cursor: pointer;
   transition: background 0.1s;
 }
 .bg-task-item:hover { background: var(--surface2); }
+.bg-task-thumb { width: 36px; height: 36px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background: var(--surface2); }
 .bg-task-name { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bg-task-stage { font-size: 10px; color: var(--text3); }
 body:not(.body--dark) .restore-pair-thumb:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+
+/* Header filter tags */
+.header-tags { display: flex; gap: 4px; align-items: center; }
+.header-tag {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 1px 8px; border-radius: 10px;
+  background: var(--surface2); font-size: 11px; color: var(--text2);
+  white-space: nowrap;
+}
+.header-tag-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.header-tag .filter-icon-off { background: transparent; padding: 0; border-radius: 0; }
+
+/* Filter icon slash overlay */
+.filter-icon-off { position: relative; }
+.filter-icon-off::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 18px; height: 2px;
+  background: #555;
+  border-radius: 1px;
+  transform: translate(-50%, -50%) rotate(45deg);
+  pointer-events: none;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+body:not(.body--dark) .filter-icon-off::after { background: #bbb; }
+
+/* Header tag icon slash - larger for 12px icons */
+.header-tag .filter-icon-off::after { width: 14px; height: 1.5px; }

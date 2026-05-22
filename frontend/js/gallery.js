@@ -15,11 +15,18 @@ const GalleryPage = {
         </q-btn>
       </q-btn-group>
       <div style="display:flex;gap:2px">
-        <q-btn flat round dense :color="favOnly ? 'red' : 'grey-7'" icon="favorite" size="sm" @click="favOnly=!favOnly; showFilterToast(); load()">
-          <q-tooltip :delay="1000">{{ t('g.fav_only') }}</q-tooltip>
+        <q-btn flat round dense size="sm" @click="cycleFavFilter(); showFilterToast(); load()"
+               :class="favFilter === 'unfav' ? 'filter-icon-off' : ''">
+          <q-icon v-if="favFilter === 'fav'" name="favorite" color="red" size="18px"></q-icon>
+          <q-icon v-else-if="favFilter === 'unfav'" name="favorite_border" color="grey-7" size="18px" style="opacity:0.5"></q-icon>
+          <q-icon v-else name="favorite_border" color="grey-7" size="18px"></q-icon>
+          <q-tooltip :delay="1000">{{ favFilter === 'fav' ? t('g.fav_only') : favFilter === 'unfav' ? t('g.unfav_only') : t('g.fav_filter') }}</q-tooltip>
         </q-btn>
-        <q-btn flat round dense :color="analyzedOnly ? 'primary' : 'grey-7'" icon="auto_awesome" size="sm" @click="analyzedOnly=!analyzedOnly; showFilterToast(); load()">
-          <q-tooltip :delay="1000">{{ t('g.analyzed_only') }}</q-tooltip>
+        <q-btn flat round dense size="sm" @click="cycleAnalysisFilter(); showFilterToast(); load()"
+               :class="analysisFilter === 'not' ? 'filter-icon-off' : ''">
+          <q-icon name="auto_awesome" :color="analysisFilter === 'analyzed' ? 'primary' : 'grey-7'" size="18px"
+                  :style="analysisFilter === 'not' ? 'opacity:0.5' : ''"></q-icon>
+          <q-tooltip :delay="1000">{{ analysisFilter === 'analyzed' ? t('g.analyzed_only') : analysisFilter === 'not' ? t('g.not_analyzed_only') : t('g.analysis_filter') }}</q-tooltip>
         </q-btn>
       </div>
       <div class="filter-stars">
@@ -28,11 +35,6 @@ const GalleryPage = {
       <div class="filter-colors">
         <span v-for="c in colorOptions" :key="c.value" class="color-swatch" :class="['bg-'+c.value, {active: filters.color_label===c.value, dim: filters.color_label && filters.color_label!==c.value}]" @click="toggleColor(c.value)"></span>
       </div>
-      <div style="width:30px;display:flex;align-items:center;justify-content:center">
-        <q-btn v-if="hasFilters" flat round dense icon="filter_list_off" size="sm" color="grey-6" @click="resetFilters">
-          <q-tooltip :delay="1000">{{ t('g.reset_filter') }}</q-tooltip>
-        </q-btn>
-      </div>
       <q-input v-model="searchText" dense filled :placeholder="t('g.search_placeholder')"
                color="grey-5" style="width:220px" @keyup.enter="doSearch">
         <template v-slot:append>
@@ -40,6 +42,9 @@ const GalleryPage = {
           <q-btn flat round dense icon="search" size="xs" color="grey-6" @click="doSearch"></q-btn>
         </template>
       </q-input>
+      <q-btn v-if="hasFilters" flat round dense icon="filter_list_off" size="sm" color="grey-6" @click="resetFilters">
+        <q-tooltip :delay="1000">{{ t('g.reset_filter') }}</q-tooltip>
+      </q-btn>
       <div class="spacer"></div>
       <div class="sort-group">
         <q-select v-model="sortBy" dense filled options-dense
@@ -336,10 +341,18 @@ const GalleryPage = {
         <q-spinner-dots color="grey-6" size="28px"></q-spinner-dots>
       </div>
     </div>
-    <q-toolbar class="gallery-footer" style="border-top:1px solid var(--border);min-height:36px;flex-shrink:0">
+    <q-toolbar class="gallery-footer" style="border-top:1px solid var(--border);min-height:36px;flex-shrink:0;position:relative">
       <span class="text-caption text-grey-6">{{ t('g.total', {n: total}) }}
         <span v-if="selArr.length" class="text-primary q-ml-sm">{{ t('g.selected', {n: selArr.length}) }}</span>
       </span>
+      <div v-if="activeFilterTags.length" class="header-tags" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)">
+        <span v-for="(tag, i) in activeFilterTags" :key="i" class="header-tag">
+          <span v-if="tag.icon" :class="tag.off ? 'filter-icon-off' : ''" style="position:relative;display:inline-flex;align-items:center"><q-icon :name="tag.icon" size="12px"></q-icon></span>
+          <span v-if="tag.stars">{{ tag.stars }}</span>
+          <span v-if="tag.dot" class="header-tag-dot" :class="'bg-'+tag.dot"></span>
+          <span v-if="tag.label">{{ tag.label }}</span>
+        </span>
+      </div>
       <q-space></q-space>
       <template v-if="viewMode==='grid'">
         <span class="text-caption text-grey-6 q-mr-sm">{{ Math.round(gridScale*100) }}%</span>
@@ -373,6 +386,10 @@ const GalleryPage = {
         <q-item v-if="selArr.length === 1 && ctxMenu.item && ctxMenu.item.media_type !== 'video'" clickable @click="ctxMenu.show = false; findSimilar()" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="content_copy" size="14px" color="grey-6"></q-icon></q-item-section>
           <q-item-section>{{ t('g.ctx_find_similar') }}</q-item-section>
+        </q-item>
+        <q-item clickable @click="openBatchAnalysisDialog()" style="padding-left:8px;padding-right:12px">
+          <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="auto_awesome" size="14px" color="grey-6"></q-icon></q-item-section>
+          <q-item-section>{{ selArr.length > 1 ? t('g.ctx_analyze_n', {n: selArr.length}) : t('g.ctx_analyze') }}</q-item-section>
         </q-item>
         <q-separator style="background:var(--border)"></q-separator>
         <q-item clickable @click="ctxMenu.show = false; deleteCtx()" style="padding-left:8px;padding-right:12px">
@@ -413,6 +430,54 @@ const GalleryPage = {
         <q-card-actions align="right">
           <q-btn flat :label="t('g.cancel')" @click="confirmBatch.show=false"></q-btn>
           <q-btn color="red" :label="t('g.confirm_remove')" @click="doBatchDelete"></q-btn>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+    <!-- Batch AI Analysis confirm -->
+    <q-dialog v-model="showBatchAnalysisDialog" class="batch-analysis-dialog">
+      <q-card style="min-width:400px" class="dialog-card">
+        <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" v-close-popup></q-btn>
+        <q-card-section>
+          <div class="text-h6">{{ t('g.batch_analysis_title') }}</div>
+        </q-card-section>
+        <q-card-section style="padding-top:0">
+          <!-- Stats -->
+          <div style="display:flex;gap:16px;margin-bottom:16px">
+            <div style="flex:1;text-align:center;padding:12px 8px;border-radius:8px;background:var(--surface2)">
+              <div style="font-size:20px;font-weight:700;color:var(--accent)">{{ batchAnalysisInfo.videos + batchAnalysisInfo.images }}</div>
+              <div style="font-size:11px;color:var(--text3);margin-top:2px">{{ t('g.batch_total', {n: ''}) }}</div>
+            </div>
+            <div style="flex:1;text-align:center;padding:12px 8px;border-radius:8px;background:var(--surface2)">
+              <div style="font-size:20px;font-weight:700;color:var(--accent)">{{ batchAnalysisInfo.videos }}</div>
+              <div style="font-size:11px;color:var(--text3);margin-top:2px">{{ t('g.batch_videos', {n: ''}) }}</div>
+            </div>
+            <div style="flex:1;text-align:center;padding:12px 8px;border-radius:8px;background:var(--surface2)">
+              <div style="font-size:20px;font-weight:700;color:var(--accent)">{{ batchAnalysisInfo.images }}</div>
+              <div style="font-size:11px;color:var(--text3);margin-top:2px">{{ t('g.batch_images', {n: ''}) }}</div>
+            </div>
+          </div>
+          <!-- Models -->
+          <div style="font-size:13px;display:flex;flex-direction:column;gap:6px">
+            <div v-if="batchAnalysisInfo.videos > 0" style="display:flex;justify-content:space-between"><span style="color:var(--text3)">{{ t('g.batch_video_model') }}</span><span>{{ batchAnalysisInfo.videoModel }}</span></div>
+            <div v-if="batchAnalysisInfo.images > 0" style="display:flex;justify-content:space-between"><span style="color:var(--text3)">{{ t('g.batch_image_model') }}</span><span>{{ batchAnalysisInfo.imageModel }}</span></div>
+          </div>
+          <!-- Already analyzed -->
+          <div v-if="batchAnalysisInfo.analyzedCount > 0" style="margin-top:14px;padding:10px 14px;border-radius:8px;background:var(--surface2)">
+            <div style="font-size:12px;color:var(--text3);margin-bottom:8px">{{ t('g.batch_already_analyzed', {n: batchAnalysisInfo.analyzedCount}) }}</div>
+            <div style="display:flex;gap:16px">
+              <q-radio v-model="batchAnalysisInfo.existingAction" val="reanalyze" dense :label="t('g.batch_reanalyze')" color="primary" style="font-size:13px"></q-radio>
+              <q-radio v-model="batchAnalysisInfo.existingAction" val="skip" dense :label="t('g.batch_skip')" color="primary" style="font-size:13px"></q-radio>
+            </div>
+          </div>
+          <!-- Cost warning -->
+          <div style="margin-top:14px;padding:8px 12px;border-radius:6px;background:var(--surface2);font-size:12px;color:var(--text3);display:flex;align-items:center;gap:6px">
+            <q-icon name="info" size="14px" color="grey-6"></q-icon>
+            {{ t('d.ai_cost_warning') }}
+          </div>
+        </q-card-section>
+        <q-card-actions align="right" style="padding:8px 16px 16px">
+          <q-btn flat :label="t('g.cancel')" v-close-popup></q-btn>
+          <q-btn color="primary" :label="t('g.start_analysis')" @click="confirmBatchAnalysis()"></q-btn>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -564,13 +629,15 @@ const GalleryPage = {
       ctxMenu: { show: false, item: null, x: 0, y: 0 },
       confirmDelete: { show: false, id: null, name: "" },
       confirmBatch: { show: false },
+      showBatchAnalysisDialog: false,
+      batchAnalysisInfo: { videos: 0, images: 0, analyzedCount: 0, videoModel: '', imageModel: '', existingAction: 'reanalyze' },
       similarDlg: { show: false, source: null, loading: false, similarType: 'near', near: [], similar: [], cluster: [] },
       similarCtxMenu: { show: false, item: null, x: 0, y: 0 },
       similarExcludeDlg: { show: false, item: null, candidates: [] },
       similarDeleteConfirm: { show: false, id: null, name: "" },
       filters: { media_type: "all", rating: "", color_label: "" },
-      favOnly: false,
-      analyzedOnly: false,
+      favFilter: null,       // null → 'fav' → 'unfav' → null
+      analysisFilter: null,  // null → 'analyzed' → 'not' → null
       groupBy: "",
       colorOptions: [
         { value: "red" }, { value: "yellow" }, { value: "green" }, { value: "blue" }, { value: "purple" },
@@ -620,7 +687,26 @@ const GalleryPage = {
       return this.similarExcludeDlg.candidates.filter(c => c.selected).length;
     },
     hasFilters() {
-      return this.filters.media_type !== "all" || this.filters.rating || this.filters.color_label || this.favOnly || this.analyzedOnly || this.searchText;
+      return this.filters.media_type !== "all" || this.filters.rating || this.filters.color_label || this.favFilter || this.analysisFilter || this.searchText;
+    },
+    activeFilterTags() {
+      const tags = [];
+      const folder = this.$root.selectedFolder;
+      if (folder) {
+        const parts = folder.split('/');
+        tags.push({ icon: 'folder', label: parts[parts.length - 1] || folder });
+      }
+      if (this.filters.media_type !== "all") {
+        tags.push({ icon: this.filters.media_type === 'image' ? 'image' : 'smart_display', label: this.t(this.filters.media_type === 'image' ? 'g.images' : 'g.videos') });
+      }
+      if (this.filters.rating) tags.push({ stars: '★'.repeat(this.filters.rating) });
+      if (this.filters.color_label) tags.push({ dot: this.filters.color_label });
+      if (this.favFilter === 'fav') tags.push({ icon: 'favorite', label: this.t('g.filter_fav') });
+      else if (this.favFilter === 'unfav') tags.push({ icon: 'favorite_border', label: this.t('g.filter_unfav'), off: true });
+      if (this.analysisFilter === 'analyzed') tags.push({ icon: 'auto_awesome', label: this.t('g.filter_analyzed') });
+      else if (this.analysisFilter === 'not') tags.push({ icon: 'auto_awesome', label: this.t('g.filter_not_analyzed'), off: true });
+      if (this.searchText) tags.push({ icon: 'search', label: this.searchText });
+      return tags;
     },
     isTimeSort() {
       return this.sortBy === "imported_at" || this.sortBy === "date_taken";
@@ -667,6 +753,36 @@ const GalleryPage = {
   },
   // -- Lifecycle: load data, register keyboard & scroll observers --
   created() {
+    // Restore filters from localStorage
+    try {
+      const saved = JSON.parse(localStorage.getItem('galleryFilters'));
+      if (saved) {
+        if (saved.filters) Object.assign(this.filters, saved.filters);
+        if (saved.favFilter) this.favFilter = saved.favFilter;
+        if (saved.analysisFilter) this.analysisFilter = saved.analysisFilter;
+        if (saved.sortBy) this.sortBy = saved.sortBy;
+        if (saved.sortOrder) this.sortOrder = saved.sortOrder;
+        if (saved.groupBy) this.groupBy = saved.groupBy;
+        if (saved.viewMode) this.viewMode = saved.viewMode;
+        if (saved.gridScale) this.gridScale = saved.gridScale;
+        if (saved.masonryCols) this.masonryCols = saved.masonryCols;
+        if (saved.justifiedRowH) this.justifiedRowH = saved.justifiedRowH;
+        if (saved.searchText) this.searchText = saved.searchText;
+      }
+    } catch {}
+    // Auto-save filters on changes
+    this._saveFilters = () => {
+      try {
+        localStorage.setItem('galleryFilters', JSON.stringify({
+          filters: this.filters, favFilter: this.favFilter, analysisFilter: this.analysisFilter,
+          sortBy: this.sortBy, sortOrder: this.sortOrder, groupBy: this.groupBy,
+          viewMode: this.viewMode, gridScale: this.gridScale,
+          masonryCols: this.masonryCols, justifiedRowH: this.justifiedRowH,
+          searchText: this.searchText,
+        }));
+      } catch {}
+    };
+    if (this.searchText) this.$root.searchQuery = this.searchText.trim();
     this.load();
     document.addEventListener("mousedown", this.closeCtx);
     document.addEventListener("keydown", this.handleKey, true);
@@ -700,6 +816,7 @@ const GalleryPage = {
     API,
     // Load first page, reset selection
     async load() {
+      if (this._saveFilters) this._saveFilters();
       this.selArr = [];
       this.page = 1;
       this.allLoaded = false;
@@ -716,8 +833,10 @@ const GalleryPage = {
           if (this.filters.media_type !== "all") params.media_type = this.filters.media_type;
           if (this.filters.rating) params.rating = this.filters.rating;
           if (this.filters.color_label) params.color_label = this.filters.color_label;
-          if (this.favOnly || this.$root.favFilter) params.favorite = "true";
-          if (this.analyzedOnly) params.analysis_status = "analyzed";
+          if (this.favFilter === 'fav') params.favorite = "true";
+          else if (this.favFilter === 'unfav') params.favorite = "false";
+          if (this.analysisFilter === 'analyzed') params.analysis_status = "analyzed";
+          else if (this.analysisFilter === 'not') params.analysis_status = "not_analyzed";
           const q = this.$root.searchQuery;
           if (q) params.q = q;
           const folder = this.$root.selectedFolder;
@@ -744,8 +863,10 @@ const GalleryPage = {
         if (this.filters.media_type !== "all") params.media_type = this.filters.media_type;
         if (this.filters.rating) params.rating = this.filters.rating;
         if (this.filters.color_label) params.color_label = this.filters.color_label;
-        if (this.favOnly || this.$root.favFilter) params.favorite = "true";
-        if (this.analyzedOnly) params.analysis_status = "analyzed";
+        if (this.favFilter === 'fav' || this.$root.favFilter) params.favorite = "true";
+        else if (this.favFilter === 'unfav') params.favorite = "false";
+        if (this.analysisFilter === 'analyzed') params.analysis_status = "analyzed";
+        else if (this.analysisFilter === 'not') params.analysis_status = "not_analyzed";
         const q = this.$root.searchQuery;
         if (q) params.q = q;
         const folder = this.$root.selectedFolder;
@@ -784,6 +905,12 @@ const GalleryPage = {
       this.showFilterToast();
       this.load();
     },
+    cycleFavFilter() {
+      this.favFilter = this.favFilter === 'fav' ? 'unfav' : this.favFilter === 'unfav' ? null : 'fav';
+    },
+    cycleAnalysisFilter() {
+      this.analysisFilter = this.analysisFilter === 'analyzed' ? 'not' : this.analysisFilter === 'not' ? null : 'analyzed';
+    },
     showFilterToast() {
       const parts = [];
       const typeMap = {image: this.t('g.filter_image'), video: this.t('g.filter_video')};
@@ -793,8 +920,10 @@ const GalleryPage = {
         const cn = {red: this.t('g.color_red'), yellow: this.t('g.color_yellow'), green: this.t('g.color_green'), blue: this.t('g.color_blue'), purple: this.t('g.color_purple')};
         parts.push(cn[this.filters.color_label] + this.t('g.filter_tag_suffix'));
       }
-      if (this.favOnly) parts.push(this.t('g.filter_fav'));
-      if (this.analyzedOnly) parts.push(this.t('g.filter_analyzed'));
+      if (this.favFilter === 'fav') parts.push(this.t('g.filter_fav'));
+      else if (this.favFilter === 'unfav') parts.push(this.t('g.filter_unfav'));
+      if (this.analysisFilter === 'analyzed') parts.push(this.t('g.filter_analyzed'));
+      else if (this.analysisFilter === 'not') parts.push(this.t('g.filter_not_analyzed'));
       const msg = parts.length ? parts.join(" · ") : this.t('g.filter_cleared');
       Quasar.Notify.create({ message: msg, position: 'top', timeout: 1800 });
     },
@@ -806,8 +935,8 @@ const GalleryPage = {
       this.filters.media_type = "all";
       this.filters.rating = null;
       this.filters.color_label = null;
-      this.favOnly = false;
-      this.analyzedOnly = false;
+      this.favFilter = null;
+      this.analysisFilter = null;
       this.searchText = "";
       this.$root.searchQuery = "";
       this.load();
@@ -998,6 +1127,101 @@ const GalleryPage = {
         const m = this.items.find(i => i.id === id);
         this.confirmDelete = { show: true, id, name: m ? m.file_name : "" };
       }
+    },
+    async openBatchAnalysisDialog() {
+      this.ctxMenu.show = false;
+      const s = await API.getSettings();
+      const modelLabels = {
+        "glm-4v-plus": "智谱 GLM-4V-Plus", "glm-4.6v": "智谱 GLM-4.6V",
+        "glm-4.6v-flash": "智谱 GLM-4.6V-Flash", "glm-4.6v-flashx": "智谱 GLM-4.6V-FlashX",
+        "glm-4.5v": "智谱 GLM-4.5V",
+      };
+      const selected = this.items.filter(m => this.selArr.includes(m.id));
+      const videos = selected.filter(m => m.media_type === 'video');
+      const images = selected.filter(m => m.media_type === 'image');
+      const analyzed = selected.filter(m => m.analysis_status === 'done');
+      this.batchAnalysisInfo = {
+        videos: videos.length,
+        images: images.length,
+        analyzedCount: analyzed.length,
+        videoModel: modelLabels[s.model] || s.model,
+        imageModel: modelLabels[s.image_model] || s.image_model,
+        existingAction: analyzed.length > 0 ? 'skip' : 'reanalyze',
+      };
+      this.showBatchAnalysisDialog = true;
+    },
+    confirmBatchAnalysis() {
+      // Save ids and options BEFORE clearing selection
+      this._pendingBatchIds = [...this.selArr];
+      this._pendingBatchSkipDone = this.batchAnalysisInfo.existingAction === 'skip';
+
+      // Ensure bg-task-bar is in DOM (needed for FLIP target)
+      const root = this.$root;
+      if (!root.bgTasks.length) {
+        root.bgTasks = [{ id: '__placeholder__', status: 'placeholder', percent: 0, fileName: '', mediaType: '', stageLabel: '' }];
+      }
+
+      // Capture dialog rect BEFORE closing
+      const dialogEl = document.querySelector('.batch-analysis-dialog .q-card');
+      const barEl = document.querySelector('.bg-task-bar');
+      let dRect = null, bRect = null;
+      if (dialogEl) dRect = dialogEl.getBoundingClientRect();
+      if (barEl) bRect = barEl.getBoundingClientRect();
+
+      this.showBatchAnalysisDialog = false;
+
+      // FLIP animation after dialog closes
+      if (dRect && bRect) {
+        const clone = document.createElement('div');
+        clone.style.cssText = `position:fixed;left:${dRect.left}px;top:${dRect.top}px;width:${dRect.width}px;height:${dRect.height}px;border-radius:12px;background:var(--surface1);box-shadow:0 8px 32px rgba(0,0,0,0.15);z-index:9999;transition:all 0.45s cubic-bezier(0.4,0,0.2,1);pointer-events:none;`;
+        document.body.appendChild(clone);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            clone.style.left = (bRect.left + bRect.width / 2 - 20) + 'px';
+            clone.style.top = bRect.top + 'px';
+            clone.style.width = '40px';
+            clone.style.height = bRect.height + 'px';
+            clone.style.opacity = '0';
+            clone.style.borderRadius = '12px';
+          });
+        });
+        setTimeout(() => clone.remove(), 500);
+      }
+
+      this.$nextTick(() => this.batchAnalyze());
+    },
+    async batchAnalyze() {
+      const root = this.$root;
+      const ids = this._pendingBatchIds || [];
+      const skipDone = this._pendingBatchSkipDone;
+      this._pendingBatchIds = null;
+      this.clearSelection();
+
+      // Remove placeholder if present
+      root.bgTasks = root.bgTasks.filter(t => t.id !== '__placeholder__');
+
+      const res = await API.startBatchAnalysis(ids, skipDone);
+      const submittedIds = res.submitted || [];
+
+      for (const id of submittedIds) {
+        const m = this.items.find(i => i.id === id);
+        if (!m) continue;
+        const oldIdx = root.bgTasks.findIndex(t => t.id === id);
+        if (oldIdx >= 0) root.bgTasks.splice(oldIdx, 1);
+        root.bgTasks.push({
+          id: m.id, fileName: m.file_name, mediaType: m.media_type,
+          status: "running", percent: 0,
+          stageLabel: t('g.queued'), startTime: Date.now(),
+        });
+      }
+      root.bgTasks = [...root.bgTasks];
+
+      Quasar.Notify.create({
+        message: submittedIds.length > 1
+          ? t('g.n_analysis_started', {n: submittedIds.length})
+          : t('g.analysis_started'),
+        position: "top", timeout: 2000,
+      });
     },
     findSimilar() {
       const id = this.selArr[0];

@@ -71,6 +71,11 @@ def _fmt(seconds: float) -> str:
 class WhisperEngine(AsrEngine):
     name = "whisper"
 
+    def preload(self, model_name=None):
+        t0 = time.time()
+        _get_model(model_name)
+        logger.info("ASR 模型预加载完成，总耗时 {:.1f}s", time.time() - t0)
+
     def transcribe(self, audio_path: str | Path, on_progress=None, model_name: str | None = None) -> list[AsrSegment]:
         if on_progress and not _model_loaded:
             on_progress("loading")

@@ -59,4 +59,5 @@ IMAGE_EXTS = {
 }
 
 # RAW formats = everything except common non-RAW image formats
-RAW_EXTS = IMAGE_EXTS - {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".tif", ".gif"}
+HEIF_EXTS = {".heic", ".heif", ".hif", ".avif"}
+RAW_EXTS = IMAGE_EXTS - {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".tif", ".gif"} - HEIF_EXTS

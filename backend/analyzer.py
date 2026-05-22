@@ -169,7 +169,7 @@ def analyze_image(image_path: str | Path, api_key: str, model: str = "glm-4.6v",
                 if on_progress:
                     on_progress("first_token")
                 first_token = False
-            logger.debug(delta.content)
+            logger.trace("image chunk: {}", repr(delta.content))
             full_content += delta.content
             if on_progress:
                 on_progress("receiving", chars=len(full_content))
