@@ -39,18 +39,6 @@ scanPaths(paths) {
   importBatch(paths) {
     return fetch(`/api/library/import-batch`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths }) });
   },
-  getCollections() {
-    return this._fetch(`/api/collections/`);
-  },
-  createCollection(name) {
-    return this._fetch(`/api/collections/`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
-  },
-  getCollectionMedia(cid) {
-    return this._fetch(`/api/collections/${cid}/media`);
-  },
-  addCollectionItems(cid, mediaIds) {
-    return this._fetch(`/api/collections/${cid}/items`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ media_ids: mediaIds }) });
-  },
   getFolders() {
     return this._fetch(`/api/library/folders`);
   },

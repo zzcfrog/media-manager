@@ -925,7 +925,6 @@ def batch_update():
                 if thumb.exists():
                     thumb.unlink()
         db.execute(f"DELETE FROM media_tags WHERE media_id IN ({placeholders})", ids)
-        db.execute(f"DELETE FROM collection_items WHERE media_id IN ({placeholders})", ids)
         db.execute(f"DELETE FROM media_segment WHERE media_id IN ({placeholders})", ids)
         db.execute(f"DELETE FROM media_fts WHERE media_id IN ({placeholders})", ids)
         for mid in ids:

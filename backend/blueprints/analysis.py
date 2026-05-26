@@ -462,6 +462,25 @@ def _merge_asr(vlm_segments, asr_segments):
                 best_seg["asr"] = asr.text
 
 
+def _normalize_timestamp(ts: str) -> str:
+    """Fix timestamps where seconds >= 60 or minutes >= 60 (LLM output error)."""
+    try:
+        parts = ts.split(":")
+        if len(parts) == 3:
+            h, m, s = float(parts[0]), float(parts[1]), float(parts[2])
+            total = h * 3600 + m * 60 + s
+        elif len(parts) == 2:
+            total = float(parts[0]) * 60 + float(parts[1])
+        else:
+            return ts
+        h = int(total // 3600)
+        m = int((total % 3600) // 60)
+        s = total % 60
+        return f"{h:02d}:{m:02d}:{s:05.2f}"
+    except (ValueError, IndexError):
+        return ts
+
+
 def save_segments(media_id, segments, model=""):
     db = get_db()
     db.execute("DELETE FROM media_segment WHERE media_id = ?", (media_id,))
@@ -472,8 +491,8 @@ def save_segments(media_id, segments, model=""):
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 media_id,
-                seg.get("time_start", ""),
-                seg.get("time_end", ""),
+                _normalize_timestamp(seg.get("time_start", "")),
+                _normalize_timestamp(seg.get("time_end", "")),
                 seg.get("visual", ""),
                 seg.get("asr", ""),
                 seg.get("subtitle", ""),

@@ -78,9 +78,9 @@
       <q-list dense>
         <q-item-label header>{{ t('side.browse') }}</q-item-label>
         <q-item clickable
-          :style="route==='#/gallery' && !collectionFilter && !selectedFolder ? 'background:var(--accent-dim);border-radius:4px' : ''"
+          :style="route==='#/gallery' && !selectedFolder ? 'background:var(--accent-dim);border-radius:4px' : ''"
           @click="navToLibrary">
-          <q-item-section avatar><q-icon name="movie" size="18px" :color="route==='#/gallery' && !collectionFilter && !selectedFolder ? 'primary' : 'grey-6'"></q-icon></q-item-section>
+          <q-item-section avatar><q-icon name="movie" size="18px" :color="route==='#/gallery' && !selectedFolder ? 'primary' : 'grey-6'"></q-icon></q-item-section>
           <q-item-section>{{ t('side.library') }}</q-item-section>
           <q-item-section v-if="!drawerMini" side style="padding-left:0;padding-right:4px">
             <q-btn flat round dense :icon="libraryExpanded ? 'expand_less' : 'expand_more'" size="xs" color="grey-6"
@@ -115,19 +115,6 @@
           <q-item-section avatar><q-icon name="content_copy" size="18px"></q-icon></q-item-section>
           <q-item-section>{{ t('side.find_dup') }}</q-item-section>
         </q-item>
-      </q-list>
-      <q-separator></q-separator>
-      <q-list dense>
-        <q-item-label header>{{ t('side.collections') }}</q-item-label>
-        <q-item v-for="c in collections" :key="c.id" clickable
-                :active="route==='#/collections/'+c.id"
-                @click="nav('#/collections/'+c.id)"
-                active-class="bg-primary text-white">
-          <q-item-section avatar><q-icon name="folder_special" size="18px"></q-icon></q-item-section>
-          <q-item-section>{{ c.name }}</q-item-section>
-          <q-item-section side><span class="text-caption text-grey-6">{{ c.item_count || 0 }}</span></q-item-section>
-        </q-item>
-        <q-item v-if="!collections.length"><q-item-section class="text-grey-7" style="font-size:11px">{{ t('side.no_collections') }}</q-item-section></q-item>
       </q-list>
       <q-space></q-space>
       <div style="padding:12px 14px;flex-shrink:0">
@@ -495,7 +482,6 @@ const app = Vue.createApp({
       currentView: "gallery",
       detailId: null,
       galleryItems: [],
-      collectionFilter: null,
       favFilter: false,
       searchQuery: "",
       showImport: false,
@@ -517,7 +503,6 @@ const app = Vue.createApp({
       showSkippedList: false,
       showFailedList: false,
       selectedPaths: [],
-      collections: [],
       folderTree: [],
       selectedFolder: null,
       expandedFolders: [],
@@ -778,7 +763,6 @@ const app = Vue.createApp({
     navToLibrary() {
       this.selectedFolder = null;
       this.favFilter = false;
-      this.collectionFilter = null;
       if (location.hash === "#/gallery") {
         this.$nextTick(() => this.$refs.gallery?.load());
       } else {
@@ -874,23 +858,14 @@ const app = Vue.createApp({
         }
       } else if (hash === "#/favorites") {
         this.currentView = "gallery";
-        this.collectionFilter = null;
         this.favFilter = true;
         this.selectedFolder = null;
         this.libraryExpanded = false;
         this.$nextTick(() => this.$refs.gallery?.load());
       } else if (hash === "#/duplicates") {
         this.currentView = "duplicates";
-      } else if (hash.startsWith("#/collections/")) {
-        this.currentView = "gallery";
-        this.collectionFilter = parseInt(hash.split("/")[2]);
-        this.favFilter = false;
-        this.selectedFolder = null;
-        this.libraryExpanded = false;
-        this.$nextTick(() => this.$refs.gallery?.load());
       } else {
         this.currentView = "gallery";
-        this.collectionFilter = null;
         this.favFilter = false;
         if (!this.selectedFolder) this.selectedFolder = null;
         this.libraryExpanded = true;
@@ -899,8 +874,7 @@ const app = Vue.createApp({
     },
     async loadSidebar() {
       try {
-        const [colRes, folderRes] = await Promise.all([API.getCollections(), API.getFolders()]);
-        this.collections = colRes.data || [];
+        const folderRes = await API.getFolders();
         this.folderTree = folderRes.data || [];
         // Expand ancestors of restored selectedFolder
         if (this.selectedFolder) {
@@ -939,7 +913,6 @@ const app = Vue.createApp({
     },
     onFolderSelect(path) {
       this.selectedFolder = this.selectedFolder === path ? null : path;
-      this.collectionFilter = null;
       this.favFilter = false;
       this.libraryExpanded = true;
       if (this.currentView !== "gallery") {

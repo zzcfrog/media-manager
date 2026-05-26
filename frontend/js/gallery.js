@@ -825,31 +825,23 @@ const GalleryPage = {
       this.page = 1;
       this.allLoaded = false;
       this.loading = true;
-      const cid = this.$root.collectionFilter;
       try {
-        let data;
-        if (cid) {
-          const res = await API.getCollectionMedia(cid);
-          data = res.data || [];
-          this.total = data.length;
-        } else {
-          const params = { page: 1, per_page: this.perPage, sort: this.sortBy, order: this.sortOrder };
-          if (this.filters.media_type !== "all") params.media_type = this.filters.media_type;
-          if (this.filters.rating) params.rating = this.filters.rating;
-          if (this.filters.color_label) params.color_label = this.filters.color_label;
-          if (this.favFilter === 'fav') params.favorite = "true";
-          else if (this.favFilter === 'unfav') params.favorite = "false";
-          if (this.analysisFilter === 'analyzed') params.analysis_status = "analyzed";
-          else if (this.analysisFilter === 'not') params.analysis_status = "not_analyzed";
-          const q = this.$root.searchQuery;
-          if (q) params.q = q;
-          const folder = this.$root.selectedFolder;
-          if (folder) params.folder = folder;
-          const res = await API.getLibrary(params);
-          data = res.data || [];
-          this.total = res.pagination?.total || 0;
-          if (data.length < this.perPage) this.allLoaded = true;
-        }
+        const params = { page: 1, per_page: this.perPage, sort: this.sortBy, order: this.sortOrder };
+        if (this.filters.media_type !== "all") params.media_type = this.filters.media_type;
+        if (this.filters.rating) params.rating = this.filters.rating;
+        if (this.filters.color_label) params.color_label = this.filters.color_label;
+        if (this.favFilter === 'fav') params.favorite = "true";
+        else if (this.favFilter === 'unfav') params.favorite = "false";
+        if (this.analysisFilter === 'analyzed') params.analysis_status = "analyzed";
+        else if (this.analysisFilter === 'not') params.analysis_status = "not_analyzed";
+        const q = this.$root.searchQuery;
+        if (q) params.q = q;
+        const folder = this.$root.selectedFolder;
+        if (folder) params.folder = folder;
+        const res = await API.getLibrary(params);
+        const data = res.data || [];
+        this.total = res.pagination?.total || 0;
+        if (data.length < this.perPage) this.allLoaded = true;
         this.items = data;
         this.$root.galleryItems = data;
       } catch(e) {

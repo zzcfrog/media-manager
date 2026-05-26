@@ -171,15 +171,7 @@ cd electron && npm start
 
 ---
 
-## 合集与标签
-
-### 合集
-
-- 在侧边栏"合集"区域点击 `+` 创建合集
-- 在画廊中选中文件后，右键菜单添加到合集
-- 点击侧边栏中的合集名称筛选显示
-
-### 标签
+## 标签
 
 - 在画廊中选中文件后，右键菜单或详情页添加标签
 - 侧边栏显示所有标签及使用次数
@@ -305,7 +297,7 @@ Adobe DNG · Canon CR2/CR3/CRW · Nikon NEF/NRW · Sony ARW/SRF/SR2 · Fujifilm 
 
 所有数据存储在 `data/` 目录下：
 
-- `media.db` — SQLite 数据库（媒体信息、分析结果、合集、标签）
+- `media.db` — SQLite 数据库（媒体信息、分析结果、标签）
 - `thumbnails/` — 生成的缩略图
 
 可通过 `MEDIA_MANAGER_HOME` 环境变量更改数据目录。

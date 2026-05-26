@@ -5,8 +5,6 @@ zh: {
   "side.library": "素材库",
   "side.favorites": "我的喜欢",
   "side.find_dup": "查找重复",
-  "side.collections": "收藏夹",
-  "side.no_collections": "暂无收藏夹",
   "side.import": "导入素材",
   "side.collapse": "收起侧边栏",
   // -- Top bar --
@@ -558,8 +556,6 @@ en: {
   "side.library": "Library",
   "side.favorites": "Favorites",
   "side.find_dup": "Find Duplicates",
-  "side.collections": "Collections",
-  "side.no_collections": "No collections yet",
   "side.import": "Import Media",
   "side.collapse": "Collapse sidebar",
   // -- Top bar --

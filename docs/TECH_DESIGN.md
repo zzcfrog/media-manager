@@ -44,7 +44,6 @@ video_analyzer/
 │   │   ├── serve.py           # 媒体文件服务（视频/图片/缩略图）
 │   │   ├── library.py         # 媒体库 CRUD、搜索、导入
 │   │   ├── analysis.py        # AI 分析（SSE 流式）
-│   │   ├── collections.py     # 合集管理
 │   │   ├── tags.py            # 标签管理
 │   │   └── settings.py        # 全局设置 CRUD
 │   └── services/
@@ -88,7 +87,6 @@ video_analyzer/
 | `serve` | 无 | 媒体文件服务 |
 | `library` | `/api/library` | 媒体库 CRUD、文件夹树、导入、相似检测、排除管理 |
 | `analysis` | `/api/analysis` | AI 分析 + 批量分析 + 分段编辑 + 进度查询 |
-| `collections` | `/api/collections` | 合集管理 |
 | `tags` | `/api/tags` | 标签管理（后端保留，前端已移除） |
 | `settings` | `/api/settings` | 全局设置 CRUD |
 
@@ -119,10 +117,6 @@ media_segment (id, media_id, time_start, time_end,
                shot_type, focal_length, camera_angle, camera_movement,
                perspective, scene_type, mood, lighting, weather,
                style, color_tone, tone, dof, composition, seq)
-
--- 合集
-collections (id, name, cover_id FK→media.id, created_at)
-collection_items (collection_id FK CASCADE, media_id FK CASCADE, PK)
 
 -- 标签
 tags (id, name UNIQUE)
@@ -404,7 +398,7 @@ Gallery.load() / Gallery.loadMore()
 | `d.*` | 详情页（元数据标签、分析维度、按钮） |
 | `dup.*` | 重复页（标签页标题、操作按钮） |
 | `s.*` | 设置页（标签页标题、字段标签） |
-| `side.*` | 侧边栏（菜单项、收藏夹） |
+| `side.*` | 侧边栏（菜单项） |
 | `imp.*` | 导入弹窗（步骤、状态、结果） |
 | `kb.*` | 快捷键参考弹窗 |
 | `ctx.*` | 右键上下文菜单 |

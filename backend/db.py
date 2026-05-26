@@ -44,19 +44,6 @@ CREATE INDEX IF NOT EXISTS idx_media_type ON media(media_type);
 CREATE INDEX IF NOT EXISTS idx_media_rating ON media(rating);
 CREATE INDEX IF NOT EXISTS idx_media_imported ON media(imported_at);
 
-CREATE TABLE IF NOT EXISTS collections (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    name        TEXT NOT NULL,
-    cover_id    INTEGER REFERENCES media(id) ON DELETE SET NULL,
-    created_at  TEXT DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS collection_items (
-    collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
-    media_id      INTEGER NOT NULL REFERENCES media(id) ON DELETE CASCADE,
-    PRIMARY KEY (collection_id, media_id)
-);
-
 CREATE TABLE IF NOT EXISTS tags (
     id   INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE
@@ -239,6 +226,21 @@ def _migrate(db):
                            (ns, ne, r["id"]))
         db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('time_format_hms', '1')")
 
+    # Fix timestamps where seconds >= 60 or minutes >= 60
+    if get_setting(db, "time_overflow_fixed") != "1":
+        rows = db.execute("SELECT id, time_start, time_end FROM media_segment WHERE time_start LIKE '%:%:%' OR time_end LIKE '%:%:%'").fetchall()
+        fixed = 0
+        for r in rows:
+            ns = _fix_overflow_timestamp(r["time_start"])
+            ne = _fix_overflow_timestamp(r["time_end"])
+            if ns != r["time_start"] or ne != r["time_end"]:
+                db.execute("UPDATE media_segment SET time_start=?, time_end=? WHERE id=?",
+                           (ns, ne, r["id"]))
+                fixed += 1
+        if fixed:
+            logger.info(f"Fixed {fixed} segments with overflow timestamps")
+        db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('time_overflow_fixed', '1')")
+
     logger.info("DB migrations applied")
 
 
@@ -251,6 +253,24 @@ def _to_hms(t):
     mm = int(parts[0])
     hh, mm = divmod(mm, 60)
     return f"{hh:02d}:{mm:02d}:{parts[1]}"
+
+
+def _fix_overflow_timestamp(t):
+    """Fix timestamps where seconds >= 60 or minutes >= 60."""
+    if not t or ":" not in t:
+        return t
+    parts = t.split(":")
+    if len(parts) != 3:
+        return t
+    try:
+        h, m, s = float(parts[0]), float(parts[1]), float(parts[2])
+        total = h * 3600 + m * 60 + s
+        h = int(total // 3600)
+        m = int((total % 3600) // 60)
+        s = total % 60
+        return f"{h:02d}:{m:02d}:{s:05.2f}"
+    except (ValueError, IndexError):
+        return t
 
 
 _DEFAULTS = {
