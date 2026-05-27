@@ -207,8 +207,8 @@ const WorkbenchPage = {
       });
     },
     openMediaPicker() {
-      const existingIds = this.project.media.map(m => m.id);
-      this.$root.pickerSelected = [...existingIds];
+      this.$root.pickerSelected = [];
+      this.$root.pickerFolder = null;
       this.$root.pickerProjectId = this.projectId;
       this.$root.pickerMode = true;
     },
