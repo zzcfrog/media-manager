@@ -464,9 +464,9 @@ body:not(.body--dark) .filter-icon-off::after { background: #bbb; }
   background: var(--accent) !important;
   color: white !important;
   font-size: 11px;
-  padding: 2px 10px !important;
+  padding: 4px 10px !important;
   border-radius: 4px;
-  min-height: 22px;
+  min-height: 26px;
 }
 body:not(.body--dark) .sidebar-action-btn {
   color: #fff !important;
