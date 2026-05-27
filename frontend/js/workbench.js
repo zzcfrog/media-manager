@@ -210,9 +210,7 @@ const WorkbenchPage = {
       const existingIds = this.project.media.map(m => m.id);
       this.$root.pickerSelected = [...existingIds];
       this.$root.pickerProjectId = this.projectId;
-      const returnTo = "#/workbench/" + this.projectId;
-      this.$root.pickerReturnTo = returnTo;
-      location.hash = "#/gallery?picker=1&projectId=" + this.projectId + "&returnTo=" + encodeURIComponent(returnTo);
+      this.$root.pickerMode = true;
     },
   },
 };
