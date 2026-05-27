@@ -837,7 +837,6 @@ const GalleryPage = {
         if (this.$refs.sentinel) this._observer.observe(this.$refs.sentinel);
       });
     }
-    });
   },
   beforeUnmount() {
     document.removeEventListener("mousedown", this.closeCtx);
