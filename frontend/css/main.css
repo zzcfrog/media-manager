@@ -55,7 +55,7 @@ body.body--dark input::placeholder { color: #555 !important; -webkit-text-fill-c
 .media-card.selected { border-color: var(--accent); }
 .picker-dialog-card .media-card { transition: border-color 0.15s; }
 .picker-dialog-card .media-card:hover { transform: none; }
-.sel-overlay { position: absolute; inset: 0; background: rgba(108,140,255,0.3); border: 2px solid var(--accent); pointer-events: none; z-index: 10; border-radius: 8px; }
+.sel-overlay { position: absolute; inset: 0; background: var(--accent-dim); border: 2px solid var(--accent); pointer-events: none; z-index: 10; border-radius: 8px; }
 .media-card .thumb-wrap { position: relative; }
 .media-card .thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: #111; display: block; }
 .media-card .thumb.portrait { object-fit: contain; }
@@ -152,7 +152,7 @@ body.body--dark input::placeholder { color: #555 !important; -webkit-text-fill-c
 .import-preview-meta { font-size: 9px; color: var(--text3); padding: 0 6px 4px; }
 
 /* Lasso selection */
-.lasso { position: fixed; border: 1px solid var(--accent); background: rgba(108,140,255,0.1); pointer-events: none; z-index: 100; }
+.lasso { position: fixed; border: 1px solid var(--accent); background: var(--accent-dim); pointer-events: none; z-index: 100; }
 
 /* Dialog backdrop blur & card style */
 .q-dialog__backdrop { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
@@ -266,7 +266,7 @@ body:not(.body--dark) .exclude-scroll-hint { background: #fff; }
 .tl-step:last-child { padding-bottom: 0; }
 .tl-dot { position: absolute; left: -28px; top: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--surface2); border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; z-index: 1; transition: all 0.4s cubic-bezier(.4,0,.2,1); font-size: 11px; }
 .tl-check { color: var(--green); font-weight: 700; animation: tlPop 0.35s ease-out; }
-.tl-step.active .tl-dot { border-color: var(--accent); background: var(--accent-dim); box-shadow: 0 0 0 4px rgba(108,140,255,0.1); animation: tlPulse 2s ease-in-out infinite; }
+.tl-step.active .tl-dot { border-color: var(--accent); background: var(--accent-dim); box-shadow: 0 0 0 4px var(--accent-dim); animation: tlPulse 2s ease-in-out infinite; }
 .tl-step.done .tl-dot { border-color: var(--green); background: rgba(76,175,80,0.15); box-shadow: 0 0 0 4px rgba(76,175,80,0.06); }
 .tl-body { min-width: 0; }
 .tl-title { font-size: 12px; font-weight: 500; color: var(--text3); transition: color 0.3s; display: flex; align-items: baseline; gap: 0; white-space: nowrap; overflow: hidden; }

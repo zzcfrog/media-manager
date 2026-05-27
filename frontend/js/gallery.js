@@ -66,17 +66,17 @@ const GalleryPage = {
         :options="durGroupOptions" emit-value map-options
         style="min-width:100px" class="q-ml-xs"></q-select>
       <q-btn-group flat style="flex-shrink:0">
-        <q-btn flat dense icon="apps" size="md" @click="viewMode='grid'" :style="{color: viewMode==='grid' ? 'var(--q-primary)' : '#9e9e9e'}">
+        <q-btn flat dense icon="apps" size="md" @click="viewMode='grid'" :style="{color: viewMode==='grid' ? 'var(--q-primary)' : 'var(--text3)'}">
           <q-tooltip :delay="1000">{{ t('g.grid_view') }}</q-tooltip>
         </q-btn>
-        <q-btn flat dense icon="view_column" size="md" @click="viewMode='masonry'" :style="{color: viewMode==='masonry' ? 'var(--q-primary)' : '#9e9e9e'}">
+        <q-btn flat dense icon="view_column" size="md" @click="viewMode='masonry'" :style="{color: viewMode==='masonry' ? 'var(--q-primary)' : 'var(--text3)'}">
           <q-tooltip :delay="1000">{{ t('g.masonry_view') }}</q-tooltip>
         </q-btn>
-        <q-btn flat dense size="md" @click="viewMode='justified'" :style="{color: viewMode==='justified' ? 'var(--q-primary)' : '#9e9e9e'}">
+        <q-btn flat dense size="md" @click="viewMode='justified'" :style="{color: viewMode==='justified' ? 'var(--q-primary)' : 'var(--text3)'}">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><rect x="1" y="3" width="18" height="4"/><rect x="1" y="8" width="18" height="4"/><rect x="1" y="13" width="18" height="4"/></svg>
           <q-tooltip :delay="1000">{{ t('g.justified_view') }}</q-tooltip>
         </q-btn>
-        <q-btn flat dense icon="list" size="md" @click="viewMode='list'" :style="{color: viewMode==='list' ? 'var(--q-primary)' : '#9e9e9e'}">
+        <q-btn flat dense icon="list" size="md" @click="viewMode='list'" :style="{color: viewMode==='list' ? 'var(--q-primary)' : 'var(--text3)'}">
           <q-tooltip :delay="1000">{{ t('g.list_view') }}</q-tooltip>
         </q-btn>
       </q-btn-group>
