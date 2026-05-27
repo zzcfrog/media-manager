@@ -154,7 +154,7 @@ body.body--dark input::placeholder { color: #555 !important; -webkit-text-fill-c
 
 /* Dialog backdrop blur & card style */
 .q-dialog__backdrop { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-.picker-dialog-card ~ .q-dialog__backdrop { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(0,0,0,0.5); }
+.q-dialog:has(.picker-dialog-card) .q-dialog__backdrop { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(0,0,0,0.5); }
 .q-dialog .q-card { border-radius: 16px !important; }
 body.body--dark .q-dialog .q-card { box-shadow: 0 24px 80px rgba(0,0,0,0.8) !important; }
 body:not(.body--dark) .q-dialog .q-card { box-shadow: 0 24px 80px rgba(255,255,255,0.3) !important; }
