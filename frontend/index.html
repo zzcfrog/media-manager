@@ -74,8 +74,9 @@
     </q-header>
 
     <!-- Media picker dialog -->
-    <q-dialog v-model="pickerMode" persistent transition-show="fade" transition-hide="fade">
-      <q-card class="picker-dialog-card">
+    <!-- Media picker overlay -->
+    <div v-if="pickerMode" class="picker-overlay">
+      <div class="picker-dialog-card">
         <div class="picker-bar">
           <q-btn flat round dense icon="close" size="sm" color="grey-6" @click="cancelPicker"></q-btn>
           <span style="font-size:14px;font-weight:500">{{ t('wb.picker_title') }}</span>
@@ -96,8 +97,8 @@
             <gallery-page v-if="pickerMode" ref="pickerGallery"></gallery-page>
           </div>
         </div>
-      </q-card>
-    </q-dialog>
+      </div>
+    </div>
 
     <!-- Sidebar -->
     <q-drawer v-model="drawerOpen" :width="260" :mini="drawerMini" :breakpoint="0" bordered style="display:flex;flex-direction:column" mini-width="56">

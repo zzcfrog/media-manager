@@ -156,7 +156,6 @@ body.body--dark input::placeholder { color: #555 !important; -webkit-text-fill-c
 
 /* Dialog backdrop blur & card style */
 .q-dialog__backdrop { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-.q-dialog:has(.picker-dialog-card) .q-dialog__backdrop { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(0,0,0,0.5); }
 .q-dialog .q-card { border-radius: 16px !important; }
 body.body--dark .q-dialog .q-card { box-shadow: 0 24px 80px rgba(0,0,0,0.8) !important; }
 body:not(.body--dark) .q-dialog .q-card { box-shadow: 0 24px 80px rgba(255,255,255,0.3) !important; }
@@ -475,13 +474,20 @@ body:not(.body--dark) .sidebar-action-btn {
   color: #fff !important;
 }
 
-/* Picker dialog */
+/* Picker overlay */
+.picker-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 6000;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .picker-dialog-card {
   background: var(--bg);
-  width: 90vw !important;
-  height: 90vh !important;
-  max-width: 90vw !important;
-  max-height: 90vh !important;
+  width: 90vw;
+  height: 90vh;
   border-radius: 12px;
   overflow: hidden;
   display: flex;
@@ -496,7 +502,6 @@ body:not(.body--dark) .sidebar-action-btn {
   min-height: 42px;
   background: var(--surface2);
   border-bottom: 1px solid var(--border);
-  border-radius: 12px 12px 0 0;
 }
 .picker-body {
   flex: 1;
