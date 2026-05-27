@@ -78,10 +78,9 @@
       <q-list dense>
         <q-item-label header style="display:flex;align-items:center;justify-content:space-between;padding-right:10px">
           <span>{{ t('side.browse') }}</span>
-          <q-btn v-if="!drawerMini" dense no-caps size="10px" icon="add_circle_outline"
-                 color="primary" text-color="white"
+          <q-btn v-if="!drawerMini" dense no-caps unelevated icon="add_circle_outline"
                  :label="t('side.import')" @click="openImport"
-                 style="background:var(--accent)"></q-btn>
+                 class="sidebar-action-btn"></q-btn>
         </q-item-label>
         <q-item clickable
           :style="route==='#/gallery' && !selectedFolder ? 'background:var(--accent-dim);border-radius:4px' : ''"
@@ -124,10 +123,9 @@
         <q-separator style="background:var(--border);margin:8px 0"></q-separator>
         <q-item-label header style="display:flex;align-items:center;justify-content:space-between;padding-right:10px">
           <span>{{ t('wb.section') }}</span>
-          <q-btn v-if="!drawerMini" dense no-caps size="10px" icon="add_circle_outline"
-                 color="primary" text-color="white"
+          <q-btn v-if="!drawerMini" dense no-caps unelevated icon="add_circle_outline"
                  :label="t('wb.new_project')" @click="openNewProject"
-                 style="background:var(--accent)"></q-btn>
+                 class="sidebar-action-btn"></q-btn>
         </q-item-label>
         <q-item v-for="p in projects" :key="p.id" clickable dense
                 :active="route==='#/workbench/'+p.id"
