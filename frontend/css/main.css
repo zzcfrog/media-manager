@@ -53,6 +53,8 @@ body.body--dark input::placeholder { color: #555 !important; -webkit-text-fill-c
 .media-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; cursor: pointer; transition: border-color 0.15s, transform 0.1s; position: relative; }
 .media-card:hover { border-color: var(--border2); transform: translateY(-1px); }
 .media-card.selected { border-color: var(--accent); }
+.picker-dialog-card .media-card { transition: none; }
+.picker-dialog-card .media-card:hover { transform: none; border-color: var(--border2); }
 .sel-overlay { position: absolute; inset: 0; background: rgba(108,140,255,0.3); border: 2px solid var(--accent); pointer-events: none; z-index: 10; border-radius: 8px; }
 .media-card .thumb-wrap { position: relative; }
 .media-card .thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: #111; display: block; }
