@@ -811,7 +811,9 @@ const GalleryPage = {
     } else {
       this._saveFilters = () => {};
     }
-    if (this.searchText) this.$root.searchQuery = this.searchText.trim();
+    if (!isPicker && this.searchText) this.$root.searchQuery = this.searchText.trim();
+    // Picker mode: fewer items per page for lighter GPU load
+    if (isPicker) this.perPage = 30;
     // Picker mode: restore pre-selected items
     if (this.$root.pickerMode && this.$root.pickerSelected?.length) {
       this.selArr = [...this.$root.pickerSelected];
@@ -860,7 +862,7 @@ const GalleryPage = {
         else if (this.favFilter === 'unfav') params.favorite = "false";
         if (this.analysisFilter === 'analyzed') params.analysis_status = "analyzed";
         else if (this.analysisFilter === 'not') params.analysis_status = "not_analyzed";
-        const q = this.$root.searchQuery;
+        const q = this.$root.pickerMode ? this.searchText : this.$root.searchQuery;
         if (q) params.q = q;
         const folder = this.$root.pickerMode ? this.$root.pickerFolder : this.$root.selectedFolder;
         if (folder) params.folder = folder;
@@ -869,7 +871,7 @@ const GalleryPage = {
         this.total = res.pagination?.total || 0;
         if (data.length < this.perPage) this.allLoaded = true;
         this.items = data;
-        this.$root.galleryItems = data;
+        if (!this.$root.pickerMode) this.$root.galleryItems = data;
       } catch(e) {
         console.error("gallery load error:", e);
       }
@@ -889,14 +891,14 @@ const GalleryPage = {
         else if (this.favFilter === 'unfav') params.favorite = "false";
         if (this.analysisFilter === 'analyzed') params.analysis_status = "analyzed";
         else if (this.analysisFilter === 'not') params.analysis_status = "not_analyzed";
-        const q = this.$root.searchQuery;
+        const q = this.$root.pickerMode ? this.searchText : this.$root.searchQuery;
         if (q) params.q = q;
         const folder = this.$root.pickerMode ? this.$root.pickerFolder : this.$root.selectedFolder;
         if (folder) params.folder = folder;
         const res = await API.getLibrary(params);
         const data = res.data || [];
         this.items = this.items.concat(data);
-        this.$root.galleryItems = this.items;
+        if (!this.$root.pickerMode) this.$root.galleryItems = this.items;
         this.total = res.pagination?.total || 0;
         if (data.length < this.perPage) this.allLoaded = true;
       } catch(e) {
@@ -951,7 +953,7 @@ const GalleryPage = {
       Quasar.Notify.create({ message: msg, position: 'top', timeout: 1800 });
     },
     doSearch() {
-      this.$root.searchQuery = this.searchText.trim();
+      if (!this.$root.pickerMode) this.$root.searchQuery = this.searchText.trim();
       this.load();
     },
     resetFilters() {
@@ -961,7 +963,7 @@ const GalleryPage = {
       this.favFilter = null;
       this.analysisFilter = null;
       this.searchText = "";
-      this.$root.searchQuery = "";
+      if (!this.$root.pickerMode) this.$root.searchQuery = "";
       this.load();
     },
     onCardClick(m, e) {
@@ -1321,7 +1323,7 @@ const GalleryPage = {
           this.similarDlg[key] = this.similarDlg[key].filter(i => i.id !== id);
         }
         this.items = this.items.filter(i => i.id !== id);
-        this.$root.galleryItems = this.items;
+        if (!this.$root.pickerMode) this.$root.galleryItems = this.items;
         this.total--;
         Quasar.Notify.create({ message: this.t('g.n_removed', {name: this.similarDeleteConfirm.name}), position: 'top', timeout: 1500 });
       } catch (e) {
@@ -1353,7 +1355,7 @@ const GalleryPage = {
       try {
         await API.deleteMedia(this.confirmDelete.id);
         this.items = this.items.filter(i => i.id !== this.confirmDelete.id);
-        this.$root.galleryItems = this.items;
+        if (!this.$root.pickerMode) this.$root.galleryItems = this.items;
         this.total--;
         Quasar.Notify.create({ message: this.t('g.n_removed', {name: this.confirmDelete.name}), position: 'top', color: 'dark', textColor: 'white', timeout: 1800 });
       } catch (e) {
@@ -1368,7 +1370,7 @@ const GalleryPage = {
         for (const id of ids) await API.deleteMedia(id);
         const set = new Set(ids);
         this.items = this.items.filter(i => !set.has(i.id));
-        this.$root.galleryItems = this.items;
+        if (!this.$root.pickerMode) this.$root.galleryItems = this.items;
         this.total -= ids.length;
         Quasar.Notify.create({ message: this.t('g.n_items_removed', {n: ids.length}), position: 'top', color: 'dark', textColor: 'white', timeout: 1800 });
       } catch (e) { console.error("batch delete error:", e); }
