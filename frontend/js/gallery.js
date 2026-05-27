@@ -98,6 +98,7 @@ const GalleryPage = {
                  @dblclick="openDetail(m.id)"
                  @contextmenu.prevent="showCtx($event, m)">
               <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
+              <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
               <div class="thumb-wrap">
                 <img class="thumb" :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
                 <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
@@ -131,6 +132,7 @@ const GalleryPage = {
              @dblclick="openDetail(m.id)"
              @contextmenu.prevent="showCtx($event, m)">
           <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
+              <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
           <div class="thumb-wrap">
             <img class="thumb" :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
             <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
@@ -166,6 +168,7 @@ const GalleryPage = {
                  @dblclick="openDetail(m.id)"
                  @contextmenu.prevent="showCtx($event, m)">
               <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
+              <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
               <div class="masonry-img">
                 <img :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
                 <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
@@ -194,6 +197,7 @@ const GalleryPage = {
              @dblclick="openDetail(m.id)"
              @contextmenu.prevent="showCtx($event, m)">
           <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
+              <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
           <div class="masonry-img">
             <img :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
             <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
@@ -224,6 +228,7 @@ const GalleryPage = {
                    @dblclick="openDetail(m.id)"
                    @contextmenu.prevent="showCtx($event, m)">
                 <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
+              <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
                 <img :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
                 <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
                 <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
@@ -251,6 +256,7 @@ const GalleryPage = {
                @dblclick="openDetail(m.id)"
                @contextmenu.prevent="showCtx($event, m)">
             <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
+              <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
             <img :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
             <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
             <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
@@ -658,6 +664,12 @@ const GalleryPage = {
       else if (val !== this._prevSortBy) this.groupBy = "";
       this._prevSortBy = val;
     },
+    selArr: {
+      handler(val) {
+        if (this.$root.pickerMode) this.$root.pickerSelected = [...val];
+      },
+      deep: true,
+    },
   },
   computed: {
     sortOptions() {
@@ -793,6 +805,10 @@ const GalleryPage = {
       } catch {}
     };
     if (this.searchText) this.$root.searchQuery = this.searchText.trim();
+    // Picker mode: restore pre-selected items
+    if (this.$root.pickerMode && this.$root.pickerSelected?.length) {
+      this.selArr = [...this.$root.pickerSelected];
+    }
     this.load();
     document.addEventListener("mousedown", this.closeCtx);
     document.addEventListener("keydown", this.handleKey, true);
@@ -827,7 +843,7 @@ const GalleryPage = {
     // Load first page, reset selection
     async load() {
       if (this._saveFilters) this._saveFilters();
-      this.selArr = [];
+      if (!this.$root.pickerMode) this.selArr = [];
       this.page = 1;
       this.allLoaded = false;
       this.loading = true;
@@ -886,6 +902,7 @@ const GalleryPage = {
       this.loadingMore = false;
     },
     openDetail(id) {
+      if (this.$root.pickerMode) return;
       location.hash = `#/detail/${id}`;
     },
     toggleSort(field) {
@@ -945,7 +962,14 @@ const GalleryPage = {
     },
     onCardClick(m, e) {
       const idx = this.items.findIndex(item => item.id === m.id);
-      if (e.shiftKey && this.lastClickIdx >= 0) {
+      if (this.$root.pickerMode) {
+        // Picker mode: toggle on every click
+        const arr = [...this.selArr];
+        const i = arr.indexOf(m.id);
+        if (i >= 0) arr.splice(i, 1); else arr.push(m.id);
+        this.selArr = arr;
+        this.lastClickIdx = idx;
+      } else if (e.shiftKey && this.lastClickIdx >= 0) {
         const from = Math.min(this.lastClickIdx, idx);
         const to = Math.max(this.lastClickIdx, idx);
         const ids = [];
@@ -1023,6 +1047,7 @@ const GalleryPage = {
       document.addEventListener("mouseup", onUp);
     },
     showCtx(e, m) {
+      if (this.$root.pickerMode) return;
       if (!this.selArr.includes(m.id)) this.selArr = [m.id];
       this.ctxMenu.item = m;
       this.ctxMenu.x = e.clientX;
@@ -1072,13 +1097,14 @@ const GalleryPage = {
       }
       // Delete
       if (key === "Delete" || key === "Backspace") {
-        if (!this.selArr.length) return;
+        if (this.$root.pickerMode || !this.selArr.length) return;
         e.preventDefault(); e.stopPropagation();
         this.deleteCtx();
         return;
       }
-      // Enter - open detail
+      // Enter - open detail (or toggle in picker mode)
       if (key === "Enter" && this.selArr.length === 1) {
+        if (this.$root.pickerMode) return;
         e.preventDefault(); e.stopPropagation();
         this.openDetail(this.selArr[0]);
         return;

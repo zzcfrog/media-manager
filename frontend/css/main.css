@@ -472,6 +472,40 @@ body:not(.body--dark) .sidebar-action-btn {
   color: #fff !important;
 }
 
+/* Picker bar */
+.picker-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  height: 36px;
+  min-height: 36px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Picker checkbox overlay on gallery cards */
+.media-card .picker-check {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 3;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.6);
+  background: rgba(0,0,0,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  cursor: pointer;
+}
+.media-card.selected .picker-check {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
 .wb-container {
   display: flex;
   flex-direction: column;

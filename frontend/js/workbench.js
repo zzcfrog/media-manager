@@ -109,62 +109,6 @@ const WorkbenchPage = {
     <span>{{ t('wb.total_duration') }}：{{ totalDuration }}</span>
     <span>{{ t('wb.segment_count') }}：{{ videoTrackCount }}</span>
   </div>
-
-  <!-- Media picker dialog -->
-  <q-dialog v-model="showMediaPicker" maximized>
-    <q-card style="background:var(--bg)" class="dialog-card">
-      <div class="wb-picker-toolbar">
-        <div style="display:flex;align-items:center;gap:8px">
-          <q-btn flat round dense icon="close" size="sm" color="grey-6" @click="showMediaPicker=false"></q-btn>
-          <span style="font-size:14px;font-weight:500">{{ t('wb.add_media') }}</span>
-          <span v-if="pickerSelected.length" style="font-size:12px;color:var(--accent)">
-            {{ t('wb.media_selected', {n: pickerSelected.length}) }}
-          </span>
-        </div>
-        <!-- Filters -->
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <q-select v-model="pickerFilter.type" :options="pickerTypeOptions" dense outlined emit-value map-options
-                    style="min-width:80px;width:80px" @update:model-value="loadPickerMedia"></q-select>
-          <q-select v-model="pickerFilter.analysis_status" :options="pickerAnalysisOptions" dense outlined emit-value map-options
-                    style="min-width:90px;width:90px" @update:model-value="loadPickerMedia"></q-select>
-          <q-input v-model="pickerFilter.q" dense outlined :placeholder="t('g.search')" clearable
-                   style="width:160px" @keyup.enter="loadPickerMedia" @clear="loadPickerMedia"></q-input>
-          <q-select v-model="pickerSort" :options="pickerSortOptions" dense outlined emit-value map-options
-                    style="min-width:100px;width:100px" @update:model-value="loadPickerMedia"></q-select>
-        </div>
-        <div style="display:flex;align-items:center;gap:4px">
-          <q-btn flat dense :label="t('g.select_all')" size="12px" @click="selectAllPicker"></q-btn>
-          <q-btn color="primary" :label="t('wb.confirm_add')" dense
-                 :disable="!pickerSelected.length" @click="confirmAddMedia"></q-btn>
-        </div>
-      </div>
-
-      <!-- Media grid -->
-      <div class="wb-picker-grid" @scroll.passive="onPickerScroll">
-        <div v-for="m in pickerMedia" :key="m.id" class="wb-picker-item"
-             :class="{ selected: pickerSelected.includes(m.id) }"
-             @click="togglePickerSelect(m.id)">
-          <img :src="'/media/thumbnail/' + m.id" loading="lazy">
-          <div class="wb-picker-overlay">
-            <q-icon :name="pickerSelected.includes(m.id) ? 'check_circle' : 'radio_button_unchecked'"
-                    :color="pickerSelected.includes(m.id) ? 'primary' : 'white'" size="22px"></q-icon>
-          </div>
-          <div class="wb-picker-name">{{ m.file_name }}</div>
-          <div class="wb-picker-badges">
-            <span v-if="m.analysis_status==='done'" style="color:var(--accent)">AI</span>
-            <span v-if="m.favorite" style="color:#ff5555">♥</span>
-            <span v-if="m.rating" style="color:var(--text3)">{{ '★'.repeat(m.rating) }}</span>
-          </div>
-        </div>
-        <div v-if="pickerLoading" style="padding:20px;text-align:center">
-          <q-spinner size="24px" color="primary"></q-spinner>
-        </div>
-        <div v-if="!pickerLoading && !pickerMedia.length" style="padding:40px;text-align:center;color:var(--text3);font-size:13px">
-          {{ t('wb.media_empty') }}
-        </div>
-      </div>
-    </q-card>
-  </q-dialog>
 </div>
   `,
 
@@ -182,22 +126,6 @@ const WorkbenchPage = {
         { key: "subtitle" },
         { key: "text" },
         { key: "video" },
-      ],
-      // Media picker state
-      showMediaPicker: false,
-      pickerMedia: [],
-      pickerSelected: [],
-      pickerLoading: false,
-      pickerAllLoaded: false,
-      pickerPage: 1,
-      pickerFilter: { type: "all", analysis_status: "all", q: "" },
-      pickerSort: "imported_at",
-      pickerSortOptions: [
-        { value: "imported_at", label: "导入时间" },
-        { value: "date_taken", label: "拍摄时间" },
-        { value: "file_name", label: "名称" },
-        { value: "rating", label: "评分" },
-        { value: "duration", label: "时长" },
       ],
     };
   },
@@ -217,20 +145,6 @@ const WorkbenchPage = {
     },
     videoTrackCount() {
       return this.getTrackItems("video").length;
-    },
-    pickerTypeOptions() {
-      return [
-        { value: "all", label: t("g.all") },
-        { value: "video", label: t("g.videos") },
-        { value: "image", label: t("g.images") },
-      ];
-    },
-    pickerAnalysisOptions() {
-      return [
-        { value: "all", label: t("g.all") },
-        { value: "done", label: t("g.analyzed") },
-        { value: "none", label: t("g.not_analyzed") },
-      ];
     },
   },
 
@@ -292,81 +206,13 @@ const WorkbenchPage = {
         location.hash = "#/gallery";
       });
     },
-
-    // ── Media picker ──────────────────────────────
-
-    async openMediaPicker() {
-      this.pickerSelected = [];
-      this.pickerMedia = [];
-      this.pickerPage = 1;
-      this.pickerAllLoaded = false;
-      this.showMediaPicker = true;
-      // Pre-select media already in project
-      const existingIds = new Set(this.project.media.map(m => m.id));
-      this.pickerSelected = [...existingIds];
-      await this.loadPickerMedia();
-    },
-    async loadPickerMedia(reset) {
-      if (reset) {
-        this.pickerPage = 1;
-        this.pickerMedia = [];
-        this.pickerAllLoaded = false;
-      }
-      this.pickerLoading = true;
-      try {
-        const params = {
-          page: this.pickerPage,
-          per_page: 60,
-          sort: this.pickerSort,
-          order: "DESC",
-        };
-        if (this.pickerFilter.type && this.pickerFilter.type !== "all") params.media_type = this.pickerFilter.type;
-        if (this.pickerFilter.analysis_status && this.pickerFilter.analysis_status !== "all") params.analysis_status = this.pickerFilter.analysis_status;
-        if (this.pickerFilter.q) params.q = this.pickerFilter.q;
-        const res = await API.getLibrary(params);
-        const data = res.data || [];
-        if (reset || this.pickerPage === 1) {
-          this.pickerMedia = data;
-        } else {
-          this.pickerMedia = [...this.pickerMedia, ...data];
-        }
-        this.pickerAllLoaded = data.length < 60;
-      } catch (e) { console.error(e); }
-      this.pickerLoading = false;
-    },
-    onPickerScroll(e) {
-      if (this.pickerAllLoaded || this.pickerLoading) return;
-      const el = e.target;
-      if (el.scrollHeight - el.scrollTop - el.clientHeight < 200) {
-        this.pickerPage++;
-        this.loadPickerMedia();
-      }
-    },
-    togglePickerSelect(id) {
-      const idx = this.pickerSelected.indexOf(id);
-      if (idx >= 0) this.pickerSelected.splice(idx, 1);
-      else this.pickerSelected.push(id);
-    },
-    selectAllPicker() {
-      const visibleIds = this.pickerMedia.map(m => m.id);
-      const allSelected = visibleIds.every(id => this.pickerSelected.includes(id));
-      if (allSelected) {
-        this.pickerSelected = this.pickerSelected.filter(id => !visibleIds.includes(id));
-      } else {
-        const set = new Set(this.pickerSelected);
-        for (const id of visibleIds) set.add(id);
-        this.pickerSelected = [...set];
-      }
-    },
-    async confirmAddMedia() {
-      try {
-        await API.updateProjectMedia(this.projectId, this.pickerSelected);
-        this.showMediaPicker = false;
-        await this.load();
-        await this.$root.loadProjects();
-      } catch (e) {
-        Quasar.Notify.create({ message: e.message, color: "negative", position: "top" });
-      }
+    openMediaPicker() {
+      const existingIds = this.project.media.map(m => m.id);
+      this.$root.pickerSelected = [...existingIds];
+      this.$root.pickerProjectId = this.projectId;
+      const returnTo = "#/workbench/" + this.projectId;
+      this.$root.pickerReturnTo = returnTo;
+      location.hash = "#/gallery?picker=1&projectId=" + this.projectId + "&returnTo=" + encodeURIComponent(returnTo);
     },
   },
 };

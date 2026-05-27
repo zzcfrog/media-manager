@@ -579,6 +579,7 @@ zh: {
   "wb.media_empty": "请先导入素材到素材库",
   "wb.add_media": "添加素材",
   "wb.confirm_add": "确认添加",
+  "wb.picker_title": "选择素材",
   "wb.media_selected": "已选 {n} 个素材",
 
 },
@@ -1163,6 +1164,7 @@ en: {
   "wb.media_empty": "Import media to library first",
   "wb.add_media": "Add Media",
   "wb.confirm_add": "Confirm",
+  "wb.picker_title": "Select Media",
   "wb.media_selected": "{n} media selected",
 }
 };
