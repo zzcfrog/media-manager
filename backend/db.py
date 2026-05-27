@@ -103,6 +103,37 @@ CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS projects (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    created_at  TEXT DEFAULT (datetime('now')),
+    updated_at  TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS project_media (
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    media_id   INTEGER NOT NULL REFERENCES media(id) ON DELETE CASCADE,
+    PRIMARY KEY (project_id, media_id)
+);
+
+CREATE TABLE IF NOT EXISTS project_tracks (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id    INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    version       INTEGER DEFAULT 1,
+    position      INTEGER DEFAULT 0,
+    track_type    TEXT NOT NULL CHECK(track_type IN ('theme','emotion','narration','subtitle','text','video')),
+    segment_id    INTEGER REFERENCES media_segment(id) ON DELETE SET NULL,
+    content       TEXT DEFAULT '',
+    time_start    TEXT DEFAULT '',
+    time_end      TEXT DEFAULT '',
+    emotion_value REAL DEFAULT 0.5,
+    metadata      TEXT DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_tracks_project ON project_tracks(project_id, version, position);
+CREATE INDEX IF NOT EXISTS idx_project_media_project ON project_media(project_id);
 """
 
 

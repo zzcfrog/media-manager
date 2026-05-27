@@ -89,6 +89,7 @@ video_analyzer/
 | `analysis` | `/api/analysis` | AI 分析 + 批量分析 + 分段编辑 + 进度查询 |
 | `tags` | `/api/tags` | 标签管理（后端保留，前端已移除） |
 | `settings` | `/api/settings` | 全局设置 CRUD |
+| `workbench` | `/api/workbench` | 创作工作台：工程 CRUD、segment 查询、多轨时间线管理 |
 
 ### 3.3 数据库
 
@@ -132,6 +133,11 @@ settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)
 
 -- 排除对（重复/相似检测排除）
 dup_exclusions (media_id_a INTEGER, media_id_b INTEGER, dup_type TEXT, PRIMARY KEY(media_id_a, media_id_b, dup_type))
+
+-- 创作工作台
+projects (id PK, name TEXT, description TEXT, created_at TEXT, updated_at TEXT)
+project_media (project_id FK, media_id FK, PK(project_id, media_id))
+project_tracks (id PK, project_id FK, version INT, position INT, track_type TEXT CHECK(...), segment_id FK nullable, content TEXT, time_start TEXT, time_end TEXT, emotion_value REAL, metadata TEXT)
 ```
 
 **迁移系统**：`_MIGRATIONS` 列表 + `_migrate()` 函数，通过 `PRAGMA table_info` 检测 `media` 和 `media_segment` 两张表的缺失列并 ALTER TABLE。特殊情况（如 dialogue→asr 重命名 + FTS 重建）在 `_migrate()` 中硬编码处理。

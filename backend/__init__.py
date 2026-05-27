@@ -24,12 +24,14 @@ def create_app() -> Flask:
     from .blueprints.analysis import bp as analysis_bp
     from .blueprints.tags import bp as tags_bp
     from .blueprints.settings import bp as settings_bp
+    from .blueprints.workbench import bp as workbench_bp
 
     app.register_blueprint(serve_bp)
     app.register_blueprint(library_bp, url_prefix="/api/library")
     app.register_blueprint(analysis_bp, url_prefix="/api/analysis")
     app.register_blueprint(tags_bp, url_prefix="/api/tags")
     app.register_blueprint(settings_bp, url_prefix="/api/settings")
+    app.register_blueprint(workbench_bp, url_prefix="/api/workbench")
 
     # Preload local ASR model in background (only for local engines like whisper)
     with app.app_context():

@@ -31,6 +31,7 @@ Hash 路由，无 Vue Router：
 - `#/gallery` — 媒体库（默认）
 - `#/favorites` — 喜欢筛选
 - `#/detail/:id` — 媒体详情
+- `#/workbench/:id` — 创作工作台
 
 Gallery 使用 `<keep-alive>` 缓存状态，Detail 每次进入重建。
 

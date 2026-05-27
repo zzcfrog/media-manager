@@ -117,4 +117,15 @@ scanPaths(paths) {
   thumbUrl(id) { return `/media/thumbnail/${id}`; },
   videoUrl(id) { return `/media/video/${id}`; },
   imageUrl(id) { return `/media/image/${id}`; },
+
+  // -- Workbench --
+  getProjects() { return this._fetch("/api/workbench/"); },
+  createProject(data) { return this._fetch("/api/workbench/", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); },
+  getProject(id) { return this._fetch(`/api/workbench/${id}`); },
+  updateProject(id, data) { return this._fetch(`/api/workbench/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); },
+  deleteProject(id) { return this._fetch(`/api/workbench/${id}`, { method: "DELETE" }); },
+  getProjectSegments(id) { return this._fetch(`/api/workbench/${id}/segments`); },
+  getProjectTracks(id) { return this._fetch(`/api/workbench/${id}/tracks`); },
+  updateProjectTracks(id, tracks) { return this._fetch(`/api/workbench/${id}/tracks`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tracks }) }); },
+  updateProjectMedia(id, mediaIds) { return this._fetch(`/api/workbench/${id}/media`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ media_ids: mediaIds }) }); },
 };
