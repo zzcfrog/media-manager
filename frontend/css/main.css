@@ -321,8 +321,10 @@ body.body--dark .q-separator { background: #252525 !important; }
 .filter-bar .sort-group,
 .filter-bar .q-field:not(.q-field--focused) { flex-shrink: 0; }
 .filter-bar .q-btn-group .q-btn { padding: 3px 10px; min-height: 28px; font-size: 13px; }
-.filter-bar .q-btn-group .q-btn--active { box-shadow: none !important; background: var(--accent) !important; color: #fff !important; }
-body:not(.body--dark) .filter-bar .q-btn-group .q-btn--active { color: #fff !important; }
+.filter-bar .q-btn-group .q-btn--active,
+.filter-bar .q-btn-group .type-btn-active { box-shadow: none !important; background: var(--accent) !important; color: #fff !important; }
+body:not(.body--dark) .filter-bar .q-btn-group .q-btn--active,
+body:not(.body--dark) .filter-bar .q-btn-group .type-btn-active { color: #fff !important; }
 .filter-bar .q-field { font-size: 12px; }
 .filter-bar .q-field__control { height: 28px !important; min-height: 28px !important; }
 .filter-bar .q-field__marginal { height: 28px !important; }

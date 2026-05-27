@@ -4,13 +4,19 @@ const GalleryPage = {
     <!-- Filter bar: type, fav/analyzed, stars, colors, reset, search, sort, group, view -->
     <div class="filter-bar">
       <q-btn-group unelevated style="border-radius:6px;overflow:hidden">
-        <q-btn unelevated dense :color="filters.media_type==='all'?'primary':'grey-9'" :text-color="filters.media_type==='all'?'white':'grey-6'" size="sm" label="ALL" @click="filters.media_type='all'; load()">
+        <q-btn unelevated dense size="sm" label="ALL"
+               :class="filters.media_type==='all'?'type-btn-active':''"
+               @click="filters.media_type='all'; load()">
           <q-tooltip :delay="1000">{{ t('g.all') }}</q-tooltip>
         </q-btn>
-        <q-btn unelevated dense :color="filters.media_type==='image'?'primary':'grey-9'" :text-color="filters.media_type==='image'?'white':'grey-6'" icon="image" size="sm" @click="filters.media_type='image'; load()">
+        <q-btn unelevated dense size="sm" icon="image"
+               :class="filters.media_type==='image'?'type-btn-active':''"
+               @click="filters.media_type='image'; load()">
           <q-tooltip :delay="1000">{{ t('g.images') }}</q-tooltip>
         </q-btn>
-        <q-btn unelevated dense :color="filters.media_type==='video'?'primary':'grey-9'" :text-color="filters.media_type==='video'?'white':'grey-6'" icon="smart_display" size="sm" @click="filters.media_type='video'; load()">
+        <q-btn unelevated dense size="sm" icon="smart_display"
+               :class="filters.media_type==='video'?'type-btn-active':''"
+               @click="filters.media_type='video'; load()">
           <q-tooltip :delay="1000">{{ t('g.videos') }}</q-tooltip>
         </q-btn>
       </q-btn-group>
