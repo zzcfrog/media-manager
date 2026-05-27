@@ -775,35 +775,42 @@ const GalleryPage = {
   },
   // -- Lifecycle: load data, register keyboard & scroll observers --
   created() {
-    // Restore filters from localStorage
-    try {
-      const saved = JSON.parse(localStorage.getItem('galleryFilters'));
-      if (saved) {
-        if (saved.filters) Object.assign(this.filters, saved.filters);
-        if (saved.favFilter) this.favFilter = saved.favFilter;
-        if (saved.analysisFilter) this.analysisFilter = saved.analysisFilter;
-        if (saved.sortBy) this.sortBy = saved.sortBy;
-        if (saved.sortOrder) this.sortOrder = saved.sortOrder;
-        if (saved.groupBy) this.groupBy = saved.groupBy;
-        if (saved.viewMode) this.viewMode = saved.viewMode;
-        if (saved.gridScale) this.gridScale = saved.gridScale;
-        if (saved.masonryCols) this.masonryCols = saved.masonryCols;
-        if (saved.justifiedRowH) this.justifiedRowH = saved.justifiedRowH;
-        if (saved.searchText) this.searchText = saved.searchText;
-      }
-    } catch {}
-    // Auto-save filters on changes
-    this._saveFilters = () => {
+    const isPicker = this.$root.pickerMode;
+    // Restore filters from localStorage (picker uses defaults)
+    if (!isPicker) {
       try {
-        localStorage.setItem('galleryFilters', JSON.stringify({
-          filters: this.filters, favFilter: this.favFilter, analysisFilter: this.analysisFilter,
-          sortBy: this.sortBy, sortOrder: this.sortOrder, groupBy: this.groupBy,
-          viewMode: this.viewMode, gridScale: this.gridScale,
-          masonryCols: this.masonryCols, justifiedRowH: this.justifiedRowH,
-          searchText: this.searchText,
-        }));
+        const saved = JSON.parse(localStorage.getItem('galleryFilters'));
+        if (saved) {
+          if (saved.filters) Object.assign(this.filters, saved.filters);
+          if (saved.favFilter) this.favFilter = saved.favFilter;
+          if (saved.analysisFilter) this.analysisFilter = saved.analysisFilter;
+          if (saved.sortBy) this.sortBy = saved.sortBy;
+          if (saved.sortOrder) this.sortOrder = saved.sortOrder;
+          if (saved.groupBy) this.groupBy = saved.groupBy;
+          if (saved.viewMode) this.viewMode = saved.viewMode;
+          if (saved.gridScale) this.gridScale = saved.gridScale;
+          if (saved.masonryCols) this.masonryCols = saved.masonryCols;
+          if (saved.justifiedRowH) this.justifiedRowH = saved.justifiedRowH;
+          if (saved.searchText) this.searchText = saved.searchText;
+        }
       } catch {}
-    };
+    }
+    // Auto-save filters on changes (picker doesn't persist)
+    if (!isPicker) {
+      this._saveFilters = () => {
+        try {
+          localStorage.setItem('galleryFilters', JSON.stringify({
+            filters: this.filters, favFilter: this.favFilter, analysisFilter: this.analysisFilter,
+            sortBy: this.sortBy, sortOrder: this.sortOrder, groupBy: this.groupBy,
+            viewMode: this.viewMode, gridScale: this.gridScale,
+            masonryCols: this.masonryCols, justifiedRowH: this.justifiedRowH,
+            searchText: this.searchText,
+          }));
+        } catch {}
+      };
+    } else {
+      this._saveFilters = () => {};
+    }
     if (this.searchText) this.$root.searchQuery = this.searchText.trim();
     // Picker mode: restore pre-selected items
     if (this.$root.pickerMode && this.$root.pickerSelected?.length) {

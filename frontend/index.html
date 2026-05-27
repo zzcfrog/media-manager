@@ -238,7 +238,7 @@
     <q-page-container>
       <q-page style="display:flex;flex-direction:column;height:calc(100vh - 40px);overflow:hidden">
         <keep-alive>
-          <gallery-page v-if="currentView==='gallery'" ref="gallery"></gallery-page>
+          <gallery-page v-if="currentView==='gallery' && !pickerMode" ref="gallery"></gallery-page>
         </keep-alive>
         <detail-page v-if="currentView==='detail'" :key="detailId"></detail-page>
         <duplicates-page v-if="currentView==='duplicates'"></duplicates-page>
