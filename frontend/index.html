@@ -89,18 +89,7 @@
           <div class="picker-sidebar">
             <q-list dense style="padding:8px 0">
               <q-item-label header style="padding:4px 12px"><span style="font-size:12px;color:var(--text2)">{{ t('side.browse') }}</span></q-item-label>
-              <q-tree :nodes="folderTree" node-key="path" label-key="label"
-                      :selected="pickerFolder" @update:selected="pickerFolderSelect"
-                      :expanded="expandedFolders" @update:expanded="expandedFolders = $event"
-                      no-connectors dense default-expand-all>
-                <template v-slot:default-header="prop">
-                  <div style="display:flex;align-items:center;gap:6px;overflow:hidden">
-                    <q-icon name="folder" size="16px" color="grey-6"></q-icon>
-                    <span style="font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ prop.node.label }}</span>
-                    <span style="font-size:10px;color:var(--text3);margin-left:auto">{{ prop.node.count || '' }}</span>
-                  </div>
-                </template>
-              </q-tree>
+              <folder-tree :nodes="folderTree" :selected="pickerFolder" @select="pickerFolderSelect"></folder-tree>
             </q-list>
           </div>
           <div class="picker-gallery">
@@ -130,21 +119,7 @@
           </q-item-section>
         </q-item>
         <div v-show="libraryExpanded && !drawerMini" style="padding-left:28px">
-          <q-tree :nodes="folderTree" node-key="path" label-key="label"
-            dense no-connectors
-            :selected="selectedFolder" @update:selected="onFolderSelect"
-            :expanded="expandedFolders" @update:expanded="v => expandedFolders = v">
-            <template v-slot:default-header="prop">
-              <div class="row items-center no-wrap" style="width:100%;padding:4px 6px;margin:-4px -6px"
-                :style="selectedFolder===prop.node.path ? 'background:var(--accent-dim);border-radius:4px' : ''"
-                @contextmenu.prevent="showFolderCtx($event, prop.node)">
-                <q-icon name="folder" size="16px" :color="selectedFolder===prop.node.path ? 'primary' : 'grey-6'" class="q-mr-xs"></q-icon>
-                <span class="folder-label" style="font-size:13px">{{ prop.node.label }}</span>
-                <span class="text-caption text-grey-6" style="flex-shrink:0;margin-left:4px">{{ prop.node.totalCount || 0 }}</span>
-                <q-tooltip :delay="1000" v-if="prop.node.label.length > 10">{{ prop.node.label }}</q-tooltip>
-              </div>
-            </template>
-          </q-tree>
+          <folder-tree :nodes="folderTree" :selected="selectedFolder" :context-menu="true" count-field="totalCount" @select="onFolderSelect" @contextmenu="showFolderCtx"></folder-tree>
         </div>
         <q-item clickable :active="route==='#/favorites'"
                 @click="nav('#/favorites')"
@@ -576,6 +551,7 @@
 <script src="/static/js/api.js"></script>
 <script src="/static/js/format.js"></script>
 <script src="/static/js/i18n.js"></script>
+<script src="/static/js/folder-tree.js"></script>
 <script src="/static/js/gallery.js"></script>
 <script src="/static/js/detail.js"></script>
 <script src="/static/js/duplicates.js"></script>
@@ -1348,6 +1324,7 @@ app.config.errorHandler = (err) => {
   console.error(err);
   Quasar.Notify.create({ message: err.message || t('g.n_error'), position: "top", color: "negative", timeout: 3000 });
 };
+app.component("folder-tree", FolderTree);
 app.component("gallery-page", GalleryPage);
 app.component("detail-page", DetailPage);
 app.component("duplicates-page", DuplicatesPage);
