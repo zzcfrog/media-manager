@@ -1,5 +1,19 @@
 # TODO
 
+## 已完成：工作台媒体选择器 — 90% 对话框方案（2026-05-27）
+
+工作台"添加素材"改为 90% 屏幕对话框（90vw x 90vh），内嵌完整 Gallery 页面，独立文件夹处理器避免 hash 变更和无限请求。
+
+**改动文件：**
+- `frontend/index.html` — 新增 `q-dialog` 媒体选择器（persistent，fade 过渡），内含 picker-bar（关闭/标题/已选计数/确认按钮）+ picker-body（左侧文件夹树 + 右侧 gallery-page 组件）；新增 `pickerFolderSelect()` 方法独立处理文件夹选择（仅更新 selectedFolder + 触发 pickerGallery.load()，不触发 hash 变更）；新增 `cancelPicker()`/`confirmPicker()` 方法；新增 `pickerMode`/`pickerProjectId`/`pickerSelected` 数据
+- `frontend/js/workbench.js` — `openMediaPicker()` 设置 root 数据并打开对话框
+- `frontend/css/main.css` — 新增 `.picker-dialog-card`（90vw x 90vh，flex column）、`.picker-bar`（42px 顶部栏）、`.picker-body`（flex row）、`.picker-sidebar`（220px）、`.picker-gallery`、`.picker-check`（卡片复选框覆盖层）样式
+
+**设计要点：**
+- 文件夹树使用 `pickerFolderSelect` 而非共享的 `onFolderSelect`，避免触发路由 hash 变更和无限请求
+- 嵌入完整 `gallery-page` 组件复用所有筛选/排序/视图功能，每张卡片叠加选择复选框
+- 对话框 persistent（点击背景不关闭），fade 过渡动画
+
 ## 已完成：创作工作台 Phase A — 工程管理 + 工作台骨架（2026-05-27）
 
 创作工作台基础架构：后端工程 CRUD API、侧边栏"编排"导航、新建工程弹窗、工作台页面骨架（6 轨时间线 + 素材面板）。

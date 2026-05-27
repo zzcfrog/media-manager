@@ -420,6 +420,41 @@ Gallery.load() / Gallery.loadMore()
 - 前端 `mounted()` 时通过 `GET /api/settings` 获取语言设置，初始化 `locale.value`
 - `setLocale()` 调用 `POST /api/settings` 持久化语言偏好
 
+### 5.5 工作台媒体选择器架构
+
+**对话框方案**：工作台的"添加素材"功能通过 `q-dialog`（persistent，fade 过渡）打开 90% 屏幕尺寸（90vw x 90vh）的对话框，内嵌完整的 `gallery-page` 组件复用所有筛选/排序/视图功能。
+
+**独立文件夹处理器**：
+
+选择器内的文件夹树使用独立的 `pickerFolderSelect(path)` 方法（替代主页面的 `onFolderSelect`），仅更新 `selectedFolder` 状态并触发表面画廊的 `load()` 重载。避免了共享 `onFolderSelect` 导致的两个问题：
+1. hash 变更（`onFolderSelect` 内含路由导航逻辑，会意外改变 URL hash）
+2. 无限请求（hash 变更触发 `hashchange` → 路由解析 → 画廊重建 → 反复请求）
+
+**数据流**：
+
+```
+WorkbenchPage.openMediaPicker()
+  ├── 设置 pickerProjectId / pickerSelected（预填已有素材 ID）
+  └── pickerMode = true  →  q-dialog 打开
+
+pickerGallery (gallery-page 组件, v-if="pickerMode")
+  ├── 读取 $root.selectedFolder 作为 folder 参数
+  ├── 读取所有筛选/排序状态（共享 root 数据）
+  └── 卡片叠加 picker-check 复选框 → toggle 进 pickerSelected 数组
+
+pickerFolderSelect(path)
+  └── selectedFolder toggle + $nextTick(pickerGallery.load())  // 不触发 hash 变更
+
+confirmPicker()
+  └── API.updateProjectMedia(pickerProjectId, pickerSelected)
+      └── 成功后关闭对话框 + 刷新工作台数据
+```
+
+**组件结构**：
+- `picker-dialog-card`：CSS 90vw x 90vh，flex column 布局
+- `picker-bar`（42px）：关闭按钮 + 标题 + 已选计数 + 确认按钮
+- `picker-body`：flex row，左侧 `picker-sidebar`（220px 文件夹树）+ 右侧 `picker-gallery`（嵌入 gallery-page）
+
 ## 6. 外部依赖
 
 | 工具 | 用途 |
