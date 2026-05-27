@@ -5,17 +5,17 @@ const GalleryPage = {
     <div class="filter-bar">
       <q-btn-group unelevated style="border-radius:6px;overflow:hidden">
         <q-btn unelevated dense size="sm" label="ALL"
-               :class="filters.media_type==='all'?'type-btn-active':''"
+               :style="filters.media_type==='all'?'background:var(--accent) !important;color:#fff !important':''"
                @click="filters.media_type='all'; load()">
           <q-tooltip :delay="1000">{{ t('g.all') }}</q-tooltip>
         </q-btn>
         <q-btn unelevated dense size="sm" icon="image"
-               :class="filters.media_type==='image'?'type-btn-active':''"
+               :style="filters.media_type==='image'?'background:var(--accent) !important;color:#fff !important':''"
                @click="filters.media_type='image'; load()">
           <q-tooltip :delay="1000">{{ t('g.images') }}</q-tooltip>
         </q-btn>
         <q-btn unelevated dense size="sm" icon="smart_display"
-               :class="filters.media_type==='video'?'type-btn-active':''"
+               :style="filters.media_type==='video'?'background:var(--accent) !important;color:#fff !important':''"
                @click="filters.media_type='video'; load()">
           <q-tooltip :delay="1000">{{ t('g.videos') }}</q-tooltip>
         </q-btn>
