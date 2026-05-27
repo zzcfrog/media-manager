@@ -472,16 +472,47 @@ body:not(.body--dark) .sidebar-action-btn {
   color: #fff !important;
 }
 
-/* Picker bar */
+/* Picker dialog */
+.picker-dialog-card {
+  background: var(--bg);
+  width: 90vw;
+  height: 90vh;
+  margin: auto;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
 .picker-bar {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 0 16px;
-  height: 36px;
-  min-height: 36px;
+  height: 42px;
+  min-height: 42px;
   background: var(--surface2);
   border-bottom: 1px solid var(--border);
+  border-radius: 12px 12px 0 0;
+}
+.picker-body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  min-height: 0;
+}
+.picker-sidebar {
+  width: 220px;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  flex-shrink: 0;
+  background: var(--surface);
+}
+.picker-gallery {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 /* Picker checkbox overlay on gallery cards */

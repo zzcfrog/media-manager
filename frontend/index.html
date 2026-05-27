@@ -74,22 +74,21 @@
     </q-header>
 
     <!-- Media picker dialog -->
-    <q-dialog v-model="pickerMode" maximized transition-show="slide-up" transition-hide="slide-down">
-      <q-card style="background:var(--bg);width:90vw;height:90vh;margin:auto;border-radius:12px;overflow:hidden;display:flex;flex-direction:column">
+    <q-dialog v-model="pickerMode" maximized persistent transition-show="fade" transition-hide="fade">
+      <q-card class="picker-dialog-card">
         <div class="picker-bar">
-          <q-btn flat round dense icon="arrow_back" size="sm" color="grey-6" @click="cancelPicker"></q-btn>
+          <q-btn flat round dense icon="close" size="sm" color="grey-6" @click="cancelPicker"></q-btn>
           <span style="font-size:14px;font-weight:500">{{ t('wb.picker_title') }}</span>
           <span style="font-size:12px;color:var(--accent);margin-left:8px">{{ t('wb.media_selected', {n: pickerSelected.length}) }}</span>
           <q-space></q-space>
-          <q-btn flat dense :label="t('g.cancel')" size="12px" @click="cancelPicker"></q-btn>
-          <q-btn unelevated dense :label="t('wb.confirm_add')" size="12px"
-                 :style="pickerSelected.length ? 'background:var(--accent);color:#fff' : 'opacity:0.4'"
+          <q-btn unelevated no-caps :label="t('wb.confirm_add')"
+                 :style="pickerSelected.length ? 'background:var(--accent);color:#fff;padding:4px 20px;border-radius:6px' : 'background:var(--surface2);color:var(--text3);padding:4px 20px;border-radius:6px'"
                  :disable="!pickerSelected.length" @click="confirmPicker"></q-btn>
         </div>
-        <div style="flex:1;overflow:hidden;display:flex">
-          <div style="width:240px;border-right:1px solid var(--border);overflow-y:auto;flex-shrink:0">
+        <div class="picker-body">
+          <div class="picker-sidebar">
             <q-list dense style="padding:8px 0">
-              <q-item-label header style="padding:4px 12px"><span style="font-size:12px">{{ t('side.browse') }}</span></q-item-label>
+              <q-item-label header style="padding:4px 12px"><span style="font-size:12px;color:var(--text2)">{{ t('side.browse') }}</span></q-item-label>
               <q-tree :nodes="folderTree" node-key="path" label-key="name"
                       :selected="selectedFolder" @update:selected="onFolderSelect"
                       :expanded="expandedFolders" @update:expanded="expandedFolders = $event"
@@ -98,14 +97,14 @@
                 <template v-slot:default-header="prop">
                   <div style="display:flex;align-items:center;gap:6px;overflow:hidden">
                     <q-icon name="folder" size="16px" color="grey-6"></q-icon>
-                    <span style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ prop.node.name }}</span>
+                    <span style="font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ prop.node.name }}</span>
                     <span style="font-size:10px;color:var(--text3);margin-left:auto">{{ prop.node.count || '' }}</span>
                   </div>
                 </template>
               </q-tree>
             </q-list>
           </div>
-          <div style="flex:1;overflow:hidden">
+          <div class="picker-gallery">
             <gallery-page v-if="pickerMode" ref="pickerGallery"></gallery-page>
           </div>
         </div>
