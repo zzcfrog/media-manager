@@ -731,7 +731,6 @@ const app = Vue.createApp({
   },
   watch: {
     selectedFolder(v) { localStorage.setItem('selectedFolder', v || ''); },
-    pickerMode(v) { document.body.classList.toggle('picker-open', v); },
     bgTasks: {
       deep: true,
       handler() {
