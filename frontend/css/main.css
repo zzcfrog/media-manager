@@ -475,9 +475,10 @@ body:not(.body--dark) .sidebar-action-btn {
 /* Picker dialog */
 .picker-dialog-card {
   background: var(--bg);
-  width: 90vw;
-  height: 90vh;
-  margin: auto;
+  width: 90vw !important;
+  height: 90vh !important;
+  max-width: 90vw !important;
+  max-height: 90vh !important;
   border-radius: 12px;
   overflow: hidden;
   display: flex;

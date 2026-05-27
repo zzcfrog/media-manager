@@ -74,7 +74,7 @@
     </q-header>
 
     <!-- Media picker dialog -->
-    <q-dialog v-model="pickerMode" maximized persistent transition-show="fade" transition-hide="fade">
+    <q-dialog v-model="pickerMode" persistent transition-show="fade" transition-hide="fade">
       <q-card class="picker-dialog-card">
         <div class="picker-bar">
           <q-btn flat round dense icon="close" size="sm" color="grey-6" @click="cancelPicker"></q-btn>
@@ -90,10 +90,9 @@
             <q-list dense style="padding:8px 0">
               <q-item-label header style="padding:4px 12px"><span style="font-size:12px;color:var(--text2)">{{ t('side.browse') }}</span></q-item-label>
               <q-tree :nodes="folderTree" node-key="path" label-key="name"
-                      :selected="selectedFolder" @update:selected="onFolderSelect"
+                      :selected="selectedFolder" @update:selected="pickerFolderSelect"
                       :expanded="expandedFolders" @update:expanded="expandedFolders = $event"
-                      no-connectors dense default-expand-all
-                      selected-color="primary">
+                      no-connectors dense default-expand-all>
                 <template v-slot:default-header="prop">
                   <div style="display:flex;align-items:center;gap:6px;overflow:hidden">
                     <q-icon name="folder" size="16px" color="grey-6"></q-icon>
@@ -1055,6 +1054,10 @@ const app = Vue.createApp({
       await API.deleteProject(project.id);
       if (location.hash === "#/workbench/" + project.id) location.hash = "#/gallery";
       await this.loadProjects();
+    },
+    pickerFolderSelect(path) {
+      this.selectedFolder = this.selectedFolder === path ? null : path;
+      this.$nextTick(() => this.$refs.pickerGallery?.load());
     },
     cancelPicker() {
       this.pickerMode = false;
