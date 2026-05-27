@@ -90,7 +90,7 @@
             <q-list dense style="padding:8px 0">
               <q-item-label header style="padding:4px 12px"><span style="font-size:12px;color:var(--text2)">{{ t('side.browse') }}</span></q-item-label>
               <q-tree :nodes="folderTree" node-key="path" label-key="label"
-                      :selected="selectedFolder" @update:selected="pickerFolderSelect"
+                      :selected="pickerFolder" @update:selected="pickerFolderSelect"
                       :expanded="expandedFolders" @update:expanded="expandedFolders = $event"
                       no-connectors dense default-expand-all>
                 <template v-slot:default-header="prop">
@@ -599,6 +599,7 @@ const app = Vue.createApp({
       pickerMode: false,
       pickerProjectId: null,
       pickerSelected: [],
+      pickerFolder: null,
       galleryItems: [],
       favFilter: false,
       searchQuery: "",
@@ -730,6 +731,7 @@ const app = Vue.createApp({
   },
   watch: {
     selectedFolder(v) { localStorage.setItem('selectedFolder', v || ''); },
+    pickerMode(v) { document.body.classList.toggle('picker-open', v); },
     bgTasks: {
       deep: true,
       handler() {
@@ -1056,7 +1058,7 @@ const app = Vue.createApp({
       await this.loadProjects();
     },
     pickerFolderSelect(path) {
-      this.selectedFolder = this.selectedFolder === path ? null : path;
+      this.pickerFolder = this.pickerFolder === path ? null : path;
       this.$nextTick(() => this.$refs.pickerGallery?.load());
     },
     cancelPicker() {

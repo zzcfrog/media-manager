@@ -855,7 +855,7 @@ const GalleryPage = {
         else if (this.analysisFilter === 'not') params.analysis_status = "not_analyzed";
         const q = this.$root.searchQuery;
         if (q) params.q = q;
-        const folder = this.$root.selectedFolder;
+        const folder = this.$root.pickerMode ? this.$root.pickerFolder : this.$root.selectedFolder;
         if (folder) params.folder = folder;
         const res = await API.getLibrary(params);
         const data = res.data || [];
@@ -884,7 +884,7 @@ const GalleryPage = {
         else if (this.analysisFilter === 'not') params.analysis_status = "not_analyzed";
         const q = this.$root.searchQuery;
         if (q) params.q = q;
-        const folder = this.$root.selectedFolder;
+        const folder = this.$root.pickerMode ? this.$root.pickerFolder : this.$root.selectedFolder;
         if (folder) params.folder = folder;
         const res = await API.getLibrary(params);
         const data = res.data || [];
