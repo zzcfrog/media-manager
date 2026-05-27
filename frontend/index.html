@@ -89,14 +89,14 @@
           <div class="picker-sidebar">
             <q-list dense style="padding:8px 0">
               <q-item-label header style="padding:4px 12px"><span style="font-size:12px;color:var(--text2)">{{ t('side.browse') }}</span></q-item-label>
-              <q-tree :nodes="folderTree" node-key="path" label-key="name"
+              <q-tree :nodes="folderTree" node-key="path" label-key="label"
                       :selected="selectedFolder" @update:selected="pickerFolderSelect"
                       :expanded="expandedFolders" @update:expanded="expandedFolders = $event"
                       no-connectors dense default-expand-all>
                 <template v-slot:default-header="prop">
                   <div style="display:flex;align-items:center;gap:6px;overflow:hidden">
                     <q-icon name="folder" size="16px" color="grey-6"></q-icon>
-                    <span style="font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ prop.node.name }}</span>
+                    <span style="font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ prop.node.label }}</span>
                     <span style="font-size:10px;color:var(--text3);margin-left:auto">{{ prop.node.count || '' }}</span>
                   </div>
                 </template>

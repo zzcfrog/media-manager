@@ -636,7 +636,7 @@ const GalleryPage = {
   data() {
     return {
       items: [], total: 0, page: 1, perPage: 60, loading: false, loadingMore: false, allLoaded: false, viewMode: "grid", searchText: "",
-      sortBy: "imported_at", sortOrder: "desc", gridScale: 1, masonryCols: 5, justifiedRowH: 220, galleryWidth: 0,
+      sortBy: "imported_at", sortOrder: "desc", gridScale: 1, masonryCols: 5, justifiedRowH: 220,
       selArr: [], lasso: null, lastClickIdx: -1,
       ctxMenu: { show: false, item: null, x: 0, y: 0 },
       confirmDelete: { show: false, id: null, name: "" },
@@ -826,15 +826,12 @@ const GalleryPage = {
     this.$nextTick(() => {
       if (this.$refs.sentinel) this._observer.observe(this.$refs.sentinel);
     });
-    this._ro = new ResizeObserver(() => { this.galleryWidth = this.$refs.galleryPage?.clientWidth || 0; });
-    if (this.$refs.galleryPage) this._ro.observe(this.$refs.galleryPage);
   },
   beforeUnmount() {
     document.removeEventListener("mousedown", this.closeCtx);
     document.removeEventListener("mousedown", this._closeSimilarCtx);
     document.removeEventListener("keydown", this.handleKey, true);
     if (this._observer) this._observer.disconnect();
-    if (this._ro) this._ro.disconnect();
   },
   // -- Methods: data loading, selection, keyboard, context menu, formatting --
   methods: {
