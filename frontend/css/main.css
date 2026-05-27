@@ -476,15 +476,17 @@ body:not(.body--dark) .filter-icon-off::after { background: #bbb; }
   min-height: 40px;
 }
 
-.wb-main {
+/* Top area: material (left) + preview (right) */
+.wb-top {
   display: flex;
   flex: 1;
   overflow: hidden;
+  min-height: 0;
 }
 
 /* Material panel */
 .wb-material {
-  width: 280px;
+  width: 320px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -577,21 +579,56 @@ body:not(.body--dark) .filter-icon-off::after { background: #bbb; }
   white-space: nowrap;
 }
 
-/* Track area */
-.wb-tracks {
+/* Preview area (top right) */
+.wb-preview {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 8px;
-  gap: 4px;
+  min-width: 0;
+}
+
+.wb-preview-media {
+  flex: 1;
+  object-fit: contain;
+  background: #000;
+  min-height: 0;
+}
+
+.wb-preview-detail {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  max-height: 100px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.wb-preview-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Track area (bottom, full width) */
+.wb-tracks {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 6px 8px;
+  gap: 3px;
+  border-top: 1px solid var(--border);
+  max-height: 280px;
 }
 
 .wb-track-row {
   display: flex;
   align-items: stretch;
-  min-height: 48px;
-  border-radius: 6px;
+  min-height: 36px;
+  border-radius: 4px;
   border: 1px solid var(--border);
   overflow: hidden;
 }

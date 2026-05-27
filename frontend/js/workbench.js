@@ -20,36 +20,62 @@ const WorkbenchPage = {
   <div v-if="loading" style="display:flex;align-items:center;justify-content:center;flex:1">
     <q-spinner size="32px" color="primary"></q-spinner>
   </div>
-  <div v-else-if="project" class="wb-main">
-    <!-- Left: Material panel -->
-    <div class="wb-material">
-      <div class="wb-material-header">
-        {{ t('wb.material') }}
-        <span style="font-size:11px;color:var(--text3);margin-left:4px">{{ segments.length }}</span>
-        <q-btn flat round dense icon="add" size="xs" color="primary" style="margin-left:auto"
-               @click="openMediaPicker">
-          <q-tooltip>{{ t('wb.add_media') }}</q-tooltip>
-        </q-btn>
-      </div>
-      <div class="wb-material-list">
-        <div v-if="!segments.length" class="wb-empty-material">{{ t('wb.no_segments') }}</div>
-        <div v-for="seg in segments" :key="seg.id" class="wb-seg-card"
-             :class="{ selected: selectedSegment && selectedSegment.id === seg.id }"
-             @click="selectedSegment = seg">
-          <img :src="'/media/thumbnail/' + seg.media_id" class="wb-seg-thumb" loading="lazy">
-          <div class="wb-seg-info">
-            <div style="display:flex;gap:4px;flex-wrap:wrap">
-              <span v-if="seg.mood" class="wb-seg-tag">{{ seg.mood }}</span>
-              <span v-if="seg.shot_type" class="wb-seg-tag">{{ seg.shot_type }}</span>
+  <template v-else-if="project">
+
+    <!-- Top: Material (left) + Preview (right) -->
+    <div class="wb-top">
+      <!-- Left: Material panel -->
+      <div class="wb-material">
+        <div class="wb-material-header">
+          {{ t('wb.material') }}
+          <span style="font-size:11px;color:var(--text3);margin-left:4px">{{ segments.length }}</span>
+          <q-btn flat round dense icon="add" size="xs" color="primary" style="margin-left:auto"
+                 @click="openMediaPicker">
+            <q-tooltip>{{ t('wb.add_media') }}</q-tooltip>
+          </q-btn>
+        </div>
+        <div class="wb-material-list">
+          <div v-if="!segments.length" class="wb-empty-material">{{ t('wb.no_segments') }}</div>
+          <div v-for="seg in segments" :key="seg.id" class="wb-seg-card"
+               :class="{ selected: selectedSegment && selectedSegment.id === seg.id }"
+               @click="selectedSegment = seg">
+            <img :src="'/media/thumbnail/' + seg.media_id" class="wb-seg-thumb" loading="lazy">
+            <div class="wb-seg-info">
+              <div style="display:flex;gap:4px;flex-wrap:wrap">
+                <span v-if="seg.mood" class="wb-seg-tag">{{ seg.mood }}</span>
+                <span v-if="seg.shot_type" class="wb-seg-tag">{{ seg.shot_type }}</span>
+              </div>
+              <div class="wb-seg-time">{{ seg.time_start }} - {{ seg.time_end }}</div>
+              <div class="wb-seg-source">{{ seg.file_name }}</div>
             </div>
-            <div class="wb-seg-time">{{ seg.time_start }} - {{ seg.time_end }}</div>
-            <div class="wb-seg-source">{{ seg.file_name }}</div>
           </div>
+        </div>
+      </div>
+
+      <!-- Right: Preview -->
+      <div class="wb-preview">
+        <template v-if="selectedSegment">
+          <img v-if="selectedSegment.media_type === 'image'"
+               :src="'/media/image/' + selectedSegment.media_id" class="wb-preview-media">
+          <video v-else :src="'/media/video/' + selectedSegment.media_id"
+                 class="wb-preview-media" controls></video>
+          <div class="wb-preview-detail">
+            <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">
+              <span v-if="selectedSegment.mood" class="wb-seg-tag">{{ selectedSegment.mood }}</span>
+              <span v-if="selectedSegment.shot_type" class="wb-seg-tag">{{ selectedSegment.shot_type }}</span>
+              <span v-if="selectedSegment.scene_type" class="wb-seg-tag">{{ selectedSegment.scene_type }}</span>
+            </div>
+            <div style="font-size:12px;color:var(--text2);line-height:1.5">{{ selectedSegment.visual }}</div>
+          </div>
+        </template>
+        <div v-else class="wb-preview-empty">
+          <q-icon name="play_circle_outline" size="48px" color="grey-6" style="opacity:0.3"></q-icon>
+          <span style="font-size:12px;color:var(--text3)">{{ t('wb.no_segments') }}</span>
         </div>
       </div>
     </div>
 
-    <!-- Right: Tracks -->
+    <!-- Bottom: Tracks -->
     <div class="wb-tracks">
       <div v-for="tt in trackTypes" :key="tt.key" class="wb-track-row">
         <div class="wb-track-label">{{ t('wb.track_' + tt.key) }}</div>
@@ -75,7 +101,8 @@ const WorkbenchPage = {
         </div>
       </div>
     </div>
-  </div>
+
+  </template>
 
   <!-- Status bar -->
   <div class="wb-statusbar">
