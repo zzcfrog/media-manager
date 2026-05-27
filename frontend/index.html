@@ -76,7 +76,13 @@
     <!-- Sidebar -->
     <q-drawer v-model="drawerOpen" :width="260" :mini="drawerMini" :breakpoint="0" bordered style="display:flex;flex-direction:column" mini-width="56">
       <q-list dense>
-        <q-item-label header>{{ t('side.browse') }}</q-item-label>
+        <q-item-label header style="display:flex;align-items:center;justify-content:space-between;padding-right:10px">
+          <span>{{ t('side.browse') }}</span>
+          <q-btn v-if="!drawerMini" flat round dense icon="add_circle_outline" size="xs" color="grey-6"
+                 @click="openImport">
+            <q-tooltip>{{ t('side.import') }}</q-tooltip>
+          </q-btn>
+        </q-item-label>
         <q-item clickable
           :style="route==='#/gallery' && !selectedFolder ? 'background:var(--accent-dim);border-radius:4px' : ''"
           @click="navToLibrary">
@@ -116,7 +122,13 @@
           <q-item-section>{{ t('side.find_dup') }}</q-item-section>
         </q-item>
         <q-separator style="background:var(--border);margin:8px 0"></q-separator>
-        <q-item-label header>{{ t('wb.section') }}</q-item-label>
+        <q-item-label header style="display:flex;align-items:center;justify-content:space-between;padding-right:10px">
+          <span>{{ t('wb.section') }}</span>
+          <q-btn v-if="!drawerMini" flat round dense icon="add" size="xs" color="grey-6"
+                 @click="openNewProject">
+            <q-tooltip>{{ t('wb.new_project') }}</q-tooltip>
+          </q-btn>
+        </q-item-label>
         <q-item v-for="p in projects" :key="p.id" clickable dense
                 :active="route==='#/workbench/'+p.id"
                 @click="nav('#/workbench/'+p.id)"
@@ -130,16 +142,7 @@
           <q-item-section avatar><q-icon name="dashboard" size="18px" color="grey-6"></q-icon></q-item-section>
           <q-item-section style="font-size:12px;color:var(--text3)">{{ t('wb.no_projects') }}</q-item-section>
         </q-item>
-        <q-item clickable @click="openNewProject" style="padding:4px 16px">
-          <q-item-section avatar><q-icon name="add" size="18px" color="grey-6"></q-icon></q-item-section>
-          <q-item-section style="font-size:12px;color:var(--text3)">{{ t('wb.new_project') }}</q-item-section>
-        </q-item>
       </q-list>
-      <q-space></q-space>
-      <div style="padding:12px 14px;flex-shrink:0">
-        <q-btn v-if="!drawerMini" color="primary" class="full-width" icon="add_circle_outline" :label="t('side.import')" @click="openImport"></q-btn>
-        <q-btn v-else flat round dense icon="add" color="primary" @click="openImport"></q-btn>
-      </div>
     </q-drawer>
 
     <!-- Folder context menu -->
