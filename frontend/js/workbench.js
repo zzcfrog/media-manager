@@ -88,15 +88,15 @@ const WorkbenchPage = {
                 <span>{{ item._segment ? (item._segment.mood || item._segment.shot_type || '...') : '?' }}</span>
               </template>
               <template v-else-if="tt.key === 'emotion'">
-                <span style="font-size:11px">{{ item.emotion_value?.toFixed(2) }}</span>
+                <span>{{ item.emotion_value?.toFixed(2) }}</span>
               </template>
               <template v-else>
-                <span style="font-size:12px">{{ item.content || '...' }}</span>
+                <span>{{ item.content || '...' }}</span>
               </template>
             </div>
           </template>
           <div v-else class="wb-track-empty">
-            <span v-if="tt.key === 'video'" style="font-size:12px;color:var(--text3)">{{ t('wb.empty_hint') }}</span>
+            <span v-if="tt.key === 'video'">{{ t('wb.empty_hint') }}</span>
           </div>
         </div>
       </div>
