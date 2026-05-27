@@ -829,14 +829,12 @@ const GalleryPage = {
     document.addEventListener("mousedown", this._closeSimilarCtx);
   },
   mounted() {
-    if (!this.$root.pickerMode) {
-      this._observer = new IntersectionObserver(([entry]) => {
-        if (entry.isIntersecting) this.loadMore();
-      }, { root: this.$refs.galleryPage, rootMargin: "200px" });
-      this.$nextTick(() => {
-        if (this.$refs.sentinel) this._observer.observe(this.$refs.sentinel);
-      });
-    }
+    this._observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) this.loadMore();
+    }, { root: this.$refs.galleryPage, rootMargin: "200px" });
+    this.$nextTick(() => {
+      if (this.$refs.sentinel) this._observer.observe(this.$refs.sentinel);
+    });
   },
   beforeUnmount() {
     document.removeEventListener("mousedown", this.closeCtx);
