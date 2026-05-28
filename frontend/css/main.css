@@ -696,10 +696,18 @@ body:not(.body--dark) .sidebar-action-btn {
 .wb-preview-detail {
   padding: 8px 12px;
   border-top: 1px solid var(--border);
-  max-height: 100px;
   overflow-y: auto;
   flex-shrink: 0;
 }
+.wb-seg-list { margin-top: 6px; }
+.wb-seg-item {
+  padding: 5px 6px; border-radius: 4px; cursor: pointer;
+  border-bottom: 1px solid var(--border); font-size: 11px;
+}
+.wb-seg-item:last-child { border-bottom: none; }
+.wb-seg-item:hover { background: var(--surface2); }
+.wb-seg-item.active { background: var(--accent-dim); }
+.wb-seg-item-time { color: var(--text3); margin-right: 6px; font-family: monospace; font-size: 10px; }
 
 .wb-preview-empty {
   flex: 1;

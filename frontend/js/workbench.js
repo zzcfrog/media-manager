@@ -28,25 +28,24 @@ const WorkbenchPage = {
       <div class="wb-material">
         <div class="wb-material-header">
           {{ t('wb.material') }}
-          <span style="font-size:11px;color:var(--text3);margin-left:4px">{{ segments.length }}</span>
+          <span style="font-size:11px;color:var(--text3);margin-left:4px">{{ project.media ? project.media.length : 0 }}</span>
           <q-btn flat round dense icon="add_circle_outline" size="xs" style="color:var(--accent);margin-left:auto"
                  @click="openMediaPicker">
             <q-tooltip>{{ t('wb.add_media') }}</q-tooltip>
           </q-btn>
         </div>
         <div class="wb-material-list">
-          <div v-if="!segments.length" class="wb-empty-material">{{ t('wb.no_segments') }}</div>
-          <div v-for="seg in segments" :key="seg.id" class="wb-seg-card"
-               :class="{ selected: selectedSegment && selectedSegment.id === seg.id }"
-               @click="selectedSegment = seg">
-            <img :src="'/media/thumbnail/' + seg.media_id" class="wb-seg-thumb" loading="lazy">
+          <div v-if="!project.media || !project.media.length" class="wb-empty-material">{{ t('wb.no_segments') }}</div>
+          <div v-for="m in project.media" :key="m.id" class="wb-seg-card"
+               :class="{ selected: selectedMedia && selectedMedia.id === m.id }"
+               @click="selectedMedia = m">
+            <img :src="'/media/thumbnail/' + m.id" class="wb-seg-thumb" loading="lazy">
             <div class="wb-seg-info">
-              <div style="display:flex;gap:4px;flex-wrap:wrap">
-                <span v-if="seg.mood" class="wb-seg-tag">{{ seg.mood }}</span>
-                <span v-if="seg.shot_type" class="wb-seg-tag">{{ seg.shot_type }}</span>
+              <div class="wb-seg-source" style="font-size:12px">{{ m.file_name }}</div>
+              <div style="display:flex;gap:4px;align-items:center">
+                <span v-if="m.duration" class="wb-seg-tag">{{ m.duration }}</span>
+                <span class="wb-seg-tag">{{ mediaSegments(m.id).length }} {{ t('wb.seg_unit') }}</span>
               </div>
-              <div class="wb-seg-time">{{ seg.time_start }} - {{ seg.time_end }}</div>
-              <div class="wb-seg-source">{{ seg.file_name }}</div>
             </div>
           </div>
         </div>
@@ -54,18 +53,28 @@ const WorkbenchPage = {
 
       <!-- Right: Preview -->
       <div class="wb-preview">
-        <template v-if="selectedSegment">
-          <img v-if="selectedSegment.media_type === 'image'"
-               :src="'/media/image/' + selectedSegment.media_id" class="wb-preview-media">
-          <video v-else :src="'/media/video/' + selectedSegment.media_id"
+        <template v-if="selectedMedia">
+          <img v-if="selectedMedia.media_type === 'image'"
+               :src="'/media/image/' + selectedMedia.id" class="wb-preview-media">
+          <video v-else :src="'/media/video/' + selectedMedia.id"
                  class="wb-preview-media" controls></video>
           <div class="wb-preview-detail">
-            <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">
-              <span v-if="selectedSegment.mood" class="wb-seg-tag">{{ selectedSegment.mood }}</span>
-              <span v-if="selectedSegment.shot_type" class="wb-seg-tag">{{ selectedSegment.shot_type }}</span>
-              <span v-if="selectedSegment.scene_type" class="wb-seg-tag">{{ selectedSegment.scene_type }}</span>
+            <div style="font-size:13px;font-weight:500;margin-bottom:4px">{{ selectedMedia.file_name }}</div>
+            <div v-if="mediaSegments(selectedMedia.id).length" class="wb-seg-list">
+              <div v-for="seg in mediaSegments(selectedMedia.id)" :key="seg.id" class="wb-seg-item"
+                   :class="{ active: activeSeg && activeSeg.id === seg.id }"
+                   @click="activeSeg = seg">
+                <span class="wb-seg-item-time">{{ seg.time_start }} - {{ seg.time_end }}</span>
+                <div style="display:flex;gap:4px;flex-wrap:wrap">
+                  <span v-if="seg.mood" class="wb-seg-tag">{{ seg.mood }}</span>
+                  <span v-if="seg.shot_type" class="wb-seg-tag">{{ seg.shot_type }}</span>
+                  <span v-if="seg.scene_type" class="wb-seg-tag">{{ seg.scene_type }}</span>
+                </div>
+                <div v-if="activeSeg && activeSeg.id === seg.id && seg.visual"
+                     style="font-size:11px;color:var(--text2);margin-top:4px;line-height:1.4">{{ seg.visual }}</div>
+              </div>
             </div>
-            <div style="font-size:12px;color:var(--text2);line-height:1.5">{{ selectedSegment.visual }}</div>
+            <div v-else style="font-size:11px;color:var(--text3);margin-top:6px">{{ t('wb.no_segments') }}</div>
           </div>
         </template>
         <div v-else class="wb-preview-empty">
@@ -118,7 +127,8 @@ const WorkbenchPage = {
       segments: [],
       tracks: [],
       loading: true,
-      selectedSegment: null,
+      selectedMedia: null,
+      activeSeg: null,
       trackTypes: [
         { key: "theme" },
         { key: "emotion" },
@@ -150,6 +160,7 @@ const WorkbenchPage = {
 
   watch: {
     projectId() { this.load(); },
+    selectedMedia() { this.activeSeg = null; },
   },
 
   created() {
@@ -182,6 +193,9 @@ const WorkbenchPage = {
     },
     getTrackItems(trackType) {
       return this.tracks.filter(tr => tr.track_type === trackType);
+    },
+    mediaSegments(mediaId) {
+      return this.segments.filter(s => s.media_id === mediaId);
     },
     _parseDuration(start, end) {
       const toSec = (t) => {
