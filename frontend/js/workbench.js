@@ -36,7 +36,8 @@ const WorkbenchPage = {
         </div>
         <div class="wb-mat-toolbar">
           <q-input v-model="matSearch" dense outlined clearable
-                   :placeholder="t('wb.search')" class="wb-mat-search">
+                   :placeholder="t('wb.search')" class="wb-mat-search"
+                   @keyup.enter="searchMedia">
             <template v-slot:prepend><q-icon name="search" size="14px"></q-icon></template>
           </q-input>
           <div class="wb-mat-filters">
@@ -169,10 +170,6 @@ const WorkbenchPage = {
       if (!this.project || !this.project.media) return [];
       let list = this.project.media;
       if (this.matType) list = list.filter(m => m.media_type === this.matType);
-      if (this.matSearch) {
-        const q = this.matSearch.toLowerCase();
-        list = list.filter(m => m.file_name.toLowerCase().includes(q));
-      }
       const key = this.matSort;
       list = [...list].sort((a, b) => {
         if (key === "duration") return (a.duration || 0) - (b.duration || 0);
@@ -200,6 +197,11 @@ const WorkbenchPage = {
   watch: {
     projectId() { this.load(); },
     selectedMedia() { this.activeSeg = null; },
+    matSearch(val) {
+      clearTimeout(this._searchTimer);
+      if (!val) { this.searchMedia(); return; }
+      this._searchTimer = setTimeout(() => this.searchMedia(), 400);
+    },
   },
 
   created() {
@@ -212,7 +214,7 @@ const WorkbenchPage = {
       this.loading = true;
       try {
         const [projRes, segRes, trackRes] = await Promise.all([
-          API.getProject(this.projectId),
+          API.getProject(this.projectId, this.matSearch),
           API.getProjectSegments(this.projectId),
           API.getProjectTracks(this.projectId),
         ]);
@@ -229,6 +231,15 @@ const WorkbenchPage = {
         Quasar.Notify.create({ message: e.message, color: "negative", position: "top" });
       }
       this.loading = false;
+    },
+    async searchMedia() {
+      if (!this.projectId) return;
+      try {
+        const res = await API.getProject(this.projectId, this.matSearch);
+        this.project = { ...this.project, media: res.data.media };
+      } catch (e) {
+        console.error(e);
+      }
     },
     getTrackItems(trackType) {
       return this.tracks.filter(tr => tr.track_type === trackType);

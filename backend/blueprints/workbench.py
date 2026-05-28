@@ -71,12 +71,24 @@ def get_project(pid):
     if not proj:
         return jsonify({"error": "Not found"}), 404
     result = dict(proj)
-    media = db.execute(
-        "SELECT m.id, m.file_name, m.media_type, m.thumbnail_path, m.duration, m.date_taken "
-        "FROM media m JOIN project_media pm ON pm.media_id = m.id "
-        "WHERE pm.project_id = ?",
-        (pid,),
-    ).fetchall()
+    q = request.args.get("q", "").strip()
+    if q:
+        from blueprints.library import _segment_query
+        seg_q = _segment_query(q)
+        media = db.execute(
+            "SELECT m.id, m.file_name, m.media_type, m.thumbnail_path, m.duration, m.date_taken "
+            "FROM media m JOIN project_media pm ON pm.media_id = m.id "
+            "JOIN media_fts fts ON fts.media_id = m.id "
+            "WHERE pm.project_id = ? AND media_fts MATCH ?",
+            (pid, seg_q),
+        ).fetchall()
+    else:
+        media = db.execute(
+            "SELECT m.id, m.file_name, m.media_type, m.thumbnail_path, m.duration, m.date_taken "
+            "FROM media m JOIN project_media pm ON pm.media_id = m.id "
+            "WHERE pm.project_id = ?",
+            (pid,),
+        ).fetchall()
     result["media"] = [dict(r) for r in media]
     result["media_count"] = len(media)
     return jsonify({"data": result})

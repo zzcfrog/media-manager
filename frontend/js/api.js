@@ -121,7 +121,7 @@ scanPaths(paths) {
   // -- Workbench --
   getProjects() { return this._fetch("/api/workbench/"); },
   createProject(data) { return this._fetch("/api/workbench/", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); },
-  getProject(id) { return this._fetch(`/api/workbench/${id}`); },
+  getProject(id, q) { return this._fetch(`/api/workbench/${id}` + (q ? `?q=${encodeURIComponent(q)}` : '')); },
   updateProject(id, data) { return this._fetch(`/api/workbench/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); },
   deleteProject(id) { return this._fetch(`/api/workbench/${id}`, { method: "DELETE" }); },
   getProjectSegments(id) { return this._fetch(`/api/workbench/${id}/segments`); },
