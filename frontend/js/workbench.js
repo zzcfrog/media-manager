@@ -29,7 +29,7 @@ const WorkbenchPage = {
         <div class="wb-material-header">
           {{ t('wb.material') }}
           <span style="font-size:11px;color:var(--text3);margin-left:4px">{{ segments.length }}</span>
-          <q-btn flat round dense icon="add" size="xs" color="primary" style="margin-left:auto"
+          <q-btn flat round dense icon="add_circle_outline" size="xs" style="color:var(--accent);margin-left:auto"
                  @click="openMediaPicker">
             <q-tooltip>{{ t('wb.add_media') }}</q-tooltip>
           </q-btn>

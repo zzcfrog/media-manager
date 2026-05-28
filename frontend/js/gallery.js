@@ -66,17 +66,17 @@ const GalleryPage = {
         :options="durGroupOptions" emit-value map-options
         style="min-width:100px" class="q-ml-xs"></q-select>
       <q-btn-group flat style="flex-shrink:0">
-        <q-btn flat dense icon="apps" size="md" @click="viewMode='grid'" :style="{color: viewMode==='grid' ? 'var(--q-primary)' : 'var(--text3)'}">
+        <q-btn flat dense icon="apps" size="md" @click="viewMode='grid'" :style="{color: viewMode==='grid' ? 'var(--accent)' : 'var(--text3)'}">
           <q-tooltip :delay="1000">{{ t('g.grid_view') }}</q-tooltip>
         </q-btn>
-        <q-btn flat dense icon="view_column" size="md" @click="viewMode='masonry'" :style="{color: viewMode==='masonry' ? 'var(--q-primary)' : 'var(--text3)'}">
+        <q-btn flat dense icon="view_column" size="md" @click="viewMode='masonry'" :style="{color: viewMode==='masonry' ? 'var(--accent)' : 'var(--text3)'}">
           <q-tooltip :delay="1000">{{ t('g.masonry_view') }}</q-tooltip>
         </q-btn>
-        <q-btn flat dense size="md" @click="viewMode='justified'" :style="{color: viewMode==='justified' ? 'var(--q-primary)' : 'var(--text3)'}">
+        <q-btn flat dense size="md" @click="viewMode='justified'" :style="{color: viewMode==='justified' ? 'var(--accent)' : 'var(--text3)'}">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><rect x="1" y="3" width="18" height="4"/><rect x="1" y="8" width="18" height="4"/><rect x="1" y="13" width="18" height="4"/></svg>
           <q-tooltip :delay="1000">{{ t('g.justified_view') }}</q-tooltip>
         </q-btn>
-        <q-btn flat dense icon="list" size="md" @click="viewMode='list'" :style="{color: viewMode==='list' ? 'var(--q-primary)' : 'var(--text3)'}">
+        <q-btn flat dense icon="list" size="md" @click="viewMode='list'" :style="{color: viewMode==='list' ? 'var(--accent)' : 'var(--text3)'}">
           <q-tooltip :delay="1000">{{ t('g.list_view') }}</q-tooltip>
         </q-btn>
       </q-btn-group>
@@ -316,7 +316,7 @@ const GalleryPage = {
           <span class="lh-col lh-sort" @click="toggleSort('file_size')">{{ t('g.col_size') }} <span v-if="sortBy==='file_size'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
           <span class="lh-col lh-sort" @click="toggleSort('date_taken')">{{ t('g.col_date_taken') }} <span v-if="sortBy==='date_taken'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
           <span class="lh-col lh-sort" @click="toggleSort('imported_at')">{{ t('g.col_imported_at') }} <span v-if="sortBy==='imported_at'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
-          <span class="lh-col lh-sort" @click="toggleSort('rating')">{{ t('g.col_rating') }} <span v-if="sortBy==='rating'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
+          <span class="lh-col lh-sort" style="width:110px" @click="toggleSort('rating')">{{ t('g.col_rating') }} <span v-if="sortBy==='rating'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
           <span style="width:32px"></span>
         </div>
         <div class="media-row" v-for="m in items" :key="m.id"
@@ -335,10 +335,10 @@ const GalleryPage = {
           <span class="row-col">{{ fmtSize(m.file_size) }}</span>
           <span class="row-col">{{ fmtListDate(m.date_taken) }}</span>
           <span class="row-col">{{ fmtListDate(m.imported_at) }}</span>
-          <span class="row-col">
+          <span class="row-col" style="width:110px;overflow:visible">
             <span v-if="m.rating" class="row-stars">{{ '★'.repeat(m.rating) }}</span>
-            <span v-if="m.favorite" class="row-fav"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
             <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
+            <span v-if="m.favorite" class="row-fav"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
             <span v-if="m.analysis_status==='done'" class="row-ai"><q-icon name="auto_awesome" size="12px" color="var(--accent)"></q-icon></span>
           </span>
           <span style="width:32px"></span>
@@ -354,8 +354,8 @@ const GalleryPage = {
       </div>
     </div>
     <q-toolbar class="gallery-footer" style="border-top:1px solid var(--border);min-height:36px;flex-shrink:0;position:relative">
-      <span class="text-caption text-grey-6">{{ t('g.total', {n: total}) }}
-        <span v-if="selArr.length" class="text-primary q-ml-sm">{{ t('g.selected', {n: selArr.length}) }}</span>
+      <span class="text-caption" style="color:var(--text3)">{{ t('g.total', {n: total}) }}
+        <span v-if="selArr.length" style="color:var(--accent)" class="q-ml-sm">{{ t('g.selected', {n: selArr.length}) }}</span>
       </span>
       <div v-if="activeFilterTags.length" class="header-tags" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)">
         <span v-for="(tag, i) in activeFilterTags" :key="i" class="header-tag">
@@ -367,19 +367,19 @@ const GalleryPage = {
       </div>
       <q-space></q-space>
       <template v-if="viewMode==='grid'">
-        <span class="text-caption text-grey-6 q-mr-sm">{{ Math.round(gridScale*100) }}%</span>
+        <span class="text-caption q-mr-sm" style="color:var(--text3)">{{ Math.round(gridScale*100) }}%</span>
         <q-slider v-model="gridScale" :min="0.5" :max="2" :step="0.25"
-                  style="width:100px" color="primary"></q-slider>
+                  style="width:100px;--q-primary:var(--accent)" color="primary"></q-slider>
       </template>
       <template v-if="viewMode==='masonry'">
-        <span class="text-caption text-grey-6 q-mr-sm">{{ t('g.masonry_cols', {n: masonryCols}) }}</span>
+        <span class="text-caption q-mr-sm" style="color:var(--text3)">{{ t('g.masonry_cols', {n: masonryCols}) }}</span>
         <q-slider v-model="masonryCols" :min="3" :max="8" :step="1"
-                  style="width:100px" color="primary"></q-slider>
+                  style="width:100px;--q-primary:var(--accent)" color="primary"></q-slider>
       </template>
       <template v-if="viewMode==='justified'">
-        <span class="text-caption text-grey-6 q-mr-sm">{{ t('g.row_height', {n: justifiedRowH}) }}</span>
+        <span class="text-caption q-mr-sm" style="color:var(--text3)">{{ t('g.row_height', {n: justifiedRowH}) }}</span>
         <q-slider v-model="justifiedRowH" :min="120" :max="400" :step="10"
-                  style="width:100px" color="primary"></q-slider>
+                  style="width:100px;--q-primary:var(--accent)" color="primary"></q-slider>
       </template>
     </q-toolbar>
     <!-- Context menu: view detail, remove, find similar -->

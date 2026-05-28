@@ -124,12 +124,12 @@
         </div>
         <q-item clickable :active="route==='#/favorites'"
                 @click="nav('#/favorites')"
-                active-class="bg-primary text-white">
+                active-class="sidebar-active-item">
           <q-item-section avatar><q-icon name="favorite" size="18px"></q-icon></q-item-section>
           <q-item-section>{{ t('side.favorites') }}</q-item-section>
         </q-item>
         <q-item clickable :active="route==='#/duplicates'" @click="nav('#/duplicates')"
-                active-class="bg-primary text-white">
+                active-class="sidebar-active-item">
           <q-item-section avatar><q-icon name="content_copy" size="18px"></q-icon></q-item-section>
           <q-item-section>{{ t('side.find_dup') }}</q-item-section>
         </q-item>
@@ -144,7 +144,7 @@
                 :active="route==='#/workbench/'+p.id"
                 @click="nav('#/workbench/'+p.id)"
                 @contextmenu.prevent="showProjectCtx($event, p)"
-                active-class="bg-primary text-white"
+                active-class="sidebar-active-item"
                 style="padding:4px 16px">
           <q-item-section avatar><q-icon name="dashboard" size="18px"></q-icon></q-item-section>
           <q-item-section style="font-size:13px">{{ p.name }}</q-item-section>

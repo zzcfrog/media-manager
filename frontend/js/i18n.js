@@ -501,7 +501,7 @@ zh: {
   "g.col_duration": "时长",
   "g.col_filename": "文件名",
   "g.col_imported_at": "导入时间",
-  "g.col_rating": "评分",
+  "g.col_rating": "标记",
   "g.col_resolution": "分辨率",
   "g.col_size": "大小",
   "g.color_blue": "蓝色标签",
