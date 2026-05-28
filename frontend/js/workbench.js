@@ -36,28 +36,30 @@ const WorkbenchPage = {
         </div>
         <div class="wb-mat-toolbar">
           <q-input v-model="matSearch" dense outlined clearable
-                   :placeholder="t('wb.search')" style="flex:1">
+                   :placeholder="t('wb.search')" class="wb-mat-search">
             <template v-slot:prepend><q-icon name="search" size="14px"></q-icon></template>
           </q-input>
-          <q-btn-toggle v-model="matType" no-caps flat dense
-                        :options="[{label:t('wb.all'),value:''},{label:t('wb.type_video'),value:'video'},{label:t('wb.type_image'),value:'image'}]"
-                        size="xs" toggle-color="primary" />
-          <q-select v-model="matSort" dense outlined flat
-                    :options="matSortOptions" emit-value map-options
-                    style="min-width:80px;font-size:11px"></q-select>
+          <div class="wb-mat-filters">
+            <q-btn-toggle v-model="matType" no-caps flat dense
+                          :options="[{label:t('wb.all'),value:''},{label:t('wb.type_video'),value:'video'},{label:t('wb.type_image'),value:'image'}]"
+                          size="xs" toggle-color="primary" />
+            <q-select v-model="matSort" dense outlined flat
+                      :options="matSortOptions" emit-value map-options
+                      style="min-width:80px;font-size:11px"></q-select>
+          </div>
         </div>
         <div class="wb-material-list wb-mat-grid">
           <div v-if="!project.media || !project.media.length" class="wb-empty-material" style="grid-column:1/-1">{{ t('wb.no_segments') }}</div>
           <div v-else-if="!filteredMedia.length" class="wb-empty-material" style="grid-column:1/-1">{{ t('wb.no_match') }}</div>
-          <div v-for="m in filteredMedia" :key="m.id" class="wb-seg-card"
+          <div v-for="m in filteredMedia" :key="m.id" class="wb-mat-card"
                :class="{ selected: selectedMedia && selectedMedia.id === m.id }"
                @click="selectedMedia = m">
-            <img :src="'/media/thumbnail/' + m.id" class="wb-seg-thumb" loading="lazy">
-            <div class="wb-seg-info">
+            <img :src="'/media/thumbnail/' + m.id" class="wb-mat-thumb" loading="lazy">
+            <div class="wb-mat-overlay">
               <div class="wb-mat-name" :title="m.file_name">{{ m.file_name }}</div>
-              <div style="display:flex;gap:4px;align-items:center">
-                <span v-if="m.duration" class="wb-seg-tag">{{ fmtDur(m.duration) }}</span>
-                <span class="wb-seg-tag">{{ mediaSegments(m.id).length }} {{ t('wb.seg_unit') }}</span>
+              <div class="wb-mat-meta">
+                <span v-if="m.duration">{{ fmtDur(m.duration) }}</span>
+                <span>{{ mediaSegments(m.id).length }} {{ t('wb.seg_unit') }}</span>
               </div>
             </div>
           </div>
