@@ -28,22 +28,35 @@ const WorkbenchPage = {
       <div class="wb-material">
         <div class="wb-material-header">
           {{ t('wb.material') }}
-          <span style="font-size:11px;color:var(--text3);margin-left:4px">{{ project.media ? project.media.length : 0 }}</span>
+          <span style="font-size:11px;color:var(--text3);margin-left:4px">{{ filteredMedia.length }}</span>
           <q-btn flat round dense icon="add_circle_outline" size="xs" style="color:var(--accent);margin-left:auto"
                  @click="openMediaPicker">
             <q-tooltip>{{ t('wb.add_media') }}</q-tooltip>
           </q-btn>
         </div>
-        <div class="wb-material-list">
-          <div v-if="!project.media || !project.media.length" class="wb-empty-material">{{ t('wb.no_segments') }}</div>
-          <div v-for="m in project.media" :key="m.id" class="wb-seg-card"
+        <div class="wb-mat-toolbar">
+          <q-input v-model="matSearch" dense outlined clearable
+                   :placeholder="t('wb.search')" style="flex:1">
+            <template v-slot:prepend><q-icon name="search" size="14px"></q-icon></template>
+          </q-input>
+          <q-btn-toggle v-model="matType" no-caps flat dense
+                        :options="[{label:t('wb.all'),value:''},{label:t('wb.type_video'),value:'video'},{label:t('wb.type_image'),value:'image'}]"
+                        size="xs" toggle-color="primary" />
+          <q-select v-model="matSort" dense outlined flat
+                    :options="matSortOptions" emit-value map-options
+                    style="min-width:80px;font-size:11px"></q-select>
+        </div>
+        <div class="wb-material-list wb-mat-grid">
+          <div v-if="!project.media || !project.media.length" class="wb-empty-material" style="grid-column:1/-1">{{ t('wb.no_segments') }}</div>
+          <div v-else-if="!filteredMedia.length" class="wb-empty-material" style="grid-column:1/-1">{{ t('wb.no_match') }}</div>
+          <div v-for="m in filteredMedia" :key="m.id" class="wb-seg-card"
                :class="{ selected: selectedMedia && selectedMedia.id === m.id }"
                @click="selectedMedia = m">
             <img :src="'/media/thumbnail/' + m.id" class="wb-seg-thumb" loading="lazy">
             <div class="wb-seg-info">
-              <div class="wb-seg-source" style="font-size:12px">{{ m.file_name }}</div>
+              <div class="wb-mat-name" :title="m.file_name">{{ m.file_name }}</div>
               <div style="display:flex;gap:4px;align-items:center">
-                <span v-if="m.duration" class="wb-seg-tag">{{ m.duration }}</span>
+                <span v-if="m.duration" class="wb-seg-tag">{{ fmtDur(m.duration) }}</span>
                 <span class="wb-seg-tag">{{ mediaSegments(m.id).length }} {{ t('wb.seg_unit') }}</span>
               </div>
             </div>
@@ -129,6 +142,14 @@ const WorkbenchPage = {
       loading: true,
       selectedMedia: null,
       activeSeg: null,
+      matSearch: "",
+      matType: "",
+      matSort: "file_name",
+      matSortOptions: [
+        { label: () => this.t('wb.sort_name'), value: "file_name" },
+        { label: () => this.t('wb.sort_duration'), value: "duration" },
+        { label: () => this.t('wb.sort_date'), value: "date_taken" },
+      ],
       trackTypes: [
         { key: "theme" },
         { key: "emotion" },
@@ -142,6 +163,22 @@ const WorkbenchPage = {
 
   computed: {
     t() { return t; },
+    filteredMedia() {
+      if (!this.project || !this.project.media) return [];
+      let list = this.project.media;
+      if (this.matType) list = list.filter(m => m.media_type === this.matType);
+      if (this.matSearch) {
+        const q = this.matSearch.toLowerCase();
+        list = list.filter(m => m.file_name.toLowerCase().includes(q));
+      }
+      const key = this.matSort;
+      list = [...list].sort((a, b) => {
+        if (key === "duration") return (a.duration || 0) - (b.duration || 0);
+        if (key === "date_taken") return (a.date_taken || "").localeCompare(b.date_taken || "");
+        return (a.file_name || "").localeCompare(b.file_name || "");
+      });
+      return list;
+    },
     totalDuration() {
       const videoItems = this.getTrackItems("video");
       if (!videoItems.length) return "00:00";
@@ -196,6 +233,15 @@ const WorkbenchPage = {
     },
     mediaSegments(mediaId) {
       return this.segments.filter(s => s.media_id === mediaId);
+    },
+    fmtDur(sec) {
+      if (!sec) return "";
+      sec = Math.round(sec);
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+      if (h) return h + ":" + String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+      return m + ":" + String(s).padStart(2, "0");
     },
     _parseDuration(start, end) {
       const toSec = (t) => {

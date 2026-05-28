@@ -608,6 +608,12 @@ body:not(.body--dark) .sidebar-action-btn {
   overflow-y: auto;
   padding: 6px;
 }
+.wb-mat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.wb-mat-grid .wb-seg-card { flex-direction: column; align-items: center; text-align: center; margin-bottom: 0; }
+.wb-mat-grid .wb-seg-thumb { width: 100%; height: 56px; }
+.wb-mat-grid .wb-seg-info { align-items: center; }
+.wb-mat-name { font-size: 11px; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.wb-mat-toolbar { display: flex; align-items: center; gap: 4px; padding: 4px 6px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 
 .wb-empty-material {
   text-align: center;

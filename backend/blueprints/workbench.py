@@ -72,7 +72,7 @@ def get_project(pid):
         return jsonify({"error": "Not found"}), 404
     result = dict(proj)
     media = db.execute(
-        "SELECT m.id, m.file_name, m.media_type, m.thumbnail_path, m.duration "
+        "SELECT m.id, m.file_name, m.media_type, m.thumbnail_path, m.duration, m.date_taken "
         "FROM media m JOIN project_media pm ON pm.media_id = m.id "
         "WHERE pm.project_id = ?",
         (pid,),
