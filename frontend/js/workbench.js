@@ -148,9 +148,9 @@ const WorkbenchPage = {
       matType: "",
       matSort: "file_name",
       matSortOptions: [
-        { label: () => this.t('wb.sort_name'), value: "file_name" },
-        { label: () => this.t('wb.sort_duration'), value: "duration" },
-        { label: () => this.t('wb.sort_date'), value: "date_taken" },
+        { label: t('wb.sort_name'), value: "file_name" },
+        { label: t('wb.sort_duration'), value: "duration" },
+        { label: t('wb.sort_date'), value: "date_taken" },
       ],
       trackTypes: [
         { key: "theme" },
