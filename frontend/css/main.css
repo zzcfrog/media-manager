@@ -613,24 +613,24 @@ body:not(.body--dark) .sidebar-action-btn {
   padding: 4px 6px; border-bottom: 1px solid var(--border); flex-shrink: 0;
 }
 .wb-mat-search { flex: 1; min-width: 0; }
-.wb-mat-search .q-field__control { min-height: 26px; padding: 0 8px; }
+.wb-mat-search .q-field__control { min-height: 22px; padding: 0 8px; }
 .wb-mat-search .q-field__control input { font-size: 11px; }
 .wb-mat-toolbar .q-btn-group { flex-shrink: 0; }
 .wb-mat-toolbar .q-btn-group .q-btn { padding: 2px 6px; min-height: 22px; font-size: 10px; }
 .wb-mat-sort { min-width: 68px; flex-shrink: 0; }
-.wb-mat-sort .q-field__control { min-height: 26px; padding: 0 8px; }
+.wb-mat-sort .q-field__control { min-height: 22px; padding: 0 8px; }
 .wb-mat-sort .q-field__control input,
 .wb-mat-sort .q-field__native,
 .wb-mat-sort .q-field__input { font-size: 10px; }
 
-.wb-mat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+.wb-mat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; align-content: start; }
 .wb-mat-card {
-  position: relative; border-radius: 6px; overflow: hidden; cursor: pointer;
-  aspect-ratio: 16/9; background: var(--surface2);
+  position: relative; border-radius: 4px; overflow: hidden; cursor: pointer;
+  background: var(--surface2);
 }
 .wb-mat-card:hover { outline: 2px solid var(--accent); outline-offset: -2px; }
 .wb-mat-card.selected { outline: 2px solid var(--accent); outline-offset: -2px; }
-.wb-mat-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
+.wb-mat-thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
 .wb-mat-overlay {
   position: absolute; bottom: 0; left: 0; right: 0;
   padding: 4px 6px; color: #fff;
