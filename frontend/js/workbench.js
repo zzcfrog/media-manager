@@ -56,11 +56,11 @@ const WorkbenchPage = {
                @click="selectedMedia = m">
             <img :src="'/media/thumbnail/' + m.id" class="wb-mat-thumb" loading="lazy">
             <div class="wb-mat-overlay">
-              <div class="wb-mat-name" :title="m.file_name">{{ m.file_name }}</div>
               <div class="wb-mat-meta">
                 <span v-if="m.duration">{{ fmtDur(m.duration) }}</span>
                 <span>{{ mediaSegments(m.id).length }} {{ t('wb.seg_unit') }}</span>
               </div>
+              <div class="wb-mat-name" :title="m.file_name">{{ m.file_name }}</div>
             </div>
           </div>
         </div>
