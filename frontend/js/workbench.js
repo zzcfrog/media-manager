@@ -40,14 +40,12 @@ const WorkbenchPage = {
                    @keyup.enter="searchMedia">
             <template v-slot:prepend><q-icon name="search" size="14px"></q-icon></template>
           </q-input>
-          <div class="wb-mat-filters">
-            <q-btn-toggle v-model="matType" no-caps flat dense
-                          :options="[{label:t('wb.all'),value:''},{label:t('wb.type_video'),value:'video'},{label:t('wb.type_image'),value:'image'}]"
-                          size="xs" toggle-color="primary" />
-            <q-select v-model="matSort" dense outlined flat
-                      :options="matSortOptions" emit-value map-options
-                      style="min-width:80px;font-size:11px"></q-select>
-          </div>
+          <q-btn-toggle v-model="matType" no-caps flat dense
+                        :options="[{label:t('wb.all'),value:''},{label:t('wb.type_video'),value:'video'},{label:t('wb.type_image'),value:'image'}]"
+                        size="xs" toggle-color="primary" />
+          <q-select v-model="matSort" dense outlined flat
+                    :options="matSortOptions" emit-value map-options
+                    class="wb-mat-sort"></q-select>
         </div>
         <div class="wb-material-list wb-mat-grid">
           <div v-if="!project.media || !project.media.length" class="wb-empty-material" style="grid-column:1/-1">{{ t('wb.no_segments') }}</div>
