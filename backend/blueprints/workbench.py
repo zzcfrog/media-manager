@@ -73,7 +73,7 @@ def get_project(pid):
     result = dict(proj)
     q = request.args.get("q", "").strip()
     if q:
-        from blueprints.library import _segment_query
+        from .library import _segment_query
         seg_q = _segment_query(q)
         media = db.execute(
             "SELECT m.id, m.file_name, m.media_type, m.thumbnail_path, m.duration, m.date_taken "
