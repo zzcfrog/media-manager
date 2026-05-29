@@ -109,9 +109,9 @@
                  :label="t('side.import')" @click="openImport"
                  class="sidebar-action-btn"></q-btn>
         </q-item-label>
-        <q-item clickable dense
+        <q-item clickable
           :style="route==='#/gallery' && !selectedFolder ? 'background:var(--accent-dim);border-radius:4px' : ''"
-          @click="navToLibrary" style="padding-left:28px">
+          @click="navToLibrary">
           <q-item-section avatar><q-icon name="movie" size="18px" :color="route==='#/gallery' && !selectedFolder ? 'primary' : 'grey-6'"></q-icon></q-item-section>
           <q-item-section>{{ t('side.library') }}</q-item-section>
           <q-item-section v-if="!drawerMini" side style="padding-left:0;padding-right:4px">
@@ -119,17 +119,17 @@
               @click.stop="libraryExpanded = !libraryExpanded"></q-btn>
           </q-item-section>
         </q-item>
-        <div v-show="libraryExpanded && !drawerMini" style="padding-left:48px">
+        <div v-show="libraryExpanded && !drawerMini" style="padding-left:28px">
           <folder-tree :nodes="folderTree" :selected="selectedFolder" :context-menu="true" count-field="totalCount" @select="onFolderSelect" @contextmenu="showFolderCtx"></folder-tree>
         </div>
         <q-item clickable :active="route==='#/favorites'"
                 @click="nav('#/favorites')"
-                active-class="sidebar-active-item" style="padding-left:28px">
+                active-class="sidebar-active-item">
           <q-item-section avatar><q-icon name="favorite" size="18px"></q-icon></q-item-section>
           <q-item-section>{{ t('side.favorites') }}</q-item-section>
         </q-item>
         <q-item clickable :active="route==='#/duplicates'" @click="nav('#/duplicates')"
-                active-class="sidebar-active-item" style="padding-left:28px">
+                active-class="sidebar-active-item">
           <q-item-section avatar><q-icon name="content_copy" size="18px"></q-icon></q-item-section>
           <q-item-section>{{ t('side.find_dup') }}</q-item-section>
         </q-item>
