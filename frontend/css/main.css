@@ -370,9 +370,13 @@ body.body--dark .q-drawer .q-item:hover { color: #fff; }
 .q-drawer .q-item-label { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; padding: 10px 16px 4px; text-transform: uppercase; }
 /* Folder tree */
 .q-drawer .q-tree { padding: 0 4px; }
-.q-drawer .q-tree .q-tree__children { padding-left: 12px; border-left-color: var(--border); }
+.q-drawer .q-tree .q-tree__children { padding-left: 14px; border-left: 1px solid var(--border); margin-left: 9px; }
 .q-drawer .q-tree .q-tree__node { padding: 1px 0; }
 .q-drawer .q-tree .q-tree__node-header { padding: 4px 6px; border-radius: 4px; min-height: 26px; }
+.q-drawer .q-tree .q-tree__node--parent > .q-tree__node-header:before,
+.q-drawer .q-tree .q-tree__node--parent > .q-tree__node-header:after { display: none; }
+.q-drawer .q-tree .q-tree__node--child > .q-tree__node-header:before,
+.q-drawer .q-tree .q-tree__node--child > .q-tree__node-header:after { display: none; }
 .q-drawer .q-tree .q-tree__arrow { font-size: 18px; }
 .q-drawer .q-tree .q-tree__node--child > .q-tree__node-header {
   padding-left: 22px;

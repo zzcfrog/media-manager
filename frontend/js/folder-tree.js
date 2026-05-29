@@ -8,7 +8,7 @@ const FolderTree = {
   emits: ["select", "contextmenu"],
   template: `
     <q-tree :nodes="nodes" node-key="path" label-key="label"
-            dense no-connectors
+            dense
             :selected="selected" @update:selected="$emit('select', $event)"
             :expanded="expanded" @update:expanded="expanded = $event">
       <template v-slot:default-header="prop">
