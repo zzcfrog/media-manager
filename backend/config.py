@@ -65,7 +65,7 @@ RAW_EXTS = IMAGE_EXTS - {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".ti
 # ── Analysis concurrency ──────────────────────────────────────
 # Max concurrent VLM (visual-language model) API calls during batch analysis.
 # Increase only if your model API supports parallel requests without rate-limiting.
-ANALYSIS_API_CONCURRENCY = 1
+ANALYSIS_API_CONCURRENCY = 2
 
 # Thread pool size for batch analysis. Each worker handles one media item through
 # the full pipeline (compress → VLM → ASR → save). I/O tasks (compress, ASR) can
