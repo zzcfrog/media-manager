@@ -12,8 +12,7 @@ const FolderTree = {
             :selected="selected" @update:selected="$emit('select', $event)"
             :expanded="expanded" @update:expanded="expanded = $event">
       <template v-slot:default-header="prop">
-        <div style="display:flex;align-items:center;gap:4px;overflow:hidden;width:100%;padding:4px 6px;margin:-4px -6px"
-             :style="selected===prop.node.path ? 'background:var(--accent-dim);border-radius:4px' : ''"
+        <div style="display:flex;align-items:center;gap:4px;overflow:hidden;width:100%"
              @contextmenu.prevent="contextMenu && $emit('contextmenu', $event, prop.node)">
           <q-icon name="folder" size="16px" :color="selected===prop.node.path ? 'primary' : 'grey-6'" class="q-mr-xs"></q-icon>
           <span style="font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ prop.node.label }}</span>
