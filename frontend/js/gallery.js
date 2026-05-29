@@ -89,7 +89,7 @@ const GalleryPage = {
           <q-timeline-entry v-for="g in groupedItems" :key="g.key"
             :title="t('g.timeline_label', {label: g.label, n: g.items.length})"
             tag="div" class="timeline-group">
-            <div class="grid" :style="{'--card-w': (180*gridScale)+'px'}">
+            <div class="grid" :class="{'grid-compact': gridScale <= 0.5}" :style="{'--card-w': (180*gridScale)+'px'}">
             <div class="media-card" v-for="m in g.items" :key="m.id"
                  :class="{selected: selArr.includes(m.id)}"
                  :data-id="m.id"
@@ -123,7 +123,7 @@ const GalleryPage = {
         </q-timeline>
       </template>
       <!-- Grid view: flat -->
-      <div v-if="items.length && viewMode==='grid' && !groupedItems" class="grid" :style="{'--card-w': (180*gridScale)+'px'}">
+      <div v-if="items.length && viewMode==='grid' && !groupedItems" class="grid" :class="{'grid-compact': gridScale <= 0.5}" :style="{'--card-w': (180*gridScale)+'px'}">
         <div class="media-card" v-for="m in items" :key="m.id"
              :class="{selected: selArr.includes(m.id)}"
              :data-id="m.id"
@@ -715,8 +715,7 @@ const GalleryPage = {
       const tags = [];
       const folder = this.$root.selectedFolder;
       if (folder) {
-        const parts = folder.split('/');
-        tags.push({ icon: 'folder', label: parts[parts.length - 1] || folder });
+        tags.push({ icon: 'folder', label: folder });
       }
       if (this.filters.media_type !== "all") {
         tags.push({ icon: this.filters.media_type === 'image' ? 'image' : 'smart_display', label: this.t(this.filters.media_type === 'image' ? 'g.images' : 'g.videos') });

@@ -60,6 +60,8 @@ body.body--dark input::placeholder { color: #555 !important; -webkit-text-fill-c
 .media-card .thumb { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: #111; display: block; }
 .media-card .thumb.portrait { object-fit: contain; }
 .media-card .info { padding: 5px 10px; }
+.grid-compact .media-card .info { display: none; }
+.grid-compact .media-card .rating { position: absolute; top: 4px; left: 6px; font-size: 9px; z-index: 2; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
 .media-card .name { font-size: 11px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .media-card .meta { font-size: 10px; color: var(--text3); margin-top: 1px; display: flex; align-items: center; gap: 6px; }
 .media-card .meta .spacer { flex: 1; }
