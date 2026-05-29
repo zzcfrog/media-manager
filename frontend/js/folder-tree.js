@@ -26,19 +26,5 @@ const FolderTree = {
     return { expanded: [] };
   },
   watch: {
-    nodes: {
-      immediate: true,
-      handler(nodes) {
-        if (!nodes.length) return;
-        const paths = [];
-        const walk = (items) => {
-          for (const n of items) {
-            if (n.children?.length) { paths.push(n.path); walk(n.children); }
-          }
-        };
-        walk(nodes);
-        this.expanded = paths;
-      },
-    },
   },
 };
