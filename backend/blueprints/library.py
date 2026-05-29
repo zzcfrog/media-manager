@@ -39,6 +39,7 @@ def list_media():
     analysis_status = request.args.get("analysis_status")
     folder = request.args.get("folder")
     q = request.args.get("q", "").strip()
+    exclude_ids = request.args.get("exclude_ids", "").strip()
 
     allowed_sorts = {"imported_at", "date_taken", "rating", "file_name", "file_size", "duration", "resolution"}
     if sort not in allowed_sorts:
@@ -67,6 +68,12 @@ def list_media():
     if folder:
         where_clauses.append("file_path LIKE ?")
         params.append(folder.rstrip("/") + "/%")
+    if exclude_ids:
+        ids = [x.strip() for x in exclude_ids.split(",") if x.strip().isdigit()]
+        if ids:
+            placeholders = ",".join("?" * len(ids))
+            where_clauses.append(f"id NOT IN ({placeholders})")
+            params.extend(ids)
 
     if q:
         seg_q = _segment_query(q)

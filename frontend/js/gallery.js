@@ -865,6 +865,7 @@ const GalleryPage = {
         if (q) params.q = q;
         const folder = this.$root.pickerMode ? this.$root.pickerFolder : this.$root.selectedFolder;
         if (folder) params.folder = folder;
+        if (this.$root.pickerMode && this.$root.pickerExcludeIds?.length) params.exclude_ids = this.$root.pickerExcludeIds.join(",");
         const res = await API.getLibrary(params);
         const data = res.data || [];
         this.total = res.pagination?.total || 0;
@@ -887,7 +888,7 @@ const GalleryPage = {
         if (this.filters.media_type !== "all") params.media_type = this.filters.media_type;
         if (this.filters.rating) params.rating = this.filters.rating;
         if (this.filters.color_label) params.color_label = this.filters.color_label;
-        if (this.favFilter === 'fav' || this.$root.favFilter) params.favorite = "true";
+        if (this.favFilter === 'fav') params.favorite = "true";
         else if (this.favFilter === 'unfav') params.favorite = "false";
         if (this.analysisFilter === 'analyzed') params.analysis_status = "analyzed";
         else if (this.analysisFilter === 'not') params.analysis_status = "not_analyzed";
@@ -895,9 +896,9 @@ const GalleryPage = {
         if (q) params.q = q;
         const folder = this.$root.pickerMode ? this.$root.pickerFolder : this.$root.selectedFolder;
         if (folder) params.folder = folder;
+        if (this.$root.pickerMode && this.$root.pickerExcludeIds?.length) params.exclude_ids = this.$root.pickerExcludeIds.join(",");
         const res = await API.getLibrary(params);
-        const data = res.data || [];
-        this.items = this.items.concat(data);
+        const data = res.data || [];        this.items = this.items.concat(data);
         if (!this.$root.pickerMode) this.$root.galleryItems = this.items;
         this.total = res.pagination?.total || 0;
         if (data.length < this.perPage) this.allLoaded = true;

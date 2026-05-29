@@ -576,9 +576,9 @@ const app = Vue.createApp({
       pickerMode: false,
       pickerProjectId: null,
       pickerSelected: [],
+      pickerExcludeIds: [],
       pickerFolder: null,
       galleryItems: [],
-      favFilter: false,
       searchQuery: "",
       showImport: false,
       showSettings: false,
@@ -859,9 +859,11 @@ const app = Vue.createApp({
     nav(hash) { location.hash = hash; },
     navToLibrary() {
       this.selectedFolder = null;
-      this.favFilter = false;
       if (location.hash === "#/gallery") {
-        this.$nextTick(() => this.$refs.gallery?.load());
+        this.$nextTick(() => {
+          if (this.$refs.gallery) this.$refs.gallery.favFilter = null;
+          this.$refs.gallery?.load();
+        });
       } else {
         location.hash = "#/gallery";
       }
@@ -921,7 +923,12 @@ const app = Vue.createApp({
       this.route = hash;
       const prevView = this.currentView;
       if (hash.startsWith("#/detail/")) {
-        if (this.$refs.gallery?.items) this.galleryItems = [...this.$refs.gallery.items];
+        const g = this.$refs.gallery;
+        if (g?.items) {
+          this.galleryItems = [...g.items];
+          this._galleryNextPage = g.page + 1;
+          this._galleryAllLoaded = g.allLoaded;
+        }
         this.currentView = "detail";
         this.detailId = parseInt(hash.split("/")[2]);
         const setFolder = (filePath) => {
@@ -955,10 +962,12 @@ const app = Vue.createApp({
         }
       } else if (hash === "#/favorites") {
         this.currentView = "gallery";
-        this.favFilter = true;
         this.selectedFolder = null;
         this.libraryExpanded = false;
-        this.$nextTick(() => this.$refs.gallery?.load());
+        this.$nextTick(() => {
+          if (this.$refs.gallery) this.$refs.gallery.favFilter = 'fav';
+          this.$refs.gallery?.load();
+        });
       } else if (hash === "#/duplicates") {
         this.currentView = "duplicates";
       } else if (hash.startsWith("#/workbench/")) {
@@ -966,10 +975,12 @@ const app = Vue.createApp({
         this.workbenchId = parseInt(hash.split("/")[2]);
       } else {
         this.currentView = "gallery";
-        this.favFilter = false;
-        if (!this.selectedFolder) this.selectedFolder = null;
+        this.selectedFolder = null;
         this.libraryExpanded = true;
-        this.$nextTick(() => this.$refs.gallery?.load());
+        this.$nextTick(() => {
+          if (this.$refs.gallery) this.$refs.gallery.favFilter = null;
+          this.$refs.gallery?.load();
+        });
       }
     },
     async loadSidebar() {
@@ -1040,13 +1051,16 @@ const app = Vue.createApp({
     cancelPicker() {
       this.pickerMode = false;
       this.pickerSelected = [];
+      this.pickerExcludeIds = [];
     },
     async confirmPicker() {
       try {
-        await API.updateProjectMedia(this.pickerProjectId, this.pickerSelected);
+        const existingIds = this.$refs.workbench?.project?.media?.map(m => m.id) || [];
+        const allIds = [...new Set([...existingIds, ...this.pickerSelected])];
+        await API.updateProjectMedia(this.pickerProjectId, allIds);
         this.pickerMode = false;
         this.pickerSelected = [];
-        // Reload workbench if currently showing
+        this.pickerExcludeIds = [];
         if (this.$refs.workbench) await this.$refs.workbench.load();
         await this.loadProjects();
       } catch (e) {
@@ -1067,18 +1081,43 @@ const app = Vue.createApp({
         return;
       }
     },
-    getAdjacentId(currentId, dir) {
+    async getAdjacentId(currentId, dir) {
       const items = this.galleryItems;
       if (!items || !items.length) return null;
       const idx = items.findIndex(m => m.id === currentId);
       if (idx < 0) return null;
       const ni = idx + dir;
-      if (ni < 0 || ni >= items.length) return null;
+      if (ni < 0) return null;
+      if (ni >= items.length) {
+        if (this._galleryAllLoaded) return null;
+        try {
+          const g = this.$refs.gallery;
+          if (!g) return null;
+          const params = { page: this._galleryNextPage, per_page: g.perPage, sort: g.sortBy, order: g.sortOrder };
+          if (g.filters.media_type !== "all") params.media_type = g.filters.media_type;
+          if (g.filters.rating) params.rating = g.filters.rating;
+          if (g.filters.color_label) params.color_label = g.filters.color_label;
+          if (g.favFilter === 'fav') params.favorite = "true";
+          else if (g.favFilter === 'unfav') params.favorite = "false";
+          if (g.analysisFilter === 'analyzed') params.analysis_status = "analyzed";
+          else if (g.analysisFilter === 'not') params.analysis_status = "not_analyzed";
+          if (this.searchQuery) params.q = this.searchQuery;
+          if (this.selectedFolder) params.folder = this.selectedFolder;
+          const res = await API.getLibrary(params);
+          const data = res.data || [];
+          if (data.length < g.perPage) this._galleryAllLoaded = true;
+          if (data.length) {
+            this.galleryItems.push(...data);
+            this._galleryNextPage++;
+            return data[0].id;
+          }
+          return null;
+        } catch { return null; }
+      }
       return items[ni].id;
     },
     onFolderSelect(path) {
       this.selectedFolder = this.selectedFolder === path ? null : path;
-      this.favFilter = false;
       this.libraryExpanded = true;
       if (this.currentView !== "gallery") {
         location.hash = "#/gallery";

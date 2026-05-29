@@ -786,14 +786,14 @@ const DetailPage = {
       }
       this.deleteSegInfo = null;
     },
-    handleKey(e) {
+    async handleKey(e) {
       if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable) return;
       const key = e.key;
       // Arrow left/right - prev/next
       if (key === "ArrowLeft" || key === "ArrowRight") {
         e.preventDefault(); e.stopPropagation();
         const dir = key === "ArrowLeft" ? -1 : 1;
-        const adjId = this.$root.getAdjacentId(this.media?.id, dir);
+        const adjId = await this.$root.getAdjacentId(this.media?.id, dir);
         if (adjId) location.hash = "#/detail/" + adjId;
         return;
       }
