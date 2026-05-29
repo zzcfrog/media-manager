@@ -875,7 +875,7 @@ const GalleryPage = {
         console.error("gallery load error:", e);
       }
       this.loading = false;
-      this.$nextTick(() => this._checkFill());
+      this.$nextTick(() => requestAnimationFrame(() => this._checkFill()));
     },
     // Infinite scroll: load next page
     async loadMore() {
@@ -906,7 +906,7 @@ const GalleryPage = {
         this.page--;
       }
       this.loadingMore = false;
-      this.$nextTick(() => this._checkFill());
+      this.$nextTick(() => requestAnimationFrame(() => this._checkFill()));
     },
     // If content doesn't fill the scroll container, keep loading
     _checkFill() {

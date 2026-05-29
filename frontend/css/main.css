@@ -50,7 +50,7 @@ body.body--dark input::placeholder { color: #555 !important; -webkit-text-fill-c
 .justified-card:hover .justified-info { opacity: 1; }
 .justified-name { font-size: 10px; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
 .justified-size { font-size: 9px; color: rgba(255,255,255,0.7); flex-shrink: 0; }
-.media-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; cursor: pointer; transition: border-color 0.15s, transform 0.1s; position: relative; }
+.media-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; cursor: pointer; transition: border-color 0.15s, transform 0.1s; position: relative; content-visibility: auto; }
 .media-card:hover { border-color: var(--border2); transform: translateY(-1px); }
 .media-card.selected { border-color: var(--accent); }
 .picker-dialog-card .media-card { transition: border-color 0.15s; }
