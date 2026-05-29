@@ -875,6 +875,7 @@ const GalleryPage = {
         console.error("gallery load error:", e);
       }
       this.loading = false;
+      this.$nextTick(() => this._checkFill());
     },
     // Infinite scroll: load next page
     async loadMore() {
@@ -905,6 +906,13 @@ const GalleryPage = {
         this.page--;
       }
       this.loadingMore = false;
+      this.$nextTick(() => this._checkFill());
+    },
+    // If content doesn't fill the scroll container, keep loading
+    _checkFill() {
+      const el = this.$refs.galleryPage;
+      if (!el || this.allLoaded || this.loadingMore) return;
+      if (el.scrollHeight <= el.clientHeight + 200) this.loadMore();
     },
     openDetail(id) {
       if (this.$root.pickerMode) return;
