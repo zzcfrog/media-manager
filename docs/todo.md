@@ -1,5 +1,45 @@
 # TODO
 
+## 已完成：UI 主题统一 + 列表视图优化 + 目录树样式（2026-05-29）
+
+全局 UI 控件统一跟随主题色，列表视图列名和颜色标签修复，目录树改为 VS Code 风格竖线缩进。
+
+**改动文件：**
+- `frontend/css/main.css` — 移除所有硬编码颜色值，改为 CSS 变量（`--accent`、`--accent-dim`）；新增 `.sidebar-active-item`（accent-dim 背景 + accent 文字）；`.media-row .color-dot` 改为 `position: static; display: inline-block`；`.grid-compact .media-card .info { display: none }`（50% 缩放隐藏卡片文字）；`.q-tree__children { padding-left: 9px; border-left: 1px solid var(--border); margin-left: 13px }` VS Code 风格竖线；叶节点 `padding-left: 22px` 箭头占位；统一 hover/selected 高亮到 `q-tree__node-header`；`.media-card { content-visibility: auto }` 渲染优化
+- `frontend/js/gallery.js` — 视图模式按钮 active 色改为 `var(--accent)`；footer 滑块 `style="--q-primary:var(--accent)"` 跟随主题；列表视图标记列宽 110px；50% 缩放添加 `grid-compact` class；文件夹筛选标签显示完整路径；`_checkFill()` + `requestAnimationFrame` 自动加载更多（小缩放时内容不填满容器时触发）
+- `frontend/js/i18n.js` — `g.col_rating` 改为"标记"
+- `frontend/js/folder-tree.js` — 移除内联 padding/margin/background，统一到 CSS；移除自动展开 watch，默认折叠
+- `frontend/index.html` — 侧边栏三个子项使用 `active-class="sidebar-active-item"`；目录树 padding-left 从 28px 改为 16px（与浏览标题对齐）；文件夹根目录与素材库菜单对齐
+- `backend/config.py` — 新增 `ANALYSIS_API_CONCURRENCY = 2` 和 `ANALYSIS_THREAD_POOL_SIZE = 5`
+- `backend/blueprints/analysis.py` — 从 config 导入并发参数替代硬编码
+
+**功能说明：**
+- 所有 UI 控件（筛选栏选中态、侧边栏、footer 滑块、工作台按钮）统一跟随用户选择的主题色
+- 列表视图"评分"列改名为"标记"，列宽加至 110px，颜色标签位置修复
+- 目录树：VS Code 风格淡色竖线缩进，叶节点箭头位置占位，选中与悬浮高亮区域统一，默认折叠不展开
+- 侧边栏浏览子项与"浏览"标题左对齐，文件夹根目录与"素材库"对齐
+- 50% 缩放隐藏卡片文字（紧凑模式），文件夹筛选标签显示完整路径
+- 分析并发参数（VLM API 信号量 2、线程池 5）移至 config.py 集中配置
+
+## 已完成：工作台素材面板改版（2026-05-29）
+
+工作台素材面板从 segment 列表改为以完整视频（media）为单位展示，新增搜索、类型筛选、排序功能。
+
+**改动文件：**
+- `frontend/js/workbench.js` — data 改为 `selectedMedia`/`activeSeg`/`matSearch`/`matType`/`matSort`；computed `filteredMedia()` 应用类型筛选和排序；`searchMedia()` 调用后端 FTS 搜索；`mediaSegments(mediaId)` 筛选指定 media 的 segments；`fmtDur(sec)` 时长格式化（M:SS 或 H:MM:SS）；素材面板模板改为双列网格卡片（封面 + 渐变叠加信息层）；预览区显示视频播放器 + segment 列表
+- `backend/blueprints/workbench.py` — `get_project` 新增 `q` 参数，通过 FTS5 搜索 media（复用 `_segment_query`），SELECT 新增 `m.date_taken` 支持排序
+- `frontend/js/api.js` — `getProject(id, q)` 支持 search 参数
+- `frontend/js/i18n.js` — 新增 `wb.*` 翻译键（搜索/类型/排序/无匹配等）
+- `frontend/css/main.css` — `.wb-mat-toolbar` 一行紧凑布局；`.wb-mat-search`/`.wb-mat-sort` 高度 26px；`.wb-mat-grid` 双列网格；`.wb-mat-card`/`.wb-mat-thumb`/`.wb-mat-overlay` 封面卡片样式
+
+**功能说明：**
+- 素材面板以完整视频为单位（缩略图 + 文件名 + 时长 + 片段数），双列网格布局
+- 工具栏一行紧凑排列：搜索框 + 类型筛选 + 排序下拉（高度 26px）
+- 搜索走后端 FTS5（支持文件名 + 分析内容模糊搜索，jieba 中文分词）
+- 支持按类型筛选（全部/视频/图片）、按名称/时长/拍摄时间排序
+- 点击视频卡片预览播放，下方显示该视频的所有 segments
+- 时长显示 HH:MM:SS 格式
+
 ## 已完成：工作台媒体选择器 — 90% 对话框方案（2026-05-27）
 
 工作台"添加素材"改为 90% 屏幕对话框（90vw x 90vh），内嵌完整 Gallery 页面，独立文件夹处理器避免 hash 变更和无限请求。

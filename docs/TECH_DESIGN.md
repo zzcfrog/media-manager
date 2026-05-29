@@ -28,7 +28,7 @@ video_analyzer/
 ├── .env                       # ZHIPUAI_API_KEY
 ├── backend/
 │   ├── __init__.py            # create_app() 工厂函数
-│   ├── config.py              # 路径、文件扩展名配置
+│   ├── config.py              # 路径、文件扩展名、分析并发配置
 │   ├── logger.py              # loguru 日志配置（文件输出 + 按天轮转）
 │   ├── db.py                  # SQLite schema、迁移、连接管理
 │   ├── analyzer.py            # VLM API 调用（视频/图片分析）
@@ -57,7 +57,10 @@ video_analyzer/
 │       ├── api.js             # API 客户端
 │       ├── i18n.js            # 轻量 i18n（t() 翻译 + Vue.reactive 状态）
 │       ├── gallery.js         # Gallery 页组件
-│       └── detail.js          # Detail 页组件
+│       ├── detail.js          # Detail 页组件
+│       ├── workbench.js       # 创作工作台页组件
+│       ├── folder-tree.js     # FolderTree 可复用组件（q-tree 封装）
+│       ├── format.js          # 共享格式化函数（fmtSize/fmtDur）
 │       └── duplicates.js      # 查找重复页组件
 ├── electron/
 │   ├── main.js                # Electron 主进程（启动 Python 后端）
@@ -251,7 +254,7 @@ import_single_file() × 5 并发（ThreadPoolExecutor）
 
 分析参数从 `settings` 表读取（非请求 body），通过 `get_setting(db, key)` 获取。
 
-**并发控制**：全局 `ThreadPoolExecutor(max_workers=5)` + `Semaphore(1)` 信号量。信号量仅在 VLM API 调用阶段获取（串行），压缩/ASR 阶段不持有信号量（可并行）。processing 状态的素材自动跳过，防止重复提交。
+**并发控制**：全局 `ThreadPoolExecutor(max_workers=ANALYSIS_THREAD_POOL_SIZE)` + `Semaphore(ANALYSIS_API_CONCURRENCY)` 信号量，参数定义在 `config.py`。信号量仅在 VLM API 调用阶段获取（串行），压缩/ASR 阶段不持有信号量（可并行）。processing 状态的素材自动跳过，防止重复提交。
 
 **单条分析**：`POST /api/analysis/<id>` 返回 SSE 流，前端通过 SSE 跟踪进度。
 
@@ -338,7 +341,8 @@ class AsrSegment:
 
 | 功能 | 技术 |
 |------|------|
-| 无限滚动 | IntersectionObserver，200px rootMargin |
+| 无限滚动 | IntersectionObserver，200px rootMargin；小缩放时 `_checkFill()` 自动加载更多（`requestAnimationFrame` 后检测 `scrollHeight <= clientHeight + 200`） |
+| 渲染优化 | `.media-card { content-visibility: auto }` 跳过屏幕外卡片渲染 |
 | 分析进度 | SSE → ReadableStream + TextDecoder → 逐行解析 JSON；批量分析通过轮询 `getProgress()` 跟踪 |
 | 筛选持久化 | localStorage 保存/恢复所有筛选、排序、视图、文件夹状态 |
 | 任务恢复 | 页面刷新时调 `getProgress()` 从后端恢复运行中的 bgTasks |
@@ -347,7 +351,9 @@ class AsrSegment:
 | 视频示波器 | Canvas，0.2x 离屏缩放，~15fps requestAnimationFrame |
 | 直方图 | 离屏 Canvas 采样 → RGB 三通道曲线 |
 | 动画 | Lottie（`lottie.min.js`） |
-| 文件夹树 | Quasar `q-tree` 组件，通过 `v-show` 控制显隐（`libraryExpanded`），使用 `:expanded` + `expandedFolders` 响应式控制展开状态，点击节点设 `selectedFolder` |
+| 文件夹树 | `FolderTree` 可复用组件（`folder-tree.js`），封装 Quasar `q-tree`（`no-connectors` + `dense`）。VS Code 风格竖线缩进（`border-left` on `q-tree__children`）。侧边栏和 picker 各持有独立 `expanded` 状态 |
+| 主题色统一 | 所有 UI 控件通过 CSS 变量 `--accent` / `--accent-dim` 跟随主题色。Quasar 组件通过 `style="--q-primary:var(--accent)"` 元素级覆盖。侧边栏选中使用 `.sidebar-active-item` 类 |
+| 50% 缩放紧凑模式 | `gridScale <= 0.5` 时添加 `.grid-compact` class，隐藏 `.media-card .info` |
 | 媒体类型筛选 | `q-btn-group` 包含独立 `q-btn`（带 `q-tooltip`），替代 `q-btn-toggle` |
 | 分段编辑 | `contenteditable` + `@blur` → `saveSegField()`（文本字段）；`×` 按钮 → `removeTag()`（标签字段） |
 | 键盘快捷键 | `document.addEventListener("keydown")` 全局监听，`created()` 注册 / `beforeUnmount()` 清理；`isContentEditable` 检测避免编辑冲突 |
@@ -453,7 +459,34 @@ confirmPicker()
 **组件结构**：
 - `picker-dialog-card`：CSS 90vw x 90vh，flex column 布局
 - `picker-bar`（42px）：关闭按钮 + 标题 + 已选计数 + 确认按钮
-- `picker-body`：flex row，左侧 `picker-sidebar`（220px 文件夹树）+ 右侧 `picker-gallery`（嵌入 gallery-page）
+- `picker-body`：flex row，左侧 `picker-sidebar`（220px `FolderTree` 组件）+ 右侧 `picker-gallery`（嵌入 gallery-page）
+
+### 5.6 FolderTree 可复用组件
+
+提取为独立组件 `frontend/js/folder-tree.js`，侧边栏和 picker 各持有独立 `expanded` 状态。
+
+**Props**：`nodes`（树数据）、`selected`（选中路径）、`contextMenu`（是否启用右键菜单）、`countField`（计数字段名）。
+
+**Emits**：`select`（节点点击）、`contextmenu`（右键事件）。
+
+**样式特点**：
+- `no-connectors` + `dense`：无默认连接线
+- VS Code 风格竖线缩进：`q-tree__children { border-left: 1px solid var(--border) }`
+- 叶节点箭头占位：`q-tree__node--child > .q-tree__node-header { padding-left: 22px }`
+- 选中/悬浮高亮统一：CSS `q-tree__node-header` 全宽高亮
+
+### 5.7 工作台素材面板架构
+
+**数据模型**：素材面板以 `project.media`（完整视频列表）为单位，`segments` 仍加载供预览区和时间线使用。
+
+**搜索**：后端 FTS5 搜索（`GET /api/workbench/:id?q=xxx`），复用 `library._segment_query()` 做 jieba 分词 + FTS MATCH。
+
+**筛选/排序**：前端 computed `filteredMedia()` 应用类型筛选（`matType`）和排序（`matSort`：name/duration/date_taken）。
+
+**辅助方法**：
+- `mediaSegments(mediaId)` — 从 `this.segments` 中筛选指定 media 的 segments
+- `fmtDur(sec)` — 秒数转 M:SS 或 H:MM:SS 格式
+- `searchMedia()` — 调用 `API.getProject(id, q)` 更新 `project.media`
 
 ## 6. 外部依赖
 
