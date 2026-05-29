@@ -61,3 +61,13 @@ IMAGE_EXTS = {
 # RAW formats = everything except common non-RAW image formats
 HEIF_EXTS = {".heic", ".heif", ".hif", ".avif"}
 RAW_EXTS = IMAGE_EXTS - {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".tif", ".gif"} - HEIF_EXTS
+
+# ── Analysis concurrency ──────────────────────────────────────
+# Max concurrent VLM (visual-language model) API calls during batch analysis.
+# Increase only if your model API supports parallel requests without rate-limiting.
+ANALYSIS_API_CONCURRENCY = 1
+
+# Thread pool size for batch analysis. Each worker handles one media item through
+# the full pipeline (compress → VLM → ASR → save). I/O tasks (compress, ASR) can
+# run in parallel across workers; VLM calls are gated by ANALYSIS_API_CONCURRENCY.
+ANALYSIS_THREAD_POOL_SIZE = 5

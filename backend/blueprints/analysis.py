@@ -8,19 +8,14 @@ from pathlib import Path
 
 from ..db import get_db, get_setting
 from ..compressor import compress_video, compress_image
-from ..config import HEIF_EXTS
+from ..config import HEIF_EXTS, ANALYSIS_API_CONCURRENCY, ANALYSIS_THREAD_POOL_SIZE
 from ..analyzer import analyze_video, analyze_image, CODING_BASE_URL
 from ..asr import get_engine as get_asr_engine, preload_all, reload_engine
 
 bp = Blueprint("analysis", __name__)
 
-# Concurrency control:
-#   Thread pool (5 workers) allows parallel compression / ASR across tasks.
-#   API semaphore (currently 1) limits concurrent VLM calls — bounded by model API rate limits.
-#   Raise _API_CONCURRENCY to allow parallel analysis when the API supports it.
-_API_CONCURRENCY = 1
-_api_semaphore = threading.Semaphore(_API_CONCURRENCY)
-_analysis_pool = ThreadPoolExecutor(max_workers=5)
+_api_semaphore = threading.Semaphore(ANALYSIS_API_CONCURRENCY)
+_analysis_pool = ThreadPoolExecutor(max_workers=ANALYSIS_THREAD_POOL_SIZE)
 _active_progress = {}  # media_id → progress dict (registered by thread, cleaned up on exit)
 
 
