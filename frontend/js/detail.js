@@ -68,10 +68,47 @@ const DetailPage = {
               </div>
             </div>
           </div>
-          <div style="flex:1;position:relative;min-height:0">
-            <video ref="player" :src="API.videoUrl(media.id)" controls preload="auto" tabindex="-1"
+          <div class="d-video-wrap" style="flex:1;position:relative;min-height:0;overflow:hidden"
+               @mouseenter="detailShowCtrl=true" @mouseleave="detailShowCtrl=false">
+            <video ref="player" :src="API.videoUrl(media.id)" preload="auto" tabindex="-1"
                    @loadeddata="onVideoLoaded" @play="onVideoPlay" @pause="onVideoPause" @seeked="onVideoSeeked" @error="onVideoError"
+                   @timeupdate="onDetailTimeUpdate" @click="toggleDetailPlay"
                    style="width:100%;height:100%;background:var(--surface2)"></video>
+            <div class="wb-controls" v-show="detailShowCtrl" @mouseenter="detailShowCtrl=true">
+              <q-btn flat round dense :icon="detailPlaying?'pause':'play_arrow'" size="sm" color="white" @click="toggleDetailPlay"></q-btn>
+              <span class="wb-ctrl-time">{{ fmtDetailTime(detailCurrentTime) }} / {{ fmtDetailTime(detailDuration) }}</span>
+              <div class="wb-seekbar" ref="detailSeekbar" @mousedown="onDetailSeekStart" @mousemove="onDetailSeekHover" @mouseleave="detailHoverSeg=-1;detailHoverTime=-1">
+                <div v-for="(seg,i) in analysis.segments" :key="'s'+i"
+                     class="wb-seg-mark"
+                     :class="{ active: activeSeg === i }"
+                     :style="detailSegBlockStyle(seg)"
+                     @mouseenter="detailHoverSeg=i" @mouseleave="detailHoverSeg=-1">
+                  <q-tooltip anchor="top middle" self="bottom middle" :delay="0" :offset="[0,8]" class="wb-seg-tooltip">
+                    <div style="font-weight:600;margin-bottom:4px">{{ seg.time_start }} → {{ seg.time_end }} <span style="opacity:0.6">{{ fmtSegDur(seg.time_start, seg.time_end) }}</span></div>
+                    <div v-if="seg.visual" style="margin-bottom:3px">{{ seg.visual }}</div>
+                    <div v-if="seg.asr && seg.asr!=='无'" style="opacity:0.8;margin-bottom:2px"><span style="opacity:0.5">ASR:</span> {{ seg.asr }}</div>
+                    <div v-if="seg.subtitle && seg.subtitle!=='无'" style="opacity:0.8;margin-bottom:2px"><span style="opacity:0.5">SUB:</span> {{ seg.subtitle }}</div>
+                    <div v-if="dimRowCam(seg)" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:2px">
+                      <template v-for="f in camFields" :key="f.key"><span v-if="seg[f.key]" class="wb-tip-dim"><span class="wb-tip-label">{{ t('d.dim.' + f.key) }}</span>{{ seg[f.key] }}</span></template>
+                    </div>
+                    <div v-if="dimRowScene(seg)" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:2px">
+                      <template v-for="f in sceneFields" :key="f.key"><span v-if="seg[f.key]" class="wb-tip-dim"><span class="wb-tip-label">{{ t('d.dim.' + f.key) }}</span>{{ seg[f.key] }}</span></template>
+                    </div>
+                    <div v-if="dimRowStyle(seg)" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:2px">
+                      <template v-for="f in styleFields" :key="f.key"><span v-if="seg[f.key]" class="wb-tip-dim"><span class="wb-tip-label">{{ t('d.dim.' + f.key) }}</span>{{ seg[f.key] }}</span></template>
+                    </div>
+                    <div v-if="seg.dominant_colors?.length" style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:2px">
+                      <span v-for="c in seg.dominant_colors" :key="c" class="wb-tip-pill">{{ c }}</span>
+                    </div>
+                    <div v-if="seg.main_subjects?.length" style="display:flex;gap:3px;flex-wrap:wrap">
+                      <span v-for="s in seg.main_subjects" :key="s" class="wb-tip-pill">{{ s }}</span>
+                    </div>
+                  </q-tooltip>
+                </div>
+                <div class="wb-seek-hover" v-if="detailHoverTime>=0 && detailDuration" :style="{left: (detailHoverTime/detailDuration*100)+'%'}"></div>
+                <div class="wb-seek-progress" v-if="detailDuration" :style="{width: (detailCurrentTime/detailDuration*100)+'%'}"></div>
+              </div>
+            </div>
           </div>
           <div class="waveform-wrap" ref="waveformWrap" @click="onWaveformClick">
             <canvas ref="wfCanvas"></canvas>
@@ -302,6 +339,12 @@ const DetailPage = {
         { key: "composition", cls: "comp" },
       ],
       colors: ["red", "yellow", "green", "blue", "purple"],
+      detailShowCtrl: false,
+      detailPlaying: false,
+      detailCurrentTime: 0,
+      detailDuration: 0,
+      detailHoverTime: -1,
+      detailHoverSeg: -1,
     };
   },
   computed: {
@@ -1120,16 +1163,74 @@ const DetailPage = {
       player.currentTime = secs;
       player.play().catch(() => {});
     },
+    toggleDetailPlay() {
+      const p = this.$refs.player;
+      if (!p) return;
+      p.paused ? p.play().catch(() => {}) : p.pause();
+    },
+    onDetailTimeUpdate() {
+      const p = this.$refs.player;
+      if (!p) return;
+      this.detailCurrentTime = p.currentTime;
+    },
+    fmtDetailTime(s) {
+      if (!s && s !== 0) return '--:--';
+      s = Math.floor(s);
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sec = s % 60;
+      if (h) return h + ':' + String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+      return m + ':' + String(sec).padStart(2, '0');
+    },
+    onDetailSeekStart(e) {
+      const bar = this.$refs.detailSeekbar;
+      const p = this.$refs.player;
+      if (!bar || !p) return;
+      const rect = bar.getBoundingClientRect();
+      const seek = (ev) => {
+        const x = Math.max(0, Math.min(ev.clientX - rect.left, rect.width));
+        p.currentTime = (x / rect.width) * this.detailDuration;
+        this.detailCurrentTime = p.currentTime;
+      };
+      seek(e);
+      const onMove = (ev) => seek(ev);
+      const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    },
+    onDetailSeekHover(e) {
+      const bar = this.$refs.detailSeekbar;
+      if (!bar || !this.detailDuration) return;
+      const rect = bar.getBoundingClientRect();
+      const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+      this.detailHoverTime = (x / rect.width) * this.detailDuration;
+    },
+    detailSegBlockStyle(seg) {
+      const total = this.media?.duration;
+      if (!total) return {};
+      const s = this.parseTime(seg.time_start);
+      const e = this.parseTime(seg.time_end);
+      if (isNaN(s) || isNaN(e)) return {};
+      const gapPx = 2;
+      const pctPerPx = 100 / (this.$refs.detailSeekbar?.clientWidth || 1);
+      const gap = Math.min(gapPx * pctPerPx, 0.3);
+      return {
+        left: (s / total * 100) + '%',
+        width: Math.max(0.5, (e - s) / total * 100 - gap) + '%',
+      };
+    },
     // -- Audio waveform --
     onVideoLoaded() {
       const player = this.$refs.player;
       if (!player) return;
+      this.detailDuration = player.duration;
+      this.detailCurrentTime = 0;
       this.loadWaveform();
       player.currentTime = 0.1;
       this.startSegTrack();
     },
-    onVideoPlay() { this.startWaveformAnim(); this.startScopes(); },
-    onVideoPause() { this.stopWaveformAnim(); this.stopScopes(); this.drawWaveform(); this.drawScopesOnce(); },
+    onVideoPlay() { this.detailPlaying = true; this.startWaveformAnim(); this.startScopes(); },
+    onVideoPause() { this.detailPlaying = false; this.stopWaveformAnim(); this.stopScopes(); this.drawWaveform(); this.drawScopesOnce(); },
     onVideoSeeked() { this.initScopes(); this.drawWaveform(); this.drawScopesOnce(); this.updateActiveSeg(); },
     onVideoError() {
       const player = this.$refs.player;

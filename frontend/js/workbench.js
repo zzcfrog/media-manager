@@ -25,8 +25,9 @@ const WorkbenchPage = {
     <!-- Top: Material (left) + Preview (right) -->
     <div class="wb-top">
       <!-- Left: Material panel -->
-      <div class="wb-material">
-        <div class="wb-mat-toolbar">
+      <div style="position:relative;display:flex;flex-shrink:0">
+        <div class="wb-material" :class="{'mat-collapsed': matCollapsed}">
+          <div class="wb-mat-toolbar">
           <q-input v-model="matSearch" dense filled clearable
                    :placeholder="'共' + filteredMedia.length + '个素材，搜索试试看'"
                    class="wb-mat-search"
@@ -62,19 +63,21 @@ const WorkbenchPage = {
             <q-tooltip>{{ t('wb.add_media') }}</q-tooltip>
           </q-btn>
         </div>
-        <div class="wb-material-list wb-mat-grid" :style="{'grid-template-columns': 'repeat('+matCols+',1fr)'}">
-          <div v-if="!project.media || !project.media.length" class="wb-empty-material" style="grid-column:1/-1">{{ t('wb.no_segments') }}</div>
-          <div v-else-if="!filteredMedia.length" class="wb-empty-material" style="grid-column:1/-1">{{ t('wb.no_match') }}</div>
-          <div v-for="m in filteredMedia" :key="m.id" class="wb-mat-card"
-               :class="{ selected: selectedMedia && selectedMedia.id === m.id }"
-               @click="selectedMedia = m">
-            <img :src="'/media/thumbnail/' + m.id" class="wb-mat-thumb" loading="lazy">
-            <div class="wb-mat-overlay">
-              <div class="wb-mat-meta">
-                <span v-if="m.duration">{{ fmtDur(m.duration) }}</span>
-                <span>{{ mediaSegments(m.id).length }} {{ t('wb.seg_unit') }}</span>
+        <div class="wb-material-list">
+          <div class="wb-mat-grid" :style="{'grid-template-columns': 'repeat('+matCols+',1fr)'}">
+            <div v-if="!project.media || !project.media.length" class="wb-empty-material" style="grid-column:1/-1">{{ t('wb.no_segments') }}</div>
+            <div v-else-if="!filteredMedia.length" class="wb-empty-material" style="grid-column:1/-1">{{ t('wb.no_match') }}</div>
+            <div v-for="m in filteredMedia" :key="m.id" class="wb-mat-card"
+                 :class="{ selected: selectedMedia && selectedMedia.id === m.id }"
+                 @click="selectedMedia = m">
+              <img :src="'/media/thumbnail/' + m.id" class="wb-mat-thumb" loading="lazy">
+              <div class="wb-mat-overlay">
+                <div class="wb-mat-meta">
+                  <span v-if="m.duration">{{ fmtDur(m.duration) }}</span>
+                  <span>{{ mediaSegments(m.id).length }} {{ t('wb.seg_unit') }}</span>
+                </div>
+                <div class="wb-mat-name" :title="m.file_name">{{ m.file_name }}</div>
               </div>
-              <div class="wb-mat-name" :title="m.file_name">{{ m.file_name }}</div>
             </div>
           </div>
         </div>
@@ -82,6 +85,7 @@ const WorkbenchPage = {
           <span style="font-size:10px;color:var(--text3);margin-right:8px;min-width:24px;text-align:right">{{ matCols }}列</span>
           <q-slider v-model="matCols" :min="2" :max="4" :step="1"
                     style="width:90px;--q-primary:var(--accent);padding:0 10px" color="primary"></q-slider>
+        </div>
         </div>
       </div>
 
@@ -92,29 +96,33 @@ const WorkbenchPage = {
           <div class="wb-preview-left">
             <!-- Video -->
             <template v-if="selectedMedia.media_type === 'video'">
-              <div class="img-meta-bar">
+              <div v-if="mediaDetail" style="flex-shrink:0;position:relative">
+                <q-btn flat round dense :icon="metaCollapsed?'expand_more':'expand_less'"
+                       size="xs" class="wb-collapse-btn" style="position:absolute;top:4px;right:4px;z-index:1"
+                       @click="metaCollapsed=!metaCollapsed"></q-btn>
+                <div class="img-meta-bar" v-show="!metaCollapsed">
                 <div class="img-meta-block">
                   <div class="img-meta-title">{{ t('d.video') }}</div>
                   <div style="display:flex;gap:14px;align-items:flex-start">
                     <div class="meta-grid" style="gap:4px 14px">
-                      <span class="meta-label">{{ t('d.resolution') }}</span><span>{{ selectedMedia.width }}x{{ selectedMedia.height }}</span>
-                      <span class="meta-label">{{ t('d.duration') }}</span><span>{{ fmtDur(selectedMedia.duration) }}</span>
-                      <span class="meta-label">{{ t('d.codec') }}</span><span>{{ selectedMedia.video_codec }}<template v-if="selectedMedia.video_profile"> ({{ selectedMedia.video_profile }})</template></span>
+                      <span class="meta-label">{{ t('d.resolution') }}</span><span>{{ mediaDetail.width }}x{{ mediaDetail.height }}</span>
+                      <span class="meta-label">{{ t('d.duration') }}</span><span>{{ fmtDur(mediaDetail.duration) }}</span>
+                      <span class="meta-label">{{ t('d.codec') }}</span><span>{{ mediaDetail.video_codec }}<template v-if="mediaDetail.video_profile"> ({{ mediaDetail.video_profile }})</template></span>
                     </div>
                     <div class="meta-grid" style="gap:4px 14px">
-                      <span class="meta-label">{{ t('d.fps') }}</span><span>{{ fmtFps(selectedMedia.fps) }}</span>
-                      <span class="meta-label">{{ t('d.bitrate') }}</span><span v-if="selectedMedia.bit_rate">{{ (selectedMedia.bit_rate / 1000000).toFixed(1) }} Mbps</span><span v-else>-</span>
-                      <span class="meta-label">{{ t('d.color_space') }}</span><span>{{ selectedMedia.color_space || '-' }}</span>
+                      <span class="meta-label">{{ t('d.fps') }}</span><span>{{ fmtFps(mediaDetail.fps) }}</span>
+                      <span class="meta-label">{{ t('d.bitrate') }}</span><span v-if="mediaDetail.bit_rate">{{ (mediaDetail.bit_rate / 1000000).toFixed(1) }} Mbps</span><span v-else>-</span>
+                      <span class="meta-label">{{ t('d.color_space') }}</span><span>{{ mediaDetail.color_space || '-' }}</span>
                     </div>
                   </div>
                 </div>
                 <div class="img-meta-block">
                   <div class="img-meta-title">{{ t('d.audio') }}</div>
                   <div class="meta-grid" style="gap:4px 14px">
-                    <template v-if="selectedMedia.audio_codec">
-                      <span class="meta-label">{{ t('d.codec') }}</span><span>{{ selectedMedia.audio_codec }}</span>
-                      <span class="meta-label">{{ t('d.sample_rate') }}</span><span v-if="selectedMedia.audio_sample_rate">{{ (selectedMedia.audio_sample_rate / 1000).toFixed(1) }} kHz</span><span v-else>-</span>
-                      <span class="meta-label">{{ t('d.channels') }}</span><span>{{ selectedMedia.audio_channels === 1 ? t('d.mono') : selectedMedia.audio_channels === 2 ? t('d.stereo') : t('d.ch_n', {n: selectedMedia.audio_channels || '-'}) }}</span>
+                    <template v-if="mediaDetail.audio_codec">
+                      <span class="meta-label">{{ t('d.codec') }}</span><span>{{ mediaDetail.audio_codec }}</span>
+                      <span class="meta-label">{{ t('d.sample_rate') }}</span><span v-if="mediaDetail.audio_sample_rate">{{ (mediaDetail.audio_sample_rate / 1000).toFixed(1) }} kHz</span><span v-else>-</span>
+                      <span class="meta-label">{{ t('d.channels') }}</span><span>{{ mediaDetail.audio_channels === 1 ? t('d.mono') : mediaDetail.audio_channels === 2 ? t('d.stereo') : t('d.ch_n', {n: mediaDetail.audio_channels || '-'}) }}</span>
                     </template>
                     <template v-else><span style="color:var(--text3)">{{ t('d.no_audio') }}</span></template>
                   </div>
@@ -122,93 +130,149 @@ const WorkbenchPage = {
                 <div class="img-meta-block">
                   <div class="img-meta-title">{{ t('d.camera_info') }}</div>
                   <div class="meta-grid" style="gap:4px 14px">
-                    <span class="meta-label">{{ t('d.make') }}</span><span>{{ selectedMedia.camera_make || '-' }}</span>
-                    <span class="meta-label">{{ t('d.model') }}</span><span>{{ selectedMedia.camera_model || '-' }}</span>
-                    <span class="meta-label">{{ t('d.lens') }}</span><span>{{ selectedMedia.lens_model || '-' }}</span>
+                    <span class="meta-label">{{ t('d.make') }}</span><span>{{ mediaDetail.camera_make || '-' }}</span>
+                    <span class="meta-label">{{ t('d.model') }}</span><span>{{ mediaDetail.camera_model || '-' }}</span>
+                    <span class="meta-label">{{ t('d.lens') }}</span><span>{{ mediaDetail.lens_model || '-' }}</span>
                   </div>
                 </div>
               </div>
-              <div style="flex:1;position:relative;min-height:0">
+              </div>
+              <div class="wb-video-wrap" style="flex:1;position:relative;min-height:0;overflow:hidden"
+                   @mouseenter="showWbOverlay=true" @mouseleave="showWbOverlay=false">
                 <video ref="wbPlayer" :key="selectedMedia.id" :src="'/media/video/' + selectedMedia.id"
-                       style="width:100%;height:100%;background:#000" controls preload="auto"
-                       @loadeddata="onWbVideoLoaded" @play="onWbVideoPlay" @pause="onWbVideoPause" @seeked="onWbVideoSeeked"></video>
+                       style="width:100%;height:100%;background:#000" preload="auto"
+                       @loadeddata="onWbVideoLoaded" @play="onWbVideoPlay" @pause="onWbVideoPause" @seeked="onWbVideoSeeked"
+                       @timeupdate="onWbTimeUpdate" @click="toggleWbPlay"></video>
+                <div v-show="showWbOverlay" class="wb-player-overlay">{{ selectedMedia.file_name }}</div>
+                <div class="wb-controls" v-show="showWbOverlay" @mouseenter="showWbOverlay=true">
+                  <q-btn flat round dense :icon="wbPlaying?'pause':'play_arrow'" size="sm" color="white" @click="toggleWbPlay"></q-btn>
+                  <span class="wb-ctrl-time">{{ fmtSec(wbCurrentTime) }} / {{ fmtSec(wbDuration) }}</span>
+                  <div class="wb-seekbar" ref="wbSeekbar" @mousedown="onWbSeekStart" @mousemove="onWbSeekHover" @mouseleave="hoverSegIndex=-1;wbHoverTime=-1">
+                    <div v-for="(seg,i) in mediaSegments(selectedMedia.id)" :key="'s'+seg.id"
+                         class="wb-seg-mark"
+                         :class="{ active: activeSegIndex === i }"
+                         :style="segBlockStyle(seg)"
+                         @mouseenter="hoverSegIndex=i" @mouseleave="hoverSegIndex=-1">
+                      <q-tooltip anchor="top middle" self="bottom middle" :delay="0" :offset="[0,8]" class="wb-seg-tooltip">
+                        <div style="font-weight:600;margin-bottom:4px">{{ seg.time_start }} → {{ seg.time_end }} <span style="opacity:0.6">{{ fmtSegDur(seg.time_start, seg.time_end) }}</span></div>
+                        <div v-if="seg.visual" style="margin-bottom:3px">{{ seg.visual }}</div>
+                        <div v-if="seg.asr && seg.asr!=='无'" style="opacity:0.8;margin-bottom:2px"><span style="opacity:0.5">ASR:</span> {{ seg.asr }}</div>
+                        <div v-if="seg.subtitle && seg.subtitle!=='无'" style="opacity:0.8;margin-bottom:2px"><span style="opacity:0.5">SUB:</span> {{ seg.subtitle }}</div>
+                        <div v-if="dimRowCam(seg)" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:2px">
+                          <template v-for="f in camFields" :key="f.key"><span v-if="seg[f.key]" class="wb-tip-dim"><span class="wb-tip-label">{{ t('d.dim.' + f.key) }}</span>{{ seg[f.key] }}</span></template>
+                        </div>
+                        <div v-if="dimRowScene(seg)" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:2px">
+                          <template v-for="f in sceneFields" :key="f.key"><span v-if="seg[f.key]" class="wb-tip-dim"><span class="wb-tip-label">{{ t('d.dim.' + f.key) }}</span>{{ seg[f.key] }}</span></template>
+                        </div>
+                        <div v-if="dimRowStyle(seg)" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:2px">
+                          <template v-for="f in styleFields" :key="f.key"><span v-if="seg[f.key]" class="wb-tip-dim"><span class="wb-tip-label">{{ t('d.dim.' + f.key) }}</span>{{ seg[f.key] }}</span></template>
+                        </div>
+                        <div v-if="seg.dominant_colors?.length" style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:2px">
+                          <span v-for="c in seg.dominant_colors" :key="c" class="wb-tip-pill">{{ c }}</span>
+                        </div>
+                        <div v-if="seg.main_subjects?.length" style="display:flex;gap:3px;flex-wrap:wrap">
+                          <span v-for="s in seg.main_subjects" :key="s" class="wb-tip-pill">{{ s }}</span>
+                        </div>
+                      </q-tooltip>
+                    </div>
+                    <div class="wb-seek-hover" v-if="wbHoverTime>=0 && wbDuration" :style="{left: (wbHoverTime/wbDuration*100)+'%'}"></div>
+                    <div class="wb-seek-progress" v-if="wbDuration" :style="{width: (wbCurrentTime/wbDuration*100)+'%'}"></div>
+                  </div>
+                </div>
               </div>
-              <div class="waveform-wrap" ref="wbWaveformWrap" @click="onWbWaveformClick">
-                <canvas ref="wbWfCanvas"></canvas>
-              </div>
-              <div class="scopes-row" ref="wbScopesRow">
+
+              <div style="flex-shrink:0;position:relative">
+                <div v-show="!scopesCollapsed">
+                  <div class="waveform-wrap" ref="wbWaveformWrap" @click="onWbWaveformClick">
+                    <canvas ref="wbWfCanvas"></canvas>
+                  </div>
+                  <div class="scopes-row" ref="wbScopesRow">
                 <div class="scope-box"><canvas ref="wbScopeWf"></canvas><span class="scope-label">Waveform</span></div>
                 <div class="scope-box"><canvas ref="wbScopePr"></canvas><span class="scope-label">Parade</span></div>
                 <div class="scope-box"><canvas ref="wbScopeVt"></canvas><span class="scope-label">Vectorscope</span></div>
+                </div>
+                </div>
+                <q-btn flat round dense :icon="scopesCollapsed?'expand_less':'expand_more'"
+                       size="xs" class="wb-collapse-btn" style="position:absolute;bottom:4px;right:4px;z-index:1"
+                       @click="scopesCollapsed=!scopesCollapsed"></q-btn>
               </div>
             </template>
             <!-- Image -->
             <template v-else>
-              <div class="img-meta-bar">
+              <div v-if="mediaDetail" style="flex-shrink:0;position:relative">
+                <q-btn flat round dense :icon="metaCollapsed?'expand_more':'expand_less'"
+                       size="xs" class="wb-collapse-btn" style="position:absolute;top:4px;right:4px;z-index:1"
+                       @click="metaCollapsed=!metaCollapsed"></q-btn>
+                <div class="img-meta-bar" v-show="!metaCollapsed">
                 <div class="img-meta-block">
                   <div class="img-meta-title">{{ t('d.image') }}</div>
                   <div class="meta-grid" style="gap:4px 14px">
-                    <span class="meta-label">{{ t('d.resolution') }}</span><span>{{ selectedMedia.width }}x{{ selectedMedia.height }}</span>
-                    <span class="meta-label">{{ t('d.codec') }}</span><span>{{ selectedMedia.video_codec || '-' }}</span>
-                    <span class="meta-label">{{ t('d.color_space') }}</span><span>{{ selectedMedia.color_space || '-' }}</span>
-                    <span class="meta-label">{{ t('d.bit_depth') }}</span><span>{{ selectedMedia.pix_fmt || '-' }}</span>
+                    <span class="meta-label">{{ t('d.resolution') }}</span><span>{{ mediaDetail.width }}x{{ mediaDetail.height }}</span>
+                    <span class="meta-label">{{ t('d.codec') }}</span><span>{{ mediaDetail.video_codec || '-' }}</span>
+                    <span class="meta-label">{{ t('d.color_space') }}</span><span>{{ mediaDetail.color_space || '-' }}</span>
+                    <span class="meta-label">{{ t('d.bit_depth') }}</span><span>{{ mediaDetail.pix_fmt || '-' }}</span>
                   </div>
                 </div>
                 <div class="img-meta-block">
                   <div class="img-meta-title">{{ t('d.camera_info') }}</div>
                   <div class="meta-grid" style="gap:4px 14px">
-                    <span class="meta-label">{{ t('d.model') }}</span><span>{{ selectedMedia.camera_model || '-' }}</span>
-                    <span class="meta-label">{{ t('d.lens') }}</span><span>{{ selectedMedia.lens_model || '-' }}</span>
+                    <span class="meta-label">{{ t('d.model') }}</span><span>{{ mediaDetail.camera_model || '-' }}</span>
+                    <span class="meta-label">{{ t('d.lens') }}</span><span>{{ mediaDetail.lens_model || '-' }}</span>
                   </div>
                 </div>
               </div>
-              <div style="flex:1;display:flex;align-items:center;justify-content:center;min-height:0;background:#000;position:relative">
+              </div>
+              <div style="flex:1;display:flex;align-items:center;justify-content:center;min-height:0;background:#000;position:relative"
+                   @mouseenter="showWbOverlay=true" @mouseleave="showWbOverlay=false">
                 <q-spinner v-if="previewLoading" size="40px" color="grey-6" style="position:absolute"></q-spinner>
                 <img ref="wbImgEl" :src="'/media/image/' + selectedMedia.id"
                      @load="onWbImageLoaded" @error="previewLoading=false"
                      style="max-width:100%;max-height:100%;object-fit:contain">
+                <div v-show="showWbOverlay" class="wb-player-overlay">{{ selectedMedia.file_name }}</div>
               </div>
               <div class="histogram-wrap" ref="wbHistWrap"><canvas ref="wbHistCanvas"></canvas></div>
             </template>
           </div>
           <!-- Right: segment info -->
-          <div class="wb-preview-sidebar">
-            <div class="wb-preview-sidebar-header">
-              <span style="font-weight:500">{{ selectedMedia.file_name }}</span>
-              <span v-if="selectedMedia.duration" style="font-size:11px;color:var(--text3);margin-left:8px">{{ fmtDur(selectedMedia.duration) }}</span>
-            </div>
+          <div style="position:relative;flex-shrink:0;display:flex">
+            <q-btn flat round dense :icon="segCompact?'unfold_more':'unfold_less'"
+                   size="xs" class="wb-collapse-btn" style="position:absolute;top:50%;left:-8px;transform:translateY(-50%);z-index:5"
+                   @click="segCompact=!segCompact">
+            </q-btn>
+          <div class="wb-preview-sidebar" :class="{compact: segCompact}">
             <template v-if="mediaSegments(selectedMedia.id).length">
-              <q-scroll-area style="flex:1">
-                <div v-for="seg in mediaSegments(selectedMedia.id)" :key="seg.id" class="segment"
-                     :class="{ active: activeSeg && activeSeg.id === seg.id }"
-                     @click="activeSeg = seg">
+              <q-scroll-area ref="wbSegScroll" style="flex:1">
+                <div v-for="(seg,i) in mediaSegments(selectedMedia.id)" :key="seg.id" class="segment"
+                     :class="{ active: activeSegIndex === i }"
+                     @click="onSegClick(seg, i)">
                   <div style="display:flex;align-items:center;justify-content:space-between">
                     <span class="seg-time"><span class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'time_start', e.target.innerText.trim())" v-text="seg.time_start"></span> → <span class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'time_end', e.target.innerText.trim())" v-text="seg.time_end"></span></span>
                     <div style="display:flex;align-items:center;gap:6px">
                       <span class="seg-dur">{{ fmtSegDur(seg.time_start, seg.time_end) }}</span>
                     </div>
                   </div>
-                  <div class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'visual', e.target.innerText)" v-text="seg.visual"></div>
-                  <div v-if="seg.asr && seg.asr!=='无'" class="seg-text-line seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'asr', e.target.innerText)"><span class="prefix">{{ t('d.dialog_asr') }}</span><span v-text="seg.asr"></span></div>
-                  <div v-if="seg.subtitle && seg.subtitle!=='无'" class="seg-text-line seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'subtitle', e.target.innerText)"><span class="prefix">{{ t('d.dialog_subtitle') }}</span><span v-text="seg.subtitle"></span></div>
-                  <div v-if="dimRowCam(seg)" class="dim-row">
+                  <div class="seg-visual seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'visual', e.target.innerText)" v-text="seg.visual"></div>
+                  <div v-if="!segCompact && seg.asr && seg.asr!=='无'" class="seg-text-line seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'asr', e.target.innerText)"><span class="prefix">{{ t('d.dialog_asr') }}</span><span v-text="seg.asr"></span></div>
+                  <div v-if="!segCompact && seg.subtitle && seg.subtitle!=='无'" class="seg-text-line seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'subtitle', e.target.innerText)"><span class="prefix">{{ t('d.dialog_subtitle') }}</span><span v-text="seg.subtitle"></span></div>
+                  <div v-if="!segCompact && dimRowCam(seg)" class="dim-row">
                     <span style="font-size:12px">🎥</span>
                     <template v-for="f in camFields" :key="f.key"><span v-if="seg[f.key]" class="dim-pair"><span class="dim-label">{{ t('d.dim.' + f.key) }}</span><span class="dim-value seg-editable" :class="f.cls" contenteditable @click.stop @blur="e => saveSegField(seg, f.key, e.target.innerText.trim())" v-text="seg[f.key]"></span></span></template>
                   </div>
-                  <div v-if="dimRowScene(seg)" class="dim-row">
+                  <div v-if="!segCompact && dimRowScene(seg)" class="dim-row">
                     <span style="font-size:12px">🌍</span>
                     <template v-for="f in sceneFields" :key="f.key"><span v-if="seg[f.key]" class="dim-pair"><span class="dim-label">{{ t('d.dim.' + f.key) }}</span><span class="dim-value seg-editable" :class="f.cls" contenteditable @click.stop @blur="e => saveSegField(seg, f.key, e.target.innerText.trim())" v-text="seg[f.key]"></span></span></template>
                   </div>
-                  <div v-if="dimRowStyle(seg)" class="dim-row">
+                  <div v-if="!segCompact && dimRowStyle(seg)" class="dim-row">
                     <span style="font-size:12px">🎨</span>
                     <template v-for="f in styleFields" :key="f.key"><span v-if="seg[f.key]" class="dim-pair"><span class="dim-label">{{ t('d.dim.' + f.key) }}</span><span class="dim-value seg-editable" :class="f.cls" contenteditable @click.stop @blur="e => saveSegField(seg, f.key, e.target.innerText.trim())" v-text="seg[f.key]"></span></span></template>
                   </div>
-                  <div class="array-group"><span class="array-label icon-label"><span class="label-icon">🌈</span>{{ t('d.colors') }}</span><div class="array-pills"><span v-for="c in (seg.dominant_colors||[])" :key="c" class="pill color seg-editable-tag" @click.stop="removeTag(seg, 'dominant_colors', c)">{{ c }}<span style="margin-left:2px;opacity:0.5">×</span></span><input class="tag-add-input" placeholder="+" @click.stop @keydown.enter.stop.prevent="e => { addTag(seg, 'dominant_colors', e.target); e.target.value='' }" /></div></div>
-                  <div class="array-group"><span class="array-label icon-label"><span class="label-icon">🏷️</span>{{ t('d.subjects') }}</span><div class="array-pills"><span v-for="s in (seg.main_subjects||[])" :key="s" class="pill subject seg-editable-tag" @click.stop="removeTag(seg, 'main_subjects', s)">{{ s }}<span style="margin-left:2px;opacity:0.5">×</span></span><input class="tag-add-input" placeholder="+" @click.stop @keydown.enter.stop.prevent="e => { addTag(seg, 'main_subjects', e.target); e.target.value='' }" /></div></div>
+                  <div v-if="!segCompact" class="array-group"><span class="array-label icon-label"><span class="label-icon">🌈</span>{{ t('d.colors') }}</span><div class="array-pills"><span v-for="c in (seg.dominant_colors||[])" :key="c" class="pill color seg-editable-tag" @click.stop="removeTag(seg, 'dominant_colors', c)">{{ c }}<span style="margin-left:2px;opacity:0.5">×</span></span><input class="tag-add-input" placeholder="+" @click.stop @keydown.enter.stop.prevent="e => { addTag(seg, 'dominant_colors', e.target); e.target.value='' }" /></div></div>
+                  <div v-if="!segCompact" class="array-group"><span class="array-label icon-label"><span class="label-icon">🏷️</span>{{ t('d.subjects') }}</span><div class="array-pills"><span v-for="s in (seg.main_subjects||[])" :key="s" class="pill subject seg-editable-tag" @click.stop="removeTag(seg, 'main_subjects', s)">{{ s }}<span style="margin-left:2px;opacity:0.5">×</span></span><input class="tag-add-input" placeholder="+" @click.stop @keydown.enter.stop.prevent="e => { addTag(seg, 'main_subjects', e.target); e.target.value='' }" /></div></div>
                 </div>
               </q-scroll-area>
             </template>
             <div v-else style="font-size:11px;color:var(--text3);padding:12px">{{ t('wb.no_segments') }}</div>
+          </div>
           </div>
         </template>
         <div v-else class="wb-preview-empty">
@@ -262,7 +326,18 @@ const WorkbenchPage = {
       tracks: [],
       loading: true,
       selectedMedia: null,
-      activeSeg: null,
+      mediaDetail: null,
+      activeSegIndex: -1,
+      showWbOverlay: false,
+      hoverSegIndex: -1,
+      _matPanelWidth: 400,
+      metaCollapsed: false,
+      scopesCollapsed: false,
+      segCompact: false,
+      wbPlaying: false,
+      wbCurrentTime: 0,
+      wbDuration: 0,
+      wbHoverTime: -1,
       previewLoading: false,
       matSearch: "",
       matType: "",
@@ -307,6 +382,10 @@ const WorkbenchPage = {
 
   computed: {
     t() { return t; },
+    matCollapsed: {
+      get() { return this.$root.matCollapsed; },
+      set(v) { this.$root.matCollapsed = v; }
+    },
     filteredMedia() {
       if (!this.project || !this.project.media) return [];
       let list = this.project.media;
@@ -339,6 +418,7 @@ const WorkbenchPage = {
   },
 
   beforeUnmount() {
+    this.stopSegTrack();
     this.stopWbWaveformAnim();
     this.stopWbScopes();
     this.$root.pickerMode = false;
@@ -346,11 +426,20 @@ const WorkbenchPage = {
 
   watch: {
     projectId() { this.load(); },
-    selectedMedia() {
-      this.activeSeg = null;
-      this.stopWbWaveformAnim(); this.stopWbScopes();
+    selectedMedia(m) {
+      this.activeSegIndex = -1;
+      this.mediaDetail = null;
+      this.wbPlaying = false;
+      this.wbCurrentTime = 0;
+      this.wbDuration = 0;
+      this.wbHoverTime = -1;
+      this.hoverSegIndex = -1;
+      this.stopSegTrack(); this.stopWbWaveformAnim(); this.stopWbScopes();
       this._wbWfPeaks = null;
       this.previewLoading = this.selectedMedia?.media_type === 'image';
+      if (m) {
+        API.getMedia(m.id).then(res => { this.mediaDetail = res; }).catch(() => {});
+      }
     },
     matCols(val) { localStorage.setItem('wb_matCols', val); },
     matSearch(val) {
@@ -445,6 +534,107 @@ const WorkbenchPage = {
     dimRowCam(seg) { return this.camFields.some(f => seg[f.key]); },
     dimRowScene(seg) { return this.sceneFields.some(f => seg[f.key]); },
     dimRowStyle(seg) { return this.styleFields.some(f => seg[f.key]); },
+    parseTime(str) {
+      if (!str) return NaN;
+      const parts = str.split(":").map(Number);
+      if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+      if (parts.length === 2) return parts[0] * 60 + parts[1];
+      return parseFloat(str);
+    },
+    segBlockStyle(seg) {
+      const total = this.selectedMedia?.duration;
+      if (!total) return {};
+      const s = this.parseTime(seg.time_start);
+      const e = this.parseTime(seg.time_end);
+      if (isNaN(s) || isNaN(e)) return {};
+      const gapPx = 2;
+      const pctPerPx = 100 / (this.$refs.wbSeekbar?.clientWidth || 1);
+      const gap = Math.min(gapPx * pctPerPx, 0.3);
+      return {
+        left: (s / total * 100) + '%',
+        width: Math.max(0.5, (e - s) / total * 100 - gap) + '%',
+      };
+    },
+    onSegClick(seg, i) {
+      this.activeSegIndex = i;
+      if (this.selectedMedia?.media_type === 'video') {
+        const player = this.$refs.wbPlayer;
+        if (player) {
+          player.currentTime = this.parseTime(seg.time_start);
+          player.play().catch(() => {});
+        }
+      }
+    },
+    toggleWbPlay() {
+      const p = this.$refs.wbPlayer;
+      if (!p) return;
+      p.paused ? p.play().catch(() => {}) : p.pause();
+    },
+    onWbTimeUpdate() {
+      const p = this.$refs.wbPlayer;
+      if (!p) return;
+      this.wbCurrentTime = p.currentTime;
+    },
+    fmtSec(s) {
+      if (!s && s !== 0) return '--:--';
+      s = Math.floor(s);
+      const m = Math.floor(s / 60);
+      const sec = s % 60;
+      return m + ':' + String(sec).padStart(2, '0');
+    },
+    onWbSeekStart(e) {
+      const bar = this.$refs.wbSeekbar;
+      const p = this.$refs.wbPlayer;
+      if (!bar || !p) return;
+      const rect = bar.getBoundingClientRect();
+      const seek = (ev) => {
+        const x = Math.max(0, Math.min(ev.clientX - rect.left, rect.width));
+        p.currentTime = (x / rect.width) * this.wbDuration;
+        this.wbCurrentTime = p.currentTime;
+      };
+      seek(e);
+      const onMove = (ev) => seek(ev);
+      const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    },
+    onWbSeekHover(e) {
+      const bar = this.$refs.wbSeekbar;
+      if (!bar || !this.wbDuration) return;
+      const rect = bar.getBoundingClientRect();
+      const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+      this.wbHoverTime = (x / rect.width) * this.wbDuration;
+    },
+    startSegTrack() {
+      if (this._segTrackInterval) return;
+      this._segTrackInterval = setInterval(() => this.updateActiveSeg(), 250);
+    },
+    stopSegTrack() {
+      if (this._segTrackInterval) { clearInterval(this._segTrackInterval); this._segTrackInterval = null; }
+    },
+    updateActiveSeg() {
+      const player = this.$refs.wbPlayer;
+      const segs = this.mediaSegments(this.selectedMedia?.id);
+      if (!player || !segs.length) return;
+      const t = player.currentTime;
+      const idx = segs.findIndex(s => t >= this.parseTime(s.time_start) && t < this.parseTime(s.time_end));
+      if (idx === -1 || idx === this.activeSegIndex) return;
+      this.activeSegIndex = idx;
+      this.$nextTick(() => {
+        const scroll = this.$refs.wbSegScroll;
+        if (!scroll) return;
+        const container = scroll.getScrollTarget();
+        const content = container.firstElementChild;
+        const el = content?.children[idx];
+        if (!el) return;
+        const containerH = container.clientHeight;
+        const scrollTop = container.scrollTop;
+        const elTop = el.offsetTop;
+        const elH = el.offsetHeight;
+        if (elTop >= scrollTop && elTop + elH <= scrollTop + containerH) return;
+        scroll.setScrollPosition("vertical", Math.max(0, elTop - (containerH - elH) / 2), 200);
+      });
+    },
     fmtSegDur(start, end) {
       const ts = (s) => { if (!s) return NaN; const p = s.split(":").map(Number); return p.length===3 ? p[0]*3600+p[1]*60+p[2] : p.length===2 ? p[0]*60+p[1] : parseFloat(s); };
       const d = ts(end) - ts(start);
@@ -520,12 +710,15 @@ const WorkbenchPage = {
     },
     // -- Video waveform --
     onWbVideoLoaded() {
+      const p = this.$refs.wbPlayer;
+      if (p) { this.wbDuration = p.duration; this.wbCurrentTime = 0; }
       this.initWbScopes();
       this.loadWbWaveform();
+      this.startSegTrack();
     },
-    onWbVideoPlay() { this.startWbWaveformAnim(); this.startWbScopes(); },
-    onWbVideoPause() { this.stopWbWaveformAnim(); this.stopWbScopes(); this.drawWbWaveform(); if (this._wbScopeOffscreen) this.drawWbScopesOnce(); },
-    onWbVideoSeeked() { this.initWbScopes(); this.drawWbWaveform(); this.drawWbScopesOnce(); },
+    onWbVideoPlay() { this.wbPlaying = true; this.startSegTrack(); this.startWbWaveformAnim(); this.startWbScopes(); },
+    onWbVideoPause() { this.wbPlaying = false; this.stopSegTrack(); this.stopWbWaveformAnim(); this.stopWbScopes(); this.drawWbWaveform(); if (this._wbScopeOffscreen) this.drawWbScopesOnce(); },
+    onWbVideoSeeked() { this.initWbScopes(); this.drawWbWaveform(); this.drawWbScopesOnce(); this.updateActiveSeg(); },
     async loadWbWaveform() {
       const player = this.$refs.wbPlayer;
       const canvas = this.$refs.wbWfCanvas;

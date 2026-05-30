@@ -255,6 +255,15 @@
     <q-tooltip :delay="1000">{{ t('side.collapse') }}</q-tooltip>
   </q-btn>
 
+  <!-- Workbench material panel toggle -->
+  <q-btn v-if="currentView==='workbench'" flat round dense
+          :icon="$root.matCollapsed ? 'chevron_right' : 'chevron_left'"
+          size="xs" color="grey-6"
+          class="drawer-toggle-btn"
+          @click="$root.matCollapsed = !$root.matCollapsed"
+          :style="{position:'fixed', left: (drawerMini ? 54 : 258) + ($root.matCollapsed ? 0 : 400) - 8 + 'px', top: '45%', zIndex: 2000}">
+  </q-btn>
+
   <!-- Settings modal -->
   <q-dialog v-model="showSettings" @show="loadSettings">
     <q-card style="min-width:440px" class="dialog-card">
@@ -578,6 +587,7 @@ const app = Vue.createApp({
       pickerSelected: [],
       pickerExcludeIds: [],
       pickerFolder: null,
+      matCollapsed: false,
       galleryItems: [],
       searchQuery: "",
       showImport: false,
