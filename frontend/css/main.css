@@ -744,7 +744,7 @@ body:not(.body--dark) .wb-mat-sort-group { background: #e0e0e0; }
   position: absolute;
   top: 8px;
   left: 8px;
-  padding: 4px 10px;
+  padding: 2px 10px;
   background: rgba(0,0,0,0.6);
   color: #fff;
   font-size: 12px;
@@ -761,7 +761,7 @@ body:not(.body--dark) .wb-mat-sort-group { background: #e0e0e0; }
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
+  padding: 4px 10px;
   background: linear-gradient(transparent, rgba(0,0,0,0.7));
   z-index: 2;
 }
@@ -775,7 +775,7 @@ body:not(.body--dark) .wb-mat-sort-group { background: #e0e0e0; }
 .wb-seekbar {
   flex: 1;
   position: relative;
-  height: 20px;
+  height: 16px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -892,13 +892,15 @@ body:not(.body--dark) .wb-mat-sort-group { background: #e0e0e0; }
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 8px;
+  padding: 2px 8px;
   border-bottom: 1px solid var(--border);
   background: var(--surface2);
   flex-shrink: 0;
+  height: 36px;
 }
-.wb-track-toolbar .q-btn { min-height: unset; }
+.wb-track-toolbar .q-btn { min-height: unset; padding: 0; }
 .wb-track-toolbar .q-select { font-size: 11px; }
+.wb-track-toolbar .q-slider { height: 20px; }
 
 .wb-tracks {
   flex-shrink: 0;
@@ -990,6 +992,23 @@ body:not(.body--dark) .wb-mat-sort-group { background: #e0e0e0; }
   height: 20px;
   object-fit: cover;
   border-radius: 2px;
+}
+
+.wb-track-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-height: 24px;
+  flex-shrink: 0;
+  cursor: pointer;
+  border-radius: 3px;
+  opacity: 0.4;
+  transition: opacity 0.15s, background 0.15s;
+}
+.wb-track-add:hover {
+  opacity: 1;
+  background: var(--accent-dim);
 }
 
 /* Status bar */

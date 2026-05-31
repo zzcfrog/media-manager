@@ -142,10 +142,13 @@ const WorkbenchPage = {
                 <video ref="wbPlayer" :key="selectedMedia.id" :src="'/media/video/' + selectedMedia.id"
                        style="width:100%;height:100%;background:#000" preload="auto"
                        @loadeddata="onWbVideoLoaded" @play="onWbVideoPlay" @pause="onWbVideoPause" @seeked="onWbVideoSeeked"
-                       @timeupdate="onWbTimeUpdate" @click="toggleWbPlay"></video>
+                       @timeupdate="onWbTimeUpdate" @click="toggleWbPlay" @error="onWbMediaError"></video>
                 <div v-show="showWbOverlay" class="wb-player-overlay">{{ selectedMedia.file_name }}</div>
                 <div class="wb-controls" v-show="showWbOverlay" @mouseenter="showWbOverlay=true">
                   <q-btn flat round dense :icon="wbPlaying?'pause':'play_arrow'" size="sm" color="white" @click="toggleWbPlay"></q-btn>
+                  <q-btn flat round dense icon="fullscreen" size="sm" color="white" @click="toggleWbFullscreen">
+                    <q-tooltip :delay="500">全屏</q-tooltip>
+                  </q-btn>
                   <span class="wb-ctrl-time">{{ fmtSec(wbCurrentTime) }} / {{ fmtSec(wbDuration) }}</span>
                   <div class="wb-seekbar" ref="wbSeekbar" @mousedown="onWbSeekStart" @mousemove="onWbSeekHover" @mouseleave="hoverSegIndex=-1;wbHoverTime=-1">
                     <div v-for="(seg,i) in mediaSegments(selectedMedia.id)" :key="'s'+seg.id"
@@ -179,10 +182,14 @@ const WorkbenchPage = {
                     <div class="wb-seek-progress" v-if="wbDuration" :style="wbProgressStyle"></div>
                   </div>
                 </div>
+                <q-btn v-if="scopesCollapsed" flat round dense icon="expand_less"
+                       size="xs" color="grey-6" @click="scopesCollapsed=!scopesCollapsed"
+                       style="position:absolute;bottom:6px;right:4px;z-index:3">
+                  <q-tooltip :delay="500">展开示波器</q-tooltip>
+                </q-btn>
               </div>
 
-              <div style="flex-shrink:0;position:relative">
-                <div v-show="!scopesCollapsed">
+              <div v-if="!scopesCollapsed" style="flex-shrink:0;position:relative">
                   <div class="waveform-wrap" ref="wbWaveformWrap" @click="onWbWaveformClick">
                     <canvas ref="wbWfCanvas"></canvas>
                   </div>
@@ -191,10 +198,11 @@ const WorkbenchPage = {
                 <div class="scope-box"><canvas ref="wbScopePr"></canvas><span class="scope-label">Parade</span></div>
                 <div class="scope-box"><canvas ref="wbScopeVt"></canvas><span class="scope-label">Vectorscope</span></div>
                 </div>
-                </div>
-                <q-btn flat round dense :icon="scopesCollapsed?'expand_less':'expand_more'"
+                <q-btn flat round dense icon="expand_more"
                        size="xs" class="wb-collapse-btn" style="position:absolute;bottom:4px;right:4px;z-index:1"
-                       @click="scopesCollapsed=!scopesCollapsed"></q-btn>
+                       @click="scopesCollapsed=!scopesCollapsed">
+                  <q-tooltip :delay="500">收起示波器</q-tooltip>
+                </q-btn>
               </div>
             </template>
             <!-- Image -->
@@ -286,19 +294,6 @@ const WorkbenchPage = {
     <div class="wb-tracks">
       <div class="wb-track-toolbar">
         <div style="display:flex;align-items:center;gap:2px">
-          <q-btn flat round dense icon="skip_previous" size="xs" color="grey-6" @click="trackSkipStart">
-            <q-tooltip :delay="500">跳到开头</q-tooltip>
-          </q-btn>
-          <q-btn flat round dense :icon="trackPlaying?'pause':'play_arrow'" size="xs" color="grey-6" @click="trackTogglePlay">
-            <q-tooltip :delay="500">播放/暂停</q-tooltip>
-          </q-btn>
-          <q-btn flat round dense icon="skip_next" size="xs" color="grey-6" @click="trackSkipEnd">
-            <q-tooltip :delay="500">跳到结尾</q-tooltip>
-          </q-btn>
-          <q-select v-model="trackSpeed" :options="[0.5,0.75,1,1.25,1.5,2]" dense flat borderless
-                    style="width:52px;font-size:11px" size="xs"></q-select>
-        </div>
-        <div style="display:flex;align-items:center;gap:2px">
           <q-btn flat round dense icon="undo" size="xs" color="grey-6" :disable="!trackCanUndo" @click="trackUndo">
             <q-tooltip :delay="500">撤销</q-tooltip>
           </q-btn>
@@ -312,32 +307,6 @@ const WorkbenchPage = {
             <q-tooltip :delay="500">删除</q-tooltip>
           </q-btn>
         </div>
-        <div style="display:flex;align-items:center;gap:2px">
-          <q-btn flat round dense icon="zoom_out" size="xs" color="grey-6" @click="trackZoomOut">
-            <q-tooltip :delay="500">缩小</q-tooltip>
-          </q-btn>
-          <q-slider v-model="trackZoom" :min="1" :max="10" :step="0.5"
-                    style="width:80px;--q-primary:var(--accent)" color="primary"></q-slider>
-          <q-btn flat round dense icon="zoom_in" size="xs" color="grey-6" @click="trackZoomIn">
-            <q-tooltip :delay="500">放大</q-tooltip>
-          </q-btn>
-          <q-btn flat round dense icon="fit_screen" size="xs" color="grey-6" @click="trackFitWidth">
-            <q-tooltip :delay="500">适配宽度</q-tooltip>
-          </q-btn>
-        </div>
-        <div style="flex:1"></div>
-        <div style="display:flex;align-items:center;gap:2px">
-          <q-btn flat dense icon="add" size="xs" color="grey-6" label="轨道" style="font-size:10px" no-caps>
-            <q-menu>
-              <q-list dense style="min-width:100px">
-                <q-item v-for="tt in trackTypes" :key="tt.key" clickable v-close-popup @click="addTrack(tt.key)">
-                  <q-item-section>{{ t('wb.track_' + tt.key) }}</q-item-section>
-                </q-item>
-              </q-list>
-            </q-menu>
-            <q-tooltip :delay="500">添加轨道</q-tooltip>
-          </q-btn>
-        </div>
       </div>
       <div v-for="tt in trackTypes" :key="tt.key" class="wb-track-row">
         <div class="wb-track-label">{{ t('wb.track_' + tt.key) }}</div>
@@ -346,7 +315,10 @@ const WorkbenchPage = {
           <template v-if="getTrackItems(tt.key).length">
             <div v-for="item in getTrackItems(tt.key)" :key="item.id" class="wb-track-item"
                  :class="['wb-track-' + tt.key, {selected: trackSelectedItem === item.id}]"
-                 @click="trackSelectedItem = item.id">
+                 :style="trackItemStyle(item)"
+                 @click="trackSelectedItem = item.id"
+                 @mousedown="onTrackItemDown($event, item, tt.key)"
+                 @mousemove="onTrackItemHover">
               <template v-if="tt.key === 'video'">
                 <img v-if="item._segment" :src="'/media/thumbnail/' + item._segment.media_id" class="wb-track-thumb">
                 <span>{{ item._segment ? (item._segment.mood || item._segment.shot_type || '...') : '?' }}</span>
@@ -359,8 +331,8 @@ const WorkbenchPage = {
               </template>
             </div>
           </template>
-          <div v-else class="wb-track-empty">
-            <span v-if="tt.key === 'video'">{{ t('wb.empty_hint') }}</span>
+          <div class="wb-track-add" @click="addTrackItem(tt.key)">
+            <q-icon name="add" size="14px" color="grey-6"></q-icon>
           </div>
           </div>
         </div>
@@ -487,6 +459,13 @@ const WorkbenchPage = {
         minWidth: (this.trackZoom * 100) + '%',
       };
     },
+    trackItemStyle(item) {
+      try {
+        const meta = JSON.parse(item.metadata || '{}');
+        if (meta.width) return { width: meta.width + 'px', minWidth: '30px' };
+      } catch(e) {}
+      return { minWidth: '30px' };
+    },
     matGridStyle() {
       return { 'grid-template-columns': `repeat(${this.matCols},1fr)` };
     },
@@ -504,6 +483,9 @@ const WorkbenchPage = {
     this.stopSegTrack();
     this.stopWbWaveformAnim();
     this.stopWbScopes();
+    if (this._onWbKey) document.removeEventListener('keydown', this._onWbKey);
+    if (this._onDragMove) document.removeEventListener('mousemove', this._onDragMove);
+    if (this._onDragEnd) document.removeEventListener('mouseup', this._onDragEnd);
     this.$root.pickerMode = false;
   },
 
@@ -538,6 +520,16 @@ const WorkbenchPage = {
 
   created() {
     this.load();
+    this._onWbKey = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        const p = this.$refs.wbPlayer;
+        if (!p) return;
+        p.paused ? p.play().catch(() => {}) : p.pause();
+      }
+    };
+    document.addEventListener('keydown', this._onWbKey);
   },
 
   methods: {
@@ -593,6 +585,12 @@ const WorkbenchPage = {
     trackZoomIn() { this.trackZoom = Math.min(10, this.trackZoom + 0.5); },
     trackZoomOut() { this.trackZoom = Math.max(1, this.trackZoom - 0.5); },
     trackFitWidth() { this.trackZoom = 1; },
+    toggleWbFullscreen() {
+      const wrap = this.$refs.wbPlayer?.parentElement;
+      if (!wrap) return;
+      if (!document.fullscreenElement) wrap.requestFullscreen?.();
+      else document.exitFullscreen?.();
+    },
     _trackSnapshot() {
       if (!this._undoStack) this._undoStack = [];
       if (!this._redoStack) this._redoStack = [];
@@ -659,7 +657,7 @@ const WorkbenchPage = {
       this.trackSelectedItem = null;
       this._trackSave();
     },
-    addTrack(type) {
+    addTrackItem(type) {
       this._trackSnapshot();
       this.tracks.push({
         id: Date.now(),
@@ -671,6 +669,96 @@ const WorkbenchPage = {
         metadata: '{}',
       });
       this._trackSave();
+    },
+    onTrackItemHover(e) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      e.currentTarget.style.cursor = (x < 5 || rect.width - x < 5) ? 'col-resize' : 'grab';
+    },
+    onTrackItemDown(e, item, trackType) {
+      if (e.button !== 0) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const nearLeft = x < 5;
+      const nearRight = rect.width - x < 5;
+      this._drag = {
+        mode: nearLeft || nearRight ? 'resize' : 'reorder',
+        edge: nearLeft ? 'left' : nearRight ? 'right' : null,
+        trackType, item,
+        startX: e.clientX,
+        startWidth: rect.width,
+        el: e.currentTarget,
+      };
+      this._onDragMove = (ev) => this._handleDragMove(ev);
+      this._onDragEnd = (ev) => this._handleDragEnd(ev);
+      document.addEventListener('mousemove', this._onDragMove);
+      document.addEventListener('mouseup', this._onDragEnd);
+      e.preventDefault();
+    },
+    _handleDragMove(e) {
+      const d = this._drag;
+      if (!d) return;
+      const dx = e.clientX - d.startX;
+      if (d.mode === 'reorder') {
+        d.el.style.transform = `translateX(${dx}px)`;
+        d.el.style.opacity = '0.5';
+        d.el.style.zIndex = '10';
+      } else {
+        if (d.edge === 'right') {
+          d.el.style.width = Math.max(30, d.startWidth + dx) + 'px';
+        } else {
+          d.el.style.width = Math.max(30, d.startWidth - dx) + 'px';
+          d.el.style.transform = `translateX(${dx}px)`;
+        }
+      }
+    },
+    _handleDragEnd(e) {
+      document.removeEventListener('mousemove', this._onDragMove);
+      document.removeEventListener('mouseup', this._onDragEnd);
+      const d = this._drag;
+      if (!d) return;
+      d.el.style.transform = '';
+      d.el.style.opacity = '';
+      d.el.style.zIndex = '';
+      if (d.mode === 'reorder') {
+        const dx = e.clientX - d.startX;
+        if (Math.abs(dx) < 5) { this._drag = null; return; }
+        const items = this.getTrackItems(d.trackType);
+        const fromIdx = items.indexOf(d.item);
+        let toIdx = 0;
+        const contentEl = d.el.parentElement;
+        const children = Array.from(contentEl.querySelectorAll('.wb-track-item'));
+        for (let i = 0; i < children.length; i++) {
+          const cr = children[i].getBoundingClientRect();
+          if (e.clientX > cr.left + cr.width / 2) toIdx = i;
+        }
+        if (fromIdx === toIdx) { this._drag = null; return; }
+        this._trackSnapshot();
+        const actualFrom = this.tracks.indexOf(d.item);
+        this.tracks.splice(actualFrom, 1);
+        const targetItems = this.getTrackItems(d.trackType);
+        const actualTo = toIdx >= targetItems.length
+          ? this.tracks.length
+          : this.tracks.indexOf(targetItems[Math.min(toIdx, targetItems.length - 1)]);
+        this.tracks.splice(actualTo, 0, d.item);
+        this._trackSave();
+      } else {
+        const dx = e.clientX - d.startX;
+        let newWidth;
+        if (d.edge === 'right') {
+          newWidth = Math.max(30, d.startWidth + dx);
+        } else {
+          newWidth = Math.max(30, d.startWidth - dx);
+        }
+        this._trackSnapshot();
+        try {
+          const meta = JSON.parse(d.item.metadata || '{}');
+          meta.width = Math.round(newWidth);
+          d.item.metadata = JSON.stringify(meta);
+        } catch(e) {}
+        this._trackSave();
+      }
+      this._drag = null;
     },
     mediaSegments(mediaId) {
       return this.segments.filter(s => s.media_id === mediaId);
@@ -897,6 +985,13 @@ const WorkbenchPage = {
       if (p) { this.wbDuration = p.duration; this.wbCurrentTime = 0; }
       this.initWbScopes();
       this.loadWbWaveform();
+    },
+    onWbMediaError() {
+      const name = this.selectedMedia?.file_name || '';
+      Quasar.Notify.create({ message: `文件无法播放：${name}`, color: 'negative', position: 'top', timeout: 3000 });
+      this.wbPlaying = false;
+      this.wbDuration = 0;
+      this.previewLoading = false;
       this.startSegTrack();
     },
     onWbVideoPlay() { this.wbPlaying = true; this.trackPlaying = true; this.startSegTrack(); this.startWbWaveformAnim(); this.startWbScopes(); },
@@ -1001,7 +1096,7 @@ const WorkbenchPage = {
       return this._wbScopeOffCtx.getImageData(0, 0, sw, sh);
     },
     drawWbWaveformScope(imgData) {
-      const c = this.$refs.wbScopeWf; if (!c) return;
+      const c = this.$refs.wbScopeWf; if (!c || !c.width || !c.height) return;
       const ctx = c.getContext('2d'); const cw = c.width, ch = c.height;
       const out = ctx.createImageData(cw, ch); const px = out.data;
       const { data, width: fw, height: fh } = imgData;
@@ -1014,7 +1109,7 @@ const WorkbenchPage = {
       ctx.putImageData(out, 0, 0);
     },
     drawWbParadeScope(imgData) {
-      const c = this.$refs.wbScopePr; if (!c) return;
+      const c = this.$refs.wbScopePr; if (!c || !c.width || !c.height) return;
       const ctx = c.getContext('2d'); const cw = c.width, ch = c.height;
       const out = ctx.createImageData(cw, ch); const px = out.data;
       const { data, width: fw, height: fh } = imgData;
@@ -1037,7 +1132,7 @@ const WorkbenchPage = {
       ctx.putImageData(out, 0, 0);
     },
     drawWbVectorscope(imgData) {
-      const c = this.$refs.wbScopeVt; if (!c) return;
+      const c = this.$refs.wbScopeVt; if (!c || !c.width || !c.height) return;
       const ctx = c.getContext('2d'); const cw = c.width, ch = c.height;
       const out = ctx.createImageData(cw, ch); const px = out.data;
       const cx = cw / 2, cy = ch / 2; const radius = Math.min(cx, cy) * 0.9;
