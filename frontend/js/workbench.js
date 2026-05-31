@@ -342,7 +342,7 @@ const WorkbenchPage = {
       <div v-for="tt in trackTypes" :key="tt.key" class="wb-track-row">
         <div class="wb-track-label">{{ t('wb.track_' + tt.key) }}</div>
         <div class="wb-track-content" :style="trackZoom > 1 ? {overflowX:'auto'} : {}">
-          <div :style="trackZoom > 1 ? {transform:'scaleX('+trackZoom+')',transformOrigin:'left',minWidth:((trackZoom)*100)+'%'} : {}">
+          <div :style="trackZoomStyle">
           <template v-if="getTrackItems(tt.key).length">
             <div v-for="item in getTrackItems(tt.key)" :key="item.id" class="wb-track-item"
                  :class="{'wb-track-' + tt.key: true, selected: trackSelectedItem === item.id}"
@@ -478,6 +478,14 @@ const WorkbenchPage = {
     },
     videoTrackCount() {
       return this.getTrackItems("video").length;
+    },
+    trackZoomStyle() {
+      if (this.trackZoom <= 1) return {};
+      return {
+        transform: `scaleX(${this.trackZoom})`,
+        transformOrigin: 'left',
+        minWidth: (this.trackZoom * 100) + '%',
+      };
     },
   },
 
