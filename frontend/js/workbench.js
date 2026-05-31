@@ -327,7 +327,7 @@ const WorkbenchPage = {
         </div>
         <div style="flex:1"></div>
         <div style="display:flex;align-items:center;gap:2px">
-          <q-btn flat dense icon="add" size="xs" color="grey-6" label="轨道" style="font-size:10px" no-caps">
+          <q-btn flat dense icon="add" size="xs" color="grey-6" label="轨道" style="font-size:10px" no-caps>
             <q-menu>
               <q-list dense style="min-width:100px">
                 <q-item v-for="tt in trackTypes" :key="tt.key" clickable v-close-popup @click="addTrack(tt.key)">
