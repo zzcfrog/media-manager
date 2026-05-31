@@ -459,13 +459,6 @@ const WorkbenchPage = {
         minWidth: (this.trackZoom * 100) + '%',
       };
     },
-    trackItemStyle(item) {
-      try {
-        const meta = JSON.parse(item.metadata || '{}');
-        if (meta.width) return { width: meta.width + 'px', minWidth: '30px' };
-      } catch(e) {}
-      return { minWidth: '30px' };
-    },
     matGridStyle() {
       return { 'grid-template-columns': `repeat(${this.matCols},1fr)` };
     },
@@ -656,6 +649,13 @@ const WorkbenchPage = {
       this.tracks.splice(idx, 1);
       this.trackSelectedItem = null;
       this._trackSave();
+    },
+    trackItemStyle(item) {
+      try {
+        const meta = JSON.parse(item.metadata || '{}');
+        if (meta.width) return { width: meta.width + 'px', minWidth: '30px' };
+      } catch(e) {}
+      return { minWidth: '30px' };
     },
     addTrackItem(type) {
       this._trackSnapshot();
