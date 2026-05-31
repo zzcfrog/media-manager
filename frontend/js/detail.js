@@ -105,8 +105,8 @@ const DetailPage = {
                     </div>
                   </q-tooltip>
                 </div>
-                <div class="wb-seek-hover" v-if="detailHoverTime>=0 && detailDuration" :style="detailHoverStyle"></div>
-                <div class="wb-seek-progress" v-if="detailDuration" :style="detailProgressStyle"></div>
+                <div class="wb-seek-hover" v-if="detailHoverTime>=0 && detailDuration" :style="{left: (detailHoverTime/detailDuration*100)+'%'}"></div>
+                <div class="wb-seek-progress" v-if="detailDuration" :style="{width: (detailCurrentTime/detailDuration*100)+'%'}"></div>
               </div>
             </div>
           </div>
@@ -149,7 +149,7 @@ const DetailPage = {
           <div ref="imgContainer" class="img-view-area">
             <q-spinner-dots v-if="imgLoading" color="grey-6" size="40px" style="position:absolute;z-index:1"></q-spinner-dots>
             <div style="position:relative;display:inline-flex;max-width:100%;max-height:100%;line-height:0">
-              <img ref="imgEl" :src="API.imageUrl(media.id)" @load="onImageLoaded" :style="imgTransformStyle" @wheel="onImgWheel" @mousedown="onImgMouseDown" @mousemove="onImgMouseMove" @mouseup="onImgMouseUp" @mouseleave="onImgMouseUp" @dragstart.prevent>
+              <img ref="imgEl" :src="API.imageUrl(media.id)" @load="onImageLoaded" :style="{transform: 'scale(' + imgZoom + ') translate(' + imgPanX + 'px,' + imgPanY + 'px)', transformOrigin: 'center center', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', background: 'var(--surface2)', transition: imgZooming ? 'transform 0.15s ease' : 'none', cursor: imgZoom > 1 ? (imgDragging ? 'grabbing' : 'grab') : 'default'}" @wheel="onImgWheel" @mousedown="onImgMouseDown" @mousemove="onImgMouseMove" @mouseup="onImgMouseUp" @mouseleave="onImgMouseUp" @dragstart.prevent>
               <div class="img-zoom-bar">
                 <q-btn flat round dense icon="remove" size="xs" color="grey-6" @click="imgZoomBy(-0.25)"></q-btn>
                 <span style="font-size:11px;color:var(--text2);min-width:36px;text-align:center">{{ Math.round(imgZoom * 100) }}%</span>
@@ -215,7 +215,7 @@ const DetailPage = {
                   </div>
                   <div class="tl-body">
                     <div class="tl-title">{{ s.label }}<span v-if="s.status==='active' && s.key==='analyze' && analyzeTipText" class="tl-tip">{{ analyzeTipText }}<span class="tl-cursor">|</span></span></div>
-                    <div class="tl-bar-track"><div class="tl-bar-fill" :style="barFillStyle(s.progress)"></div></div>
+                    <div class="tl-bar-track"><div class="tl-bar-fill" :style="{width: s.progress+'%'}"></div></div>
                     <div class="tl-info"><span>{{ s.substepText || s.statusText }}<span v-if="s.extra" class="tl-extra">{{ s.extra }}</span></span><span v-if="s.duration" class="tl-time">{{ s.duration.toFixed(1) }}s</span></div>
                   </div>
                 </div>
@@ -366,25 +366,6 @@ const DetailPage = {
       rh = Math.min(rh, mmH);
       return { left: rx + 'px', top: ry + 'px', width: rw + 'px', height: rh + 'px' };
     },
-    detailHoverStyle() {
-      if (!this.detailDuration) return {};
-      return { left: (this.detailHoverTime / this.detailDuration * 100) + '%' };
-    },
-    detailProgressStyle() {
-      if (!this.detailDuration) return {};
-      return { width: (this.detailCurrentTime / this.detailDuration * 100) + '%' };
-    },
-    imgTransformStyle() {
-      return {
-        transform: `scale(${this.imgZoom}) translate(${this.imgPanX}px,${this.imgPanY}px)`,
-        transformOrigin: 'center center',
-        maxWidth: '100%', maxHeight: '100%',
-        objectFit: 'contain',
-        background: 'var(--surface2)',
-        transition: this.imgZooming ? 'transform 0.15s ease' : 'none',
-        cursor: this.imgZoom > 1 ? (this.imgDragging ? 'grabbing' : 'grab') : 'default',
-      };
-    },
   },
   beforeUnmount() {
     if (this._onKey) document.removeEventListener("keydown", this._onKey, true);
@@ -493,7 +474,6 @@ const DetailPage = {
   methods: {
     t,
     API,
-    barFillStyle(p) { return { width: p + '%' }; },
     _applyBgTaskStep(task) {
       const step = task.step || "";
       const stages = this.analysisStages;
