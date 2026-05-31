@@ -488,6 +488,20 @@ confirmPicker()
 - `fmtDur(sec)` — 秒数转 M:SS 或 H:MM:SS 格式
 - `searchMedia()` — 调用 `API.getProject(id, q)` 更新 `project.media`
 
+### 5.8 时间线工具栏架构
+
+**播放控制**：`trackTogglePlay`/`trackSkipStart`/`trackSkipEnd` 联动预览区 `$refs.wbPlayer`，`trackSpeed` watch 同步 `playbackRate`。
+
+**缩放**：`trackZoom`（1-10x）通过内联 `transform: scaleX()` + `minWidth` 百分比缩放 `.wb-track-content` 内容区域，超出时横向滚动。
+
+**编辑操作**：
+- **撤销/重做**：JSON 快照栈（`_undoStack` / `_redoStack`），每次编辑前调用 `_trackSnapshot()` 保存当前状态
+- **分割**：`trackSplit()` 将选中轨道项按时间中点一分为二，插入两个新项替换原项
+- **删除**：`trackDelete()` 从 `this.tracks` 移除选中项
+- 所有编辑操作调用 `_trackSave()` 持久化，内部通过 `API.updateProjectTracks(id, tracks)` 发送 PUT 请求
+
+**选中状态**：`trackSelectedItem` 记录选中轨道项 id，点击轨道项设置，编辑/删除后重置为 null。
+
 ## 6. 外部依赖
 
 | 工具 | 用途 |

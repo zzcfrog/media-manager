@@ -1,5 +1,22 @@
 # TODO
 
+## 已完成：工作台时间线工具栏（2026-05-31）
+
+时间线上方新增工具栏，包含播放控制、编辑操作、缩放和添加轨道功能。
+
+**改动文件：**
+- `frontend/js/workbench.js` — 新增 track toolbar 模板（播放控制：跳到开头/播放暂停/跳到结尾/倍速选择；编辑：撤销/重做/分割/删除；缩放：缩小/滑块/放大/适配宽度；添加轨道菜单）；`trackPlaying`/`trackSpeed`/`trackZoom`/`trackCanUndo`/`trackCanRedo`/`trackSelectedItem` 数据；`trackTogglePlay`/`trackSkipStart`/`trackSkipEnd` 联动视频播放器；`trackSpeed` watch 同步 `playbackRate`；`trackZoom` 缩放轨道内容（scaleX + minWidth）；`_trackSnapshot`/`trackUndo`/`trackRedo` 撤销重做栈；`trackSplit` 分割轨道项（中点切分）；`trackDelete` 删除选中项；`addTrack(type)` 添加空轨道；轨道项点击选中高亮
+- `frontend/css/main.css` — `.wb-track-toolbar` 工具栏样式（flex + gap 8px + border-bottom）；`.wb-track-item.selected` 选中态（accent outline）
+
+**功能说明：**
+- 播放控制联动预览区视频播放器（跳到开头/结尾、播放/暂停、倍速 0.5x-2x）
+- 缩放滑块 1-10x，通过 scaleX 放大轨道内容并可横向滚动
+- 撤销/重做栈（JSON 快照），编辑操作自动入栈
+- 分割：将选中轨道项从中点一分为二
+- 删除：移除选中轨道项
+- 添加轨道：下拉菜单选择轨道类型（主题/情绪/旁白/字幕/文字/视频）
+- 所有修改通过 `API.updateProjectTracks` 持久化
+
 ## 已完成：UI 主题统一 + 列表视图优化 + 目录树样式（2026-05-29）
 
 全局 UI 控件统一跟随主题色，列表视图列名和颜色标签修复，目录树改为 VS Code 风格竖线缩进。

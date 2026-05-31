@@ -284,12 +284,69 @@ const WorkbenchPage = {
 
     <!-- Bottom: Tracks -->
     <div class="wb-tracks">
+      <div class="wb-track-toolbar">
+        <div style="display:flex;align-items:center;gap:2px">
+          <q-btn flat round dense icon="skip_previous" size="xs" color="grey-6" @click="trackSkipStart">
+            <q-tooltip :delay="500">跳到开头</q-tooltip>
+          </q-btn>
+          <q-btn flat round dense :icon="trackPlaying?'pause':'play_arrow'" size="xs" color="grey-6" @click="trackTogglePlay">
+            <q-tooltip :delay="500">播放/暂停</q-tooltip>
+          </q-btn>
+          <q-btn flat round dense icon="skip_next" size="xs" color="grey-6" @click="trackSkipEnd">
+            <q-tooltip :delay="500">跳到结尾</q-tooltip>
+          </q-btn>
+          <q-select v-model="trackSpeed" :options="[0.5,0.75,1,1.25,1.5,2]" dense flat borderless
+                    style="width:52px;font-size:11px" size="xs"></q-select>
+        </div>
+        <div style="display:flex;align-items:center;gap:2px">
+          <q-btn flat round dense icon="undo" size="xs" color="grey-6" :disable="!trackCanUndo" @click="trackUndo">
+            <q-tooltip :delay="500">撤销</q-tooltip>
+          </q-btn>
+          <q-btn flat round dense icon="redo" size="xs" color="grey-6" :disable="!trackCanRedo" @click="trackRedo">
+            <q-tooltip :delay="500">重做</q-tooltip>
+          </q-btn>
+          <q-btn flat round dense icon="content_cut" size="xs" color="grey-6" :disable="!trackSelectedItem" @click="trackSplit">
+            <q-tooltip :delay="500">分割</q-tooltip>
+          </q-btn>
+          <q-btn flat round dense icon="delete_outline" size="xs" color="grey-6" :disable="!trackSelectedItem" @click="trackDelete">
+            <q-tooltip :delay="500">删除</q-tooltip>
+          </q-btn>
+        </div>
+        <div style="display:flex;align-items:center;gap:2px">
+          <q-btn flat round dense icon="zoom_out" size="xs" color="grey-6" @click="trackZoomOut">
+            <q-tooltip :delay="500">缩小</q-tooltip>
+          </q-btn>
+          <q-slider v-model="trackZoom" :min="1" :max="10" :step="0.5"
+                    style="width:80px;--q-primary:var(--accent)" color="primary"></q-slider>
+          <q-btn flat round dense icon="zoom_in" size="xs" color="grey-6" @click="trackZoomIn">
+            <q-tooltip :delay="500">放大</q-tooltip>
+          </q-btn>
+          <q-btn flat round dense icon="fit_screen" size="xs" color="grey-6" @click="trackFitWidth">
+            <q-tooltip :delay="500">适配宽度</q-tooltip>
+          </q-btn>
+        </div>
+        <div style="flex:1"></div>
+        <div style="display:flex;align-items:center;gap:2px">
+          <q-btn flat dense icon="add" size="xs" color="grey-6" label="轨道" style="font-size:10px" no-caps">
+            <q-menu>
+              <q-list dense style="min-width:100px">
+                <q-item v-for="tt in trackTypes" :key="tt.key" clickable v-close-popup @click="addTrack(tt.key)">
+                  <q-item-section>{{ t('wb.track_' + tt.key) }}</q-item-section>
+                </q-item>
+              </q-list>
+            </q-menu>
+            <q-tooltip :delay="500">添加轨道</q-tooltip>
+          </q-btn>
+        </div>
+      </div>
       <div v-for="tt in trackTypes" :key="tt.key" class="wb-track-row">
         <div class="wb-track-label">{{ t('wb.track_' + tt.key) }}</div>
-        <div class="wb-track-content">
+        <div class="wb-track-content" :style="trackZoom > 1 ? {overflowX:'auto'} : {}">
+          <div :style="trackZoom > 1 ? {transform:'scaleX('+trackZoom+')',transformOrigin:'left',minWidth:((trackZoom)*100)+'%'} : {}">
           <template v-if="getTrackItems(tt.key).length">
             <div v-for="item in getTrackItems(tt.key)" :key="item.id" class="wb-track-item"
-                 :class="'wb-track-' + tt.key">
+                 :class="{'wb-track-' + tt.key: true, selected: trackSelectedItem === item.id}"
+                 @click="trackSelectedItem = item.id">
               <template v-if="tt.key === 'video'">
                 <img v-if="item._segment" :src="'/media/thumbnail/' + item._segment.media_id" class="wb-track-thumb">
                 <span>{{ item._segment ? (item._segment.mood || item._segment.shot_type || '...') : '?' }}</span>
@@ -304,6 +361,7 @@ const WorkbenchPage = {
           </template>
           <div v-else class="wb-track-empty">
             <span v-if="tt.key === 'video'">{{ t('wb.empty_hint') }}</span>
+          </div>
           </div>
         </div>
       </div>
@@ -334,6 +392,12 @@ const WorkbenchPage = {
       metaCollapsed: false,
       scopesCollapsed: false,
       segCompact: false,
+      trackPlaying: false,
+      trackSpeed: 1,
+      trackZoom: 1,
+      trackCanUndo: false,
+      trackCanRedo: false,
+      trackSelectedItem: null,
       wbPlaying: false,
       wbCurrentTime: 0,
       wbDuration: 0,
@@ -447,6 +511,10 @@ const WorkbenchPage = {
       if (!val) { this.searchMedia(); return; }
       this._searchTimer = setTimeout(() => this.searchMedia(), 400);
     },
+    trackSpeed(v) {
+      const p = this.$refs.wbPlayer;
+      if (p) p.playbackRate = v;
+    },
   },
 
   created() {
@@ -488,6 +556,102 @@ const WorkbenchPage = {
     },
     getTrackItems(trackType) {
       return this.tracks.filter(tr => tr.track_type === trackType);
+    },
+    trackSkipStart() {
+      const p = this.$refs.wbPlayer;
+      if (p) { p.currentTime = 0; p.pause(); }
+    },
+    trackSkipEnd() {
+      const p = this.$refs.wbPlayer;
+      if (p && p.duration) { p.currentTime = p.duration; p.pause(); }
+    },
+    trackTogglePlay() {
+      const p = this.$refs.wbPlayer;
+      if (!p) return;
+      if (p.paused) { p.play().catch(() => {}); this.trackPlaying = true; }
+      else { p.pause(); this.trackPlaying = false; }
+    },
+    trackZoomIn() { this.trackZoom = Math.min(10, this.trackZoom + 0.5); },
+    trackZoomOut() { this.trackZoom = Math.max(1, this.trackZoom - 0.5); },
+    trackFitWidth() { this.trackZoom = 1; },
+    _trackSnapshot() {
+      if (!this._undoStack) this._undoStack = [];
+      if (!this._redoStack) this._redoStack = [];
+      this._undoStack.push(JSON.parse(JSON.stringify(this.tracks)));
+      this._redoStack = [];
+      this.trackCanUndo = true;
+      this.trackCanRedo = false;
+    },
+    async _trackSave() {
+      if (!this.projectId) return;
+      const payload = this.tracks.map(t => {
+        const o = { ...t };
+        delete o._segment;
+        return o;
+      });
+      try {
+        await API.updateProjectTracks(this.projectId, payload);
+      } catch (e) {
+        Quasar.Notify.create({ message: '保存轨道失败', color: 'negative', position: 'top' });
+      }
+    },
+    trackUndo() {
+      if (!this._undoStack || !this._undoStack.length) return;
+      if (!this._redoStack) this._redoStack = [];
+      this._redoStack.push(JSON.parse(JSON.stringify(this.tracks)));
+      this.tracks = this._undoStack.pop();
+      this.trackCanUndo = this._undoStack.length > 0;
+      this.trackCanRedo = true;
+      this.trackSelectedItem = null;
+      this._trackSave();
+    },
+    trackRedo() {
+      if (!this._redoStack || !this._redoStack.length) return;
+      this._undoStack.push(JSON.parse(JSON.stringify(this.tracks)));
+      this.tracks = this._redoStack.pop();
+      this.trackCanUndo = true;
+      this.trackCanRedo = this._redoStack.length > 0;
+      this.trackSelectedItem = null;
+      this._trackSave();
+    },
+    trackSplit() {
+      if (!this.trackSelectedItem) return;
+      const idx = this.tracks.findIndex(t => t.id === this.trackSelectedItem);
+      if (idx < 0) return;
+      const item = this.tracks[idx];
+      const ts = this._parseDuration(item.time_start, item.time_end);
+      if (ts < 2) return;
+      this._trackSnapshot();
+      const half = ts / 2;
+      const tsNum = parseFloat(item.time_start) || 0;
+      const mid = tsNum + half;
+      const part1 = { ...item, id: Date.now(), time_end: String(mid.toFixed(2)) };
+      const part2 = { ...item, id: Date.now() + 1, time_start: String(mid.toFixed(2)) };
+      this.tracks.splice(idx, 1, part1, part2);
+      this.trackSelectedItem = null;
+      this._trackSave();
+    },
+    trackDelete() {
+      if (!this.trackSelectedItem) return;
+      const idx = this.tracks.findIndex(t => t.id === this.trackSelectedItem);
+      if (idx < 0) return;
+      this._trackSnapshot();
+      this.tracks.splice(idx, 1);
+      this.trackSelectedItem = null;
+      this._trackSave();
+    },
+    addTrack(type) {
+      this._trackSnapshot();
+      this.tracks.push({
+        id: Date.now(),
+        track_type: type,
+        content: '',
+        time_start: '',
+        time_end: '',
+        emotion_value: 0.5,
+        metadata: '{}',
+      });
+      this._trackSave();
     },
     mediaSegments(mediaId) {
       return this.segments.filter(s => s.media_id === mediaId);
@@ -716,8 +880,8 @@ const WorkbenchPage = {
       this.loadWbWaveform();
       this.startSegTrack();
     },
-    onWbVideoPlay() { this.wbPlaying = true; this.startSegTrack(); this.startWbWaveformAnim(); this.startWbScopes(); },
-    onWbVideoPause() { this.wbPlaying = false; this.stopSegTrack(); this.stopWbWaveformAnim(); this.stopWbScopes(); this.drawWbWaveform(); if (this._wbScopeOffscreen) this.drawWbScopesOnce(); },
+    onWbVideoPlay() { this.wbPlaying = true; this.trackPlaying = true; this.startSegTrack(); this.startWbWaveformAnim(); this.startWbScopes(); },
+    onWbVideoPause() { this.wbPlaying = false; this.trackPlaying = false; this.stopSegTrack(); this.stopWbWaveformAnim(); this.stopWbScopes(); this.drawWbWaveform(); if (this._wbScopeOffscreen) this.drawWbScopesOnce(); },
     onWbVideoSeeked() { this.initWbScopes(); this.drawWbWaveform(); this.drawWbScopesOnce(); this.updateActiveSeg(); },
     async loadWbWaveform() {
       const player = this.$refs.wbPlayer;

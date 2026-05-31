@@ -888,6 +888,18 @@ body:not(.body--dark) .wb-mat-sort-group { background: #e0e0e0; }
 }
 
 /* Track area (bottom, full width, compact like DaVinci/FCP) */
+.wb-track-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+  flex-shrink: 0;
+}
+.wb-track-toolbar .q-btn { min-height: unset; }
+.wb-track-toolbar .q-select { font-size: 11px; }
+
 .wb-tracks {
   flex-shrink: 0;
   display: flex;
@@ -955,6 +967,11 @@ body:not(.body--dark) .wb-mat-sort-group { background: #e0e0e0; }
 
 .wb-track-item:hover {
   background: var(--accent-dim);
+}
+
+.wb-track-item.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .wb-track-video {
