@@ -911,6 +911,29 @@ body:not(.body--dark) .wb-mat-sort-group { background: #e0e0e0; }
   overflow: hidden;
 }
 
+.wb-timeline-scroll {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.wb-ruler-row {
+  display: flex;
+  height: 24px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.wb-ruler-content {
+  position: relative;
+}
+
+.wb-ruler-content canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
 .wb-track-row {
   display: flex;
   align-items: stretch;
@@ -935,36 +958,23 @@ body:not(.body--dark) .wb-mat-sort-group { background: #e0e0e0; }
 }
 
 .wb-track-content {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  padding: 0 4px;
-  gap: 2px;
-  overflow-x: auto;
+  position: relative;
   min-height: 32px;
 }
 
-.wb-track-empty {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  color: var(--text3);
-  opacity: 0.5;
-}
-
 .wb-track-item {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
   display: flex;
   align-items: center;
   gap: 3px;
   padding: 2px 8px;
   font-size: 11px;
   white-space: nowrap;
-  flex-shrink: 0;
+  overflow: hidden;
   background: var(--surface2);
-  border-right: 2px solid var(--bg);
-  height: 100%;
+  border-radius: 3px;
 }
 
 .wb-track-item:hover {
@@ -981,26 +991,20 @@ body:not(.body--dark) .wb-mat-sort-group { background: #e0e0e0; }
 }
 
 .wb-track-thumb {
-  width: 28px;
-  height: 18px;
-  object-fit: cover;
-  border-radius: 2px;
-}
-
-.wb-track-thumb {
-  width: 32px;
-  height: 20px;
+  width: 24px;
+  height: 16px;
   object-fit: cover;
   border-radius: 2px;
 }
 
 .wb-track-add {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  min-height: 24px;
-  flex-shrink: 0;
   cursor: pointer;
   border-radius: 3px;
   opacity: 0.4;

@@ -307,15 +307,31 @@ const WorkbenchPage = {
             <q-tooltip :delay="500">删除</q-tooltip>
           </q-btn>
         </div>
+        <div style="flex:1"></div>
+        <div style="display:flex;align-items:center;gap:2px">
+          <q-btn flat round dense icon="zoom_out" size="xs" color="grey-6" @click="trackZoom = Math.max(1, trackZoom - 1)">
+            <q-tooltip :delay="500">缩小</q-tooltip>
+          </q-btn>
+          <q-slider v-model="trackZoom" :min="1" :max="10" :step="1"
+                    style="width:80px;--q-primary:var(--accent)" color="primary"></q-slider>
+          <q-btn flat round dense icon="zoom_in" size="xs" color="grey-6" @click="trackZoom = Math.min(10, trackZoom + 1)">
+            <q-tooltip :delay="500">放大</q-tooltip>
+          </q-btn>
+        </div>
       </div>
-      <div v-for="tt in trackTypes" :key="tt.key" class="wb-track-row">
-        <div class="wb-track-label">{{ t('wb.track_' + tt.key) }}</div>
-        <div class="wb-track-content" :style="trackZoom > 1 ? {overflowX:'auto'} : {}">
-          <div :style="trackZoomStyle">
-          <template v-if="getTrackItems(tt.key).length">
+      <div class="wb-timeline-scroll" ref="wbTimelineScroll">
+        <div class="wb-ruler-row">
+          <div class="wb-track-label"></div>
+          <div class="wb-ruler-content" :style="{width: timelineWidth + 'px'}">
+            <canvas ref="wbRulerCanvas"></canvas>
+          </div>
+        </div>
+        <div v-for="tt in trackTypes" :key="tt.key" class="wb-track-row">
+          <div class="wb-track-label">{{ t('wb.track_' + tt.key) }}</div>
+          <div class="wb-track-content" :style="{width: timelineWidth + 'px'}">
             <div v-for="item in getTrackItems(tt.key)" :key="item.id" class="wb-track-item"
                  :class="['wb-track-' + tt.key, {selected: trackSelectedItem === item.id}]"
-                 :style="trackItemStyle(item)"
+                 :style="trackItemPos(item)"
                  @click="trackSelectedItem = item.id"
                  @mousedown="onTrackItemDown($event, item, tt.key)"
                  @mousemove="onTrackItemHover">
@@ -330,10 +346,9 @@ const WorkbenchPage = {
                 <span>{{ item.content || '...' }}</span>
               </template>
             </div>
-          </template>
-          <div class="wb-track-add" @click="addTrackItem(tt.key)">
-            <q-icon name="add" size="14px" color="grey-6"></q-icon>
-          </div>
+            <div class="wb-track-add" :style="trackAddPos(tt.key)" @click="addTrackItem(tt.key)">
+              <q-icon name="add" size="14px" color="grey-6"></q-icon>
+            </div>
           </div>
         </div>
       </div>
@@ -451,14 +466,16 @@ const WorkbenchPage = {
     videoTrackCount() {
       return this.getTrackItems("video").length;
     },
-    trackZoomStyle() {
-      if (this.trackZoom <= 1) return {};
-      return {
-        transform: `scaleX(${this.trackZoom})`,
-        transformOrigin: 'left',
-        minWidth: (this.trackZoom * 100) + '%',
-      };
+    pps() { return this.trackZoom * 20; },
+    timelineDuration() {
+      let max = 60;
+      for (const tr of this.tracks) {
+        const s = this._timeToSec(tr.time_end);
+        if (s > max) max = s;
+      }
+      return max + 30;
     },
+    timelineWidth() { return Math.round(this.pps * this.timelineDuration); },
     matGridStyle() {
       return { 'grid-template-columns': `repeat(${this.matCols},1fr)` };
     },
@@ -509,6 +526,8 @@ const WorkbenchPage = {
       const p = this.$refs.wbPlayer;
       if (p) p.playbackRate = v;
     },
+    trackZoom() { this.$nextTick(() => this.drawRuler()); },
+    tracks: { handler() { this.$nextTick(() => this.drawRuler()); }, deep: true },
   },
 
   created() {
@@ -575,8 +594,8 @@ const WorkbenchPage = {
       if (p.paused) { p.play().catch(() => {}); this.trackPlaying = true; }
       else { p.pause(); this.trackPlaying = false; }
     },
-    trackZoomIn() { this.trackZoom = Math.min(10, this.trackZoom + 0.5); },
-    trackZoomOut() { this.trackZoom = Math.max(1, this.trackZoom - 0.5); },
+    trackZoomIn() { this.trackZoom = Math.min(10, this.trackZoom + 1); },
+    trackZoomOut() { this.trackZoom = Math.max(1, this.trackZoom - 1); },
     trackFitWidth() { this.trackZoom = 1; },
     toggleWbFullscreen() {
       const wrap = this.$refs.wbPlayer?.parentElement;
@@ -650,12 +669,63 @@ const WorkbenchPage = {
       this.trackSelectedItem = null;
       this._trackSave();
     },
-    trackItemStyle(item) {
-      try {
-        const meta = JSON.parse(item.metadata || '{}');
-        if (meta.width) return { width: meta.width + 'px', minWidth: '30px' };
-      } catch(e) {}
-      return { minWidth: '30px' };
+    _timeToSec(t) {
+      if (!t) return 0;
+      const parts = String(t).split(':').map(Number);
+      if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+      if (parts.length === 2) return parts[0] * 60 + parts[1];
+      return parseFloat(t) || 0;
+    },
+    trackItemPos(item) {
+      const s = this._timeToSec(item.time_start);
+      const e = this._timeToSec(item.time_end);
+      if (e <= s) return { left: '0px', width: '40px' };
+      return {
+        left: Math.round(s * this.pps) + 'px',
+        width: Math.max(30, Math.round((e - s) * this.pps)) + 'px',
+      };
+    },
+    trackAddPos(trackType) {
+      const items = this.getTrackItems(trackType);
+      if (!items.length) return { left: '4px' };
+      const last = items[items.length - 1];
+      const e = this._timeToSec(last.time_end);
+      return { left: Math.round((e || 0) * this.pps + 4) + 'px' };
+    },
+    drawRuler() {
+      const c = this.$refs.wbRulerCanvas;
+      if (!c) return;
+      const dpr = window.devicePixelRatio || 1;
+      const w = this.timelineWidth;
+      const h = 24;
+      c.width = w * dpr;
+      c.height = h * dpr;
+      c.style.width = w + 'px';
+      c.style.height = h + 'px';
+      const ctx = c.getContext('2d');
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, w, h);
+      const pps = this.pps;
+      let interval;
+      if (pps >= 100) interval = 1;
+      else if (pps >= 40) interval = 5;
+      else if (pps >= 20) interval = 10;
+      else if (pps >= 8) interval = 30;
+      else interval = 60;
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text3').trim() || '#666';
+      ctx.font = '10px sans-serif';
+      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--border2').trim() || '#333';
+      for (let t = 0; t * pps < w; t += interval) {
+        const x = t * pps;
+        ctx.beginPath();
+        ctx.moveTo(x, h - 8);
+        ctx.lineTo(x, h);
+        ctx.stroke();
+        const m = Math.floor(t / 60);
+        const s = t % 60;
+        const label = m + ':' + String(s).padStart(2, '0');
+        ctx.fillText(label, x + 3, h - 10);
+      }
     },
     addTrackItem(type) {
       this._trackSnapshot();
