@@ -64,7 +64,7 @@ const WorkbenchPage = {
           </q-btn>
         </div>
         <div class="wb-material-list">
-          <div class="wb-mat-grid" :style="{'grid-template-columns': 'repeat('+matCols+',1fr)'}">
+          <div class="wb-mat-grid" :style="matGridStyle">
             <div v-if="!project.media || !project.media.length" class="wb-empty-material" style="grid-column:1/-1">{{ t('wb.no_segments') }}</div>
             <div v-else-if="!filteredMedia.length" class="wb-empty-material" style="grid-column:1/-1">{{ t('wb.no_match') }}</div>
             <div v-for="m in filteredMedia" :key="m.id" class="wb-mat-card"
@@ -175,8 +175,8 @@ const WorkbenchPage = {
                         </div>
                       </q-tooltip>
                     </div>
-                    <div class="wb-seek-hover" v-if="wbHoverTime>=0 && wbDuration" :style="{left: (wbHoverTime/wbDuration*100)+'%'}"></div>
-                    <div class="wb-seek-progress" v-if="wbDuration" :style="{width: (wbCurrentTime/wbDuration*100)+'%'}"></div>
+                    <div class="wb-seek-hover" v-if="wbHoverTime>=0 && wbDuration" :style="wbHoverStyle"></div>
+                    <div class="wb-seek-progress" v-if="wbDuration" :style="wbProgressStyle"></div>
                   </div>
                 </div>
               </div>
@@ -345,7 +345,7 @@ const WorkbenchPage = {
           <div :style="trackZoomStyle">
           <template v-if="getTrackItems(tt.key).length">
             <div v-for="item in getTrackItems(tt.key)" :key="item.id" class="wb-track-item"
-                 :class="{'wb-track-' + tt.key: true, selected: trackSelectedItem === item.id}"
+                 :class="['wb-track-' + tt.key, {selected: trackSelectedItem === item.id}]"
                  @click="trackSelectedItem = item.id">
               <template v-if="tt.key === 'video'">
                 <img v-if="item._segment" :src="'/media/thumbnail/' + item._segment.media_id" class="wb-track-thumb">
@@ -486,6 +486,17 @@ const WorkbenchPage = {
         transformOrigin: 'left',
         minWidth: (this.trackZoom * 100) + '%',
       };
+    },
+    matGridStyle() {
+      return { 'grid-template-columns': `repeat(${this.matCols},1fr)` };
+    },
+    wbHoverStyle() {
+      if (!this.wbDuration) return {};
+      return { left: (this.wbHoverTime / this.wbDuration * 100) + '%' };
+    },
+    wbProgressStyle() {
+      if (!this.wbDuration) return {};
+      return { width: (this.wbCurrentTime / this.wbDuration * 100) + '%' };
     },
   },
 
