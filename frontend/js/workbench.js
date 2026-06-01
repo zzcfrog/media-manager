@@ -252,7 +252,12 @@ const WorkbenchPage = {
               <q-scroll-area ref="wbSegScroll" style="flex:1">
                 <div v-for="(seg,i) in mediaSegments(selectedMedia.id)" :key="seg.id" class="segment"
                      :class="{ active: activeSegIndex === i }"
-                     @click="onSegClick(seg, i)">
+                     @click="onSegClick(seg, i)"
+                     draggable="true"
+                     @dragstart="onSegDragStart($event, seg)">
+                  <div class="seg-drag-handle" title="拖到轨道上">
+                    <q-icon name="drag_indicator" size="12px" color="grey-6"></q-icon>
+                  </div>
                   <div style="display:flex;align-items:center;justify-content:space-between">
                     <span class="seg-time"><span class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'time_start', e.target.innerText.trim())" v-text="seg.time_start"></span> → <span class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'time_end', e.target.innerText.trim())" v-text="seg.time_end"></span></span>
                     <div style="display:flex;align-items:center;gap:6px">
@@ -313,7 +318,7 @@ const WorkbenchPage = {
             <q-tooltip :delay="500">缩小</q-tooltip>
           </q-btn>
           <q-slider v-model="trackZoom" :min="1" :max="10" :step="1"
-                    style="width:80px;--q-primary:var(--accent)" color="primary"></q-slider>
+                    style="width:80px;--q-primary:var(--accent);padding:0" color="primary" dense></q-slider>
           <q-btn flat round dense icon="zoom_in" size="xs" color="grey-6" @click="trackZoom = Math.min(10, trackZoom + 1)">
             <q-tooltip :delay="500">放大</q-tooltip>
           </q-btn>
@@ -326,9 +331,10 @@ const WorkbenchPage = {
             <canvas ref="wbRulerCanvas"></canvas>
           </div>
         </div>
-        <div v-for="tt in trackTypes" :key="tt.key" class="wb-track-row">
+        <div v-for="tt in trackTypes" :key="tt.key" class="wb-track-row" :class="{'wb-track-row-video': tt.key === 'video'}">
           <div class="wb-track-label">{{ t('wb.track_' + tt.key) }}</div>
-          <div class="wb-track-content" :style="{width: timelineWidth + 'px'}">
+          <div class="wb-track-content" :style="{width: timelineWidth + 'px'}"
+               @dragover.prevent @drop="onTrackDrop($event, tt.key)">
             <div v-for="item in getTrackItems(tt.key)" :key="item.id" class="wb-track-item"
                  :class="['wb-track-' + tt.key, {selected: trackSelectedItem === item.id}]"
                  :style="trackItemPos(item)"
@@ -336,8 +342,9 @@ const WorkbenchPage = {
                  @mousedown="onTrackItemDown($event, item, tt.key)"
                  @mousemove="onTrackItemHover">
               <template v-if="tt.key === 'video'">
-                <img v-if="item._segment" :src="'/media/thumbnail/' + item._segment.media_id" class="wb-track-thumb">
-                <span>{{ item._segment ? (item._segment.mood || item._segment.shot_type || '...') : '?' }}</span>
+                <div v-if="item._segment" class="wb-track-filmstrip"
+                     :style="{backgroundImage: 'url(/media/thumbnail/' + item._segment.media_id + ')'}"></div>
+                <span class="wb-track-item-label">{{ item._segment ? (item._segment.mood || item._segment.shot_type || '...') : '?' }}</span>
               </template>
               <template v-else-if="tt.key === 'emotion'">
                 <span>{{ item.emotion_value?.toFixed(2) }}</span>
@@ -382,6 +389,7 @@ const WorkbenchPage = {
       trackPlaying: false,
       trackSpeed: 1,
       trackZoom: 1,
+      zoomPps: 20,
       trackCanUndo: false,
       trackCanRedo: false,
       trackSelectedItem: null,
@@ -466,7 +474,7 @@ const WorkbenchPage = {
     videoTrackCount() {
       return this.getTrackItems("video").length;
     },
-    pps() { return this.trackZoom * 20; },
+    pps() { return this.zoomPps; },
     timelineDuration() {
       let max = 60;
       for (const tr of this.tracks) {
@@ -475,7 +483,7 @@ const WorkbenchPage = {
       }
       return max + 30;
     },
-    timelineWidth() { return Math.round(this.pps * this.timelineDuration); },
+    timelineWidth() { return Math.round(this.zoomPps * this.timelineDuration); },
     matGridStyle() {
       return { 'grid-template-columns': `repeat(${this.matCols},1fr)` };
     },
@@ -496,6 +504,7 @@ const WorkbenchPage = {
     if (this._onWbKey) document.removeEventListener('keydown', this._onWbKey);
     if (this._onDragMove) document.removeEventListener('mousemove', this._onDragMove);
     if (this._onDragEnd) document.removeEventListener('mouseup', this._onDragEnd);
+    if (this._zoomAnim) cancelAnimationFrame(this._zoomAnim);
     this.$root.pickerMode = false;
   },
 
@@ -526,7 +535,24 @@ const WorkbenchPage = {
       const p = this.$refs.wbPlayer;
       if (p) p.playbackRate = v;
     },
-    trackZoom() { this.$nextTick(() => this.drawRuler()); },
+    trackZoom(val) {
+      const target = val * 20;
+      const animate = () => {
+        const cur = this.zoomPps;
+        const diff = target - cur;
+        if (Math.abs(diff) < 0.5) {
+          this.zoomPps = target;
+          this.drawRuler();
+          this._zoomAnim = null;
+          return;
+        }
+        this.zoomPps = cur + diff * 0.15;
+        this.drawRuler();
+        this._zoomAnim = requestAnimationFrame(animate);
+      };
+      if (this._zoomAnim) cancelAnimationFrame(this._zoomAnim);
+      animate();
+    },
     tracks: { handler() { this.$nextTick(() => this.drawRuler()); }, deep: true },
   },
 
@@ -688,9 +714,16 @@ const WorkbenchPage = {
     trackAddPos(trackType) {
       const items = this.getTrackItems(trackType);
       if (!items.length) return { left: '4px' };
-      const last = items[items.length - 1];
-      const e = this._timeToSec(last.time_end);
-      return { left: Math.round((e || 0) * this.pps + 4) + 'px' };
+      let maxEnd = 0;
+      for (const item of items) {
+        const e = this._timeToSec(item.time_end);
+        if (e > maxEnd) maxEnd = e;
+        else {
+          const s = this._timeToSec(item.time_start);
+          if (s > maxEnd) maxEnd = s;
+        }
+      }
+      return { left: Math.round(maxEnd * this.pps + 4) + 'px' };
     },
     drawRuler() {
       const c = this.$refs.wbRulerCanvas;
@@ -705,18 +738,30 @@ const WorkbenchPage = {
       const ctx = c.getContext('2d');
       ctx.scale(dpr, dpr);
       ctx.clearRect(0, 0, w, h);
-      const pps = this.pps;
+      const pps = this.zoomPps;
       let interval;
       if (pps >= 100) interval = 1;
       else if (pps >= 40) interval = 5;
       else if (pps >= 20) interval = 10;
       else if (pps >= 8) interval = 30;
       else interval = 60;
-      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text3').trim() || '#666';
+      const minor = interval / 10;
+      const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text3').trim() || '#666';
+      const lineColor = getComputedStyle(document.documentElement).getPropertyValue('--border2').trim() || '#333';
       ctx.font = '10px sans-serif';
-      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--border2').trim() || '#333';
+      // minor ticks
+      ctx.strokeStyle = lineColor;
+      for (let t = 0; t * pps < w; t += minor) {
+        const x = Math.round(t * pps) + 0.5;
+        ctx.beginPath();
+        ctx.moveTo(x, h - 4);
+        ctx.lineTo(x, h);
+        ctx.stroke();
+      }
+      // major ticks + labels
+      ctx.fillStyle = textColor;
       for (let t = 0; t * pps < w; t += interval) {
-        const x = t * pps;
+        const x = Math.round(t * pps) + 0.5;
         ctx.beginPath();
         ctx.moveTo(x, h - 8);
         ctx.lineTo(x, h);
@@ -727,14 +772,57 @@ const WorkbenchPage = {
         ctx.fillText(label, x + 3, h - 10);
       }
     },
+    onSegDragStart(e, seg) {
+      e.dataTransfer.setData('application/json', JSON.stringify(seg));
+      e.dataTransfer.effectAllowed = 'copy';
+    },
+    onTrackDrop(e, trackType) {
+      const data = e.dataTransfer?.getData('application/json');
+      if (!data) return;
+      try {
+        const seg = JSON.parse(data);
+        this._trackSnapshot();
+        const items = this.getTrackItems(trackType);
+        let maxEnd = 0;
+        for (const item of items) {
+          const et = this._timeToSec(item.time_end);
+          if (et > maxEnd) maxEnd = et;
+        }
+        this.tracks.push({
+          id: Date.now(),
+          track_type: trackType,
+          segment_id: seg.id,
+          content: seg.visual || '',
+          time_start: seg.time_start || '0:00',
+          time_end: seg.time_end || '0:05',
+          emotion_value: 0.5,
+          metadata: '{}',
+          _segment: seg,
+        });
+        this._trackSave();
+      } catch(err) {}
+    },
     addTrackItem(type) {
       this._trackSnapshot();
+      const items = this.getTrackItems(type);
+      let maxEnd = 0;
+      for (const item of items) {
+        const e = this._timeToSec(item.time_end);
+        if (e > maxEnd) maxEnd = e;
+      }
+      const m = Math.floor(maxEnd / 60);
+      const s = maxEnd % 60;
+      const startStr = m + ':' + String(Math.round(s)).padStart(2, '0');
+      const endSec = maxEnd + 5;
+      const em = Math.floor(endSec / 60);
+      const es = endSec % 60;
+      const endStr = em + ':' + String(Math.round(es)).padStart(2, '0');
       this.tracks.push({
         id: Date.now(),
         track_type: type,
         content: '',
-        time_start: '',
-        time_end: '',
+        time_start: startStr,
+        time_end: endStr,
         emotion_value: 0.5,
         metadata: '{}',
       });

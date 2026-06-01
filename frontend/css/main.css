@@ -891,16 +891,16 @@ body:not(.body--dark) .wb-mat-sort-group { background: #e0e0e0; }
 .wb-track-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   padding: 2px 8px;
   border-bottom: 1px solid var(--border);
   background: var(--surface2);
   flex-shrink: 0;
-  height: 36px;
+  height: 28px;
 }
 .wb-track-toolbar .q-btn { min-height: unset; padding: 0; }
 .wb-track-toolbar .q-select { font-size: 11px; }
-.wb-track-toolbar .q-slider { height: 20px; }
+.wb-track-toolbar .q-slider { height: 16px; padding: 0; margin: 0 4px; }
 
 .wb-tracks {
   flex-shrink: 0;
@@ -943,6 +943,50 @@ body:not(.body--dark) .wb-mat-sort-group { background: #e0e0e0; }
 
 .wb-track-row:last-child {
   border-bottom: none;
+}
+
+.wb-track-row-video {
+  min-height: 56px;
+}
+.wb-track-row-video .wb-track-content {
+  min-height: 56px;
+}
+.wb-track-row-video .wb-track-item {
+  overflow: hidden;
+}
+
+.wb-track-filmstrip {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-size: auto 100%;
+  background-repeat: repeat-x;
+  background-position: left center;
+  opacity: 0.5;
+  border-radius: 3px;
+}
+
+.wb-track-item-label {
+  position: relative;
+  z-index: 1;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.seg-drag-handle {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  cursor: grab;
+  opacity: 0.3;
+  z-index: 2;
+  padding: 2px;
+  border-radius: 3px;
+}
+.seg-drag-handle:hover {
+  opacity: 0.8;
+  background: var(--accent-dim);
 }
 
 .wb-track-label {
