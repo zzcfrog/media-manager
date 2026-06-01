@@ -6,7 +6,7 @@
 <title>Media Manager</title>
 <link rel="stylesheet" href="/static/css/quasar.prod.css">
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" type="text/css">
-<link rel="stylesheet" href="/static/css/main.css">
+<link rel="stylesheet" href="/static/css/main.css?v=20260531">
 </head>
 <body>
 <div id="app">
@@ -135,6 +135,25 @@
         </q-item>
         <q-separator style="background:var(--border);margin:8px 0"></q-separator>
         <q-item-label header style="display:flex;align-items:center;justify-content:space-between;padding-right:10px">
+          <span>{{ t('cg.section') }}</span>
+          <q-btn v-if="!drawerMini" dense no-caps unelevated icon="auto_awesome"
+                 :label="t('cg.new_plan')" @click="openNewCreativePlan"
+                 class="sidebar-action-btn"></q-btn>
+        </q-item-label>
+        <q-item v-for="p in creativePlans" :key="'cg'+p.id" clickable dense
+                :active="route==='#/workbench/'+p.id"
+                @click="nav('#/workbench/'+p.id)"
+                active-class="sidebar-active-item"
+                style="padding:4px 16px">
+          <q-item-section avatar><q-icon name="auto_awesome" size="18px"></q-icon></q-item-section>
+          <q-item-section style="font-size:13px">{{ p.name }}</q-item-section>
+        </q-item>
+        <q-item v-if="!creativePlans.length && !drawerMini" disable style="padding:4px 16px;opacity:0.4">
+          <q-item-section avatar><q-icon name="auto_awesome" size="18px" color="grey-6"></q-icon></q-item-section>
+          <q-item-section style="font-size:12px;color:var(--text3)">{{ t('cg.no_plans') }}</q-item-section>
+        </q-item>
+        <q-separator style="background:var(--border);margin:8px 0"></q-separator>
+        <q-item-label header style="display:flex;align-items:center;justify-content:space-between;padding-right:10px">
           <span>{{ t('wb.section') }}</span>
           <q-btn v-if="!drawerMini" dense no-caps unelevated icon="add_circle_outline"
                  :label="t('wb.new_project')" @click="openNewProject"
@@ -247,6 +266,11 @@
       </q-page>
     </q-page-container>
   </q-layout>
+
+  <!-- Creative Wizard Dialog -->
+  <creative-wizard :show="showCreativeWizard" @update:show="showCreativeWizard=$event"
+                   :project-id="wizardProjectId"
+                   @done="onCreativeDone"></creative-wizard>
 
   <!-- Drawer toggle -->
   <q-btn flat round dense :icon="drawerMini ? 'chevron_right' : 'chevron_left'" size="xs" color="grey-6"
@@ -566,6 +590,7 @@
 <script src="/static/js/detail.js"></script>
 <script src="/static/js/duplicates.js"></script>
 <script src="/static/js/workbench.js"></script>
+<script src="/static/js/creative-wizard.js"></script>
 <script>
 const app = Vue.createApp({
   data() {
@@ -575,6 +600,9 @@ const app = Vue.createApp({
       detailId: null,
       workbenchId: null,
       projects: [],
+      creativePlans: [],
+      showCreativeWizard: false,
+      wizardProjectId: null,
       showNewProject: false,
       newProjectForm: { name: "", description: "" },
       newProjectLoading: false,
@@ -640,6 +668,7 @@ const app = Vue.createApp({
   created() {
     this.loadSidebar();
     this.loadProjects();
+    this.loadCreativePlans();
     API.getSettings().then(s => { i18nState.locale = s.language || "zh"; }).catch(() => {});
     this.applyTheme();
     if (this.accentColor) this.setAccentColor(this.accentColor);
@@ -1008,6 +1037,37 @@ const app = Vue.createApp({
           this.expandedFolders = [...expanded];
         }
       } catch (e) { console.error(e); }
+    },
+    async loadCreativePlans() {
+      try {
+        const res = await API.getCreativePlans();
+        this.creativePlans = res.data || [];
+      } catch (e) { console.error(e); }
+    },
+    openNewCreativePlan() {
+      // Create a draft project first, then open wizard
+      Quasar.Dialog.create({
+        title: t('cg.new_plan'),
+        message: t('wb.name_label'),
+        prompt: { model: '', type: 'text', outlined: true },
+        cancel: true,
+        persistent: false,
+      }).onOk(async name => {
+        if (!name.trim()) return;
+        try {
+          const res = await API.createCreativePlan({ name: name.trim() });
+          this.wizardProjectId = res.data.id;
+          this.showCreativeWizard = true;
+          this.loadCreativePlans();
+          this.loadProjects();
+        } catch (e) {
+          Quasar.Notify.create({ type: 'negative', message: e.message });
+        }
+      });
+    },
+    onCreativeDone(pid) {
+      this.loadCreativePlans();
+      this.loadProjects();
     },
     async loadProjects() {
       try {
@@ -1379,6 +1439,7 @@ app.component("gallery-page", GalleryPage);
 app.component("detail-page", DetailPage);
 app.component("duplicates-page", DuplicatesPage);
 app.component("workbench-page", WorkbenchPage);
+app.component("creative-wizard", CreativeWizard);
 app.mount("#app");
 </script>
 </body>

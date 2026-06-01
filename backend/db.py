@@ -179,13 +179,16 @@ _MIGRATIONS = [
     ("dof", "ALTER TABLE media_segment ADD COLUMN dof TEXT DEFAULT ''"),
     ("style", "ALTER TABLE media_segment ADD COLUMN style TEXT DEFAULT ''"),
     ("composition", "ALTER TABLE media_segment ADD COLUMN composition TEXT DEFAULT ''"),
+    ("creative_brief", "ALTER TABLE projects ADD COLUMN creative_brief TEXT"),
+    ("ai_plan", "ALTER TABLE projects ADD COLUMN ai_plan TEXT"),
 ]
 
 
 def _migrate(db):
     cols = {r[1] for r in db.execute("PRAGMA table_info(media)").fetchall()}
     seg_cols = {r[1] for r in db.execute("PRAGMA table_info(media_segment)").fetchall()}
-    all_known = cols | seg_cols
+    proj_cols = {r[1] for r in db.execute("PRAGMA table_info(projects)").fetchall()}
+    all_known = cols | seg_cols | proj_cols
     for name, sql in _MIGRATIONS:
         if name not in all_known:
             if sql:

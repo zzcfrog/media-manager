@@ -43,6 +43,29 @@
 - [ ] 素材数据压缩策略：哪些维度发给大模型，截断长度？
 - [ ] 自定义情绪弧线（手绘曲线）Phase 1 是否实现？
 
+## 已完成：AI 创意引导器 Phase 1 — 侧边栏 + 数据模型 + 引导器骨架（2026-06-01）
+
+侧边栏新增「构思」板块，后端 creative 蓝图 API，前端 5 步引导器组件骨架。
+
+**改动文件：**
+- `backend/db.py` — `_MIGRATIONS` 新增 `creative_brief`、`ai_plan` 两列；`_migrate()` 新增 `projects` 表列检查
+- `backend/blueprints/creative.py` — **新建**：创意引导器 API 蓝图（7 个端点：CRUD + brief 更新 + 素材统计 + AI 生成 SSE + 方案应用）
+- `backend/__init__.py` — 注册 creative 蓝图（`/api/creative`）
+- `backend/creative_prompt.txt` — **新建**：AI 导演 Prompt 模板（角色定义 + 创作原则 + 输入输出 Schema）
+- `frontend/js/api.js` — 新增 7 个 creative API 方法
+- `frontend/js/creative-wizard.js` — **新建**：5 步引导器组件（选模板→叙事结构→情绪弧线→声音设计→确认生成），含 SSE 流式进度展示
+- `frontend/js/i18n.js` — 新增 `cg.*` 翻译键（中英文各约 80 个）
+- `frontend/index.html` — 侧边栏插入「构思」板块（between 浏览 and 编排）；新增 creative-wizard 对话框；`openNewCreativePlan()` 弹窗输入名称→创建项目→打开引导器；`loadCreativePlans()`/`onCreativeDone()` 方法；`creativePlans`/`showCreativeWizard`/`wizardProjectId` 数据
+- `frontend/css/main.css` — 新增 `.cg-*` 引导器样式（模板卡片、选项芯片、弧线选择、确认摘要、生成进度等）
+
+**功能说明：**
+- 侧边栏三个板块：浏览 → 构思 → 编排
+- 「新建构思」按钮 → 弹窗输入名称 → 创建项目 → 打开 5 步引导器
+- 引导器收集创作意图（模板/结构/弧线/声音/确认），每步可查看素材统计
+- 确认后 SSE 流式调用大模型生成方案，自动组装时间线
+- 生成完成后跳转到工作台页面
+- 构思项目同时出现在「构思」和「编排」列表中
+
 ## 已完成：工作台时间线工具栏（2026-05-31）
 
 时间线上方新增工具栏，包含播放控制、编辑操作、缩放和添加轨道功能。

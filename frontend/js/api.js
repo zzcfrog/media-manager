@@ -128,4 +128,13 @@ scanPaths(paths) {
   getProjectTracks(id) { return this._fetch(`/api/workbench/${id}/tracks`); },
   updateProjectTracks(id, tracks) { return this._fetch(`/api/workbench/${id}/tracks`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tracks }) }); },
   updateProjectMedia(id, mediaIds) { return this._fetch(`/api/workbench/${id}/media`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ media_ids: mediaIds }) }); },
+
+  // -- Creative --
+  getCreativePlans() { return this._fetch("/api/creative/"); },
+  createCreativePlan(data) { return this._fetch("/api/creative/", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); },
+  getCreativePlan(id) { return this._fetch(`/api/creative/${id}`); },
+  updateCreativeBrief(id, brief) { return this._fetch(`/api/creative/${id}/brief`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ creative_brief: brief }) }); },
+  generateCreativePlan(id) { return fetch(`/api/creative/${id}/generate`, { method: "POST", headers: { "Content-Type": "application/json" } }); },
+  applyCreativePlan(id) { return this._fetch(`/api/creative/${id}/apply`, { method: "POST" }); },
+  getCreativeStats(id) { return this._fetch(`/api/creative/${id}/stats`); },
 };
