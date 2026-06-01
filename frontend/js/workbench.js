@@ -69,7 +69,9 @@ const WorkbenchPage = {
             <div v-else-if="!filteredMedia.length" class="wb-empty-material" style="grid-column:1/-1">{{ t('wb.no_match') }}</div>
             <div v-for="m in filteredMedia" :key="m.id" class="wb-mat-card"
                  :class="{ selected: selectedMedia && selectedMedia.id === m.id }"
-                 @click="selectedMedia = m">
+                 @click="selectedMedia = m"
+                 draggable="true"
+                 @dragstart="onMatDragStart($event, m)">
               <img :src="'/media/thumbnail/' + m.id" class="wb-mat-thumb" loading="lazy">
               <div class="wb-mat-overlay">
                 <div class="wb-mat-meta">
@@ -255,11 +257,11 @@ const WorkbenchPage = {
                      @click="onSegClick(seg, i)"
                      draggable="true"
                      @dragstart="onSegDragStart($event, seg)">
-                  <div class="seg-drag-handle" title="拖到轨道上">
-                    <q-icon name="drag_indicator" size="12px" color="grey-6"></q-icon>
-                  </div>
                   <div style="display:flex;align-items:center;justify-content:space-between">
-                    <span class="seg-time"><span class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'time_start', e.target.innerText.trim())" v-text="seg.time_start"></span> → <span class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'time_end', e.target.innerText.trim())" v-text="seg.time_end"></span></span>
+                    <div style="display:flex;align-items:center;gap:4px">
+                      <span class="seg-drag-handle" title="拖到轨道上"><q-icon name="drag_indicator" size="16px" color="grey-5"></q-icon></span>
+                      <span class="seg-time"><span class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'time_start', e.target.innerText.trim())" v-text="seg.time_start"></span> → <span class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'time_end', e.target.innerText.trim())" v-text="seg.time_end"></span></span>
+                    </div>
                     <div style="display:flex;align-items:center;gap:6px">
                       <span class="seg-dur">{{ fmtSegDur(seg.time_start, seg.time_end) }}</span>
                     </div>
@@ -324,7 +326,8 @@ const WorkbenchPage = {
           </q-btn>
         </div>
       </div>
-      <div class="wb-timeline-scroll" ref="wbTimelineScroll">
+      <div class="wb-timeline-scroll" ref="wbTimelineScroll" @click="onTimelineClick">
+        <div class="wb-playhead" :style="{left: (60 + Math.round(playheadTime * pps)) + 'px'}" @mousedown.stop="onPlayheadDown"></div>
         <div class="wb-ruler-row">
           <div class="wb-track-label"></div>
           <div class="wb-ruler-content" :style="{width: timelineWidth + 'px'}">
@@ -393,6 +396,7 @@ const WorkbenchPage = {
       trackCanUndo: false,
       trackCanRedo: false,
       trackSelectedItem: null,
+      playheadTime: 0,
       wbPlaying: false,
       wbCurrentTime: 0,
       wbDuration: 0,
@@ -772,35 +776,152 @@ const WorkbenchPage = {
         ctx.fillText(label, x + 3, h - 10);
       }
     },
+    onTimelineClick(e) {
+      if (e.target.closest('.wb-track-item') || e.target.closest('.wb-track-add') || e.target.closest('.wb-track-label')) return;
+      const scroll = this.$refs.wbTimelineScroll;
+      if (!scroll) return;
+      const rect = scroll.getBoundingClientRect();
+      const x = e.clientX - rect.left + scroll.scrollLeft - 60;
+      if (x < 0) return;
+      this.playheadTime = x / this.pps;
+      this.seekToPlayhead();
+    },
+    onPlayheadDown(e) {
+      e.preventDefault();
+      const scroll = this.$refs.wbTimelineScroll;
+      if (!scroll) return;
+      const onMove = (ev) => {
+        const rect = scroll.getBoundingClientRect();
+        const x = ev.clientX - rect.left + scroll.scrollLeft - 60;
+        this.playheadTime = Math.max(0, x / this.pps);
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        this.seekToPlayhead();
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    },
+    seekToPlayhead() {
+      const player = this.$refs.wbPlayer;
+      if (!player || !this.selectedMedia) return;
+      // 查找 video 轨道上 playheadTime 对应的块
+      const items = this.getTrackItems('video').sort((a, b) => this._timeToSec(a.time_start) - this._timeToSec(b.time_start));
+      for (const item of items) {
+        const start = this._timeToSec(item.time_start);
+        const end = this._timeToSec(item.time_end);
+        if (this.playheadTime >= start && this.playheadTime < end) {
+          let meta = {};
+          try { meta = JSON.parse(item.metadata || '{}'); } catch(e) {}
+          const srcStart = this._timeToSec(meta.srcStart || '0:00');
+          const offset = this.playheadTime - start;
+          const targetTime = srcStart + offset;
+          // 如果这个块关联的视频不是当前选中的，先切换
+          const mediaId = meta.srcMediaId || (item._segment?.media_id);
+          if (mediaId && this.selectedMedia.id !== mediaId) {
+            const m = this.project.media.find(x => x.id === mediaId);
+            if (m) this.selectedMedia = m;
+          }
+          this.$nextTick(() => {
+            const p = this.$refs.wbPlayer;
+            if (p) p.currentTime = targetTime;
+          });
+          return;
+        }
+      }
+    },
+    syncPlayheadFromPlayer() {
+      const player = this.$refs.wbPlayer;
+      if (!player || player.paused) return;
+      const items = this.getTrackItems('video').sort((a, b) => this._timeToSec(a.time_start) - this._timeToSec(b.time_start));
+      const t = player.currentTime;
+      for (const item of items) {
+        const start = this._timeToSec(item.time_start);
+        const end = this._timeToSec(item.time_end);
+        let meta = {};
+        try { meta = JSON.parse(item.metadata || '{}'); } catch(e) {}
+        const srcStart = this._timeToSec(meta.srcStart || '0:00');
+        const srcEnd = this._timeToSec(meta.srcEnd || item.time_end);
+        const srcDur = srcEnd - srcStart;
+        if (t >= srcStart && t < srcStart + srcDur + 0.5) {
+          this.playheadTime = start + (t - srcStart);
+          return;
+        }
+      }
+    },
     onSegDragStart(e, seg) {
-      e.dataTransfer.setData('application/json', JSON.stringify(seg));
+      e.dataTransfer.setData('application/json', JSON.stringify({ type: 'segment', ...seg }));
       e.dataTransfer.effectAllowed = 'copy';
+    },
+    onMatDragStart(e, m) {
+      e.dataTransfer.setData('application/json', JSON.stringify({ type: 'media', id: m.id, file_name: m.file_name, media_type: m.media_type, duration: m.duration }));
+      e.dataTransfer.effectAllowed = 'copy';
+    },
+    _secToStr(sec) {
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return m + ':' + String(Math.round(s * 10) / 10).padStart(4, '0');
     },
     onTrackDrop(e, trackType) {
       const data = e.dataTransfer?.getData('application/json');
       if (!data) return;
       try {
-        const seg = JSON.parse(data);
+        const payload = JSON.parse(data);
         this._trackSnapshot();
-        const items = this.getTrackItems(trackType);
-        let maxEnd = 0;
-        for (const item of items) {
-          const et = this._timeToSec(item.time_end);
-          if (et > maxEnd) maxEnd = et;
+        // 计算放置位置对应的轨道时间
+        const contentEl = e.currentTarget;
+        const rect = contentEl.getBoundingClientRect();
+        const dropSec = Math.max(0, (e.clientX - rect.left) / this.pps);
+        // 计算新块的时长
+        let dur;
+        if (payload.type === 'segment') {
+          dur = this._parseDuration(payload.time_start, payload.time_end) || 5;
+        } else {
+          dur = Math.min(payload.duration || 5, 5);
         }
-        this.tracks.push({
+        // 找到该轨道的所有 items 并按轨道时间排序
+        const items = this.getTrackItems(trackType)
+          .map(item => ({ item, start: this._timeToSec(item.time_start), end: this._timeToSec(item.time_end) }))
+          .sort((a, b) => a.start - b.start);
+        // 找插入点：dropSec 应插入的位置
+        let insertIdx = items.length; // 默认在末尾
+        for (let i = 0; i < items.length; i++) {
+          if (dropSec < items[i].end) { insertIdx = i; break; }
+        }
+        // 从插入点开始，后续所有块的 time_start/time_end 后移 dur
+        for (let i = insertIdx; i < items.length; i++) {
+          const it = items[i].item;
+          const s = this._timeToSec(it.time_start) + dur;
+          const e = this._timeToSec(it.time_end) + dur;
+          it.time_start = this._secToStr(s);
+          it.time_end = this._secToStr(e);
+        }
+        // 确定新块的轨道起始时间
+        let newStart = dropSec;
+        if (insertIdx > 0 && dropSec < items[insertIdx - 1].end) {
+          newStart = items[insertIdx - 1].end; // 贴紧前一个块的末尾
+        }
+        // 创建新块
+        const newItem = {
           id: Date.now(),
           track_type: trackType,
-          segment_id: seg.id,
-          content: seg.visual || '',
-          time_start: seg.time_start || '0:00',
-          time_end: seg.time_end || '0:05',
+          content: payload.visual || '',
+          time_start: this._secToStr(newStart),
+          time_end: this._secToStr(newStart + dur),
           emotion_value: 0.5,
           metadata: '{}',
-          _segment: seg,
-        });
+        };
+        if (payload.type === 'segment') {
+          newItem.segment_id = payload.id;
+          newItem._segment = payload;
+          newItem.metadata = JSON.stringify({ srcStart: payload.time_start, srcEnd: payload.time_end, srcMediaId: payload.media_id });
+        } else {
+          newItem.metadata = JSON.stringify({ srcMediaId: payload.id, srcStart: '0:00', srcEnd: this._secToStr(dur) });
+        }
+        this.tracks.push(newItem);
         this._trackSave();
-      } catch(err) {}
+      } catch(err) { console.error('onTrackDrop', err); }
     },
     addTrackItem(type) {
       this._trackSnapshot();
@@ -1003,6 +1124,7 @@ const WorkbenchPage = {
       const p = this.$refs.wbPlayer;
       if (!p) return;
       this.wbCurrentTime = p.currentTime;
+      this.syncPlayheadFromPlayer();
     },
     fmtSec(s) {
       if (!s && s !== 0) return '--:--';
