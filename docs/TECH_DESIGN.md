@@ -569,7 +569,116 @@ HDBSCAN(min_cluster_size=2, metric="euclidean")
 - 噪声点（label=-1）不输出
 - 性能：428 张图片 → 55 聚类，耗时 0.4 秒
 
-## 9. 已知技术问题
+## 9. AI 创意引导器技术架构
+
+详见 [PRD_AI_CREATIVE.md](PRD_AI_CREATIVE.md)。
+
+### 9.1 新增后端模块
+
+```
+backend/
+├── creative/
+│   ├── __init__.py          # 模块入口，注册蓝图
+│   ├── guide.py             # 创意引导器核心：组装输入、调用 LLM、解析输出
+│   ├── assembler.py         # 时间线组装器：AI 方案 → project_tracks
+│   ├── templates.py         # 模板定义与加载
+│   └── prompt_builder.py    # Prompt 构建：填充素材数据 + 创作指令
+├── templates/               # 创作模板 JSON 文件
+│   ├── long_documentary.json
+│   ├── quick_montage.json
+│   └── free_creation.json
+└── creative_prompt.txt      # AI 导演 Prompt 模板
+```
+
+### 9.2 新增 API 端点
+
+| 路由 | 方法 | 说明 |
+|------|------|------|
+| `/api/workbench/<pid>/creative-brief` | POST | 组装素材数据 + 创作指令 → 调用大模型 → SSE 流式返回方案 |
+| `/api/workbench/<pid>/creative-brief/preview` | POST | 仅组装输入 JSON 预览（不调用大模型，用于调试） |
+| `/api/workbench/<pid>/creative-brief/apply` | POST | 接收 AI 方案 JSON → 组装为 tracks → 写入 project_tracks |
+
+### 9.3 creative-brief 端点流程
+
+```
+POST /api/workbench/<pid>/creative-brief
+Body: { template, duration_target, opening, structure, emotion_arc, voice, music, ending }
+
+1. 验证工程存在且有已分析的视频素材
+2. 查询工程所有 media + segments（按 date_taken / media_id / seq 排序）
+3. templates.py 加载模板定义，合并用户选择
+4. prompt_builder.py 组装：
+   a. 系统提示词（角色 + 创作原则 + 输出 schema）
+   b. 用户消息（创作指令 JSON + 素材数据 JSON）
+5. 调用大模型 API（OpenAI 兼容 SDK，SSE 流式）
+6. 流式返回：
+   - 事件类型：progress（进度百分比）、shot（每生成一个 shot 实时推送）、done（完整方案）、error
+7. 全部返回后解析完整 JSON，校验 segment_id 有效性
+```
+
+### 9.4 素材数据压缩策略
+
+200+ segment 的完整元数据可能超出 token 限制，采用压缩策略：
+
+| 策略 | 说明 |
+|------|------|
+| 精简维度 | 仅发送 AI 导演需要的维度：segment_id, duration, visual(截断100字), mood, scene_type, shot_type, asr(截断50字), dominant_colors |
+| 去除空值 | ASR 为空的不发送 |
+| 时长聚合 | 用秒数替代 MM:SS 格式 |
+| 预估 | 每个 segment 约 50-80 tokens，200 segments ≈ 10k-16k tokens |
+
+### 9.5 时间线组装器
+
+`assembler.py` 将 AI 方案 JSON 转换为 `project_tracks` 记录：
+
+```
+AI 方案 JSON
+    │
+    │  遍历 acts → shots
+    ▼
+acts[i] → theme track item（标题 + purpose）
+    │
+shots[j] → video track item（segment_id + 时间范围）
+    │
+shots[j].narration → narration track item
+    │
+shots[j].emotion → emotion track item
+    │
+shots[j].use_asr + segment.asr → subtitle track item
+    │
+acts[i].title → text track item（标题卡）
+    │
+    ▼
+PUT /api/workbench/<pid>/tracks（批量替换）
+```
+
+**segment_id 校验**：组装前验证所有 segment_id 存在于工程的素材中，无效的标记为缺口（ghost slot）。
+
+### 9.6 前端实现
+
+**创意引导器对话框**：`q-dialog`（全屏模式），内部分步表单组件（5 步），每步展示素材匹配统计。
+
+**成片大纲面板**：右侧面板新增 Tab 切换（成片大纲 / 分析结果），大纲数据从 `project_tracks` 的 `theme` 类型条目派生。
+
+**素材统计查询**：`GET /api/workbench/<pid>/segments` 返回所有 segment，前端按 mood/scene_type 等维度聚合统计，展示在引导器每一步中。
+
+### 9.7 数据模型变更
+
+无新增数据库表。AI 方案数据完全通过现有 `project_tracks` 表存储：
+
+- `theme` 类型条目的 `metadata` JSON 增加 `purpose`（创作意图）和 `act_id`（幕标识）
+- `video` 类型条目的 `metadata` JSON 增加 `purpose`（镜头意图）和 `act_id`
+- `narration` 类型条目的 `content` 存储 AI 生成的旁白文案
+- `emotion` 类型条目存储 AI 建议的情绪锚点值
+
+`projects` 表增加可选字段：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `creative_brief` | TEXT | JSON，存储用户在引导器中的创作指令（可回溯/重新生成） |
+| `ai_plan` | TEXT | JSON，存储 AI 返回的完整方案（可回溯） |
+
+## 10. 已知技术问题
 
 详见 [docs/todo.md](todo.md)。
 

@@ -1,5 +1,48 @@
 # TODO
 
+## 规划中：AI 创意引导器（Creative Guide）
+
+将创作工作台从「AI 辅助粗剪工具」升级为「AI 驱动的创意构思工具」。完整 PRD 见 [PRD_AI_CREATIVE.md](PRD_AI_CREATIVE.md)。
+
+### Phase 1：MVP
+
+**后端**：
+- [ ] 新增 `backend/creative/` 模块（guide.py / assembler.py / templates.py / prompt_builder.py）
+- [ ] 新增 `POST /api/workbench/<pid>/creative-brief` 端点（组装素材数据 + 调用大模型 SSE 流式返回）
+- [ ] 新增 `POST /api/workbench/<pid>/creative-brief/apply` 端点（AI 方案 → project_tracks 组装）
+- [ ] 新增 3 个内置模板 JSON（long_documentary / quick_montage / free_creation）
+- [ ] 新增 AI 导演 Prompt 模板（backend/creative_prompt.txt）
+- [ ] `projects` 表新增 `creative_brief` / `ai_plan` 可选字段
+
+**前端**：
+- [ ] 工作台工具栏新增「AI 构思」按钮
+- [ ] 5 步创意引导器全屏对话框（选模板 → 叙事结构 → 情绪弧线 → 声音设计 → 确认）
+- [ ] 每步展示素材匹配统计（mood/scene_type/ASR 分布）
+- [ ] 生成进度对话框（SSE 实时进度）
+- [ ] 成片大纲面板（右侧 Tab 切换：成片大纲 / 分析结果）
+- [ ] 大纲段落交互（点击定位、拖拽排序、展开/折叠）
+- [ ] 大纲 ↔ 时间线双向同步
+
+### Phase 2：智能交互增强
+- [ ] 单段落 AI 重新生成
+- [ ] AI 推荐替换镜头
+- [ ] 大纲面板段落拖拽重排
+- [ ] 情绪弧线可视化编辑
+- [ ] AI 补充/精简段落
+
+### Phase 3：高级功能
+- [ ] 参考视频解构
+- [ ] 自定义模板保存
+- [ ] 多方案对比
+- [ ] 版本分支
+- [ ] 导出创意简报
+
+### 待确认项
+- [ ] 创意引导使用的模型是否独立于分析模型？默认用哪个？
+- [ ] 是否需要「重新生成」功能（保留/覆盖选项）？
+- [ ] 素材数据压缩策略：哪些维度发给大模型，截断长度？
+- [ ] 自定义情绪弧线（手绘曲线）Phase 1 是否实现？
+
 ## 已完成：工作台时间线工具栏（2026-05-31）
 
 时间线上方新增工具栏，包含播放控制、编辑操作、缩放和添加轨道功能。
