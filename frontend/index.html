@@ -1107,12 +1107,12 @@ const app = Vue.createApp({
       if (!this.renameForm.name.trim()) return;
       await API.updateProject(this.renameTarget.id, { name: this.renameForm.name.trim() });
       this.showProjectRename = false;
-      await this.loadProjects();
+      await Promise.all([this.loadProjects(), this.loadCreativePlans()]);
     },
     async deleteProjectConfirm(project) {
       await API.deleteProject(project.id);
       if (location.hash === "#/workbench/" + project.id) location.hash = "#/gallery";
-      await this.loadProjects();
+      await Promise.all([this.loadProjects(), this.loadCreativePlans()]);
     },
     pickerFolderSelect(path) {
       this.pickerFolder = this.pickerFolder === path ? null : path;
