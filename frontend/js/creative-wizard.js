@@ -94,21 +94,11 @@ const CreativeWizard = {
             <div class="cg-arc-grid">
               <div v-for="arc in emotionArcs" :key="arc.id" class="cg-arc-card"
                    :class="{active: brief.emotion_arc===arc.id}" @click="brief.emotion_arc=arc.id">
-                <svg class="cg-arc-svg" viewBox="0 0 120 50" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <defs>
-                    <linearGradient :id="'arc-grad-'+arc.id" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.2"/>
-                      <stop offset="100%" stop-color="var(--accent)" stop-opacity="0.8"/>
-                    </linearGradient>
-                  </defs>
-                  <!-- Fill area under curve -->
-                  <path :d="arc.fill" :fill="'url(#arc-grad-'+arc.id+')'" />
-                  <!-- Curve line -->
-                  <path :d="arc.path" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" fill="none" />
-                  <!-- Dots at key points -->
-                  <circle v-for="(pt, i) in arc.dots" :key="i" :cx="pt[0]" :cy="pt[1]" r="3" fill="var(--accent)" />
+                <svg class="cg-arc-svg" viewBox="0 0 200 80" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+                  <path :d="arc.fill" fill="var(--accent)" fill-opacity="0.12" />
+                  <path :d="arc.path" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" />
                 </svg>
-                <div class="cg-arc-name">{{ t(arc.labelKey) }}</div>
+                <div class="cg-arc-label">{{ t(arc.labelKey) }}</div>
               </div>
             </div>
             <cg-stats-panel v-if="stats" :stats="stats"></cg-stats-panel>
@@ -119,29 +109,17 @@ const CreativeWizard = {
             <h3 class="cg-step-title">{{ t('cg.step_sound') }}</h3>
             <div class="cg-sub-section">
               <div class="cg-sub-title">{{ t('cg.voice_style') }}</div>
-              <div class="cg-option-row">
-                <div v-for="opt in voiceOptions" :key="opt.id" class="cg-option-chip"
+              <div class="cg-option-grid4">
+                <div v-for="opt in voiceOptions" :key="opt.id" class="cg-struct-card"
                      :class="{active: brief.voice.style===opt.id}" @click="brief.voice.style=opt.id">
-                  {{ t(opt.labelKey) }}
+                  <div class="cg-struct-icon">{{ opt.icon }}</div>
+                  <div class="cg-option-name">{{ t(opt.labelKey) }}</div>
+                  <div class="cg-struct-desc">{{ t(opt.descKey) }}</div>
                 </div>
               </div>
             </div>
-            <div class="cg-sound-grid">
-              <q-select v-model="brief.music.mood" :options="moodOptions" :label="t('cg.music_mood')"
-                        outlined dense emit-value map-options
-                        :style="'--q-primary:var(--accent);min-width:140px'"></q-select>
-              <q-select v-model="brief.music.tempo" :options="tempoOptions" :label="t('cg.music_tempo')"
-                        outlined dense emit-value map-options
-                        :style="'--q-primary:var(--accent);min-width:140px'"></q-select>
-              <q-select v-model="brief.music.style" :options="musicStyleOptions" :label="t('cg.music_style')"
-                        outlined dense emit-value map-options
-                        :style="'--q-primary:var(--accent);min-width:140px'"></q-select>
-            </div>
-            <div class="cg-input-row" style="margin-top:12px">
-              <q-input v-model="brief.music.reference" :label="t('cg.music_ref')"
-                       outlined dense style="max-width:400px"
-                       :style="'--q-primary:var(--accent)'"></q-input>
-            </div>
+            <div class="cg-sound-note">{{ t('cg.music_auto_note') }}</div>
+            <cg-stats-panel v-if="stats" :stats="stats"></cg-stats-panel>
           </div>
 
           <!-- Step 5: Confirm -->
@@ -152,7 +130,7 @@ const CreativeWizard = {
               <div class="cg-confirm-row"><span class="cg-confirm-label">{{ t('cg.confirm_structure') }}</span><span>{{ structureLabel }}</span></div>
               <div class="cg-confirm-row"><span class="cg-confirm-label">{{ t('cg.confirm_arc') }}</span><span>{{ arcLabel }}</span></div>
               <div class="cg-confirm-row"><span class="cg-confirm-label">{{ t('cg.confirm_voice') }}</span><span>{{ voiceLabel }}</span></div>
-              <div class="cg-confirm-row"><span class="cg-confirm-label">{{ t('cg.confirm_music') }}</span><span>{{ brief.music.mood }} · {{ brief.music.tempo }} · {{ brief.music.style }}</span></div>
+              <div class="cg-confirm-row"><span class="cg-confirm-label">{{ t('cg.confirm_music') }}</span><span>{{ t('cg.music_auto_note').replace('🎬 ', '') }}</span></div>
               <div class="cg-confirm-row"><span class="cg-confirm-label">{{ t('cg.confirm_ending') }}</span><span>{{ endingLabel }}</span></div>
             </div>
             <div class="cg-confirm-stats" v-if="stats">
@@ -249,41 +227,37 @@ const CreativeWizard = {
         {
           id: "gradual_build",
           labelKey: "cg.arc_gradual",
-          // 从左下缓慢上升到右上——渐入高潮
-          path: "M 5 45 C 20 42, 35 38, 50 32 S 75 18, 90 10 L 115 5",
-          fill: "M 5 45 C 20 42, 35 38, 50 32 S 75 18, 90 10 L 115 5 L 115 50 L 5 50 Z",
-          dots: [[5,45],[50,32],[90,10],[115,5]],
+          // 平缓起步，持续攀升，末段陡升到高点
+          path: "M 0 65 Q 50 58 80 40 T 200 8",
+          fill: "M 0 65 Q 50 58 80 40 T 200 8 L 200 80 L 0 80 Z",
         },
         {
           id: "rollercoaster",
           labelKey: "cg.arc_rollercoaster",
-          // 多次起伏，波峰波谷交替
-          path: "M 5 35 C 15 10, 25 10, 35 30 S 50 48, 60 25 S 75 5, 85 20 S 100 45, 115 8",
-          fill: "M 5 35 C 15 10, 25 10, 35 30 S 50 48, 60 25 S 75 5, 85 20 S 100 45, 115 8 L 115 50 L 5 50 Z",
-          dots: [[5,35],[25,12],[50,42],[75,8],[100,38],[115,8]],
+          // 三起三落，波动剧烈
+          path: "M 0 55 C 25 15 45 15 55 50 S 80 75 100 30 S 135 5 155 40 S 185 70 200 10",
+          fill: "M 0 55 C 25 15 45 15 55 50 S 80 75 100 30 S 135 5 155 40 S 185 70 200 10 L 200 80 L 0 80 Z",
         },
         {
           id: "deep_narrative",
           labelKey: "cg.arc_deep",
-          // 低沉开始，缓慢上升，末段攀升
-          path: "M 5 40 C 15 42, 25 40, 35 38 S 55 35, 65 30 S 80 20, 90 14 L 115 6",
-          fill: "M 5 40 C 15 42, 25 40, 35 38 S 55 35, 65 30 S 80 20, 90 14 L 115 6 L 115 50 L 5 50 Z",
-          dots: [[5,40],[35,38],[65,30],[90,14],[115,6]],
+          // 长期低位盘旋，最后大幅攀升
+          path: "M 0 60 C 40 62 70 58 100 52 S 140 30 160 18 L 200 6",
+          fill: "M 0 60 C 40 62 70 58 100 52 S 140 30 160 18 L 200 6 L 200 80 L 0 80 Z",
         },
         {
           id: "custom",
           labelKey: "cg.arc_custom",
-          // 水平虚线表示用户自定义
-          path: "M 5 25 L 35 25 L 65 25 L 95 25 L 115 25",
-          fill: "M 5 25 L 35 25 L 65 25 L 95 25 L 115 25 L 115 50 L 5 50 Z",
-          dots: [[5,25],[65,25],[115,25]],
+          // 起伏不定的锯齿线
+          path: "M 0 45 L 30 20 L 55 60 L 85 15 L 110 55 L 140 10 L 170 50 L 200 25",
+          fill: "M 0 45 L 30 20 L 55 60 L 85 15 L 110 55 L 140 10 L 170 50 L 200 25 L 200 80 L 0 80 Z",
         },
       ],
       voiceOptions: [
-        { id: "sync", labelKey: "cg.voice_sync" },
-        { id: "narration", labelKey: "cg.voice_narration" },
-        { id: "mixed", labelKey: "cg.voice_mixed" },
-        { id: "music_only", labelKey: "cg.voice_music_only" },
+        { id: "sync", icon: "🎙", labelKey: "cg.voice_sync", descKey: "cg.voice_sync_desc" },
+        { id: "narration", icon: "🎙", labelKey: "cg.voice_narration", descKey: "cg.voice_narration_desc" },
+        { id: "mixed", icon: "🎙", labelKey: "cg.voice_mixed", descKey: "cg.voice_mixed_desc" },
+        { id: "music_only", icon: "🎵", labelKey: "cg.voice_music_only", descKey: "cg.voice_music_only_desc" },
       ],
       moodOptions: [
         { value: "", label: "—" },
