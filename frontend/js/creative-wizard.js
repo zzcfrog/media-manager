@@ -200,6 +200,73 @@ const CreativeWizard = {
         music: { mood: "", tempo: "", style: "", reference: "" },
         ending: { type: "bookend" },
       },
+      // Static option arrays — must be in data() for template access
+      templates: [
+        { id: "long_documentary", icon: "🎬", nameKey: "cg.template_long", descKey: "cg.template_long_desc" },
+        { id: "quick_montage", icon: "⚡", nameKey: "cg.template_quick", descKey: "cg.template_quick_desc" },
+        { id: "free_creation", icon: "📝", nameKey: "cg.template_free", descKey: "cg.template_free_desc" },
+      ],
+      openingOptions: [
+        { id: "suspense", labelKey: "cg.opening_suspense" },
+        { id: "atmosphere", labelKey: "cg.opening_atmosphere" },
+        { id: "character", labelKey: "cg.opening_character" },
+        { id: "quote", labelKey: "cg.opening_quote" },
+      ],
+      endingOptions: [
+        { id: "bookend", labelKey: "cg.ending_bookend" },
+        { id: "elevation", labelKey: "cg.ending_elevation" },
+        { id: "open", labelKey: "cg.ending_open" },
+        { id: "call", labelKey: "cg.ending_call" },
+      ],
+      montageOptions: [
+        { id: "beat", labelKey: "cg.montage_beat" },
+        { id: "montage", labelKey: "cg.montage_montage" },
+        { id: "transition", labelKey: "cg.montage_transition" },
+      ],
+      structureOptions: [
+        { id: "timeline", labelKey: "cg.struct_timeline" },
+        { id: "thematic", labelKey: "cg.struct_thematic" },
+        { id: "three_act", labelKey: "cg.struct_three_act" },
+        { id: "contrast", labelKey: "cg.struct_contrast" },
+      ],
+      emotionArcs: [
+        { id: "gradual_build", chart: "  ╱╱╱╱╱▓▓", labelKey: "cg.arc_gradual" },
+        { id: "rollercoaster", chart: "  ╱▓╲╱▓╱▓▓", labelKey: "cg.arc_rollercoaster" },
+        { id: "deep_narrative", chart: "  ─╲──╱──╱▓", labelKey: "cg.arc_deep" },
+        { id: "custom", chart: "  ─ ─ ─ ─", labelKey: "cg.arc_custom" },
+      ],
+      voiceOptions: [
+        { id: "sync", labelKey: "cg.voice_sync" },
+        { id: "narration", labelKey: "cg.voice_narration" },
+        { id: "mixed", labelKey: "cg.voice_mixed" },
+        { id: "music_only", labelKey: "cg.voice_music_only" },
+      ],
+      moodOptions: [
+        { value: "", label: "—" },
+        { value: "calm", label: "沉稳" },
+        { value: "epic", label: "激昂" },
+        { value: "warm", label: "温暖" },
+        { value: "mystery", label: "神秘" },
+      ],
+      tempoOptions: [
+        { value: "", label: "—" },
+        { value: "slow", label: "慢" },
+        { value: "medium", label: "中" },
+        { value: "fast", label: "快" },
+      ],
+      musicStyleOptions: [
+        { value: "", label: "—" },
+        { value: "piano", label: "钢琴" },
+        { value: "strings", label: "弦乐" },
+        { value: "electronic", label: "电子" },
+        { value: "folk", label: "民谣" },
+        { value: "ambient", label: "氛围" },
+      ],
+      genSteps: [
+        { key: "analyzing", label: "分析素材内容..." },
+        { key: "generating", label: "匹配镜头与情绪..." },
+        { key: "parsing", label: "解析生成结果..." },
+      ],
     };
   },
 
@@ -348,72 +415,4 @@ const CreativeWizard = {
       return "radio_button_unchecked";
     },
   },
-
-  // Static option definitions
-  templates: [
-    { id: "long_documentary", icon: "🎬", nameKey: "cg.template_long", descKey: "cg.template_long_desc" },
-    { id: "quick_montage", icon: "⚡", nameKey: "cg.template_quick", descKey: "cg.template_quick_desc" },
-    { id: "free_creation", icon: "📝", nameKey: "cg.template_free", descKey: "cg.template_free_desc" },
-  ],
-  openingOptions: [
-    { id: "suspense", labelKey: "cg.opening_suspense" },
-    { id: "atmosphere", labelKey: "cg.opening_atmosphere" },
-    { id: "character", labelKey: "cg.opening_character" },
-    { id: "quote", labelKey: "cg.opening_quote" },
-  ],
-  endingOptions: [
-    { id: "bookend", labelKey: "cg.ending_bookend" },
-    { id: "elevation", labelKey: "cg.ending_elevation" },
-    { id: "open", labelKey: "cg.ending_open" },
-    { id: "call", labelKey: "cg.ending_call" },
-  ],
-  montageOptions: [
-    { id: "beat", labelKey: "cg.montage_beat" },
-    { id: "montage", labelKey: "cg.montage_montage" },
-    { id: "transition", labelKey: "cg.montage_transition" },
-  ],
-  structureOptions: [
-    { id: "timeline", labelKey: "cg.struct_timeline" },
-    { id: "thematic", labelKey: "cg.struct_thematic" },
-    { id: "three_act", labelKey: "cg.struct_three_act" },
-    { id: "contrast", labelKey: "cg.struct_contrast" },
-  ],
-  emotionArcs: [
-    { id: "gradual_build", chart: "  ╱╱╱╱╱▓▓", labelKey: "cg.arc_gradual" },
-    { id: "rollercoaster", chart: "  ╱▓╲╱▓╱▓▓", labelKey: "cg.arc_rollercoaster" },
-    { id: "deep_narrative", chart: "  ─╲──╱──╱▓", labelKey: "cg.arc_deep" },
-    { id: "custom", chart: "  ─ ─ ─ ─", labelKey: "cg.arc_custom" },
-  ],
-  voiceOptions: [
-    { id: "sync", labelKey: "cg.voice_sync" },
-    { id: "narration", labelKey: "cg.voice_narration" },
-    { id: "mixed", labelKey: "cg.voice_mixed" },
-    { id: "music_only", labelKey: "cg.voice_music_only" },
-  ],
-  moodOptions: [
-    { value: "", label: "—" },
-    { value: "calm", label: "沉稳" },
-    { value: "epic", label: "激昂" },
-    { value: "warm", label: "温暖" },
-    { value: "mystery", label: "神秘" },
-  ],
-  tempoOptions: [
-    { value: "", label: "—" },
-    { value: "slow", label: "慢" },
-    { value: "medium", label: "中" },
-    { value: "fast", label: "快" },
-  ],
-  musicStyleOptions: [
-    { value: "", label: "—" },
-    { value: "piano", label: "钢琴" },
-    { value: "strings", label: "弦乐" },
-    { value: "electronic", label: "电子" },
-    { value: "folk", label: "民谣" },
-    { value: "ambient", label: "氛围" },
-  ],
-  genSteps: [
-    { key: "analyzing", label: "分析素材内容..." },
-    { key: "generating", label: "匹配镜头与情绪..." },
-    { key: "parsing", label: "解析生成结果..." },
-  ],
 };
