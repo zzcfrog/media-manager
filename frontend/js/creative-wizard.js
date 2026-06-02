@@ -21,21 +21,19 @@ const CreativeWizard = {
           <div v-if="step===1" class="cg-step-content">
             <h3 class="cg-step-title">{{ t('cg.select_media') }}</h3>
             <p class="cg-step-desc">{{ t('cg.select_media_desc') }}</p>
-            <div v-if="mediaLoading" style="text-align:center;padding:40px;color:var(--text3)">...</div>
-            <div v-else-if="!mediaList.length" class="cg-empty">{{ t('cg.no_media') }}</div>
-            <div v-else class="cg-media-grid">
-              <div v-for="m in mediaList" :key="m.id" class="cg-media-card"
-                   :class="{selected: selectedMediaIds.includes(m.id)}" @click="toggleMedia(m.id)">
+            <div v-if="selectedMediaIds.length" class="cg-selected-grid">
+              <div v-for="m in selectedMediaInfo" :key="m.id" class="cg-selected-card">
                 <img :src="'/media/thumbnail/'+m.id" class="cg-media-thumb" />
-                <div class="cg-media-check">
-                  <q-icon :name="selectedMediaIds.includes(m.id) ? 'check_circle' : 'radio_button_unchecked'"
-                          :color="selectedMediaIds.includes(m.id) ? 'accent' : 'grey'" size="22px"></q-icon>
-                </div>
                 <div class="cg-media-info">{{ m.file_name }}</div>
               </div>
             </div>
-            <div class="cg-media-status" v-if="mediaList.length">
-              {{ t('cg.confirm_segments', {n: selectedMediaIds.length}) }}
+            <div v-else class="cg-empty">{{ t('cg.no_media') }}</div>
+            <div class="cg-media-actions">
+              <q-btn unelevated no-caps icon="add_circle_outline" :label="t('wb.add_media')"
+                     color="accent" @click="openPicker"></q-btn>
+              <span v-if="selectedMediaIds.length" class="cg-media-status">
+                {{ t('cg.confirm_segments', {n: selectedMediaIds.length}) }}
+              </span>
             </div>
           </div>
 
@@ -204,9 +202,8 @@ const CreativeWizard = {
       genShots: 0,
       genCurrentStep: "",
       stats: null,
-      mediaLoading: false,
-      mediaList: [],
       selectedMediaIds: [],
+      selectedMediaInfo: [],
       brief: {
         template: "long_documentary",
         montage_style: "beat",
@@ -349,7 +346,7 @@ const CreativeWizard = {
         this.genProgress = 0;
         this.genShots = 0;
         this.selectedMediaIds = [];
-        this.loadMediaList();
+        this.selectedMediaInfo = [];
         this.loadStats();
       }
     },
@@ -373,23 +370,27 @@ const CreativeWizard = {
       this.brief.template = id;
     },
 
-    async loadMediaList() {
-      this.mediaLoading = true;
-      try {
-        // Load all analyzed media from the library
-        const res = await API.getLibrary({ page: 1, per_page: 200, analysis_status: "done" });
-        this.mediaList = (res.data || []).filter(m => m.media_type === "video");
-      } catch (e) {
-        console.error(e);
-        this.mediaList = [];
-      } finally {
-        this.mediaLoading = false;
-      }
+    openPicker() {
+      // Use the root-level media picker
+      const root = this.$root;
+      root.pickerSelected = [...this.selectedMediaIds];
+      root.pickerExcludeIds = [];
+      root.pickerProjectId = this.projectId;
+      root._pickerCallback = (ids) => {
+        this.selectedMediaIds = [...ids];
+        // Fetch info for selected media
+        this.loadSelectedInfo(ids);
+      };
+      root.pickerMode = true;
     },
-    toggleMedia(id) {
-      const idx = this.selectedMediaIds.indexOf(id);
-      if (idx >= 0) this.selectedMediaIds.splice(idx, 1);
-      else this.selectedMediaIds.push(id);
+    async loadSelectedInfo(ids) {
+      if (!ids.length) { this.selectedMediaInfo = []; return; }
+      try {
+        const res = await API.getLibrary({ page: 1, per_page: 200 });
+        this.selectedMediaInfo = (res.data || []).filter(m => ids.includes(m.id));
+      } catch (e) {
+        this.selectedMediaInfo = [];
+      }
     },
 
     async loadStats() {

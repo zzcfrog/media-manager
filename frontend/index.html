@@ -1125,8 +1125,18 @@ const app = Vue.createApp({
     },
     async confirmPicker() {
       try {
+        const selected = [...this.pickerSelected];
+        // If a callback is set (creative wizard), just pass IDs back
+        if (this._pickerCallback) {
+          this._pickerCallback(selected);
+          this._pickerCallback = null;
+          this.pickerMode = false;
+          this.pickerSelected = [];
+          this.pickerExcludeIds = [];
+          return;
+        }
         const existingIds = this.$refs.workbench?.project?.media?.map(m => m.id) || [];
-        const allIds = [...new Set([...existingIds, ...this.pickerSelected])];
+        const allIds = [...new Set([...existingIds, ...selected])];
         await API.updateProjectMedia(this.pickerProjectId, allIds);
         this.pickerMode = false;
         this.pickerSelected = [];
