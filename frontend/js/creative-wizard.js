@@ -66,10 +66,13 @@ const CreativeWizard = {
           <!-- Step 2: Structure -->
           <div v-if="step===2" class="cg-step-content">
             <h3 class="cg-step-title">{{ t('cg.step_structure') }}</h3>
-            <div class="cg-option-grid">
-              <div v-for="opt in structureOptions" :key="opt.id" class="cg-option-card"
+            <div class="cg-option-grid4">
+              <div v-for="opt in structureOptions" :key="opt.id" class="cg-struct-card"
                    :class="{active: brief.structure===opt.id}" @click="brief.structure=opt.id">
+                <div class="cg-struct-icon">{{ opt.icon }}</div>
                 <div class="cg-option-name">{{ t(opt.labelKey) }}</div>
+                <div class="cg-struct-desc">{{ t(opt.descKey) }}</div>
+                <div class="cg-struct-example">{{ t(opt.exampleKey) }}</div>
               </div>
             </div>
             <div class="cg-input-row" style="margin-top:20px">
@@ -224,10 +227,10 @@ const CreativeWizard = {
         { id: "transition", labelKey: "cg.montage_transition" },
       ],
       structureOptions: [
-        { id: "timeline", labelKey: "cg.struct_timeline" },
-        { id: "thematic", labelKey: "cg.struct_thematic" },
-        { id: "three_act", labelKey: "cg.struct_three_act" },
-        { id: "contrast", labelKey: "cg.struct_contrast" },
+        { id: "timeline", icon: "📅", labelKey: "cg.struct_timeline", descKey: "cg.struct_timeline_desc", exampleKey: "cg.struct_timeline_ex" },
+        { id: "thematic", icon: "🗂", labelKey: "cg.struct_thematic", descKey: "cg.struct_thematic_desc", exampleKey: "cg.struct_thematic_ex" },
+        { id: "three_act", icon: "🎭", labelKey: "cg.struct_three_act", descKey: "cg.struct_three_act_desc", exampleKey: "cg.struct_three_act_ex" },
+        { id: "contrast", icon: "🔄", labelKey: "cg.struct_contrast", descKey: "cg.struct_contrast_desc", exampleKey: "cg.struct_contrast_ex" },
       ],
       emotionArcs: [
         { id: "gradual_build", chart: "  ╱╱╱╱╱▓▓", labelKey: "cg.arc_gradual" },
