@@ -94,7 +94,20 @@ const CreativeWizard = {
             <div class="cg-arc-grid">
               <div v-for="arc in emotionArcs" :key="arc.id" class="cg-arc-card"
                    :class="{active: brief.emotion_arc===arc.id}" @click="brief.emotion_arc=arc.id">
-                <div class="cg-arc-chart">{{ arc.chart }}</div>
+                <svg class="cg-arc-svg" viewBox="0 0 120 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient :id="'arc-grad-'+arc.id" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.2"/>
+                      <stop offset="100%" stop-color="var(--accent)" stop-opacity="0.8"/>
+                    </linearGradient>
+                  </defs>
+                  <!-- Fill area under curve -->
+                  <path :d="arc.fill" :fill="'url(#arc-grad-'+arc.id+')'" />
+                  <!-- Curve line -->
+                  <path :d="arc.path" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" fill="none" />
+                  <!-- Dots at key points -->
+                  <circle v-for="(pt, i) in arc.dots" :key="i" :cx="pt[0]" :cy="pt[1]" r="3" fill="var(--accent)" />
+                </svg>
                 <div class="cg-arc-name">{{ t(arc.labelKey) }}</div>
               </div>
             </div>
@@ -233,10 +246,38 @@ const CreativeWizard = {
         { id: "contrast", icon: "🔄", labelKey: "cg.struct_contrast", descKey: "cg.struct_contrast_desc", exampleKey: "cg.struct_contrast_ex" },
       ],
       emotionArcs: [
-        { id: "gradual_build", chart: "  ╱╱╱╱╱▓▓", labelKey: "cg.arc_gradual" },
-        { id: "rollercoaster", chart: "  ╱▓╲╱▓╱▓▓", labelKey: "cg.arc_rollercoaster" },
-        { id: "deep_narrative", chart: "  ─╲──╱──╱▓", labelKey: "cg.arc_deep" },
-        { id: "custom", chart: "  ─ ─ ─ ─", labelKey: "cg.arc_custom" },
+        {
+          id: "gradual_build",
+          labelKey: "cg.arc_gradual",
+          // 从左下缓慢上升到右上——渐入高潮
+          path: "M 5 45 C 20 42, 35 38, 50 32 S 75 18, 90 10 L 115 5",
+          fill: "M 5 45 C 20 42, 35 38, 50 32 S 75 18, 90 10 L 115 5 L 115 50 L 5 50 Z",
+          dots: [[5,45],[50,32],[90,10],[115,5]],
+        },
+        {
+          id: "rollercoaster",
+          labelKey: "cg.arc_rollercoaster",
+          // 多次起伏，波峰波谷交替
+          path: "M 5 35 C 15 10, 25 10, 35 30 S 50 48, 60 25 S 75 5, 85 20 S 100 45, 115 8",
+          fill: "M 5 35 C 15 10, 25 10, 35 30 S 50 48, 60 25 S 75 5, 85 20 S 100 45, 115 8 L 115 50 L 5 50 Z",
+          dots: [[5,35],[25,12],[50,42],[75,8],[100,38],[115,8]],
+        },
+        {
+          id: "deep_narrative",
+          labelKey: "cg.arc_deep",
+          // 低沉开始，缓慢上升，末段攀升
+          path: "M 5 40 C 15 42, 25 40, 35 38 S 55 35, 65 30 S 80 20, 90 14 L 115 6",
+          fill: "M 5 40 C 15 42, 25 40, 35 38 S 55 35, 65 30 S 80 20, 90 14 L 115 6 L 115 50 L 5 50 Z",
+          dots: [[5,40],[35,38],[65,30],[90,14],[115,6]],
+        },
+        {
+          id: "custom",
+          labelKey: "cg.arc_custom",
+          // 水平虚线表示用户自定义
+          path: "M 5 25 L 35 25 L 65 25 L 95 25 L 115 25",
+          fill: "M 5 25 L 35 25 L 65 25 L 95 25 L 115 25 L 115 50 L 5 50 Z",
+          dots: [[5,25],[65,25],[115,25]],
+        },
       ],
       voiceOptions: [
         { id: "sync", labelKey: "cg.voice_sync" },
