@@ -1,4 +1,4 @@
-// AI Creative Guide Wizard — 5-step creative brief dialog
+// AI Creative Guide Wizard — 6-step creative brief dialog
 const CreativeWizard = {
   template: `
     <q-dialog :model-value="show" @update:model-value="$emit('update:show', $event)" maximized transition-show="fade" transition-hide="fade">
@@ -7,7 +7,7 @@ const CreativeWizard = {
         <div class="cg-header">
           <span class="cg-title">{{ t('cg.section') }}</span>
           <div class="cg-steps">
-            <div v-for="i in 5" :key="i" class="cg-step-dot" :class="{active: step===i, done: step>i}">
+            <div v-for="i in 6" :key="i" class="cg-step-dot" :class="{active: step===i, done: step>i}">
               <q-icon v-if="step>i" name="check" size="14px"></q-icon>
               <span v-else>{{ i }}</span>
             </div>
@@ -17,8 +17,30 @@ const CreativeWizard = {
 
         <!-- Step content -->
         <div class="cg-body" v-if="!generating">
-          <!-- Step 1: Template -->
+          <!-- Step 1: Select Media -->
           <div v-if="step===1" class="cg-step-content">
+            <h3 class="cg-step-title">{{ t('cg.select_media') }}</h3>
+            <p class="cg-step-desc">{{ t('cg.select_media_desc') }}</p>
+            <div v-if="mediaLoading" style="text-align:center;padding:40px;color:var(--text3)">...</div>
+            <div v-else-if="!mediaList.length" class="cg-empty">{{ t('cg.no_media') }}</div>
+            <div v-else class="cg-media-grid">
+              <div v-for="m in mediaList" :key="m.id" class="cg-media-card"
+                   :class="{selected: selectedMediaIds.includes(m.id)}" @click="toggleMedia(m.id)">
+                <img :src="'/media/thumbnail/'+m.id" class="cg-media-thumb" />
+                <div class="cg-media-check">
+                  <q-icon :name="selectedMediaIds.includes(m.id) ? 'check_circle' : 'radio_button_unchecked'"
+                          :color="selectedMediaIds.includes(m.id) ? 'accent' : 'grey'" size="22px"></q-icon>
+                </div>
+                <div class="cg-media-info">{{ m.file_name }}</div>
+              </div>
+            </div>
+            <div class="cg-media-status" v-if="mediaList.length">
+              {{ t('cg.confirm_segments', {n: selectedMediaIds.length}) }}
+            </div>
+          </div>
+
+          <!-- Step 2: Template -->
+          <div v-if="step===2" class="cg-step-content">
             <h3 class="cg-step-title">{{ t('cg.step_template') }}</h3>
             <div class="cg-template-grid">
               <div v-for="tp in templates" :key="tp.id" class="cg-template-card"
@@ -63,8 +85,8 @@ const CreativeWizard = {
             </template>
           </div>
 
-          <!-- Step 2: Structure -->
-          <div v-if="step===2" class="cg-step-content">
+          <!-- Step 3: Structure -->
+          <div v-if="step===3" class="cg-step-content">
             <h3 class="cg-step-title">{{ t('cg.step_structure') }}</h3>
             <div class="cg-option-grid4">
               <div v-for="opt in structureOptions" :key="opt.id" class="cg-struct-card"
@@ -88,8 +110,8 @@ const CreativeWizard = {
             <cg-stats-panel v-if="stats" :stats="stats"></cg-stats-panel>
           </div>
 
-          <!-- Step 3: Emotion Arc -->
-          <div v-if="step===3" class="cg-step-content">
+          <!-- Step 4: Emotion Arc -->
+          <div v-if="step===4" class="cg-step-content">
             <h3 class="cg-step-title">{{ t('cg.step_emotion') }}</h3>
             <div class="cg-arc-grid">
               <div v-for="arc in emotionArcs" :key="arc.id" class="cg-arc-card"
@@ -104,8 +126,8 @@ const CreativeWizard = {
             <cg-stats-panel v-if="stats" :stats="stats"></cg-stats-panel>
           </div>
 
-          <!-- Step 4: Sound Design -->
-          <div v-if="step===4" class="cg-step-content">
+          <!-- Step 5: Sound Design -->
+          <div v-if="step===5" class="cg-step-content">
             <h3 class="cg-step-title">{{ t('cg.step_sound') }}</h3>
             <div class="cg-sub-section">
               <div class="cg-sub-title">{{ t('cg.voice_style') }}</div>
@@ -122,8 +144,8 @@ const CreativeWizard = {
             <cg-stats-panel v-if="stats" :stats="stats"></cg-stats-panel>
           </div>
 
-          <!-- Step 5: Confirm -->
-          <div v-if="step===5" class="cg-step-content">
+          <!-- Step 6: Confirm -->
+          <div v-if="step===6" class="cg-step-content">
             <h3 class="cg-step-title">{{ t('cg.confirm_title') }}</h3>
             <div class="cg-confirm-card">
               <div class="cg-confirm-row"><span class="cg-confirm-label">{{ t('cg.confirm_template') }}</span><span>{{ templateLabel }}</span></div>
@@ -158,9 +180,9 @@ const CreativeWizard = {
         <!-- Footer -->
         <div class="cg-footer" v-if="!generating">
           <q-btn flat :label="t('cg.prev')" @click="step--" :disable="step<=1"></q-btn>
-          <q-btn v-if="step<5" unelevated :label="t('cg.next')" @click="step++"
+          <q-btn v-if="step<6" unelevated :label="t('cg.next')" @click="step++"
                  color="accent" :disable="!canNext"></q-btn>
-          <q-btn v-if="step===5" unelevated :label="t('cg.generate_btn')" @click="startGenerate"
+          <q-btn v-if="step===6" unelevated :label="t('cg.generate_btn')" @click="startGenerate"
                  color="accent" :loading="generating" :disable="!projectId"></q-btn>
         </div>
       </q-card>
@@ -182,6 +204,9 @@ const CreativeWizard = {
       genShots: 0,
       genCurrentStep: "",
       stats: null,
+      mediaLoading: false,
+      mediaList: [],
+      selectedMediaIds: [],
       brief: {
         template: "long_documentary",
         montage_style: "beat",
@@ -290,7 +315,8 @@ const CreativeWizard = {
 
   computed: {
     canNext() {
-      if (this.step === 1) return !!this.brief.template;
+      if (this.step === 1) return this.selectedMediaIds.length > 0;
+      if (this.step === 2) return !!this.brief.template;
       return true;
     },
     templateLabel() {
@@ -322,6 +348,8 @@ const CreativeWizard = {
         this.generating = false;
         this.genProgress = 0;
         this.genShots = 0;
+        this.selectedMediaIds = [];
+        this.loadMediaList();
         this.loadStats();
       }
     },
@@ -345,6 +373,25 @@ const CreativeWizard = {
       this.brief.template = id;
     },
 
+    async loadMediaList() {
+      this.mediaLoading = true;
+      try {
+        // Load all analyzed media from the library
+        const res = await API.getLibrary({ page: 1, per_page: 200, analysis_status: "done" });
+        this.mediaList = (res.data || []).filter(m => m.media_type === "video");
+      } catch (e) {
+        console.error(e);
+        this.mediaList = [];
+      } finally {
+        this.mediaLoading = false;
+      }
+    },
+    toggleMedia(id) {
+      const idx = this.selectedMediaIds.indexOf(id);
+      if (idx >= 0) this.selectedMediaIds.splice(idx, 1);
+      else this.selectedMediaIds.push(id);
+    },
+
     async loadStats() {
       if (!this.projectId) return;
       try {
@@ -363,7 +410,11 @@ const CreativeWizard = {
       this.genCurrentStep = "analyzing";
 
       try {
-        // Save brief first
+        // Save selected media to project first
+        if (this.selectedMediaIds.length > 0) {
+          await API.updateProjectMedia(this.projectId, this.selectedMediaIds);
+        }
+        // Save brief
         await API.updateCreativeBrief(this.projectId, this.brief);
 
         // Call generate (SSE)
