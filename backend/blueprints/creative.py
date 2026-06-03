@@ -274,7 +274,10 @@ def generate_plan(pid):
 
     def do_generate():
         """Run in thread — call LLM API. Must use its own DB connection."""
-        try:
+        from flask import current_app
+        app = current_app._get_current_object()
+        with app.app_context():
+          try:
             thread_db = get_db()
             from openai import OpenAI
             base_url = get_setting(thread_db, "api_base_url", "https://open.bigmodel.cn/api/paas/v4")
@@ -332,9 +335,9 @@ def generate_plan(pid):
             progress["step"] = "done"
             progress["percent"] = 100
 
-        except Exception as e:
+          except Exception as e:
             progress["error"] = str(e)
-        finally:
+          finally:
             progress["done"] = True
 
     import threading
