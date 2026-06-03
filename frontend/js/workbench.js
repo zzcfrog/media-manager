@@ -517,12 +517,11 @@ const WorkbenchPage = {
     videoTrackCount() {
       return this.getTrackItems("video").length;
     },
-    // Total duration of all video track items on timeline
+    // Total duration of all video track items on timeline (sum of each segment's duration)
     timelineTotalDuration() {
       const items = this.getTrackItems('video');
       if (!items.length) return 0;
-      const maxEnd = Math.max(...items.map(it => this._timeToSec(it.time_end)));
-      return maxEnd;
+      return items.reduce((sum, it) => sum + this._timeToSec(it.time_end) - this._timeToSec(it.time_start), 0);
     },
     // Display duration: timeline total or source video duration
     displayDuration() {
@@ -907,31 +906,34 @@ const WorkbenchPage = {
     syncPlayheadFromPlayer() {
       const player = this.$refs.wbPlayer;
       if (!player || player.paused) return;
+      if (!this.timelinePlayMode) return;
       const items = this.getTrackItems('video').sort((a, b) => this._timeToSec(a.time_start) - this._timeToSec(b.time_start));
       if (!items.length) return;
       const t = player.currentTime;
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        const start = this._timeToSec(item.time_start);
-        const end = this._timeToSec(item.time_end);
+      // Find the track item the player is currently inside
+      let currentItem = null;
+      for (const item of items) {
         let meta = {};
         try { meta = JSON.parse(item.metadata || '{}'); } catch(e) {}
         const srcStart = this._timeToSec(meta.srcStart || '0:00');
         const srcEnd = this._timeToSec(meta.srcEnd || item.time_end);
-        const srcDur = srcEnd - srcStart;
-        if (t >= srcStart && t < srcStart + srcDur + 0.5) {
-          this.playheadTime = start + (t - srcStart);
-          return;
+        if (t >= srcStart && t < srcEnd) {
+          const tlStart = this._timeToSec(item.time_start);
+          this.playheadTime = tlStart + (t - srcStart);
+          currentItem = item;
+          break;
         }
       }
-      // Current segment ended — only auto-advance in timeline mode
-      if (!this.timelinePlayMode) return;
-      const next = items.find(it => this._timeToSec(it.time_start) > this.playheadTime);
-      if (next) {
-        this.playheadTime = this._timeToSec(next.time_start);
-        this.seekToPlayhead(true);
-      } else {
-        player.pause();
+      // Segment ended — jump to next
+      if (!currentItem) {
+        const next = items.find(it => this._timeToSec(it.time_start) > this.playheadTime);
+        if (next) {
+          player.pause();
+          this.playheadTime = this._timeToSec(next.time_start);
+          this.seekToPlayhead(true);
+        } else {
+          player.pause();
+        }
       }
     },
     onSegDragStart(e, seg) {
@@ -1256,6 +1258,10 @@ const WorkbenchPage = {
     updateActiveSeg() {
       const player = this.$refs.wbPlayer;
       if (!player) return;
+      // In timeline mode, also check segment boundaries
+      if (this.timelinePlayMode && !player.paused) {
+        this.syncPlayheadFromPlayer();
+      }
       let idx = -1;
       if (this.timelinePlayMode) {
         // Timeline mode: match by playheadTime vs track item timeline positions
