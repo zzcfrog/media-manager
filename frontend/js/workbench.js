@@ -953,11 +953,12 @@ const WorkbenchPage = {
         this.playheadTime = tlStart + elapsed;
         // Boundary: playhead exceeds this item's timeline duration
         if (elapsed >= tlDur) {
-          player.pause();
           const next = items.find(it => this._timeToSec(it.time_start) >= tlEnd - 0.01);
           if (next) {
             this.playheadTime = this._timeToSec(next.time_start);
             this.seekToPlayhead(true);
+          } else {
+            player.pause();
           }
           return;
         }
@@ -965,8 +966,8 @@ const WorkbenchPage = {
         // Not inside any segment — jump to next
         const next = items.find(it => this._timeToSec(it.time_start) > this.playheadTime);
         if (next) {
-          player.pause();
           this.playheadTime = this._timeToSec(next.time_start);
+          this.seekToPlayhead(true);
           this.seekToPlayhead(true);
         } else {
           player.pause();
