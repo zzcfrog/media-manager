@@ -32,7 +32,7 @@ def list_projects():
     db = get_db()
     rows = db.execute(
         "SELECT p.*, (SELECT COUNT(*) FROM project_media WHERE project_id = p.id) AS media_count "
-        "FROM projects p WHERE p.creative_brief IS NULL ORDER BY p.updated_at DESC"
+        "FROM projects p ORDER BY p.updated_at DESC"
     ).fetchall()
     return jsonify({"data": [dict(r) for r in rows]})
 

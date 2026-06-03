@@ -1,8 +1,8 @@
 // AI Creative Guide Wizard — 6-step creative brief dialog
 const CreativeWizard = {
   template: `
-    <q-dialog :model-value="show" @update:model-value="$emit('update:show', $event)" maximized transition-show="fade" transition-hide="fade">
-      <q-card class="cg-wizard-card" style="background:var(--surface)">
+    <q-dialog v-if="!pickerOpen" :model-value="show" @update:model-value="$emit('update:show', $event)" transition-show="fade" transition-hide="fade">
+      <q-card class="cg-wizard-card" style="background:var(--surface);width:90vw;max-width:90vw;height:90vh;max-height:90vh">
         <!-- Header -->
         <div class="cg-header">
           <span class="cg-title">{{ t('cg.section') }}</span>
@@ -20,16 +20,15 @@ const CreativeWizard = {
           <!-- Step 1: Select Media -->
           <div v-if="step===1" class="cg-step-content">
             <h3 class="cg-step-title">{{ t('cg.select_media') }}</h3>
-            <p class="cg-step-desc">{{ t('cg.select_media_desc') }}</p>
             <div v-if="selectedMediaIds.length" class="cg-selected-grid">
               <div v-for="m in selectedMediaInfo" :key="m.id" class="cg-selected-card">
                 <img :src="'/media/thumbnail/'+m.id" class="cg-media-thumb" />
                 <div class="cg-media-info">{{ m.file_name }}</div>
               </div>
             </div>
-            <div v-else class="cg-empty">{{ t('cg.no_media') }}</div>
             <div class="cg-media-actions">
-              <q-btn unelevated no-caps icon="add_circle_outline" :label="t('wb.add_media')"
+              <q-btn unelevated no-caps icon="add_circle_outline"
+                     :label="selectedMediaIds.length ? t('cg.reselect') : t('wb.add_media')"
                      color="accent" @click="openPicker"></q-btn>
               <span v-if="selectedMediaIds.length" class="cg-media-status">
                 {{ t('cg.confirm_segments', {n: selectedMediaIds.length}) }}
@@ -105,7 +104,11 @@ const CreativeWizard = {
                        outlined dense style="max-width:500px"
                        :style="'--q-primary:var(--accent)'"></q-input>
             </div>
-            <cg-stats-panel v-if="stats" :stats="stats"></cg-stats-panel>
+            <div v-if="stats" class="cg-stats-inline">
+              <span>{{ t('cg.stats_media', {v: stats.video_count || 0, i: stats.image_count || 0}) }}</span>
+              <span style="margin:0 8px;opacity:0.3">|</span>
+              <span>{{ t('cg.stats_total', {n: stats.total_segments, d: fmtDur(stats.total_duration)}) }}</span>
+            </div>
           </div>
 
           <!-- Step 4: Emotion Arc -->
@@ -121,7 +124,11 @@ const CreativeWizard = {
                 <div class="cg-arc-label">{{ t(arc.labelKey) }}</div>
               </div>
             </div>
-            <cg-stats-panel v-if="stats" :stats="stats"></cg-stats-panel>
+            <div v-if="stats" class="cg-stats-inline">
+              <span>{{ t('cg.stats_media', {v: stats.video_count || 0, i: stats.image_count || 0}) }}</span>
+              <span style="margin:0 8px;opacity:0.3">|</span>
+              <span>{{ t('cg.stats_total', {n: stats.total_segments, d: fmtDur(stats.total_duration)}) }}</span>
+            </div>
           </div>
 
           <!-- Step 5: Sound Design -->
@@ -139,12 +146,19 @@ const CreativeWizard = {
               </div>
             </div>
             <div class="cg-sound-note">{{ t('cg.music_auto_note') }}</div>
-            <cg-stats-panel v-if="stats" :stats="stats"></cg-stats-panel>
+            <div v-if="stats" class="cg-stats-inline">
+              <span>{{ t('cg.stats_media', {v: stats.video_count || 0, i: stats.image_count || 0}) }}</span>
+              <span style="margin:0 8px;opacity:0.3">|</span>
+              <span>{{ t('cg.stats_total', {n: stats.total_segments, d: fmtDur(stats.total_duration)}) }}</span>
+            </div>
           </div>
 
           <!-- Step 6: Confirm -->
           <div v-if="step===6" class="cg-step-content">
             <h3 class="cg-step-title">{{ t('cg.confirm_title') }}</h3>
+            <q-input v-model="planName" :label="t('wb.name_label')"
+                      outlined dense style="max-width:400px;margin-bottom:16px"
+                      :style="'--q-primary:var(--accent)'"></q-input>
             <div class="cg-confirm-card">
               <div class="cg-confirm-row"><span class="cg-confirm-label">{{ t('cg.confirm_template') }}</span><span>{{ templateLabel }}</span></div>
               <div class="cg-confirm-row"><span class="cg-confirm-label">{{ t('cg.confirm_structure') }}</span><span>{{ structureLabel }}</span></div>
@@ -167,7 +181,7 @@ const CreativeWizard = {
           <div class="cg-gen-steps">
             <div v-for="gs in genSteps" :key="gs.key" class="cg-gen-step" :class="genStepClass(gs.key)">
               <q-icon :name="genStepIcon(gs.key)" size="18px"></q-icon>
-              <span>{{ gs.label }}</span>
+              <span>{{ t(gs.labelKey) }}</span>
             </div>
           </div>
           <q-linear-progress :value="genProgress/100" color="accent" size="8px" rounded style="max-width:400px;margin:16px auto"></q-linear-progress>
@@ -178,10 +192,12 @@ const CreativeWizard = {
         <!-- Footer -->
         <div class="cg-footer" v-if="!generating">
           <q-btn flat :label="t('cg.prev')" @click="step--" :disable="step<=1"></q-btn>
+          <q-space></q-space>
+          <q-btn v-if="step>1 && step<6" flat no-caps :label="t('cg.skip_create')" color="grey-6" @click="skipAndCreate"></q-btn>
           <q-btn v-if="step<6" unelevated :label="t('cg.next')" @click="step++"
                  color="accent" :disable="!canNext"></q-btn>
           <q-btn v-if="step===6" unelevated :label="t('cg.generate_btn')" @click="startGenerate"
-                 color="accent" :loading="generating" :disable="!projectId"></q-btn>
+                 color="accent" :loading="generating" :disable="!canNext"></q-btn>
         </div>
       </q-card>
     </q-dialog>
@@ -189,7 +205,7 @@ const CreativeWizard = {
 
   props: {
     show: Boolean,
-    projectId: { type: Number, default: null },
+    editProjectId: { type: Number, default: null },
   },
 
   emits: ["update:show", "done"],
@@ -202,6 +218,8 @@ const CreativeWizard = {
       genShots: 0,
       genCurrentStep: "",
       stats: null,
+      pickerOpen: false,
+      planName: "",
       selectedMediaIds: [],
       selectedMediaInfo: [],
       brief: {
@@ -282,30 +300,30 @@ const CreativeWizard = {
         { id: "music_only", icon: "🎵", labelKey: "cg.voice_music_only", descKey: "cg.voice_music_only_desc" },
       ],
       moodOptions: [
-        { value: "", label: "—" },
-        { value: "calm", label: "沉稳" },
-        { value: "epic", label: "激昂" },
-        { value: "warm", label: "温暖" },
-        { value: "mystery", label: "神秘" },
+        { value: "", labelKey: "" },
+        { value: "calm", labelKey: "cg.mood_calm" },
+        { value: "epic", labelKey: "cg.mood_epic" },
+        { value: "warm", labelKey: "cg.mood_warm" },
+        { value: "mystery", labelKey: "cg.mood_mystery" },
       ],
       tempoOptions: [
-        { value: "", label: "—" },
-        { value: "slow", label: "慢" },
-        { value: "medium", label: "中" },
-        { value: "fast", label: "快" },
+        { value: "", labelKey: "" },
+        { value: "slow", labelKey: "cg.tempo_slow" },
+        { value: "medium", labelKey: "cg.tempo_medium" },
+        { value: "fast", labelKey: "cg.tempo_fast" },
       ],
       musicStyleOptions: [
-        { value: "", label: "—" },
-        { value: "piano", label: "钢琴" },
-        { value: "strings", label: "弦乐" },
-        { value: "electronic", label: "电子" },
-        { value: "folk", label: "民谣" },
-        { value: "ambient", label: "氛围" },
+        { value: "", labelKey: "" },
+        { value: "piano", labelKey: "cg.music_piano" },
+        { value: "strings", labelKey: "cg.music_strings" },
+        { value: "electronic", labelKey: "cg.music_electronic" },
+        { value: "folk", labelKey: "cg.music_folk" },
+        { value: "ambient", labelKey: "cg.music_ambient" },
       ],
       genSteps: [
-        { key: "analyzing", label: "分析素材内容..." },
-        { key: "generating", label: "匹配镜头与情绪..." },
-        { key: "parsing", label: "解析生成结果..." },
+        { key: "analyzing", labelKey: "cg.gen_analyzing" },
+        { key: "generating", labelKey: "cg.gen_generating" },
+        { key: "parsing", labelKey: "cg.gen_parsing" },
       ],
     };
   },
@@ -314,6 +332,7 @@ const CreativeWizard = {
     canNext() {
       if (this.step === 1) return this.selectedMediaIds.length > 0;
       if (this.step === 2) return !!this.brief.template;
+      if (this.step === 6) return this.planName.trim().length > 0;
       return true;
     },
     templateLabel() {
@@ -341,17 +360,26 @@ const CreativeWizard = {
   watch: {
     show(v) {
       if (v) {
-        this.step = 1;
         this.generating = false;
         this.genProgress = 0;
         this.genShots = 0;
-        this.selectedMediaIds = [];
-        this.selectedMediaInfo = [];
-        this.loadStats();
+        if (this.editProjectId) {
+          // Edit mode: load existing project data and skip to step 2
+          this.step = 2;
+          this.loadEditProject();
+        } else {
+          // New plan: start from step 1 (media picker)
+          this.step = 1;
+          this.planName = "";
+          this.selectedMediaIds = [];
+          this.selectedMediaInfo = [];
+          this.$nextTick(() => this.openPicker());
+        }
       }
     },
-    step() {
+    step(v) {
       this.loadStats();
+      if (v === 1 && this.selectedMediaIds.length) this.$nextTick(() => this.openPicker());
     },
   },
 
@@ -370,56 +398,97 @@ const CreativeWizard = {
       this.brief.template = id;
     },
 
+    async skipAndCreate() {
+      // Prompt for name, then create a minimal project and go to workbench
+      const name = this.planName.trim() || this.t('cg.new_plan');
+      try {
+        const mediaIds = this.selectedMediaIds.length ? this.selectedMediaIds : undefined;
+        const res = await API.createCreativePlan({ name, media_ids: mediaIds });
+        const pid = res.data.id;
+        this.$emit("done", pid);
+        this.$emit("update:show", false);
+        this.$root.loadProjectList();
+        location.hash = "#/workbench/" + pid;
+      } catch (e) {
+        Quasar.Notify.create({ type: "negative", message: e.message || this.t('cg.gen_fail') });
+      }
+    },
+
+    async loadEditProject() {
+      // Load existing project data for re-editing from workbench
+      try {
+        const res = await API.getProject(this.editProjectId);
+        this.planName = res.data.name || "";
+        const media = res.data.media || [];
+        this.selectedMediaIds = media.map(m => m.id);
+        this.selectedMediaInfo = media;
+        // Restore brief if exists
+        const brief = res.data.creative_brief;
+        if (brief && typeof brief === "object") Object.assign(this.brief, brief);
+        this.loadStats();
+      } catch (e) {
+        console.error(e);
+      }
+    },
+
     openPicker() {
-      // Use the root-level media picker
+      this.pickerOpen = true;
       const root = this.$root;
       root.pickerSelected = [...this.selectedMediaIds];
       root.pickerExcludeIds = [];
-      root.pickerProjectId = this.projectId;
+      root.pickerProjectId = null;
       root._pickerCallback = (ids) => {
         this.selectedMediaIds = [...ids];
-        // Fetch info for selected media
+        this.pickerOpen = false;
         this.loadSelectedInfo(ids);
+        if (ids.length) this.step = 2;
       };
       root.pickerMode = true;
     },
     async loadSelectedInfo(ids) {
       if (!ids.length) { this.selectedMediaInfo = []; return; }
       try {
-        const res = await API.getLibrary({ page: 1, per_page: 200 });
-        this.selectedMediaInfo = (res.data || []).filter(m => ids.includes(m.id));
+        const infos = await Promise.all(ids.map(id => API.getMedia(id).catch(() => null)));
+        this.selectedMediaInfo = infos.filter(Boolean);
       } catch (e) {
         this.selectedMediaInfo = [];
       }
     },
 
     async loadStats() {
-      if (!this.projectId) return;
+      if (!this.selectedMediaIds.length) { this.stats = null; return; }
       try {
-        const res = await API.getCreativeStats(this.projectId);
-        this.stats = res.data;
+        const res = await API.getSegmentStats(this.selectedMediaIds);
+        this.stats = res;
       } catch (e) {
         console.error(e);
       }
     },
 
     async startGenerate() {
-      if (!this.projectId) return;
+      if (!this.selectedMediaIds.length && !this.editProjectId) return;
       this.generating = true;
       this.genProgress = 0;
       this.genShots = 0;
       this.genCurrentStep = "analyzing";
 
       try {
-        // Save selected media to project first
-        if (this.selectedMediaIds.length > 0) {
-          await API.updateProjectMedia(this.projectId, this.selectedMediaIds);
+        let pid;
+        if (this.editProjectId) {
+          // Edit mode: update existing project
+          pid = this.editProjectId;
+          await API.updateProject(pid, { name: this.planName.trim() || this.t('cg.new_plan') });
+          await API.updateProjectMedia(pid, this.selectedMediaIds);
+          await API.updateCreativeBrief(pid, this.brief);
+        } else {
+          // New project: create now
+          const name = this.planName.trim() || this.t('cg.new_plan');
+          const createRes = await API.createCreativePlan({ name, media_ids: this.selectedMediaIds, creative_brief: this.brief });
+          pid = createRes.data.id;
         }
-        // Save brief
-        await API.updateCreativeBrief(this.projectId, this.brief);
 
         // Call generate (SSE)
-        const resp = await API.generateCreativePlan(this.projectId);
+        const resp = await API.generateCreativePlan(pid);
         const reader = resp.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
@@ -451,12 +520,12 @@ const CreativeWizard = {
                 if (data.plan) {
                   // Plan received — apply to tracks
                   this.genProgress = 95;
-                  await API.applyCreativePlan(this.projectId);
+                  await API.applyCreativePlan(pid);
                   this.genProgress = 100;
                   this.generating = false;
-                  this.$emit("done", this.projectId);
+                  this.$emit("done", pid);
                   this.$emit("update:show", false);
-                  location.hash = "#/workbench/" + this.projectId;
+                  location.hash = "#/workbench/" + pid;
                   return;
                 }
               } catch (e) {}
@@ -464,7 +533,7 @@ const CreativeWizard = {
           }
         }
       } catch (e) {
-        Quasar.Notify.create({ type: "negative", message: e.message || "生成失败" });
+        Quasar.Notify.create({ type: "negative", message: e.message || this.t('cg.gen_fail') });
       } finally {
         this.generating = false;
       }

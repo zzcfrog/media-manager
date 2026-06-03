@@ -3,7 +3,7 @@ const API = {
   async _fetch(url, options) {
     const r = await fetch(url, options);
     if (!r.ok) {
-      let msg = `请求失败 (${r.status})`;
+      let msg = t('g.request_fail', { status: r.status });
       try {
         const body = await r.json();
         if (body.error) msg = body.error;
@@ -13,6 +13,15 @@ const API = {
       throw err;
     }
     return r.json();
+  },
+  getSegmentStats(mediaIds) {
+    return this._fetch(`/api/library/segment-stats`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ media_ids: mediaIds }) });
+  },
+  getLibraryIds(params = {}) {
+    params.fields = "id";
+    params.per_page = 1; // ignored by backend in id mode, but keeps params clean
+    const qs = new URLSearchParams(params).toString();
+    return this._fetch(`/api/library/?${qs}`);
   },
   getLibrary(params = {}) {
     const qs = new URLSearchParams(params).toString();
@@ -37,7 +46,8 @@ scanPaths(paths) {
     return this._fetch(`/api/library/import-one`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) });
   },
   importBatch(paths) {
-    return fetch(`/api/library/import-batch`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths }) });
+    return fetch(`/api/library/import-batch`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths }) })
+      .then(r => { if (!r.ok) throw new Error(r.status); return r; });
   },
   getFolders() {
     return this._fetch(`/api/library/folders`);
@@ -58,7 +68,8 @@ scanPaths(paths) {
     return this._fetch(`/api/library/folder`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) });
   },
   syncFolder(path) {
-    return fetch(`/api/library/sync-folder`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) });
+    return fetch(`/api/library/sync-folder`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) })
+      .then(r => { if (!r.ok) throw new Error(r.status); return r; });
   },
   addDupExclusions(pairs, dupType) {
     return this._fetch(`/api/library/dup-exclusions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pairs, dup_type: dupType }) });

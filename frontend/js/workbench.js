@@ -10,6 +10,9 @@ const WorkbenchPage = {
       <span v-if="project && project.description" style="font-size:12px;color:var(--text3);margin-left:8px">{{ project.description }}</span>
     </div>
     <div style="display:flex;align-items:center;gap:4px">
+      <q-btn v-if="project" unelevated no-caps dense icon="auto_awesome"
+             :label="t('cg.section')" color="accent" @click="openWizard"
+             style="font-size:12px;padding:2px 12px;border-radius:8px"></q-btn>
       <q-btn v-if="project" flat round dense icon="delete" size="sm" color="grey-6" @click="deleteProject">
         <q-tooltip>{{ t('wb.delete_project') }}</q-tooltip>
       </q-btn>
@@ -29,7 +32,7 @@ const WorkbenchPage = {
         <div class="wb-material" :class="{'mat-collapsed': matCollapsed}">
           <div class="wb-mat-toolbar">
           <q-input v-model="matSearch" dense filled clearable
-                   :placeholder="'共' + filteredMedia.length + '个素材，搜索试试看'"
+                   :placeholder="t('wb.search_placeholder', {n: filteredMedia.length})"
                    class="wb-mat-search"
                    @keyup.enter="searchMedia">
             <template v-slot:prepend><q-icon name="search" size="14px"></q-icon></template>
@@ -84,7 +87,7 @@ const WorkbenchPage = {
           </div>
         </div>
         <div class="wb-mat-footer">
-          <span style="font-size:10px;color:var(--text3);margin-right:8px;min-width:24px;text-align:right">{{ matCols }}列</span>
+          <span style="font-size:10px;color:var(--text3);margin-right:8px;min-width:24px;text-align:right">{{ matCols }}{{ t('wb.cols') }}</span>
           <q-slider v-model="matCols" :min="2" :max="4" :step="1"
                     style="width:90px;--q-primary:var(--accent);padding:0 10px" color="primary"></q-slider>
         </div>
@@ -149,7 +152,7 @@ const WorkbenchPage = {
                 <div class="wb-controls" v-show="showWbOverlay" @mouseenter="showWbOverlay=true">
                   <q-btn flat round dense :icon="wbPlaying?'pause':'play_arrow'" size="sm" color="white" @click="toggleWbPlay"></q-btn>
                   <q-btn flat round dense icon="fullscreen" size="sm" color="white" @click="toggleWbFullscreen">
-                    <q-tooltip :delay="500">全屏</q-tooltip>
+                    <q-tooltip :delay="500">{{ t('wb.fullscreen') }}</q-tooltip>
                   </q-btn>
                   <span class="wb-ctrl-time">{{ fmtSec(wbCurrentTime) }} / {{ fmtSec(wbDuration) }}</span>
                   <div class="wb-seekbar" ref="wbSeekbar" @mousedown="onWbSeekStart" @mousemove="onWbSeekHover" @mouseleave="hoverSegIndex=-1;wbHoverTime=-1">
@@ -187,7 +190,7 @@ const WorkbenchPage = {
                 <q-btn v-if="scopesCollapsed" flat round dense icon="expand_less"
                        size="xs" color="grey-6" @click="scopesCollapsed=!scopesCollapsed"
                        style="position:absolute;bottom:6px;right:4px;z-index:3">
-                  <q-tooltip :delay="500">展开示波器</q-tooltip>
+                  <q-tooltip :delay="500">{{ t('wb.expand_scopes') }}</q-tooltip>
                 </q-btn>
               </div>
 
@@ -203,7 +206,7 @@ const WorkbenchPage = {
                 <q-btn flat round dense icon="expand_more"
                        size="xs" class="wb-collapse-btn" style="position:absolute;bottom:4px;right:4px;z-index:1"
                        @click="scopesCollapsed=!scopesCollapsed">
-                  <q-tooltip :delay="500">收起示波器</q-tooltip>
+                  <q-tooltip :delay="500">{{ t('wb.collapse_scopes') }}</q-tooltip>
                 </q-btn>
               </div>
             </template>
@@ -259,7 +262,7 @@ const WorkbenchPage = {
                      @dragstart="onSegDragStart($event, seg)">
                   <div style="display:flex;align-items:center;justify-content:space-between">
                     <div style="display:flex;align-items:center;gap:4px">
-                      <span class="seg-drag-handle" title="拖到轨道上"><q-icon name="drag_indicator" size="16px" color="grey-5"></q-icon></span>
+                      <span class="seg-drag-handle" :title="t('wb.drag_to_track')"><q-icon name="drag_indicator" size="16px" color="grey-5"></q-icon></span>
                       <span class="seg-time"><span class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'time_start', e.target.innerText.trim())" v-text="seg.time_start"></span> → <span class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'time_end', e.target.innerText.trim())" v-text="seg.time_end"></span></span>
                     </div>
                     <div style="display:flex;align-items:center;gap:6px">
@@ -302,27 +305,27 @@ const WorkbenchPage = {
       <div class="wb-track-toolbar">
         <div style="display:flex;align-items:center;gap:2px">
           <q-btn flat round dense icon="undo" size="xs" color="grey-6" :disable="!trackCanUndo" @click="trackUndo">
-            <q-tooltip :delay="500">撤销</q-tooltip>
+            <q-tooltip :delay="500">{{ t('wb.undo') }}</q-tooltip>
           </q-btn>
           <q-btn flat round dense icon="redo" size="xs" color="grey-6" :disable="!trackCanRedo" @click="trackRedo">
-            <q-tooltip :delay="500">重做</q-tooltip>
+            <q-tooltip :delay="500">{{ t('wb.redo') }}</q-tooltip>
           </q-btn>
           <q-btn flat round dense icon="content_cut" size="xs" color="grey-6" :disable="!trackSelectedItem" @click="trackSplit">
-            <q-tooltip :delay="500">分割</q-tooltip>
+            <q-tooltip :delay="500">{{ t('wb.split') }}</q-tooltip>
           </q-btn>
           <q-btn flat round dense icon="delete_outline" size="xs" color="grey-6" :disable="!trackSelectedItem" @click="trackDelete">
-            <q-tooltip :delay="500">删除</q-tooltip>
+            <q-tooltip :delay="500">{{ t('wb.delete') }}</q-tooltip>
           </q-btn>
         </div>
         <div style="flex:1"></div>
         <div style="display:flex;align-items:center;gap:2px">
           <q-btn flat round dense icon="zoom_out" size="xs" color="grey-6" @click="trackZoom = Math.max(1, trackZoom - 1)">
-            <q-tooltip :delay="500">缩小</q-tooltip>
+            <q-tooltip :delay="500">{{ t('wb.zoom_out') }}</q-tooltip>
           </q-btn>
           <q-slider v-model="trackZoom" :min="1" :max="10" :step="1"
                     style="width:80px;--q-primary:var(--accent);padding:0" color="primary" dense></q-slider>
           <q-btn flat round dense icon="zoom_in" size="xs" color="grey-6" @click="trackZoom = Math.min(10, trackZoom + 1)">
-            <q-tooltip :delay="500">放大</q-tooltip>
+            <q-tooltip :delay="500">{{ t('wb.zoom_in') }}</q-tooltip>
           </q-btn>
         </div>
       </div>
@@ -651,7 +654,7 @@ const WorkbenchPage = {
       try {
         await API.updateProjectTracks(this.projectId, payload);
       } catch (e) {
-        Quasar.Notify.create({ message: '保存轨道失败', color: 'negative', position: 'top' });
+        Quasar.Notify.create({ message: t('wb.track_save_fail'), color: 'negative', position: 'top' });
       }
     },
     trackUndo() {
@@ -1061,6 +1064,12 @@ const WorkbenchPage = {
       };
       return Math.max(0, toSec(end) - toSec(start));
     },
+    openWizard() {
+      // Open creative wizard for this existing project
+      const root = this.$root;
+      root.wizardEditProjectId = this.projectId;
+      root.showCreativeWizard = true;
+    },
     async deleteProject() {
       if (!this.project) return;
       Quasar.Dialog.create({
@@ -1268,7 +1277,7 @@ const WorkbenchPage = {
     },
     onWbMediaError() {
       const name = this.selectedMedia?.file_name || '';
-      Quasar.Notify.create({ message: `文件无法播放：${name}`, color: 'negative', position: 'top', timeout: 3000 });
+      Quasar.Notify.create({ message: t('wb.media_play_error', { name }), color: 'negative', position: 'top', timeout: 3000 });
       this.wbPlaying = false;
       this.wbDuration = 0;
       this.previewLoading = false;

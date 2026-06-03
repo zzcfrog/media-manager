@@ -88,6 +88,11 @@ def list_media():
 
     total = db.execute(f"SELECT COUNT(*) FROM media{where}", params).fetchone()[0]
 
+    # IDs-only mode (for select-all without loading full data)
+    if request.args.get("fields") == "id":
+        rows = db.execute(f"SELECT id FROM media{where}", params).fetchall()
+        return jsonify({"data": [r["id"] for r in rows], "total": total})
+
     rows = db.execute(
         f"SELECT * FROM media{where} ORDER BY {order_expr} {order} LIMIT ? OFFSET ?",
         params + [per_page, (page - 1) * per_page],
@@ -108,6 +113,70 @@ def list_media():
             "pages": (total + per_page - 1) // per_page,
         },
     })
+
+
+@bp.route("/segment-stats", methods=["POST"])
+def segment_stats():
+    """Return segment statistics for a list of media IDs (no project required)."""
+    media_ids = request.json.get("media_ids") or []
+    if not media_ids:
+        return jsonify({"total_segments": 0, "total_duration": 0, "video_count": 0, "image_count": 0,
+                         "mood_distribution": {}, "scene_distribution": {}, "shot_distribution": {}, "asr_count": 0})
+    db = get_db()
+    placeholders = ",".join("?" * len(media_ids))
+    # Media type counts
+    media_rows = db.execute(f"SELECT media_type FROM media WHERE id IN ({placeholders})", media_ids).fetchall()
+    video_count = sum(1 for r in media_rows if r["media_type"] == "video")
+    image_count = sum(1 for r in media_rows if r["media_type"] == "image")
+    # Segment stats
+    rows = db.execute(
+        f"SELECT mood, scene_type, asr, shot_type, time_start, time_end "
+        f"FROM media_segment WHERE media_id IN ({placeholders})",
+        media_ids,
+    ).fetchall()
+    total_segments = len(rows)
+    total_duration = 0.0
+    mood_dist = {}
+    scene_dist = {}
+    shot_dist = {}
+    asr_count = 0
+    for r in rows:
+        try:
+            ts = _parse_seg_time(r["time_start"])
+            te = _parse_seg_time(r["time_end"])
+            total_duration += te - ts
+        except (ValueError, TypeError):
+            pass
+        if r["mood"]:
+            mood_dist[r["mood"]] = mood_dist.get(r["mood"], 0) + 1
+        if r["scene_type"]:
+            scene_dist[r["scene_type"]] = scene_dist.get(r["scene_type"], 0) + 1
+        if r["shot_type"]:
+            shot_dist[r["shot_type"]] = shot_dist.get(r["shot_type"], 0) + 1
+        if r["asr"]:
+            asr_count += 1
+    return jsonify({
+        "total_segments": total_segments,
+        "total_duration": round(total_duration, 1),
+        "video_count": video_count,
+        "image_count": image_count,
+        "mood_distribution": mood_dist,
+        "scene_distribution": scene_dist,
+        "shot_distribution": shot_dist,
+        "asr_count": asr_count,
+    })
+
+
+def _parse_seg_time(s):
+    """Parse MM:SS.ss or HH:MM:SS.ss to seconds."""
+    if not s:
+        return 0.0
+    parts = s.split(":")
+    if len(parts) == 2:
+        return float(parts[0]) * 60 + float(parts[1])
+    elif len(parts) == 3:
+        return float(parts[0]) * 3600 + float(parts[1]) * 60 + float(parts[2])
+    return 0.0
 
 
 @bp.route("/folders")

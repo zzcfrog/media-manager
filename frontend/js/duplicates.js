@@ -339,9 +339,9 @@ const DuplicatesPage = {
       if (!this.lasso && Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
       if (!this.lasso) this.lasso = true;
       const l = Math.min(this._lassoStart.x, e.clientX);
-      const t = Math.min(this._lassoStart.y, e.clientY);
+      const top = Math.min(this._lassoStart.y, e.clientY);
       this.lassoStyle = {
-        left: l + "px", top: t + "px",
+        left: l + "px", top: top + "px",
         width: Math.abs(dx) + "px", height: Math.abs(dy) + "px",
       };
     },

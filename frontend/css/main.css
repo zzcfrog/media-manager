@@ -1168,7 +1168,7 @@ body:not(.body--dark) .wb-mat-sort-group { background: #e0e0e0; }
 .cg-wizard-card {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
 }
 .cg-header {
   display: flex;
@@ -1373,6 +1373,14 @@ body:not(.body--dark) .wb-mat-sort-group { background: #e0e0e0; }
   font-size: 13px;
   color: var(--accent);
   line-height: 1.5;
+}
+.cg-stats-inline {
+  margin-top: 16px;
+  padding: 8px 12px;
+  background: var(--surface2);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text2);
 }
 
 /* Media selection */

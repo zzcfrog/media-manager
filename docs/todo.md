@@ -1,27 +1,6 @@
 # TODO
 
-## 规划中：AI 创意引导器（Creative Guide）
-
-将创作工作台从「AI 辅助粗剪工具」升级为「AI 驱动的创意构思工具」。完整 PRD 见 [PRD_AI_CREATIVE.md](PRD_AI_CREATIVE.md)。
-
-### Phase 1：MVP
-
-**后端**：
-- [ ] 新增 `backend/creative/` 模块（guide.py / assembler.py / templates.py / prompt_builder.py）
-- [ ] 新增 `POST /api/workbench/<pid>/creative-brief` 端点（组装素材数据 + 调用大模型 SSE 流式返回）
-- [ ] 新增 `POST /api/workbench/<pid>/creative-brief/apply` 端点（AI 方案 → project_tracks 组装）
-- [ ] 新增 3 个内置模板 JSON（long_documentary / quick_montage / free_creation）
-- [ ] 新增 AI 导演 Prompt 模板（backend/creative_prompt.txt）
-- [ ] `projects` 表新增 `creative_brief` / `ai_plan` 可选字段
-
-**前端**：
-- [ ] 工作台工具栏新增「AI 构思」按钮
-- [ ] 5 步创意引导器全屏对话框（选模板 → 叙事结构 → 情绪弧线 → 声音设计 → 确认）
-- [ ] 每步展示素材匹配统计（mood/scene_type/ASR 分布）
-- [ ] 生成进度对话框（SSE 实时进度）
-- [ ] 成片大纲面板（右侧 Tab 切换：成片大纲 / 分析结果）
-- [ ] 大纲段落交互（点击定位、拖拽排序、展开/折叠）
-- [ ] 大纲 ↔ 时间线双向同步
+## 规划中：AI 创意引导器 Phase 2
 
 ### Phase 2：智能交互增强
 - [ ] 单段落 AI 重新生成
@@ -37,11 +16,54 @@
 - [ ] 版本分支
 - [ ] 导出创意简报
 
-### 待确认项
-- [ ] 创意引导使用的模型是否独立于分析模型？默认用哪个？
-- [ ] 是否需要「重新生成」功能（保留/覆盖选项）？
-- [ ] 素材数据压缩策略：哪些维度发给大模型，截断长度？
-- [ ] 自定义情绪弧线（手绘曲线）Phase 1 是否实现？
+## 已完成：合并构思与编排 + Ctrl+A 全选 + 项目创建推迟（2026-06-03）
+
+合并侧边栏「构思」和「编排」为一个统一项目列表，新增 Ctrl+A 全选素材，项目创建推迟到引导器最后一步。
+
+**改动文件：**
+- `backend/blueprints/workbench.py` — `GET /api/workbench/` 去掉 `creative_brief IS NULL` 过滤，返回所有项目
+- `backend/blueprints/library.py` — 新增 `POST /api/library/segment-stats`（接受 media_ids 数组，无需项目即可查询片段统计）；新增 `_parse_seg_time` helper
+- `backend/blueprints/creative.py` — `get_stats` 新增 `video_count` / `image_count` 字段
+- `frontend/index.html` — 侧边栏合并为一个「构思」板块（`projectList`），删除「编排」板块及其新建工程弹窗；`openNewCreativePlan()` 不再预创建项目；`wizardEditProjectId` data 支持工作台编辑模式
+- `frontend/js/creative-wizard.js` — 移除 `projectId` prop，新增 `editProjectId` prop；`loadStats()` 改用 `API.getSegmentStats()`；`startGenerate()` 区分新建和编辑模式，新建时才创建项目；新增 `skipAndCreate()` + 每步 footer「跳过并创建」按钮；新增 `loadEditProject()` 预加载已有项目；名称输入移入第6步确认区；选完素材自动跳第2步；引导器改为 90% 尺寸；stats 显示视频数/图片数
+- `frontend/js/workbench.js` — 工具栏新增「AI 构思」按钮 + `openWizard()` 方法唤起引导器编辑模式
+- `frontend/js/gallery.js` — 新增 Ctrl+A 全选：`_buildParams()` 提取共享筛选逻辑，`selectAll()` 调 `getLibraryIds` 一次拿所有匹配 ID，`deselectAll()` 清空，再次 Ctrl+A 反选
+- `frontend/js/api.js` — 新增 `getSegmentStats(mediaIds)` 和 `getLibraryIds(params)`
+- `frontend/js/i18n.js` — 新增 wb 工具栏/错误/搜索、g 后台任务状态、cg 音乐风格/生成失败/跳过/统计等 i18n key（中英文各约 30 个）
+- `frontend/css/main.css` — `.cg-wizard-card` 高度改为 100%；新增 `.cg-stats-inline` 样式
+- `frontend/js/duplicates.js` — `onLassoMove` 中 `const t` 改名 `top`
+
+**功能说明：**
+- 侧边栏只有一个项目列表，图标根据是否有 AI 方案区分（auto_awesome / dashboard）
+- 「新建构思」直接弹出素材选择器，不再预创建项目，中途关闭无垃圾数据
+- 引导器每步可「跳过并创建」快速创建空项目进入工作台
+- 工作台工具栏「AI 构思」按钮可重新唤起引导器，预填已有素材，重新 AI 生成
+- Ctrl+A 全选匹配当前筛选条件的所有素材（不限已加载数量）
+- stats 统计不依赖项目，直接查 media_segment
+
+## 已完成：i18n 硬编码修复 + 基本错误修复（2026-06-02）
+- `frontend/js/i18n.js` — 新增 30+ 个 i18n key（wb 搜索/列/工具栏/错误、g 后台任务状态、cg 音乐风格/生成失败）；清理重复 `wb.media_selected` key
+- `frontend/js/creative-wizard.js` — `genSteps` 改用 `labelKey` + `t()`；`moodOptions`/`musicStyleOptions`/`tempoOptions` 改用 `labelKey`；错误消息改用 `t('cg.gen_fail')`；`loadSelectedInfo` 改为按 ID 逐个拉取（修复仅拉前 200 条的问题）；`<cg-stats-panel>` 替换为内联渲染
+- `frontend/js/workbench.js` — 搜索 placeholder、列标签、全屏/示波器 tooltip、工具栏按钮 tooltip（撤销/重做/分割/删除/缩放）、错误通知全部改用 `t()` 调用
+- `frontend/js/api.js` — 默认错误消息改用 `t('g.request_fail')`；`importBatch`/`syncFolder` 增加 HTTP 错误检查
+- `frontend/js/duplicates.js` — `onLassoMove` 中 `const t` 改名 `top`，避免遮蔽 i18n `t()`
+- `frontend/index.html` — 后台任务轮询状态标签改用 `t()` 调用；修复 `for (const t of tasks)` 遮蔽 i18n `t()` 导致恢复任务时报错
+- `frontend/css/main.css` — 新增 `.cg-stats-inline` 样式
+
+**修复的错误：**
+1. **[高] index.html `t` 变量遮蔽**：`for (const t of tasks)` 遮蔽了全局 `t()` 函数，导致恢复后台任务时 `stageLabel` 为 undefined 并抛出运行时错误
+2. **[高] cg-stats-panel 组件未定义**：引导器第3-5步使用 `<cg-stats-panel>` 但组件从未注册，统计信息不显示。替换为内联渲染
+3. **[中] api.js SSE 端点无错误处理**：`importBatch`/`syncFolder` 用原始 `fetch()` 跳过 `_fetch` 错误检查，服务端返回 4xx/5xx 时静默失败
+4. **[中] loadSelectedInfo 仅拉前200条**：选中的素材如果不在前 200 条结果中，引导器第1步不显示已选素材。改为按 ID 逐个拉取
+5. **[低] duplicates.js `t` 变量遮蔽**：套索选择 `onLassoMove` 中 `const t` 遮蔽 i18n 函数（当前无报错，潜在风险）
+
+## 已完成：引导器第1步复用全局素材选择器（2026-06-02）
+
+引导器第1步改为自动弹出全局素材选择器（90%弹窗），选中后返回引导器显示已选素材摘要。
+
+**改动文件：**
+- `frontend/js/creative-wizard.js` — `<q-dialog v-if="!pickerOpen">` 在 picker 打开时销毁引导器避免遮挡；watch `show` 时 `$nextTick(() => this.openPicker())` 自动弹出；`openPicker()` 设置 `pickerOpen=true`，callback 重置；取消选择也通过 callback 正常返回
+- `frontend/index.html` — `cancelPicker()` 增加 `_pickerCallback` 调用，确保用户取消 picker 后引导器正常恢复
 
 ## 已完成：AI 创意引导器 Phase 1 — 侧边栏 + 数据模型 + 引导器骨架（2026-06-01）
 

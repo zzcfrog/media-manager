@@ -845,6 +845,38 @@ const GalleryPage = {
   methods: {
     t,
     API,
+    // Build query params from current filters (shared by load, loadMore, selectAll)
+    _buildParams(page) {
+      const params = { page, per_page: this.perPage, sort: this.sortBy, order: this.sortOrder };
+      if (this.filters.media_type !== "all") params.media_type = this.filters.media_type;
+      if (this.filters.rating) params.rating = this.filters.rating;
+      if (this.filters.color_label) params.color_label = this.filters.color_label;
+      if (this.favFilter === 'fav') params.favorite = "true";
+      else if (this.favFilter === 'unfav') params.favorite = "false";
+      if (this.analysisFilter === 'analyzed') params.analysis_status = "analyzed";
+      else if (this.analysisFilter === 'not') params.analysis_status = "not_analyzed";
+      const q = this.$root.pickerMode ? this.searchText : this.$root.searchQuery;
+      if (q) params.q = q;
+      const folder = this.$root.pickerMode ? this.$root.pickerFolder : this.$root.selectedFolder;
+      if (folder) params.folder = folder;
+      if (this.$root.pickerMode && this.$root.pickerExcludeIds?.length) params.exclude_ids = this.$root.pickerExcludeIds.join(",");
+      return params;
+    },
+    // Select all items matching current filters (fetches all IDs from backend)
+    async selectAll() {
+      try {
+        const params = this._buildParams(1);
+        const res = await API.getLibraryIds(params);
+        const allIds = res.data || [];
+        this.selArr = allIds;
+      } catch (e) {
+        console.error("selectAll error:", e);
+      }
+    },
+    // Deselect all
+    deselectAll() {
+      this.selArr = [];
+    },
     // Load first page, reset selection
     async load() {
       if (this._saveFilters) this._saveFilters();
@@ -853,20 +885,7 @@ const GalleryPage = {
       this.allLoaded = false;
       this.loading = true;
       try {
-        const params = { page: 1, per_page: this.perPage, sort: this.sortBy, order: this.sortOrder };
-        if (this.filters.media_type !== "all") params.media_type = this.filters.media_type;
-        if (this.filters.rating) params.rating = this.filters.rating;
-        if (this.filters.color_label) params.color_label = this.filters.color_label;
-        if (this.favFilter === 'fav') params.favorite = "true";
-        else if (this.favFilter === 'unfav') params.favorite = "false";
-        if (this.analysisFilter === 'analyzed') params.analysis_status = "analyzed";
-        else if (this.analysisFilter === 'not') params.analysis_status = "not_analyzed";
-        const q = this.$root.pickerMode ? this.searchText : this.$root.searchQuery;
-        if (q) params.q = q;
-        const folder = this.$root.pickerMode ? this.$root.pickerFolder : this.$root.selectedFolder;
-        if (folder) params.folder = folder;
-        if (this.$root.pickerMode && this.$root.pickerExcludeIds?.length) params.exclude_ids = this.$root.pickerExcludeIds.join(",");
-        const res = await API.getLibrary(params);
+        const res = await API.getLibrary(this._buildParams(1));
         const data = res.data || [];
         this.total = res.pagination?.total || 0;
         if (data.length < this.perPage) this.allLoaded = true;
@@ -884,20 +903,7 @@ const GalleryPage = {
       this.loadingMore = true;
       this.page++;
       try {
-        const params = { page: this.page, per_page: this.perPage, sort: this.sortBy, order: this.sortOrder };
-        if (this.filters.media_type !== "all") params.media_type = this.filters.media_type;
-        if (this.filters.rating) params.rating = this.filters.rating;
-        if (this.filters.color_label) params.color_label = this.filters.color_label;
-        if (this.favFilter === 'fav') params.favorite = "true";
-        else if (this.favFilter === 'unfav') params.favorite = "false";
-        if (this.analysisFilter === 'analyzed') params.analysis_status = "analyzed";
-        else if (this.analysisFilter === 'not') params.analysis_status = "not_analyzed";
-        const q = this.$root.pickerMode ? this.searchText : this.$root.searchQuery;
-        if (q) params.q = q;
-        const folder = this.$root.pickerMode ? this.$root.pickerFolder : this.$root.selectedFolder;
-        if (folder) params.folder = folder;
-        if (this.$root.pickerMode && this.$root.pickerExcludeIds?.length) params.exclude_ids = this.$root.pickerExcludeIds.join(",");
-        const res = await API.getLibrary(params);
+        const res = await API.getLibrary(this._buildParams(this.page));
         const data = res.data || [];        this.items = this.items.concat(data);
         if (!this.$root.pickerMode) this.$root.galleryItems = this.items;
         this.total = res.pagination?.total || 0;
@@ -1107,6 +1113,13 @@ const GalleryPage = {
           const el = document.querySelector(`[data-id="${this.items[ni]?.id}"]`);
           el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
         });
+        return;
+      }
+      // Ctrl+A — select all matching items
+      if ((e.ctrlKey || e.metaKey) && key === "a") {
+        e.preventDefault(); e.stopPropagation();
+        if (this.selArr.length === this.total) { this.deselectAll(); return; }
+        this.selectAll();
         return;
       }
       // Delete

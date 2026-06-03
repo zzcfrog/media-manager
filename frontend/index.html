@@ -140,37 +140,20 @@
                  :label="t('cg.new_plan')" @click="openNewCreativePlan"
                  class="sidebar-action-btn"></q-btn>
         </q-item-label>
-        <q-item v-for="p in creativePlans" :key="'cg'+p.id" clickable dense
-                :active="route==='#/workbench/'+p.id"
-                @click="nav('#/workbench/'+p.id)"
-                active-class="sidebar-active-item"
-                style="padding:4px 16px">
-          <q-item-section avatar><q-icon name="auto_awesome" size="18px"></q-icon></q-item-section>
-          <q-item-section style="font-size:13px">{{ p.name }}</q-item-section>
-        </q-item>
-        <q-item v-if="!creativePlans.length && !drawerMini" disable style="padding:4px 16px;opacity:0.4">
-          <q-item-section avatar><q-icon name="auto_awesome" size="18px" color="grey-6"></q-icon></q-item-section>
-          <q-item-section style="font-size:12px;color:var(--text3)">{{ t('cg.no_plans') }}</q-item-section>
-        </q-item>
-        <q-separator style="background:var(--border);margin:8px 0"></q-separator>
-        <q-item-label header style="display:flex;align-items:center;justify-content:space-between;padding-right:10px">
-          <span>{{ t('wb.section') }}</span>
-          <q-btn v-if="!drawerMini" dense no-caps unelevated icon="add_circle_outline"
-                 :label="t('wb.new_project')" @click="openNewProject"
-                 class="sidebar-action-btn"></q-btn>
-        </q-item-label>
-        <q-item v-for="p in projects" :key="p.id" clickable dense
+        <q-item v-for="p in projectList" :key="p.id" clickable dense
                 :active="route==='#/workbench/'+p.id"
                 @click="nav('#/workbench/'+p.id)"
                 @contextmenu.prevent="showProjectCtx($event, p)"
                 active-class="sidebar-active-item"
                 style="padding:4px 16px">
-          <q-item-section avatar><q-icon name="dashboard" size="18px"></q-icon></q-item-section>
+          <q-item-section avatar>
+            <q-icon :name="p.creative_brief ? 'auto_awesome' : 'dashboard'" size="18px"></q-icon>
+          </q-item-section>
           <q-item-section style="font-size:13px">{{ p.name }}</q-item-section>
         </q-item>
-        <q-item v-if="!projects.length" disable style="padding:4px 16px;opacity:0.4">
-          <q-item-section avatar><q-icon name="dashboard" size="18px" color="grey-6"></q-icon></q-item-section>
-          <q-item-section style="font-size:12px;color:var(--text3)">{{ t('wb.no_projects') }}</q-item-section>
+        <q-item v-if="!projectList.length && !drawerMini" disable style="padding:4px 16px;opacity:0.4">
+          <q-item-section avatar><q-icon name="auto_awesome" size="18px" color="grey-6"></q-icon></q-item-section>
+          <q-item-section style="font-size:12px;color:var(--text3)">{{ t('cg.no_plans') }}</q-item-section>
         </q-item>
       </q-list>
     </q-drawer>
@@ -269,7 +252,7 @@
 
   <!-- Creative Wizard Dialog -->
   <creative-wizard :show="showCreativeWizard" @update:show="showCreativeWizard=$event"
-                   :project-id="wizardProjectId"
+                   :edit-project-id="wizardEditProjectId"
                    @done="onCreativeDone"></creative-wizard>
 
   <!-- Drawer toggle -->
@@ -531,24 +514,6 @@
     </q-card>
   </q-dialog>
 
-  <!-- New project dialog (name + description only, media added later in workbench) -->
-  <q-dialog v-model="showNewProject">
-    <q-card style="min-width:400px" class="dialog-card">
-      <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" v-close-popup></q-btn>
-      <q-card-section>
-        <div class="text-h6">{{ t('wb.create_title') }}</div>
-      </q-card-section>
-      <q-card-section style="display:flex;flex-direction:column;gap:12px">
-        <q-input v-model="newProjectForm.name" :label="t('wb.name_label')" dense outlined></q-input>
-        <q-input v-model="newProjectForm.description" :label="t('wb.desc_label')" type="textarea" rows="2" dense outlined></q-input>
-      </q-card-section>
-      <q-card-actions align="right">
-        <q-btn flat :label="t('wb.cancel')" v-close-popup></q-btn>
-        <q-btn color="primary" :label="t('wb.create_btn')" :loading="newProjectLoading" @click="createNewProject"></q-btn>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
-
   <!-- Rename project dialog -->
   <q-dialog v-model="showProjectRename">
     <q-card style="min-width:320px" class="dialog-card">
@@ -599,13 +564,9 @@ const app = Vue.createApp({
       currentView: "gallery",
       detailId: null,
       workbenchId: null,
-      projects: [],
-      creativePlans: [],
+      projectList: [],
       showCreativeWizard: false,
-      wizardProjectId: null,
-      showNewProject: false,
-      newProjectForm: { name: "", description: "" },
-      newProjectLoading: false,
+      wizardEditProjectId: null,
       showProjectRename: false,
       renameTarget: null,
       renameForm: { name: "" },
@@ -667,8 +628,7 @@ const app = Vue.createApp({
   },
   created() {
     this.loadSidebar();
-    this.loadProjects();
-    this.loadCreativePlans();
+    this.loadProjectList();
     API.getSettings().then(s => { i18nState.locale = s.language || "zh"; }).catch(() => {});
     this.applyTheme();
     if (this.accentColor) this.setAccentColor(this.accentColor);
@@ -684,11 +644,11 @@ const app = Vue.createApp({
     // Restore bgTasks from backend (survives page refresh)
     API.getProgress().then(tasks => {
       if (tasks.length) {
-        for (const t of tasks) {
+        for (const task of tasks) {
           this.bgTasks.push({
-            id: t.id, fileName: t.file_name || '', mediaType: t.media_type || '',
+            id: task.id, fileName: task.file_name || '', mediaType: task.media_type || '',
             status: 'running', percent: 0,
-            stageLabel: i18nState.locale === 'zh' ? '分析中' : 'Analyzing',
+            stageLabel: t('g.bg_running'),
             startTime: Date.now(),
           });
         }
@@ -712,11 +672,11 @@ const app = Vue.createApp({
           task.step = p.step;
           if (p.step === "compressing") {
             task.percent = (p.compress_pct || 0) * 0.4;
-            task.stageLabel = i18nState.locale === "zh" ? "压缩中" : "Compressing";
+            task.stageLabel = t('g.bg_compressing');
           } else if (p.step === "analyzing") {
             const isImage = task.mediaType === "image" || p.media_type === "image";
             task.percent = isImage ? 70 : 60;
-            task.stageLabel = i18nState.locale === "zh" ? "AI 分析中" : "Analyzing";
+            task.stageLabel = t('g.bg_ai_analyzing');
           }
           changed = true;
         } else {
@@ -725,11 +685,11 @@ const app = Vue.createApp({
             const res = await API.getAnalysis(task.id);
             if (res.status === "done") {
               task.status = "done"; task.step = "done"; task.percent = 100;
-              task.stageLabel = i18nState.locale === "zh" ? "分析完成" : "Done";
+              task.stageLabel = t('g.bg_done');
               changed = true;
             } else if (res.status === "error") {
               task.status = "error";
-              task.stageLabel = i18nState.locale === "zh" ? "分析失败" : "Error";
+              task.stageLabel = t('g.bg_error');
               changed = true;
             }
           } catch {}
@@ -1038,62 +998,19 @@ const app = Vue.createApp({
         }
       } catch (e) { console.error(e); }
     },
-    async loadCreativePlans() {
+    async loadProjectList() {
       try {
-        const res = await API.getCreativePlans();
-        this.creativePlans = res.data || [];
+        const res = await API.getProjects();
+        this.projectList = res.data || [];
       } catch (e) { console.error(e); }
     },
     openNewCreativePlan() {
-      // Create a draft project first, then open wizard
-      Quasar.Dialog.create({
-        title: t('cg.new_plan'),
-        message: t('wb.name_label'),
-        prompt: { model: '', type: 'text', outlined: true },
-        cancel: true,
-        persistent: false,
-      }).onOk(async name => {
-        if (!name.trim()) return;
-        try {
-          const res = await API.createCreativePlan({ name: name.trim() });
-          this.wizardProjectId = res.data.id;
-          this.showCreativeWizard = true;
-          this.loadCreativePlans();
-          this.loadProjects();
-        } catch (e) {
-          Quasar.Notify.create({ type: 'negative', message: e.message });
-        }
-      });
+      this.wizardEditProjectId = null;
+      this.showCreativeWizard = true;
     },
     onCreativeDone(pid) {
-      this.loadCreativePlans();
-      this.loadProjects();
-    },
-    async loadProjects() {
-      try {
-        const res = await API.getProjects();
-        this.projects = res.data || [];
-      } catch (e) { console.error(e); }
-    },
-    async openNewProject() {
-      this.newProjectForm = { name: "", description: "" };
-      this.showNewProject = true;
-    },
-    async createNewProject() {
-      if (!this.newProjectForm.name.trim()) return;
-      this.newProjectLoading = true;
-      try {
-        const res = await API.createProject({
-          name: this.newProjectForm.name.trim(),
-          description: this.newProjectForm.description,
-        });
-        this.showNewProject = false;
-        await this.loadProjects();
-        location.hash = "#/workbench/" + res.data.id;
-      } catch (e) {
-        Quasar.Notify.create({ message: e.message, color: "negative", position: "top" });
-      }
-      this.newProjectLoading = false;
+      this.wizardEditProjectId = null;
+      this.loadProjectList();
     },
     showProjectCtx(e, project) {
       this.projectCtx = { show: true, project, x: e.clientX, y: e.clientY };
@@ -1107,12 +1024,12 @@ const app = Vue.createApp({
       if (!this.renameForm.name.trim()) return;
       await API.updateProject(this.renameTarget.id, { name: this.renameForm.name.trim() });
       this.showProjectRename = false;
-      await Promise.all([this.loadProjects(), this.loadCreativePlans()]);
+      await this.loadProjectList();
     },
     async deleteProjectConfirm(project) {
       await API.deleteProject(project.id);
       if (location.hash === "#/workbench/" + project.id) location.hash = "#/gallery";
-      await Promise.all([this.loadProjects(), this.loadCreativePlans()]);
+      await this.loadProjectList();
     },
     pickerFolderSelect(path) {
       this.pickerFolder = this.pickerFolder === path ? null : path;
@@ -1122,6 +1039,10 @@ const app = Vue.createApp({
       this.pickerMode = false;
       this.pickerSelected = [];
       this.pickerExcludeIds = [];
+      if (this._pickerCallback) {
+        this._pickerCallback([]);
+        this._pickerCallback = null;
+      }
     },
     async confirmPicker() {
       try {
@@ -1142,7 +1063,7 @@ const app = Vue.createApp({
         this.pickerSelected = [];
         this.pickerExcludeIds = [];
         if (this.$refs.workbench) await this.$refs.workbench.load();
-        await this.loadProjects();
+        await this.loadProjectList();
       } catch (e) {
         Quasar.Notify.create({ message: e.message, color: 'negative', position: 'top' });
       }

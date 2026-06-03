@@ -406,7 +406,7 @@ Gallery.load() / Gallery.loadMore()
 
 | 前缀 | 覆盖范围 |
 |------|---------|
-| `g.*` | 通用（确认、取消、保存、删除等） |
+| `g.*` | 通用（确认、取消、保存、删除等）、后台任务状态、API 错误 |
 | `d.*` | 详情页（元数据标签、分析维度、按钮） |
 | `dup.*` | 重复页（标签页标题、操作按钮） |
 | `s.*` | 设置页（标签页标题、字段标签） |
@@ -414,6 +414,8 @@ Gallery.load() / Gallery.loadMore()
 | `imp.*` | 导入弹窗（步骤、状态、结果） |
 | `kb.*` | 快捷键参考弹窗 |
 | `ctx.*` | 右键上下文菜单 |
+| `wb.*` | 工作台（素材面板、轨道工具栏、播放器、错误通知） |
+| `cg.*` | 创意引导器（模板、结构、弧线、声音、进度、统计） |
 
 **回退链**：`translations[currentLocale][key]` → `translations['zh'][key]` → `key` 本身（开发时可见未翻译的键）。
 
@@ -656,11 +658,16 @@ PUT /api/workbench/<pid>/tracks（批量替换）
 
 ### 9.6 前端实现
 
-**创意引导器对话框**：`q-dialog`（全屏模式），内部分步表单组件（5 步），每步展示素材匹配统计。
+**创意引导器对话框**：`q-dialog`（全屏模式，`v-if="!pickerOpen"` 在素材选择器打开时销毁避免遮挡），内部分步表单组件（6 步：选素材 → 选模板 → 叙事结构 → 情绪弧线 → 声音设计 → 确认生成）。第 1 步进入时自动弹出全局素材选择器（90% 弹窗），选中后回到引导器显示已选素材摘要。
+
+**素材选择器交互**：
+- `openPicker()` 设置 `$root.pickerMode=true` 并注册 `_pickerCallback`，同时设 `pickerOpen=true` 销毁引导器 dialog
+- 选择器确认后 callback 回传 ID 数组，重置 `pickerOpen=false` 恢复引导器
+- 取消选择（`cancelPicker`）同样调用 callback 传空数组，确保引导器正常恢复
 
 **成片大纲面板**：右侧面板新增 Tab 切换（成片大纲 / 分析结果），大纲数据从 `project_tracks` 的 `theme` 类型条目派生。
 
-**素材统计查询**：`GET /api/workbench/<pid>/segments` 返回所有 segment，前端按 mood/scene_type 等维度聚合统计，展示在引导器每一步中。
+**素材统计查询**：`GET /api/creative/<pid>/stats` 返回聚合统计（总片段数、总时长），引导器各步底部显示内联统计摘要。
 
 ### 9.7 数据模型变更
 

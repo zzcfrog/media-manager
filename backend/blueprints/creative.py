@@ -167,10 +167,20 @@ def get_stats(pid):
         if r["asr"]:
             asr_count += 1
 
+    # Count media by type
+    media_rows = db.execute(
+        "SELECT m.media_type FROM media m JOIN project_media pm ON pm.media_id = m.id WHERE pm.project_id = ?",
+        (pid,),
+    ).fetchall()
+    video_count = sum(1 for r in media_rows if r["media_type"] == "video")
+    image_count = sum(1 for r in media_rows if r["media_type"] == "image")
+
     return jsonify({
         "data": {
             "total_segments": total_segments,
             "total_duration": round(total_duration, 1),
+            "video_count": video_count,
+            "image_count": image_count,
             "mood_distribution": mood_dist,
             "scene_distribution": scene_dist,
             "shot_distribution": shot_dist,
