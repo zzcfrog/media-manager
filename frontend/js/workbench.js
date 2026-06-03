@@ -947,6 +947,8 @@ const WorkbenchPage = {
       }
       // Segment ended — jump to next
       if (!currentItem) {
+        console.log('[tl] segment ended', 't=', t.toFixed(2), 'playhead=', this.playheadTime.toFixed(2),
+          'items=', items.map(it => `${it.time_start}-${it.time_end} src=${it.metadata}`).join(' | '));
         const next = items.find(it => this._timeToSec(it.time_start) > this.playheadTime);
         if (next) {
           player.pause();
