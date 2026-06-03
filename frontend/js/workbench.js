@@ -847,7 +847,9 @@ const WorkbenchPage = {
       if (!player || player.paused) return;
       const items = this.getTrackItems('video').sort((a, b) => this._timeToSec(a.time_start) - this._timeToSec(b.time_start));
       const t = player.currentTime;
-      for (const item of items) {
+      let matched = false;
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
         const start = this._timeToSec(item.time_start);
         const end = this._timeToSec(item.time_end);
         let meta = {};
@@ -857,7 +859,18 @@ const WorkbenchPage = {
         const srcDur = srcEnd - srcStart;
         if (t >= srcStart && t < srcStart + srcDur + 0.5) {
           this.playheadTime = start + (t - srcStart);
+          matched = true;
           return;
+        }
+      }
+      // Current segment ended — jump to next track item
+      if (!matched && items.length) {
+        const next = items.find(it => this._timeToSec(it.time_start) > this.playheadTime);
+        if (next) {
+          this.playheadTime = this._timeToSec(next.time_start);
+          this.seekToPlayhead(true);
+        } else {
+          player.pause();
         }
       }
     },
