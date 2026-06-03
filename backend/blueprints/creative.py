@@ -37,17 +37,21 @@ def create_creative_plan():
     creative_brief = data.get("creative_brief", {})
 
     db = get_db()
-    cur = db.execute(
-        "INSERT INTO projects (name, description, creative_brief) VALUES (?, ?, ?)",
-        (name, description, json.dumps(creative_brief, ensure_ascii=False)),
-    )
-    project_id = cur.lastrowid
-    for mid in media_ids:
-        db.execute(
-            "INSERT OR IGNORE INTO project_media (project_id, media_id) VALUES (?, ?)",
-            (project_id, mid),
+    try:
+        cur = db.execute(
+            "INSERT INTO projects (name, description, creative_brief) VALUES (?, ?, ?)",
+            (name, description, json.dumps(creative_brief, ensure_ascii=False)),
         )
-    db.commit()
+        project_id = cur.lastrowid
+        for mid in media_ids:
+            db.execute(
+                "INSERT OR IGNORE INTO project_media (project_id, media_id) VALUES (?, ?)",
+                (project_id, mid),
+            )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
     row = db.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
     result = dict(row)
@@ -488,27 +492,31 @@ def apply_plan(pid):
             })
 
     # Write tracks (atomic replace)
-    db.execute("DELETE FROM project_tracks WHERE project_id = ? AND version = 1", (pid,))
-    for tr in tracks:
-        db.execute(
-            "INSERT INTO project_tracks "
-            "(project_id, version, position, track_type, segment_id, content, "
-            "time_start, time_end, emotion_value, metadata) "
-            "VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                pid,
-                tr.get("position", 0),
-                tr.get("track_type", "video"),
-                tr.get("segment_id"),
-                tr.get("content", ""),
-                tr.get("time_start", "00:00.00"),
-                tr.get("time_end", "00:05.00"),
-                tr.get("emotion_value", 0.5),
-                tr.get("metadata", "{}"),
-            ),
-        )
-    db.execute("UPDATE projects SET updated_at = datetime('now') WHERE id = ?", (pid,))
-    db.commit()
+    try:
+        db.execute("DELETE FROM project_tracks WHERE project_id = ? AND version = 1", (pid,))
+        for tr in tracks:
+            db.execute(
+                "INSERT INTO project_tracks "
+                "(project_id, version, position, track_type, segment_id, content, "
+                "time_start, time_end, emotion_value, metadata) "
+                "VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    pid,
+                    tr.get("position", 0),
+                    tr.get("track_type", "video"),
+                    tr.get("segment_id"),
+                    tr.get("content", ""),
+                    tr.get("time_start", "00:00.00"),
+                    tr.get("time_end", "00:05.00"),
+                    tr.get("emotion_value", 0.5),
+                    tr.get("metadata", "{}"),
+                ),
+            )
+        db.execute("UPDATE projects SET updated_at = datetime('now') WHERE id = ?", (pid,))
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
     return jsonify({"ok": True, "track_count": len(tracks)})
 
