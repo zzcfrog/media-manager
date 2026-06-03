@@ -268,14 +268,13 @@ def generate_plan(pid):
     )
 
     # SSE streaming response
-    from flask import Response, stream_with_context
+    from flask import Response, stream_with_context, current_app
 
     progress = {"step": "starting", "percent": 0, "done": False, "result": None, "error": None}
+    app = current_app._get_current_object()
 
     def do_generate():
         """Run in thread — call LLM API. Must use its own DB connection."""
-        from flask import current_app
-        app = current_app._get_current_object()
         with app.app_context():
           try:
             thread_db = get_db()
