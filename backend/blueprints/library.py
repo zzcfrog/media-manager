@@ -251,7 +251,7 @@ def batch_get():
         return jsonify([])
     placeholders = ",".join("?" * len(ids))
     db = get_db()
-    rows = db.execute(f"SELECT id, file_name FROM media WHERE id IN ({placeholders})", ids).fetchall()
+    rows = db.execute(f"SELECT id, file_name, media_type FROM media WHERE id IN ({placeholders})", ids).fetchall()
     return jsonify([dict(r) for r in rows])
 
 

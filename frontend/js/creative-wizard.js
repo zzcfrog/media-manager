@@ -21,8 +21,11 @@ const CreativeWizard = {
           <div v-if="step===1" class="cg-step-content">
             <h3 class="cg-step-title">{{ t('cg.select_media') }}</h3>
             <div v-if="selectedMediaIds.length" class="cg-selected-grid">
-              <div v-for="m in selectedMediaInfo" :key="m.id" class="cg-selected-card">
-                <img :src="'/media/thumbnail/'+m.id" class="cg-media-thumb" />
+              <div v-for="m in selectedMediaInfo" :key="m.id" class="cg-selected-card" @click="previewMedia(m)">
+                <div class="cg-media-thumb-wrap">
+                  <img :src="'/media/thumbnail/'+m.id" class="cg-media-thumb" />
+                  <div v-if="m.media_type==='video'" class="cg-play-btn"><q-icon name="play_arrow" size="24px" color="white"></q-icon></div>
+                </div>
                 <div class="cg-media-info">{{ m.file_name }}</div>
               </div>
             </div>
@@ -429,6 +432,12 @@ const CreativeWizard = {
         this.loadStats();
       } catch (e) {
         console.error(e);
+      }
+    },
+
+    previewMedia(m) {
+      if (m.media_type === 'video') {
+        window.open('/media/stream/' + m.id, '_blank');
       }
     },
 

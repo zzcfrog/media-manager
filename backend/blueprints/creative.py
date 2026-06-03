@@ -266,6 +266,7 @@ def generate_plan(pid):
     ).replace(
         "{segments_json}", json.dumps(segments_json, ensure_ascii=False, indent=2)
     )
+    logger.info("Creative generate [pid={}]: model={}, segments_count={}, prompt_length={}", pid, model, len(segments_json), len(user_content))
 
     # SSE streaming response
     from flask import Response, stream_with_context, current_app
@@ -333,9 +334,11 @@ def generate_plan(pid):
             progress["result"] = plan
             progress["step"] = "done"
             progress["percent"] = 100
+            logger.info("Creative generate [pid={}]: done, acts={}, shots={}", pid, len(plan.get("acts", [])), sum(len(a.get("shots", [])) for a in plan.get("acts", [])))
 
           except Exception as e:
             progress["error"] = str(e)
+            logger.error("Creative generate [pid={}]: error — {}", pid, e)
           finally:
             progress["done"] = True
 
