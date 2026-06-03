@@ -902,6 +902,7 @@ const WorkbenchPage = {
           const targetTime = srcStart + offset;
           const mediaId = meta.srcMediaId || (item._segment?.media_id);
           const needSwitch = mediaId && this.selectedMedia.id !== mediaId;
+          console.log('[tl] seekToPlayhead', 'wasPlaying=', wasPlaying, 'needSwitch=', needSwitch, 'targetTime=', targetTime, 'mediaId=', mediaId, 'selectedId=', this.selectedMedia.id);
           if (needSwitch) {
             const m = this.project.media.find(x => x.id === mediaId);
             if (m) {
@@ -912,9 +913,10 @@ const WorkbenchPage = {
             // Same media — seek directly (video already loaded)
             const doSeek = () => {
               const p = this.$refs.wbPlayer;
+              console.log('[tl] doSeek', 'p=', !!p, 'paused=', p?.paused, 'targetTime=', targetTime);
               if (p) {
                 p.currentTime = targetTime;
-                if (wasPlaying) p.play().catch(() => {});
+                if (wasPlaying) p.play().catch((e) => console.log('[tl] play error', e));
               }
             };
             if (player) doSeek();
