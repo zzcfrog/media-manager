@@ -931,24 +931,38 @@ const WorkbenchPage = {
       const items = this.getTrackItems('video').sort((a, b) => this._timeToSec(a.time_start) - this._timeToSec(b.time_start));
       if (!items.length) return;
       const t = player.currentTime;
-      // Find the track item the player is currently inside
+      // Find the track item the player is currently inside, using source time range
       let currentItem = null;
+      let currentMeta = null;
       for (const item of items) {
         let meta = {};
         try { meta = JSON.parse(item.metadata || '{}'); } catch(e) {}
         const srcStart = this._timeToSec(meta.srcStart || '0:00');
         const srcEnd = this._timeToSec(meta.srcEnd || item.time_end);
-        if (t >= srcStart && t < srcEnd) {
-          const tlStart = this._timeToSec(item.time_start);
-          this.playheadTime = tlStart + (t - srcStart);
+        if (t >= srcStart && t < srcEnd + 1) {
           currentItem = item;
+          currentMeta = { srcStart, srcEnd };
           break;
         }
       }
-      // Segment ended — jump to next
-      if (!currentItem) {
-        console.log('[tl] segment ended', 't=', t.toFixed(2), 'playhead=', this.playheadTime.toFixed(2),
-          'items=', items.map(it => `${it.time_start}-${it.time_end} src=${it.metadata}`).join(' | '));
+      if (currentItem) {
+        const tlStart = this._timeToSec(currentItem.time_start);
+        const tlEnd = this._timeToSec(currentItem.time_end);
+        const tlDur = tlEnd - tlStart;
+        const elapsed = Math.min(t - currentMeta.srcStart, tlDur);
+        this.playheadTime = tlStart + elapsed;
+        // Boundary: playhead exceeds this item's timeline duration
+        if (elapsed >= tlDur) {
+          player.pause();
+          const next = items.find(it => this._timeToSec(it.time_start) >= tlEnd - 0.01);
+          if (next) {
+            this.playheadTime = this._timeToSec(next.time_start);
+            this.seekToPlayhead(true);
+          }
+          return;
+        }
+      } else {
+        // Not inside any segment — jump to next
         const next = items.find(it => this._timeToSec(it.time_start) > this.playheadTime);
         if (next) {
           player.pause();
