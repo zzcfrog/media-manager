@@ -875,8 +875,22 @@ const WorkbenchPage = {
     seekToPlayhead(wasPlaying) {
       this.timelinePlayMode = true;
       const player = this.$refs.wbPlayer;
-      if (!player || !this.selectedMedia) return;
       const items = this.getTrackItems('video').sort((a, b) => this._timeToSec(a.time_start) - this._timeToSec(b.time_start));
+      if (!items.length) return;
+      // No media selected yet — find the track item at playhead and select its source media
+      if (!this.selectedMedia) {
+        const item = items.find(it => this.playheadTime >= this._timeToSec(it.time_start) && this.playheadTime < this._timeToSec(it.time_end));
+        if (item) {
+          let meta = {};
+          try { meta = JSON.parse(item.metadata || '{}'); } catch(e) {}
+          const mediaId = meta.srcMediaId || (item._segment?.media_id);
+          if (mediaId) {
+            const m = this.project.media.find(x => x.id === mediaId);
+            if (m) this.selectedMedia = m;
+          }
+        }
+        if (!this.selectedMedia) return;
+      }
       for (const item of items) {
         const start = this._timeToSec(item.time_start);
         const end = this._timeToSec(item.time_end);
@@ -891,18 +905,20 @@ const WorkbenchPage = {
           if (needSwitch) {
             const m = this.project.media.find(x => x.id === mediaId);
             if (m) {
-              // Save seek target — loadeddata will execute it after video switches
               this._pendingTlSeek = { time: targetTime, play: wasPlaying };
               this.selectedMedia = m;
             }
           } else {
-            this.$nextTick(() => {
+            // Same media — seek directly (video already loaded)
+            const doSeek = () => {
               const p = this.$refs.wbPlayer;
               if (p) {
                 p.currentTime = targetTime;
                 if (wasPlaying) p.play().catch(() => {});
               }
-            });
+            };
+            if (player) doSeek();
+            else this.$nextTick(doSeek);
           }
           return;
         }
