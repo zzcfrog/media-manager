@@ -72,7 +72,7 @@ const WorkbenchPage = {
             <div v-else-if="!filteredMedia.length" class="wb-empty-material" style="grid-column:1/-1">{{ t('wb.no_match') }}</div>
             <div v-for="m in filteredMedia" :key="m.id" class="wb-mat-card"
                  :class="{ selected: selectedMedia && selectedMedia.id === m.id }"
-                 @click="selectedMedia = m"
+                 @click="selectedMedia = m; timelinePlayMode = false"
                  draggable="true"
                  @dragstart="onMatDragStart($event, m)">
               <img :src="'/media/thumbnail/' + m.id" class="wb-mat-thumb" loading="lazy">
@@ -253,7 +253,42 @@ const WorkbenchPage = {
                    @click="segCompact=!segCompact">
             </q-btn>
           <div class="wb-preview-sidebar" :class="{compact: segCompact}">
-            <template v-if="mediaSegments(selectedMedia.id).length">
+            <!-- Timeline mode: read-only track items with timeline positions -->
+            <template v-if="timelinePlayMode && timelineSegments.length">
+              <q-scroll-area ref="wbSegScroll" style="flex:1">
+                <div v-for="(seg,i) in timelineSegments" :key="seg.id" class="segment"
+                     :class="{ active: activeSegIndex === i }"
+                     @click="onSegClick(seg, i)">
+                  <div style="display:flex;align-items:center;justify-content:space-between">
+                    <div style="display:flex;align-items:center;gap:4px">
+                      <span class="seg-time"><span v-text="seg._tlTimeStart"></span> → <span v-text="seg._tlTimeEnd"></span></span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <span class="seg-dur">{{ fmtSegDur(seg._tlTimeStart, seg._tlTimeEnd) }}</span>
+                    </div>
+                  </div>
+                  <div class="seg-visual" v-text="seg.visual"></div>
+                  <div v-if="!segCompact && seg.asr && seg.asr!=='无'" class="seg-text-line"><span class="prefix">{{ t('d.dialog_asr') }}</span><span v-text="seg.asr"></span></div>
+                  <div v-if="!segCompact && seg.subtitle && seg.subtitle!=='无'" class="seg-text-line"><span class="prefix">{{ t('d.dialog_subtitle') }}</span><span v-text="seg.subtitle"></span></div>
+                  <div v-if="!segCompact && dimRowCam(seg)" class="dim-row">
+                    <span style="font-size:12px">🎥</span>
+                    <template v-for="f in camFields" :key="f.key"><span v-if="seg[f.key]" class="dim-pair"><span class="dim-label">{{ t('d.dim.' + f.key) }}</span><span class="dim-value" :class="f.cls" v-text="seg[f.key]"></span></span></template>
+                  </div>
+                  <div v-if="!segCompact && dimRowScene(seg)" class="dim-row">
+                    <span style="font-size:12px">🌍</span>
+                    <template v-for="f in sceneFields" :key="f.key"><span v-if="seg[f.key]" class="dim-pair"><span class="dim-label">{{ t('d.dim.' + f.key) }}</span><span class="dim-value" :class="f.cls" v-text="seg[f.key]"></span></span></template>
+                  </div>
+                  <div v-if="!segCompact && dimRowStyle(seg)" class="dim-row">
+                    <span style="font-size:12px">🎨</span>
+                    <template v-for="f in styleFields" :key="f.key"><span v-if="seg[f.key]" class="dim-pair"><span class="dim-label">{{ t('d.dim.' + f.key) }}</span><span class="dim-value" :class="f.cls" v-text="seg[f.key]"></span></span></template>
+                  </div>
+                  <div v-if="!segCompact" class="array-group"><span class="array-label icon-label"><span class="label-icon">🌈</span>{{ t('d.colors') }}</span><div class="array-pills"><span v-for="c in (seg.dominant_colors||[])" :key="c" class="pill color">{{ c }}</span></div></div>
+                  <div v-if="!segCompact" class="array-group"><span class="array-label icon-label"><span class="label-icon">🏷️</span>{{ t('d.subjects') }}</span><div class="array-pills"><span v-for="s in (seg.main_subjects||[])" :key="s" class="pill subject">{{ s }}</span></div></div>
+                </div>
+              </q-scroll-area>
+            </template>
+            <!-- Media mode: editable segments with original positions -->
+            <template v-else-if="!timelinePlayMode && mediaSegments(selectedMedia.id).length">
               <q-scroll-area ref="wbSegScroll" style="flex:1">
                 <div v-for="(seg,i) in mediaSegments(selectedMedia.id)" :key="seg.id" class="segment"
                      :class="{ active: activeSegIndex === i }"
@@ -386,6 +421,7 @@ const WorkbenchPage = {
       selectedMedia: null,
       mediaDetail: null,
       activeSegIndex: -1,
+      timelinePlayMode: false,
       showWbOverlay: false,
       hoverSegIndex: -1,
       _matPanelWidth: 400,
@@ -493,6 +529,20 @@ const WorkbenchPage = {
     timelineWidth() { return Math.round(this.zoomPps * this.timelineDuration); },
     matGridStyle() {
       return { 'grid-template-columns': `repeat(${this.matCols},1fr)` };
+    },
+    // Timeline segments: video track items with their timeline positions + original analysis data
+    timelineSegments() {
+      return this.getTrackItems('video')
+        .sort((a, b) => this._timeToSec(a.time_start) - this._timeToSec(b.time_start))
+        .map(item => {
+          const seg = item._segment || {};
+          return {
+            ...seg,
+            id: item.id,
+            _tlTimeStart: item.time_start,
+            _tlTimeEnd: item.time_end,
+          };
+        });
     },
     wbHoverStyle() {
       if (!this.wbDuration) return {};
@@ -812,6 +862,7 @@ const WorkbenchPage = {
       document.addEventListener('mouseup', onUp);
     },
     seekToPlayhead(wasPlaying) {
+      this.timelinePlayMode = true;
       const player = this.$refs.wbPlayer;
       if (!player || !this.selectedMedia) return;
       // 查找 video 轨道上 playheadTime 对应的块
@@ -1195,10 +1246,20 @@ const WorkbenchPage = {
     },
     updateActiveSeg() {
       const player = this.$refs.wbPlayer;
-      const segs = this.mediaSegments(this.selectedMedia?.id);
-      if (!player || !segs.length) return;
-      const t = player.currentTime;
-      const idx = segs.findIndex(s => t >= this.parseTime(s.time_start) && t < this.parseTime(s.time_end));
+      if (!player) return;
+      let idx = -1;
+      if (this.timelinePlayMode) {
+        // Timeline mode: match by playheadTime vs track item timeline positions
+        const segs = this.timelineSegments;
+        if (!segs.length) return;
+        idx = segs.findIndex(s => this.playheadTime >= this._timeToSec(s._tlTimeStart) && this.playheadTime < this._timeToSec(s._tlTimeEnd));
+      } else {
+        // Media mode: match by video currentTime vs original segment positions
+        const segs = this.mediaSegments(this.selectedMedia?.id);
+        if (!segs.length) return;
+        const t = player.currentTime;
+        idx = segs.findIndex(s => t >= this.parseTime(s.time_start) && t < this.parseTime(s.time_end));
+      }
       if (idx === -1 || idx === this.activeSegIndex) return;
       this.activeSegIndex = idx;
       this.$nextTick(() => {
