@@ -218,7 +218,7 @@ def generate_plan(pid):
     if not api_key:
         return jsonify({"error": "API key not configured"}), 400
 
-    model = get_setting(db, "creative_model", "glm-4v-plus")
+    model = get_setting(db, "creative_model", "glm-5-turbo")
 
     # Load all segments for this project's media
     from .workbench import _SEG_COLS

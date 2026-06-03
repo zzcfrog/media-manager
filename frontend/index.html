@@ -319,6 +319,7 @@
           <div style="font-size:11px;color:var(--text3);padding:0 4px">{{ t('s.estimated_bitrate', {rate: estimatedBitrate}) }}</div>
           <q-toggle v-if="hwEncoderAvailable" v-model="settingsForm.hwAccel" :label="t('s.hw_accel')"></q-toggle>
           <q-select v-model="settingsForm.model" :options="computedModelOptions" :label="t('s.ai_model')" dense filled emit-value map-options></q-select>
+          <q-select v-model="settingsForm.creativeModel" :options="computedCreativeModelOptions" :label="t('s.creative_model')" dense filled emit-value map-options></q-select>
           <q-input v-model="settingsForm.videoApiKey" :type="showVideoKey ? 'text' : 'password'" :label="t('s.api_key')" dense filled>
             <template v-slot:append>
               <q-icon :name="showVideoKey ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="showVideoKey = !showVideoKey"></q-icon>
@@ -582,7 +583,7 @@ const app = Vue.createApp({
       showImport: false,
       showSettings: false,
       showShortcuts: false,
-      settingsForm: { resolution: "480", fps: "30", model: "glm-4.6v", useMultimodal: true, asrEngine: "whisper", asrModel: "large-v3", videoApiKey: "", asrApiKey: "", imageResolution: "1920", imageApiKey: "", imageModel: "glm-4.6v", hwAccel: false, language: "zh" },
+      settingsForm: { resolution: "480", fps: "30", model: "glm-4.6v", useMultimodal: true, asrEngine: "whisper", asrModel: "large-v3", videoApiKey: "", asrApiKey: "", imageResolution: "1920", imageApiKey: "", imageModel: "glm-4.6v", hwAccel: false, language: "zh", creativeModel: "glm-5-turbo" },
       settingsTab: "general",
       hwEncoderAvailable: false,
       showVideoKey: false,
@@ -795,6 +796,14 @@ const app = Vue.createApp({
         { label: t('s.model_glm46v_flash'), value: "glm-4.6v-flash" },
         { label: t('s.model_glm46v_flashx'), value: "glm-4.6v-flashx" },
         { label: t('s.model_glm45v'), value: "glm-4.5v" },
+      ];
+    },
+    computedCreativeModelOptions() {
+      return [
+        { label: "GLM-5-Turbo", value: "glm-5-turbo" },
+        { label: "GLM-5.1", value: "glm-5.1" },
+        { label: "GLM-5", value: "glm-5" },
+        { label: "GLM-4.6", value: "glm-4.6" },
       ];
     },
     computedAsrOptions() {
@@ -1229,6 +1238,7 @@ const app = Vue.createApp({
         this.settingsForm.imageResolution = s.image_resolution || "1920";
         this.settingsForm.imageApiKey = s.image_api_key || "";
         this.settingsForm.imageModel = s.image_model || "glm-4.6v";
+        this.settingsForm.creativeModel = s.creative_model || "glm-5-turbo";
         this.settingsForm.hwAccel = s.hw_accel === "true";
         this.settingsForm.language = s.language || "zh";
         this.hwEncoderAvailable = !!s.hw_encoder;
@@ -1253,6 +1263,7 @@ const app = Vue.createApp({
           image_model: this.settingsForm.imageModel,
           hw_accel: String(this.settingsForm.hwAccel),
           language: this.settingsForm.language,
+          creative_model: this.settingsForm.creativeModel,
         });
         if (prevAsrModel && prevAsrModel !== this.settingsForm.asrModel) {
           fetch("/api/analysis/asr-reload", {

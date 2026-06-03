@@ -54,6 +54,7 @@ zh: {
   "s.image_analysis": "图片分析",
   "s.compress_size": "压缩尺寸",
   "s.ai_model": "AI 模型",
+  "s.creative_model": "构思生成模型",
   "s.api_key": "API Key",
   "s.img_api_hint": "图片分析的 API Key（需单独设置）",
   // Video settings
@@ -776,6 +777,7 @@ en: {
   "s.image_analysis": "Image Analysis",
   "s.compress_size": "Compress Size",
   "s.ai_model": "AI Model",
+  "s.creative_model": "Creative Model",
   "s.api_key": "API Key",
   "s.img_api_hint": "API Key for image analysis (separate setting)",
   // Video settings
