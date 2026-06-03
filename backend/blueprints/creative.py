@@ -269,10 +269,11 @@ def generate_plan(pid):
     progress = {"step": "starting", "percent": 0, "done": False, "result": None, "error": None}
 
     def do_generate():
-        """Run in thread — call LLM API."""
+        """Run in thread — call LLM API. Must use its own DB connection."""
         try:
+            thread_db = get_db()
             from openai import OpenAI
-            base_url = get_setting(db, "api_base_url", "https://open.bigmodel.cn/api/paas/v4")
+            base_url = get_setting(thread_db, "api_base_url", "https://open.bigmodel.cn/api/paas/v4")
             client = OpenAI(api_key=api_key, base_url=base_url)
 
             progress["step"] = "analyzing"
@@ -317,11 +318,11 @@ def generate_plan(pid):
             _validate_plan(plan, valid_ids)
 
             # Save to database
-            db.execute(
+            thread_db.execute(
                 "UPDATE projects SET ai_plan = ?, updated_at = datetime('now') WHERE id = ?",
                 (json.dumps(plan, ensure_ascii=False), pid),
             )
-            db.commit()
+            thread_db.commit()
 
             progress["result"] = plan
             progress["step"] = "done"
