@@ -1,7 +1,7 @@
 // AI Creative Guide Wizard — 6-step creative brief dialog
 const CreativeWizard = {
   template: `
-    <q-dialog v-if="!pickerOpen" :model-value="show" @update:model-value="$emit('update:show', $event)" transition-show="fade" transition-hide="fade">
+    <q-dialog :model-value="show && !pickerOpen" @update:model-value="pickerOpen ? null : $emit('update:show', $event)" transition-show="fade" transition-hide="fade">
       <q-card class="cg-wizard-card" style="background:var(--surface);width:90vw;max-width:90vw;height:90vh;max-height:90vh">
         <!-- Header -->
         <div class="cg-header">
@@ -94,14 +94,17 @@ const CreativeWizard = {
                 <div class="cg-struct-example">{{ t(opt.exampleKey) }}</div>
               </div>
             </div>
-            <div class="cg-input-row" style="margin-top:20px">
+            <div class="cg-input-row" style="margin-top:20px;display:flex;gap:14px">
+              <q-input v-model="planName" :label="t('wb.name_label')"
+                       outlined dense style="flex:3"
+                       :style="'--q-primary:var(--accent)'"></q-input>
               <q-input v-model.number="brief.duration_target" type="number" min="1" max="120"
-                       :label="t('cg.duration_target')" outlined dense style="max-width:200px"
+                       :label="t('cg.duration_target')" outlined dense style="flex:1"
                        :style="'--q-primary:var(--accent)'"></q-input>
             </div>
             <div class="cg-input-row">
               <q-input v-model="brief.theme_description" :label="t('cg.theme_desc')"
-                       outlined dense style="max-width:500px"
+                       outlined dense
                        :style="'--q-primary:var(--accent)'"></q-input>
             </div>
             <div v-if="stats" class="cg-stats-inline">
@@ -156,10 +159,8 @@ const CreativeWizard = {
           <!-- Step 6: Confirm -->
           <div v-if="step===6" class="cg-step-content">
             <h3 class="cg-step-title">{{ t('cg.confirm_title') }}</h3>
-            <q-input v-model="planName" :label="t('wb.name_label')"
-                      outlined dense style="max-width:400px;margin-bottom:16px"
-                      :style="'--q-primary:var(--accent)'"></q-input>
             <div class="cg-confirm-card">
+              <div class="cg-confirm-row"><span class="cg-confirm-label">{{ t('wb.name_label') }}</span><span>{{ planName }}</span></div>
               <div class="cg-confirm-row"><span class="cg-confirm-label">{{ t('cg.confirm_template') }}</span><span>{{ templateLabel }}</span></div>
               <div class="cg-confirm-row"><span class="cg-confirm-label">{{ t('cg.confirm_structure') }}</span><span>{{ structureLabel }}</span></div>
               <div class="cg-confirm-row"><span class="cg-confirm-label">{{ t('cg.confirm_arc') }}</span><span>{{ arcLabel }}</span></div>
@@ -332,7 +333,7 @@ const CreativeWizard = {
     canNext() {
       if (this.step === 1) return this.selectedMediaIds.length > 0;
       if (this.step === 2) return !!this.brief.template;
-      if (this.step === 6) return this.planName.trim().length > 0;
+      if (this.step === 3) return this.planName.trim().length > 0;
       return true;
     },
     templateLabel() {
@@ -448,8 +449,8 @@ const CreativeWizard = {
     async loadSelectedInfo(ids) {
       if (!ids.length) { this.selectedMediaInfo = []; return; }
       try {
-        const infos = await Promise.all(ids.map(id => API.getMedia(id).catch(() => null)));
-        this.selectedMediaInfo = infos.filter(Boolean);
+        const infos = await API.batchGet(ids);
+        this.selectedMediaInfo = infos;
       } catch (e) {
         this.selectedMediaInfo = [];
       }

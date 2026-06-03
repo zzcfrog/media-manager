@@ -637,7 +637,7 @@ const GalleryPage = {
     return {
       items: [], total: 0, page: 1, perPage: 60, loading: false, loadingMore: false, allLoaded: false, viewMode: "grid", searchText: "",
       sortBy: "imported_at", sortOrder: "desc", gridScale: 1, masonryCols: 5, justifiedRowH: 220,
-      selArr: [], lasso: null, lastClickIdx: -1,
+      selArr: [], _allSelected: false, lasso: null, lastClickIdx: -1,
       ctxMenu: { show: false, item: null, x: 0, y: 0 },
       confirmDelete: { show: false, id: null, name: "" },
       confirmBatch: { show: false },
@@ -666,9 +666,9 @@ const GalleryPage = {
     },
     selArr: {
       handler(val) {
-        if (this.$root.pickerMode) this.$root.pickerSelected = [...val];
+        if (this.$root.pickerMode) this.$root.pickerSelected = val;
       },
-      deep: true,
+      flush: 'sync',
     },
   },
   computed: {
@@ -809,6 +809,7 @@ const GalleryPage = {
       };
     } else {
       this._saveFilters = () => {};
+      this._isPicker = true;
     }
     if (!isPicker && this.searchText) this.$root.searchQuery = this.searchText.trim();
     // Picker mode: fewer items per page for lighter GPU load
@@ -864,21 +865,30 @@ const GalleryPage = {
     },
     // Select all items matching current filters (fetches all IDs from backend)
     async selectAll() {
+      if (this._selectAllPending) return;
+      this._selectAllPending = true;
       try {
         const params = this._buildParams(1);
+        console.log('[selectAll] filters.media_type:', this.filters.media_type, 'params:', JSON.stringify(params));
         const res = await API.getLibraryIds(params);
         const allIds = res.data || [];
         this.selArr = allIds;
+        this._allSelected = true;
+        if (this.$root.pickerMode) this.$root.pickerSelected = allIds;
       } catch (e) {
         console.error("selectAll error:", e);
       }
+      this._selectAllPending = false;
     },
     // Deselect all
     deselectAll() {
       this.selArr = [];
+      this._allSelected = false;
+      if (this.$root.pickerMode) this.$root.pickerSelected = [];
     },
     // Load first page, reset selection
     async load() {
+      this._allSelected = false;
       if (this._saveFilters) this._saveFilters();
       if (!this.$root.pickerMode) this.selArr = [];
       this.page = 1;
@@ -981,6 +991,7 @@ const GalleryPage = {
       this.load();
     },
     onCardClick(m, e) {
+      this._allSelected = false;
       const idx = this.items.findIndex(item => item.id === m.id);
       if (this.$root.pickerMode) {
         // Picker mode: toggle on every click
@@ -1081,8 +1092,9 @@ const GalleryPage = {
     },
     handleKey(e) {
       if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable) return;
-      // Skip when not on gallery view
-      if (this.$root.currentView !== "gallery") return;
+      // In picker mode, only the picker instance handles keys; main instance must skip
+      if (this.$root.pickerMode && !this._isPicker) return;
+      if (!this.$root.pickerMode && this.$root.currentView !== "gallery") return;
       const key = e.key;
       // Arrow keys - move selection
       if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(key)) {
@@ -1115,10 +1127,10 @@ const GalleryPage = {
         });
         return;
       }
-      // Ctrl+A — select all matching items
+      // Ctrl+A — toggle select all
       if ((e.ctrlKey || e.metaKey) && key === "a") {
         e.preventDefault(); e.stopPropagation();
-        if (this.selArr.length === this.total) { this.deselectAll(); return; }
+        if (this._allSelected || this._selectAllPending) { this.deselectAll(); return; }
         this.selectAll();
         return;
       }

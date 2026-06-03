@@ -243,6 +243,18 @@ def get_media(media_id):
     return jsonify(media)
 
 
+@bp.route("/batch-get", methods=["POST"])
+def batch_get():
+    """Return basic info for multiple media items in one request."""
+    ids = request.get_json().get("ids", [])
+    if not ids:
+        return jsonify([])
+    placeholders = ",".join("?" * len(ids))
+    db = get_db()
+    rows = db.execute(f"SELECT id, file_name FROM media WHERE id IN ({placeholders})", ids).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
 @bp.route("/import-one", methods=["POST"])
 def import_one():
     from ..services.importer import import_single_file

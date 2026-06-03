@@ -39,6 +39,9 @@ const API = {
   batchUpdate(data) {
     return this._fetch(`/api/library/batch`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
   },
+  batchGet(ids) {
+    return this._fetch(`/api/library/batch-get`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) });
+  },
 scanPaths(paths) {
     return this._fetch(`/api/library/scan`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths }) });
   },

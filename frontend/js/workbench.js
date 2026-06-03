@@ -1079,7 +1079,7 @@ const WorkbenchPage = {
         persistent: false,
       }).onOk(async () => {
         await API.deleteProject(this.project.id);
-        await Promise.all([this.$root.loadProjects(), this.$root.loadCreativePlans()]);
+        await this.$root.loadProjectList();
         location.hash = "#/gallery";
       });
     },
