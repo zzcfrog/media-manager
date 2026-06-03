@@ -786,13 +786,18 @@ const WorkbenchPage = {
       const rect = scroll.getBoundingClientRect();
       const x = e.clientX - rect.left + scroll.scrollLeft - 60;
       if (x < 0) return;
+      const player = this.$refs.wbPlayer;
+      const wasPlaying = player && !player.paused;
       this.playheadTime = x / this.pps;
-      this.seekToPlayhead();
+      this.seekToPlayhead(wasPlaying);
     },
     onPlayheadDown(e) {
       e.preventDefault();
       const scroll = this.$refs.wbTimelineScroll;
       if (!scroll) return;
+      const player = this.$refs.wbPlayer;
+      const wasPlaying = player && !player.paused;
+      if (wasPlaying) player.pause();
       const onMove = (ev) => {
         const rect = scroll.getBoundingClientRect();
         const x = ev.clientX - rect.left + scroll.scrollLeft - 60;
@@ -801,12 +806,12 @@ const WorkbenchPage = {
       const onUp = () => {
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
-        this.seekToPlayhead();
+        this.seekToPlayhead(wasPlaying);
       };
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
     },
-    seekToPlayhead() {
+    seekToPlayhead(wasPlaying) {
       const player = this.$refs.wbPlayer;
       if (!player || !this.selectedMedia) return;
       // 查找 video 轨道上 playheadTime 对应的块
@@ -828,7 +833,10 @@ const WorkbenchPage = {
           }
           this.$nextTick(() => {
             const p = this.$refs.wbPlayer;
-            if (p) p.currentTime = targetTime;
+            if (p) {
+              p.currentTime = targetTime;
+              if (wasPlaying) p.play().catch(() => {});
+            }
           });
           return;
         }
