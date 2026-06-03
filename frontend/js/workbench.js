@@ -587,6 +587,7 @@ const WorkbenchPage = {
       this.hoverSegIndex = -1;
       this.stopSegTrack(); this.stopWbWaveformAnim(); this.stopWbScopes();
       this._wbWfPeaks = null;
+      this._pendingTlSeek = null;
       this.previewLoading = this.selectedMedia?.media_type === 'image';
       if (m) {
         API.getMedia(m.id).then(res => { this.mediaDetail = res; }).catch(() => {});
@@ -875,7 +876,6 @@ const WorkbenchPage = {
       this.timelinePlayMode = true;
       const player = this.$refs.wbPlayer;
       if (!player || !this.selectedMedia) return;
-      // 查找 video 轨道上 playheadTime 对应的块
       const items = this.getTrackItems('video').sort((a, b) => this._timeToSec(a.time_start) - this._timeToSec(b.time_start));
       for (const item of items) {
         const start = this._timeToSec(item.time_start);
@@ -886,19 +886,24 @@ const WorkbenchPage = {
           const srcStart = this._timeToSec(meta.srcStart || '0:00');
           const offset = this.playheadTime - start;
           const targetTime = srcStart + offset;
-          // 如果这个块关联的视频不是当前选中的，先切换
           const mediaId = meta.srcMediaId || (item._segment?.media_id);
-          if (mediaId && this.selectedMedia.id !== mediaId) {
+          const needSwitch = mediaId && this.selectedMedia.id !== mediaId;
+          if (needSwitch) {
             const m = this.project.media.find(x => x.id === mediaId);
-            if (m) this.selectedMedia = m;
-          }
-          this.$nextTick(() => {
-            const p = this.$refs.wbPlayer;
-            if (p) {
-              p.currentTime = targetTime;
-              if (wasPlaying) p.play().catch(() => {});
+            if (m) {
+              // Save seek target — loadeddata will execute it after video switches
+              this._pendingTlSeek = { time: targetTime, play: wasPlaying };
+              this.selectedMedia = m;
             }
-          });
+          } else {
+            this.$nextTick(() => {
+              const p = this.$refs.wbPlayer;
+              if (p) {
+                p.currentTime = targetTime;
+                if (wasPlaying) p.play().catch(() => {});
+              }
+            });
+          }
           return;
         }
       }
@@ -1369,6 +1374,15 @@ const WorkbenchPage = {
     onWbVideoLoaded() {
       const p = this.$refs.wbPlayer;
       if (p) { this.wbDuration = p.duration; this.wbCurrentTime = 0; }
+      // Execute pending timeline seek (video just switched)
+      if (this._pendingTlSeek) {
+        const { time, play } = this._pendingTlSeek;
+        this._pendingTlSeek = null;
+        if (p) {
+          p.currentTime = time;
+          if (play) p.play().catch(() => {});
+        }
+      }
       this.initWbScopes();
       this.loadWbWaveform();
     },
