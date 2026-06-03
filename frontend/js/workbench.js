@@ -154,7 +154,7 @@ const WorkbenchPage = {
                   <q-btn flat round dense icon="fullscreen" size="sm" color="white" @click="toggleWbFullscreen">
                     <q-tooltip :delay="500">{{ t('wb.fullscreen') }}</q-tooltip>
                   </q-btn>
-                  <span class="wb-ctrl-time">{{ fmtSec(wbCurrentTime) }} / {{ fmtSec(wbDuration) }}</span>
+                  <span class="wb-ctrl-time">{{ fmtSec(timelinePlayMode ? playheadTime : wbCurrentTime) }} / {{ fmtSec(displayDuration) }}</span>
                   <div class="wb-seekbar" ref="wbSeekbar" @mousedown="onWbSeekStart" @mousemove="onWbSeekHover" @mouseleave="hoverSegIndex=-1;wbHoverTime=-1">
                     <div v-for="(seg,i) in mediaSegments(selectedMedia.id)" :key="'s'+seg.id"
                          class="wb-seg-mark"
@@ -516,6 +516,17 @@ const WorkbenchPage = {
     },
     videoTrackCount() {
       return this.getTrackItems("video").length;
+    },
+    // Total duration of all video track items on timeline
+    timelineTotalDuration() {
+      const items = this.getTrackItems('video');
+      if (!items.length) return 0;
+      const maxEnd = Math.max(...items.map(it => this._timeToSec(it.time_end)));
+      return maxEnd;
+    },
+    // Display duration: timeline total or source video duration
+    displayDuration() {
+      return this.timelinePlayMode ? this.timelineTotalDuration : this.wbDuration;
     },
     pps() { return this.zoomPps; },
     timelineDuration() {
@@ -897,8 +908,8 @@ const WorkbenchPage = {
       const player = this.$refs.wbPlayer;
       if (!player || player.paused) return;
       const items = this.getTrackItems('video').sort((a, b) => this._timeToSec(a.time_start) - this._timeToSec(b.time_start));
+      if (!items.length) return;
       const t = player.currentTime;
-      let matched = false;
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         const start = this._timeToSec(item.time_start);
@@ -910,19 +921,17 @@ const WorkbenchPage = {
         const srcDur = srcEnd - srcStart;
         if (t >= srcStart && t < srcStart + srcDur + 0.5) {
           this.playheadTime = start + (t - srcStart);
-          matched = true;
           return;
         }
       }
-      // Current segment ended — jump to next track item
-      if (!matched && items.length) {
-        const next = items.find(it => this._timeToSec(it.time_start) > this.playheadTime);
-        if (next) {
-          this.playheadTime = this._timeToSec(next.time_start);
-          this.seekToPlayhead(true);
-        } else {
-          player.pause();
-        }
+      // Current segment ended — only auto-advance in timeline mode
+      if (!this.timelinePlayMode) return;
+      const next = items.find(it => this._timeToSec(it.time_start) > this.playheadTime);
+      if (next) {
+        this.playheadTime = this._timeToSec(next.time_start);
+        this.seekToPlayhead(true);
+      } else {
+        player.pause();
       }
     },
     onSegDragStart(e, seg) {
