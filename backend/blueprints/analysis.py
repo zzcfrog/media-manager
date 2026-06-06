@@ -476,9 +476,45 @@ def _normalize_timestamp(ts: str) -> str:
         return ts
 
 
+def _ts_to_seconds(ts: str) -> float:
+    """Parse HH:MM:SS.ss or MM:SS.ss to seconds."""
+    try:
+        parts = ts.split(":")
+        if len(parts) == 3:
+            return float(parts[0]) * 3600 + float(parts[1]) * 60 + float(parts[2])
+        elif len(parts) == 2:
+            return float(parts[0]) * 60 + float(parts[1])
+    except (ValueError, IndexError):
+        pass
+    return 0.0
+
+
+def _fix_segment_overlaps(segments):
+    """Fix overlapping segments by cascading start times.
+
+    If a segment's start time is earlier than the previous segment's end time,
+    set it to the previous segment's end time. Ensures no gaps and no overlaps.
+    All subsequent segments cascade forward.
+    """
+    if len(segments) <= 1:
+        return
+    # Sort by start time
+    segments.sort(key=lambda s: _ts_to_seconds(s.get("time_start", "")))
+    for i in range(1, len(segments)):
+        prev_end = _ts_to_seconds(segments[i - 1].get("time_end", ""))
+        cur_start = _ts_to_seconds(segments[i].get("time_start", ""))
+        if cur_start < prev_end:
+            h = int(prev_end // 3600)
+            m = int((prev_end % 3600) // 60)
+            s = prev_end % 60
+            segments[i]["time_start"] = f"{h:02d}:{m:02d}:{s:05.2f}"
+
+
 def save_segments(media_id, segments, model=""):
     db = get_db()
     db.execute("DELETE FROM media_segment WHERE media_id = ?", (media_id,))
+
+    _fix_segment_overlaps(segments)
 
     for i, seg in enumerate(segments):
         db.execute(

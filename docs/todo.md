@@ -1,5 +1,17 @@
 # TODO
 
+## 已完成：LLM 分片时间重叠修正（2026-06-06）
+
+LLM 返回的分析分片（media_segment）在时间上可能重叠，保存前自动修正：按 start_time 排序后，若后一分片的 start < 前一分片的 end，则将后一分片的 start 设为前一分片的 end，逐级顺延，确保无间隙无重叠。
+
+**改动文件：**
+- `backend/blueprints/analysis.py` — 新增 `_ts_to_seconds()` 辅助函数（HH:MM:SS.ss → 秒数）；新增 `_fix_segment_overlaps()` 函数（按时间排序 + 级联修正重叠 start_time）；`save_segments()` 在插入前调用 `_fix_segment_overlaps(segments)`
+
+**功能说明：**
+- 所有轨道（视频/情绪/旁白/字幕/主题/文字）共用同一份 `media_segment` 时间戳，修正在源头，下游无需改动
+- 创意向导 `apply_plan()` 读取的 segment 时间已无重叠，`srcStart`/`srcEnd` 直接可用
+- 修正后分片严格连续：`segments[i].time_start == segments[i-1].time_end`
+
 ## 规划中：AI 创意引导器 Phase 2
 
 ### Phase 2：智能交互增强

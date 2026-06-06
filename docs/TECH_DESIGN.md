@@ -275,7 +275,7 @@ compress_video() — ffmpeg 压缩到 temp_video/（线程运行，SSE 推送真
 analyze_video(multimodal=True, on_progress) — 线程运行，SSE 推送子步骤
     │   子步骤：uploading → receiving (N 字符)
     ↓
-save_segments() → _refresh_fts() → call_on_close()
+save_segments() → _fix_segment_overlaps()（修正重叠时间戳）→ _refresh_fts() → call_on_close()
 ```
 
 **独立 ASR 模式**（`use_multimodal=false`）：VLM + ASR 并行，VLM 完成立刻标记，ASR 独立推进。
@@ -296,7 +296,7 @@ compress_video() — ffmpeg 压缩（线程运行，SSE 推送真实百分比）
     ↓
 _merge_asr() — 最佳匹配：每段 ASR 只匹配重叠时间最长的 VLM 分段
     ↓
-save_segments() → _refresh_fts() → call_on_close()
+save_segments() → _fix_segment_overlaps()（修正重叠时间戳）→ _refresh_fts() → call_on_close()
 ```
 
 进度通过 **SSE（Server-Sent Events）** 实时推送到前端：
