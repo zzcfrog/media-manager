@@ -137,7 +137,7 @@ def get_project_segments(pid):
     if not proj:
         return jsonify({"error": "Not found"}), 404
     rows = db.execute(
-        f"SELECT {_SEG_COLS}, m.file_name, m.media_type, m.thumbnail_path "
+        f"SELECT {_SEG_COLS}, m.file_name, m.media_type, m.thumbnail_path, m.duration "
         "FROM media_segment ms "
         "JOIN project_media pm ON pm.media_id = ms.media_id "
         "JOIN media m ON m.id = ms.media_id "

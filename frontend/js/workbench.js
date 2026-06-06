@@ -386,6 +386,12 @@ const WorkbenchPage = {
           <div class="wb-track-label">{{ t('wb.track_' + tt.key) }}</div>
           <div class="wb-track-content" :style="{width: timelineWidth + 'px'}"
                @dragover.prevent @drop="onTrackDrop($event, tt.key)">
+            <svg v-if="tt.key === 'emotion' && emotionCurvePath.line"
+                 class="wb-emotion-curve" :viewBox="'0 0 ' + timelineWidth + ' 28'"
+                 preserveAspectRatio="none">
+              <path :d="emotionCurvePath.fill" fill="var(--accent)" fill-opacity="0.12"/>
+              <path :d="emotionCurvePath.line" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+            </svg>
             <div v-for="item in getTrackItems(tt.key)" :key="item.id" class="wb-track-item"
                  :class="['wb-track-' + tt.key, {selected: trackSelectedItem === item.id}]"
                  :style="trackItemPos(item)"
@@ -394,14 +400,17 @@ const WorkbenchPage = {
                  @mousemove="onTrackItemHover">
               <template v-if="tt.key === 'video'">
                 <div v-if="item._segment" class="wb-track-filmstrip"
-                     :style="{backgroundImage: 'url(/media/thumbnail/' + item._segment.media_id + ')'}"></div>
+                     :style="filmstripStyle(item)"></div>
                 <span class="wb-track-item-label">{{ item._segment ? (item._segment.mood || item._segment.shot_type || '...') : '?' }}</span>
               </template>
               <template v-else-if="tt.key === 'emotion'">
-                <span>{{ item.emotion_value?.toFixed(2) }}</span>
+                <q-tooltip :delay="300" :offset="[0, 4]">
+                  {{ (item.emotion_value ?? 0.5).toFixed(2) }}<span v-if="item.content"> · {{ item.content }}</span>
+                </q-tooltip>
               </template>
               <template v-else>
-                <span>{{ item.content || '...' }}</span>
+                <span class="wb-track-text">{{ item.content || '...' }}</span>
+                <q-tooltip v-if="item.content" :delay="400" :offset="[0, 4]">{{ item.content }}</q-tooltip>
               </template>
             </div>
             <div class="wb-track-add" :style="trackAddPos(tt.key)" @click="addTrackItem(tt.key)">
@@ -441,7 +450,7 @@ const WorkbenchPage = {
       trackPlaying: false,
       trackSpeed: 1,
       trackZoom: 1,
-      zoomPps: 20,
+      zoomPps: 2,
       trackCanUndo: false,
       trackCanRedo: false,
       trackSelectedItem: null,
@@ -547,6 +556,26 @@ const WorkbenchPage = {
       return max + 30;
     },
     timelineWidth() { return Math.round(this.zoomPps * this.timelineDuration); },
+    emotionCurvePath() {
+      const items = this.getTrackItems('emotion')
+        .map(it => ({
+          t: (this._timeToSec(it.time_start) + this._timeToSec(it.time_end)) / 2,
+          v: it.emotion_value ?? 0.5,
+        }))
+        .sort((a, b) => a.t - b.t);
+      if (!items.length) return { line: '', fill: '' };
+      const pps = this.pps;
+      const H = 28;
+      const pts = [{ x: 0, y: (1 - items[0].v) * H }];
+      for (const it of items) pts.push({ x: it.t * pps, y: (1 - it.v) * H });
+      pts.push({ x: this.timelineWidth, y: (1 - items[items.length - 1].v) * H });
+      let d = `M${pts[0].x},${pts[0].y}`;
+      for (let i = 1; i < pts.length; i++) {
+        const dx = (pts[i].x - pts[i - 1].x) / 3;
+        d += ` C${pts[i - 1].x + dx},${pts[i - 1].y} ${pts[i].x - dx},${pts[i].y} ${pts[i].x},${pts[i].y}`;
+      }
+      return { line: d, fill: d + ` L${pts[pts.length - 1].x},${H} L${pts[0].x},${H}Z` };
+    },
     rulerStyle() {
       const pps = this.zoomPps;
       let interval;
@@ -660,16 +689,20 @@ const WorkbenchPage = {
       if (p) p.playbackRate = v;
     },
     trackZoom(val) {
-      const target = val * 20;
+      const el = this.$refs.wbTimelineScroll;
+      const target = 1 * Math.pow(2, val);
+      const centerTime = this.playheadTime;
       const animate = () => {
         const cur = this.zoomPps;
         const diff = target - cur;
         if (Math.abs(diff) < 0.5) {
           this.zoomPps = target;
+          if (el) el.scrollLeft = Math.max(0, Math.round(centerTime * target + 60 - el.clientWidth / 2));
           this._zoomAnim = null;
           return;
         }
         this.zoomPps = cur + diff * 0.15;
+        if (el) el.scrollLeft = Math.max(0, Math.round(centerTime * this.zoomPps + 60 - el.clientWidth / 2));
         this._zoomAnim = requestAnimationFrame(animate);
       };
       if (this._zoomAnim) cancelAnimationFrame(this._zoomAnim);
@@ -697,21 +730,8 @@ const WorkbenchPage = {
     zoomToFit() {
       const el = this.$refs.wbTimelineScroll;
       if (!el) return;
-      const availWidth = el.clientWidth - 60; // subtract track-label width
-      const targetPps = availWidth / this.timelineDuration;
-      if (this._zoomAnim) cancelAnimationFrame(this._zoomAnim);
-      const animate = () => {
-        const cur = this.zoomPps;
-        const diff = targetPps - cur;
-        if (Math.abs(diff) < 0.5) {
-          this.zoomPps = targetPps;
-          this._zoomAnim = null;
-          return;
-        }
-        this.zoomPps = cur + diff * 0.15;
-        this._zoomAnim = requestAnimationFrame(animate);
-      };
-      animate();
+      const availWidth = el.clientWidth - 60;
+      this.zoomPps = availWidth / this.timelineDuration;
     },
     async load() {
       if (!this.projectId) return;
@@ -781,6 +801,15 @@ const WorkbenchPage = {
     trackZoomIn() { this.trackZoom = Math.min(10, this.trackZoom + 1); },
     trackZoomOut() { this.trackZoom = Math.max(1, this.trackZoom - 1); },
     trackFitWidth() { this.trackZoom = 1; },
+    filmstripStyle(item) {
+      const seg = item._segment;
+      if (!seg) return {};
+      return {
+        backgroundImage: `url(/media/thumbnail/${seg.media_id})`,
+        backgroundSize: 'auto 100%',
+        backgroundRepeat: 'repeat-x',
+      };
+    },
     toggleWbFullscreen() {
       const wrap = this.$refs.wbPlayer?.parentElement;
       if (!wrap) return;

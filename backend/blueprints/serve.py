@@ -154,11 +154,38 @@ def serve_image(media_id):
 
 @bp.route("/media/thumbnail/<int:media_id>")
 def serve_thumbnail(media_id):
+    from flask import request
     db = get_db()
     row = db.execute("SELECT id, file_path, media_type, thumbnail_path FROM media WHERE id = ?", (media_id,)).fetchone()
     if not row:
         from flask import abort
         abort(404)
+
+    # If ?t= is specified, extract frame at that timestamp via ffmpeg
+    t_param = request.args.get("t")
+    if t_param is not None:
+        try:
+            t_sec = float(t_param)
+        except (ValueError, TypeError):
+            t_sec = 0
+        if row["media_type"] == "video" and shutil.which("ffmpeg"):
+            import tempfile, subprocess
+            tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+            try:
+                cmd = [
+                    "ffmpeg", "-ss", str(t_sec), "-i", str(row["file_path"]),
+                    "-frames:v", "1", "-vf", "scale=320:-1", "-y", tmp.name,
+                ]
+                subprocess.run(cmd, capture_output=True, timeout=10)
+                if Path(tmp.name).exists() and Path(tmp.name).stat().st_size > 0:
+                    return send_file(tmp.name, mimetype="image/jpeg")
+            except Exception:
+                pass
+            finally:
+                try: Path(tmp.name).unlink()
+                except: pass
+        # Fallback: return default thumbnail
+        t_param = None
 
     # Try existing thumbnail
     if row["thumbnail_path"]:
@@ -176,6 +203,41 @@ def serve_thumbnail(media_id):
             db.execute("UPDATE media SET thumbnail_path = ? WHERE id = ?", (thumb, row["id"]))
             db.commit()
             return send_file(THUMB_DIR / thumb, mimetype="image/jpeg")
+
+    from flask import abort
+    abort(404)
+
+
+@bp.route("/media/filmstrip/<int:media_id>")
+def serve_filmstrip(media_id):
+    import subprocess, json
+    db = get_db()
+    row = db.execute("SELECT id, file_path, media_type, duration FROM media WHERE id = ?", (media_id,)).fetchone()
+    if not row or row["media_type"] != "video":
+        from flask import abort
+        abort(404)
+
+    cache_name = f"filmstrip_{media_id}.jpg"
+    cache_path = THUMB_DIR / cache_name
+    if cache_path.exists():
+        return send_file(cache_path, mimetype="image/jpeg")
+
+    dur = row["duration"] or 60
+    interval = 1
+    frame_w = 160
+    frame_count = min(600, max(10, int(dur / interval)))
+
+    try:
+        cmd = [
+            "ffmpeg", "-i", str(row["file_path"]),
+            "-vf", f"fps=1/{interval},scale={frame_w}:-1,tile={frame_count}x1",
+            "-frames:v", "1", "-y", str(cache_path),
+        ]
+        result = subprocess.run(cmd, capture_output=True, timeout=30)
+        if result.returncode == 0 and cache_path.exists() and cache_path.stat().st_size > 0:
+            return send_file(cache_path, mimetype="image/jpeg")
+    except Exception:
+        pass
 
     from flask import abort
     abort(404)

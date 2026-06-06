@@ -872,9 +872,9 @@ const GalleryPage = {
         console.log('[selectAll] filters.media_type:', this.filters.media_type, 'params:', JSON.stringify(params));
         const res = await API.getLibraryIds(params);
         const allIds = res.data || [];
-        this.selArr = allIds;
+        this.selArr = [...new Set([...this.selArr, ...allIds])];
         this._allSelected = true;
-        if (this.$root.pickerMode) this.$root.pickerSelected = allIds;
+        if (this.$root.pickerMode) this.$root.pickerSelected = this.selArr;
       } catch (e) {
         console.error("selectAll error:", e);
       }
@@ -1024,6 +1024,7 @@ const GalleryPage = {
       if (!container) return;
       const sx = e.clientX, sy = e.clientY;
       const startScroll = container.scrollTop;
+      const selBefore = [...this.selArr];
       let dragging = false;
       let scrollRaf = null;
       const EDGE = 60;
@@ -1054,7 +1055,7 @@ const GalleryPage = {
             ids.push(parseInt(el.dataset.id));
           }
         });
-        this.selArr = ids;
+        this.selArr = [...new Set([...selBefore, ...ids])];
       };
       const onMove = (ev) => {
         ev.preventDefault();
@@ -1068,7 +1069,7 @@ const GalleryPage = {
         doScroll(ev);
       };
       const onUp = () => {
-        if (!dragging) this.selArr = [];
+        if (!dragging && !this.$root.pickerMode) this.selArr = [];
         this.lasso = null;
         if (scrollRaf) cancelAnimationFrame(scrollRaf);
         document.removeEventListener("mousemove", onMove);

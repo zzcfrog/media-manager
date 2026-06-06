@@ -110,6 +110,11 @@ const CreativeWizard = {
                        outlined dense
                        :style="'--q-primary:var(--accent)'"></q-input>
             </div>
+            <div class="cg-input-row">
+              <q-input v-model="brief.creator_intent" :label="t('cg.creator_intent')"
+                       type="textarea" autogrow outlined dense
+                       :style="'--q-primary:var(--accent)'"></q-input>
+            </div>
             <div v-if="stats" class="cg-stats-inline">
               <span>{{ t('cg.stats_media', {v: stats.video_count || 0, i: stats.image_count || 0}) }}</span>
               <span style="margin:0 8px;opacity:0.3">|</span>
@@ -231,6 +236,7 @@ const CreativeWizard = {
         montage_style: "beat",
         duration_target: 30,
         theme_description: "",
+        creator_intent: "",
         opening: { type: "atmosphere" },
         structure: "three_act",
         emotion_arc: "gradual_build",

@@ -466,6 +466,7 @@ def apply_plan(pid):
             tracks.append({
                 "track_type": "emotion",
                 "emotion_value": shot.get("emotion", 0.5),
+                "content": shot.get("purpose", ""),
                 "position": len(tracks),
                 "time_start": ts,
                 "time_end": te,
@@ -806,6 +807,11 @@ def render_brief_text(brief):
     theme = brief.get("theme_description", "").strip()
     if theme:
         parts.append(f"创作主题：{theme}")
+
+    # Creator's intent
+    intent = brief.get("creator_intent", "").strip()
+    if intent:
+        parts.append(f"创作者意图：{intent}")
 
     # Duration
     dur = brief.get("duration_target")

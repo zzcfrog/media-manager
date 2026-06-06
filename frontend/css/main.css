@@ -996,9 +996,8 @@ body:not(.body--dark) .wb-mat-sort-group { background: #e0e0e0; }
 .wb-track-filmstrip {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  background-size: auto 100%;
-  background-repeat: repeat-x;
-  background-position: left center;
+  background-repeat: no-repeat;
+  background-size: cover;
   opacity: 0.5;
   border-radius: 3px;
 }
@@ -1056,6 +1055,10 @@ body:not(.body--dark) .wb-mat-sort-group { background: #e0e0e0; }
   background: var(--surface2);
   border-radius: 3px;
 }
+.wb-track-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .wb-track-item:hover {
   background: var(--accent-dim);
@@ -1068,6 +1071,20 @@ body:not(.body--dark) .wb-mat-sort-group { background: #e0e0e0; }
 
 .wb-track-video {
   background: var(--surface2);
+}
+
+/* Emotion track: curve overlay */
+.wb-emotion-curve {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  width: 100%;
+  height: calc(100% - 4px);
+  pointer-events: none;
+}
+.wb-track-emotion {
+  background: transparent;
+  border: none;
 }
 
 .wb-track-thumb {
