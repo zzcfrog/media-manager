@@ -144,10 +144,12 @@ const WorkbenchPage = {
               </div>
               <div class="wb-video-wrap" style="flex:1;position:relative;min-height:0;overflow:hidden"
                    @mouseenter="showWbOverlay=true" @mouseleave="showWbOverlay=false">
-                <video ref="wbPlayer" :key="selectedMedia.id" :src="'/media/video/' + selectedMedia.id"
+                <video ref="wbPlayer" :src="'/media/video/' + selectedMedia.id"
                        style="width:100%;height:100%;background:#000" preload="auto"
                        @loadeddata="onWbVideoLoaded" @play="onWbVideoPlay" @pause="onWbVideoPause" @seeked="onWbVideoSeeked"
-                       @timeupdate="onWbTimeUpdate" @click="toggleWbPlay" @error="onWbMediaError"></video>
+                       @timeupdate="onWbTimeUpdate" @ended="onWbVideoEnded" @click="toggleWbPlay" @error="onWbMediaError"></video>
+                <!-- Hidden video for preloading next segment into browser cache -->
+                <video ref="wbPreload" style="display:none" preload="auto"></video>
                 <div v-show="showWbOverlay" class="wb-player-overlay">{{ selectedMedia.file_name }}</div>
                 <div class="wb-controls" v-show="showWbOverlay" @mouseenter="showWbOverlay=true">
                   <q-btn flat round dense :icon="wbPlaying?'pause':'play_arrow'" size="sm" color="white" @click="toggleWbPlay"></q-btn>
@@ -156,13 +158,13 @@ const WorkbenchPage = {
                   </q-btn>
                   <span class="wb-ctrl-time">{{ fmtSec(timelinePlayMode ? playheadTime : wbCurrentTime) }} / {{ fmtSec(displayDuration) }}</span>
                   <div class="wb-seekbar" ref="wbSeekbar" @mousedown="onWbSeekStart" @mousemove="onWbSeekHover" @mouseleave="hoverSegIndex=-1;wbHoverTime=-1">
-                    <div v-for="(seg,i) in mediaSegments(selectedMedia.id)" :key="'s'+seg.id"
+                    <div v-for="(seg,i) in seekbarSegments" :key="'s'+seg.id"
                          class="wb-seg-mark"
                          :class="{ active: activeSegIndex === i }"
                          :style="segBlockStyle(seg)"
                          @mouseenter="hoverSegIndex=i" @mouseleave="hoverSegIndex=-1">
                       <q-tooltip anchor="top middle" self="bottom middle" :delay="0" :offset="[0,8]" class="wb-seg-tooltip">
-                        <div style="font-weight:600;margin-bottom:4px">{{ seg.time_start }} → {{ seg.time_end }} <span style="opacity:0.6">{{ fmtSegDur(seg.time_start, seg.time_end) }}</span></div>
+                        <div style="font-weight:600;margin-bottom:4px">{{ timelinePlayMode ? seg._tlTimeStart : seg.time_start }} → {{ timelinePlayMode ? seg._tlTimeEnd : seg.time_end }} <span style="opacity:0.6">{{ fmtSegDur(timelinePlayMode ? seg._tlTimeStart : seg.time_start, timelinePlayMode ? seg._tlTimeEnd : seg.time_end) }}</span></div>
                         <div v-if="seg.visual" style="margin-bottom:3px">{{ seg.visual }}</div>
                         <div v-if="seg.asr && seg.asr!=='无'" style="opacity:0.8;margin-bottom:2px"><span style="opacity:0.5">ASR:</span> {{ seg.asr }}</div>
                         <div v-if="seg.subtitle && seg.subtitle!=='无'" style="opacity:0.8;margin-bottom:2px"><span style="opacity:0.5">SUB:</span> {{ seg.subtitle }}</div>
@@ -183,8 +185,8 @@ const WorkbenchPage = {
                         </div>
                       </q-tooltip>
                     </div>
-                    <div class="wb-seek-hover" v-if="wbHoverTime>=0 && wbDuration" :style="wbHoverStyle"></div>
-                    <div class="wb-seek-progress" v-if="wbDuration" :style="wbProgressStyle"></div>
+                    <div class="wb-seek-hover" v-if="wbHoverTime>=0 && displayDuration" :style="wbHoverStyle"></div>
+                    <div class="wb-seek-progress" v-if="displayDuration" :style="wbProgressStyle"></div>
                   </div>
                 </div>
                 <q-btn v-if="scopesCollapsed" flat round dense icon="expand_less"
@@ -195,7 +197,7 @@ const WorkbenchPage = {
               </div>
 
               <div v-if="!scopesCollapsed" style="flex-shrink:0;position:relative">
-                  <div class="waveform-wrap" ref="wbWaveformWrap" @click="onWbWaveformClick">
+                  <div v-show="!timelinePlayMode" class="waveform-wrap" ref="wbWaveformWrap" @click="onWbWaveformClick">
                     <canvas ref="wbWfCanvas"></canvas>
                   </div>
                   <div class="scopes-row" ref="wbScopesRow">
@@ -339,27 +341,33 @@ const WorkbenchPage = {
     <div class="wb-tracks">
       <div class="wb-track-toolbar">
         <div style="display:flex;align-items:center;gap:2px">
-          <q-btn flat round dense icon="undo" size="xs" color="grey-6" :disable="!trackCanUndo" @click="trackUndo">
+          <q-btn flat dense icon="undo" size="sm" color="grey-6" :disable="!trackCanUndo" @click="trackUndo">
             <q-tooltip :delay="500">{{ t('wb.undo') }}</q-tooltip>
           </q-btn>
-          <q-btn flat round dense icon="redo" size="xs" color="grey-6" :disable="!trackCanRedo" @click="trackRedo">
+          <q-btn flat dense icon="redo" size="sm" color="grey-6" :disable="!trackCanRedo" @click="trackRedo">
             <q-tooltip :delay="500">{{ t('wb.redo') }}</q-tooltip>
           </q-btn>
-          <q-btn flat round dense icon="content_cut" size="xs" color="grey-6" :disable="!trackSelectedItem" @click="trackSplit">
+          <q-btn flat dense icon="content_cut" size="sm" color="grey-6" :disable="!trackSelectedItem" @click="trackSplit">
             <q-tooltip :delay="500">{{ t('wb.split') }}</q-tooltip>
           </q-btn>
-          <q-btn flat round dense icon="delete_outline" size="xs" color="grey-6" :disable="!trackSelectedItem" @click="trackDelete">
+          <q-btn flat dense icon="delete_outline" size="sm" color="grey-6" :disable="!trackSelectedItem" @click="trackDelete">
             <q-tooltip :delay="500">{{ t('wb.delete') }}</q-tooltip>
           </q-btn>
         </div>
         <div style="flex:1"></div>
         <div style="display:flex;align-items:center;gap:2px">
-          <q-btn flat round dense icon="zoom_out" size="xs" color="grey-6" @click="trackZoom = Math.max(1, trackZoom - 1)">
+          <q-btn flat dense size="sm" color="grey-6" @click="zoomToFit">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="22" height="9" rx="2"/><line x1="5" y1="3" x2="5" y2="7"/><line x1="9" y1="3" x2="9" y2="9"/><line x1="13" y1="3" x2="13" y2="7"/><line x1="17" y1="3" x2="17" y2="9"/><line x1="21" y1="3" x2="21" y2="7"/><line x1="2" y1="16.5" x2="2" y2="20.5"/><line x1="22" y1="16.5" x2="22" y2="20.5"/><line x1="4.5" y1="18.5" x2="19.5" y2="18.5"/><polyline points="4.5,18.5 7,17"/><polyline points="4.5,18.5 7,20"/><polyline points="19.5,18.5 17,17"/><polyline points="19.5,18.5 17,20"/></svg>
+            <q-tooltip :delay="500">{{ t('wb.zoom_fit') }}</q-tooltip>
+          </q-btn>
+          <q-btn flat dense size="sm" color="grey-6" style="margin-right:6px" @click="trackZoom = Math.max(1, trackZoom - 1)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10" cy="10" r="7"/><line x1="14.95" y1="14.95" x2="18" y2="18"/><line x1="7" y1="10" x2="13" y2="10"/></svg>
             <q-tooltip :delay="500">{{ t('wb.zoom_out') }}</q-tooltip>
           </q-btn>
           <q-slider v-model="trackZoom" :min="1" :max="10" :step="1"
                     style="width:80px;--q-primary:var(--accent);padding:0" color="primary" dense></q-slider>
-          <q-btn flat round dense icon="zoom_in" size="xs" color="grey-6" @click="trackZoom = Math.min(10, trackZoom + 1)">
+          <q-btn flat dense size="sm" color="grey-6" style="margin-left:6px" @click="trackZoom = Math.min(10, trackZoom + 1)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10" cy="10" r="7"/><line x1="14.95" y1="14.95" x2="18" y2="18"/><line x1="10" y1="7" x2="10" y2="13"/><line x1="7" y1="10" x2="13" y2="10"/></svg>
             <q-tooltip :delay="500">{{ t('wb.zoom_in') }}</q-tooltip>
           </q-btn>
         </div>
@@ -368,8 +376,10 @@ const WorkbenchPage = {
         <div class="wb-playhead" :style="{left: (60 + Math.round(playheadTime * pps)) + 'px'}" @mousedown.stop="onPlayheadDown"></div>
         <div class="wb-ruler-row">
           <div class="wb-track-label"></div>
-          <div class="wb-ruler-content" :style="{width: timelineWidth + 'px'}">
-            <canvas ref="wbRulerCanvas"></canvas>
+          <div class="wb-ruler-content" :style="rulerStyle">
+            <span v-for="tick in rulerTicks" :key="tick.t" class="wb-ruler-tick" :style="{left: tick.x + 'px'}">
+              <span class="wb-ruler-label">{{ tick.label }}</span>
+            </span>
           </div>
         </div>
         <div v-for="tt in trackTypes" :key="tt.key" class="wb-track-row" :class="{'wb-track-row-video': tt.key === 'video'}">
@@ -425,8 +435,8 @@ const WorkbenchPage = {
       showWbOverlay: false,
       hoverSegIndex: -1,
       _matPanelWidth: 400,
-      metaCollapsed: false,
-      scopesCollapsed: false,
+      metaCollapsed: true,
+      scopesCollapsed: true,
       segCompact: false,
       trackPlaying: false,
       trackSpeed: 1,
@@ -537,8 +547,48 @@ const WorkbenchPage = {
       return max + 30;
     },
     timelineWidth() { return Math.round(this.zoomPps * this.timelineDuration); },
+    rulerStyle() {
+      const pps = this.zoomPps;
+      let interval;
+      if (pps >= 100) interval = 1;
+      else if (pps >= 40) interval = 5;
+      else if (pps >= 20) interval = 10;
+      else if (pps >= 8) interval = 30;
+      else interval = 60;
+      const minor = interval / 10;
+      const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--border2').trim() || '#333';
+      const grad = `repeating-linear-gradient(to right, ${bgColor} 0px, ${bgColor} 1px, transparent 1px, transparent ${Math.round(minor * pps)}px)`;
+      return {
+        width: this.timelineWidth + 'px',
+        backgroundImage: grad,
+        backgroundSize: '100% 4px',
+        backgroundPosition: 'bottom left',
+        backgroundRepeat: 'no-repeat',
+      };
+    },
+    rulerTicks() {
+      const pps = this.zoomPps;
+      const w = this.timelineWidth;
+      let interval;
+      if (pps >= 100) interval = 1;
+      else if (pps >= 40) interval = 5;
+      else if (pps >= 20) interval = 10;
+      else if (pps >= 8) interval = 30;
+      else interval = 60;
+      const ticks = [];
+      for (let t = 0; t * pps < w; t += interval) {
+        const m = Math.floor(t / 60);
+        const s = t % 60;
+        ticks.push({ t, x: Math.round(t * pps), label: m + ':' + String(s).padStart(2, '0') });
+      }
+      return ticks;
+    },
     matGridStyle() {
       return { 'grid-template-columns': `repeat(${this.matCols},1fr)` };
+    },
+    // Segments shown on the seekbar: timeline or source depending on mode
+    seekbarSegments() {
+      return this.timelinePlayMode ? this.timelineSegments : this.mediaSegments(this.selectedMedia?.id);
     },
     // Timeline segments: video track items with their timeline positions + original analysis data
     timelineSegments() {
@@ -555,12 +605,15 @@ const WorkbenchPage = {
         });
     },
     wbHoverStyle() {
-      if (!this.wbDuration) return {};
-      return { left: (this.wbHoverTime / this.wbDuration * 100) + '%' };
+      const total = this.timelinePlayMode ? this.displayDuration : this.wbDuration;
+      if (!total) return {};
+      return { left: (this.wbHoverTime / total * 100) + '%' };
     },
     wbProgressStyle() {
-      if (!this.wbDuration) return {};
-      return { width: (this.wbCurrentTime / this.wbDuration * 100) + '%' };
+      const total = this.timelinePlayMode ? this.displayDuration : this.wbDuration;
+      const pos = this.timelinePlayMode ? this.playheadTime : this.wbCurrentTime;
+      if (!total) return {};
+      return { width: (pos / total * 100) + '%' };
     },
   },
 
@@ -572,6 +625,7 @@ const WorkbenchPage = {
     if (this._onDragMove) document.removeEventListener('mousemove', this._onDragMove);
     if (this._onDragEnd) document.removeEventListener('mouseup', this._onDragEnd);
     if (this._zoomAnim) cancelAnimationFrame(this._zoomAnim);
+    if (this._playheadAnim) cancelAnimationFrame(this._playheadAnim);
     this.$root.pickerMode = false;
   },
 
@@ -587,7 +641,9 @@ const WorkbenchPage = {
       this.hoverSegIndex = -1;
       this.stopSegTrack(); this.stopWbWaveformAnim(); this.stopWbScopes();
       this._wbWfPeaks = null;
+      const savedSeek = this._pendingTlSeek;
       this._pendingTlSeek = null;
+      this.$nextTick(() => { if (savedSeek) this._pendingTlSeek = savedSeek; });
       this.previewLoading = this.selectedMedia?.media_type === 'image';
       if (m) {
         API.getMedia(m.id).then(res => { this.mediaDetail = res; }).catch(() => {});
@@ -610,21 +666,20 @@ const WorkbenchPage = {
         const diff = target - cur;
         if (Math.abs(diff) < 0.5) {
           this.zoomPps = target;
-          this.drawRuler();
           this._zoomAnim = null;
           return;
         }
         this.zoomPps = cur + diff * 0.15;
-        this.drawRuler();
         this._zoomAnim = requestAnimationFrame(animate);
       };
       if (this._zoomAnim) cancelAnimationFrame(this._zoomAnim);
       animate();
     },
-    tracks: { handler() { this.$nextTick(() => this.drawRuler()); }, deep: true },
+    tracks: { deep: true },
   },
 
   created() {
+    this._preloadedMediaId = null;
     this.load();
     this._onWbKey = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
@@ -639,6 +694,25 @@ const WorkbenchPage = {
   },
 
   methods: {
+    zoomToFit() {
+      const el = this.$refs.wbTimelineScroll;
+      if (!el) return;
+      const availWidth = el.clientWidth - 60; // subtract track-label width
+      const targetPps = availWidth / this.timelineDuration;
+      if (this._zoomAnim) cancelAnimationFrame(this._zoomAnim);
+      const animate = () => {
+        const cur = this.zoomPps;
+        const diff = targetPps - cur;
+        if (Math.abs(diff) < 0.5) {
+          this.zoomPps = targetPps;
+          this._zoomAnim = null;
+          return;
+        }
+        this.zoomPps = cur + diff * 0.15;
+        this._zoomAnim = requestAnimationFrame(animate);
+      };
+      animate();
+    },
     async load() {
       if (!this.projectId) return;
       this.loading = true;
@@ -661,6 +735,22 @@ const WorkbenchPage = {
         Quasar.Notify.create({ message: e.message, color: "negative", position: "top" });
       }
       this.loading = false;
+      // Auto-select first media so the video player is ready for timeline playback
+      if (!this.selectedMedia && this.project?.media?.length) {
+        // Prefer the media used in the first video track item
+        const videoTracks = this.getTrackItems('video')
+          .sort((a, b) => this._timeToSec(a.time_start) - this._timeToSec(b.time_start));
+        let mediaId = null;
+        if (videoTracks.length) {
+          let meta = {};
+          try { meta = JSON.parse(videoTracks[0].metadata || '{}'); } catch(e) {}
+          mediaId = meta.srcMediaId || (videoTracks[0]._segment?.media_id);
+        }
+        const m = mediaId
+          ? this.project.media.find(x => x.id === mediaId)
+          : this.project.media[0];
+        if (m) this.selectedMedia = m;
+      }
     },
     async searchMedia() {
       if (!this.projectId) return;
@@ -793,53 +883,6 @@ const WorkbenchPage = {
       }
       return { left: Math.round(maxEnd * this.pps + 4) + 'px' };
     },
-    drawRuler() {
-      const c = this.$refs.wbRulerCanvas;
-      if (!c) return;
-      const dpr = window.devicePixelRatio || 1;
-      const w = this.timelineWidth;
-      const h = 24;
-      c.width = w * dpr;
-      c.height = h * dpr;
-      c.style.width = w + 'px';
-      c.style.height = h + 'px';
-      const ctx = c.getContext('2d');
-      ctx.scale(dpr, dpr);
-      ctx.clearRect(0, 0, w, h);
-      const pps = this.zoomPps;
-      let interval;
-      if (pps >= 100) interval = 1;
-      else if (pps >= 40) interval = 5;
-      else if (pps >= 20) interval = 10;
-      else if (pps >= 8) interval = 30;
-      else interval = 60;
-      const minor = interval / 10;
-      const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text3').trim() || '#666';
-      const lineColor = getComputedStyle(document.documentElement).getPropertyValue('--border2').trim() || '#333';
-      ctx.font = '10px sans-serif';
-      // minor ticks
-      ctx.strokeStyle = lineColor;
-      for (let t = 0; t * pps < w; t += minor) {
-        const x = Math.round(t * pps) + 0.5;
-        ctx.beginPath();
-        ctx.moveTo(x, h - 4);
-        ctx.lineTo(x, h);
-        ctx.stroke();
-      }
-      // major ticks + labels
-      ctx.fillStyle = textColor;
-      for (let t = 0; t * pps < w; t += interval) {
-        const x = Math.round(t * pps) + 0.5;
-        ctx.beginPath();
-        ctx.moveTo(x, h - 8);
-        ctx.lineTo(x, h);
-        ctx.stroke();
-        const m = Math.floor(t / 60);
-        const s = t % 60;
-        const label = m + ':' + String(s).padStart(2, '0');
-        ctx.fillText(label, x + 3, h - 10);
-      }
-    },
     onTimelineClick(e) {
       if (e.target.closest('.wb-track-item') || e.target.closest('.wb-track-add') || e.target.closest('.wb-track-label')) return;
       const scroll = this.$refs.wbTimelineScroll;
@@ -902,7 +945,9 @@ const WorkbenchPage = {
           const targetTime = srcStart + offset;
           const mediaId = meta.srcMediaId || (item._segment?.media_id);
           const needSwitch = mediaId && this.selectedMedia.id !== mediaId;
-          console.log('[tl] seekToPlayhead', 'wasPlaying=', wasPlaying, 'needSwitch=', needSwitch, 'targetTime=', targetTime, 'mediaId=', mediaId, 'selectedId=', this.selectedMedia.id);
+          this._currentTlItem = item;
+          // Preload next segment's video in hidden element
+          this._preloadNextSegment(items, item);
           if (needSwitch) {
             const m = this.project.media.find(x => x.id === mediaId);
             if (m) {
@@ -913,10 +958,9 @@ const WorkbenchPage = {
             // Same media — seek directly (video already loaded)
             const doSeek = () => {
               const p = this.$refs.wbPlayer;
-              console.log('[tl] doSeek', 'p=', !!p, 'paused=', p?.paused, 'targetTime=', targetTime);
               if (p) {
                 p.currentTime = targetTime;
-                if (wasPlaying) p.play().catch((e) => console.log('[tl] play error', e));
+                if (wasPlaying) p.play().catch(() => {});
               }
             };
             if (player) doSeek();
@@ -926,50 +970,39 @@ const WorkbenchPage = {
         }
       }
     },
+    _preloadNextSegment(items, currentItem) {
+      const tlEnd = this._timeToSec(currentItem.time_end);
+      const next = items.find(it => this._timeToSec(it.time_start) >= tlEnd - 0.01);
+      if (!next) return;
+      let meta = {};
+      try { meta = JSON.parse(next.metadata || '{}'); } catch(e) {}
+      const mediaId = meta.srcMediaId || (next._segment?.media_id);
+      if (!mediaId || mediaId === this._preloadedMediaId) return;
+      const el = this.$refs.wbPreload;
+      if (el) {
+        el.src = '/media/video/' + mediaId;
+        this._preloadedMediaId = mediaId;
+      }
+    },
     syncPlayheadFromPlayer() {
       const player = this.$refs.wbPlayer;
       if (!player || player.paused) return;
       if (!this.timelinePlayMode) return;
-      const items = this.getTrackItems('video').sort((a, b) => this._timeToSec(a.time_start) - this._timeToSec(b.time_start));
-      if (!items.length) return;
+      if (this._pendingTlSeek) return;
+      const item = this._currentTlItem;
+      if (!item) return;
+      let meta = {};
+      try { meta = JSON.parse(item.metadata || '{}'); } catch(e) {}
+      const srcStart = this._timeToSec(meta.srcStart || '0:00');
+      const tlEnd = this._timeToSec(item.time_end);
+      const tlDur = tlEnd - this._timeToSec(item.time_start);
       const t = player.currentTime;
-      // Find the track item the player is currently inside, using source time range
-      let currentItem = null;
-      let currentMeta = null;
-      for (const item of items) {
-        let meta = {};
-        try { meta = JSON.parse(item.metadata || '{}'); } catch(e) {}
-        const srcStart = this._timeToSec(meta.srcStart || '0:00');
-        const srcEnd = this._timeToSec(meta.srcEnd || item.time_end);
-        if (t >= srcStart && t < srcEnd + 1) {
-          currentItem = item;
-          currentMeta = { srcStart, srcEnd };
-          break;
-        }
-      }
-      if (currentItem) {
-        const tlStart = this._timeToSec(currentItem.time_start);
-        const tlEnd = this._timeToSec(currentItem.time_end);
-        const tlDur = tlEnd - tlStart;
-        const elapsed = Math.min(t - currentMeta.srcStart, tlDur);
-        this.playheadTime = tlStart + elapsed;
-        // Boundary: playhead exceeds this item's timeline duration
-        if (elapsed >= tlDur) {
-          const next = items.find(it => this._timeToSec(it.time_start) >= tlEnd - 0.01);
-          if (next) {
-            this.playheadTime = this._timeToSec(next.time_start);
-            this.seekToPlayhead(true);
-          } else {
-            player.pause();
-          }
-          return;
-        }
-      } else {
-        // Not inside any segment — jump to next
-        const next = items.find(it => this._timeToSec(it.time_start) > this.playheadTime);
+      const elapsed = Math.max(0, Math.min(t - srcStart, tlDur));
+      if (elapsed >= tlDur) {
+        const items = this.getTrackItems('video').sort((a, b) => this._timeToSec(a.time_start) - this._timeToSec(b.time_start));
+        const next = items.find(it => this._timeToSec(it.time_start) >= tlEnd - 0.01);
         if (next) {
           this.playheadTime = this._timeToSec(next.time_start);
-          this.seekToPlayhead(true);
           this.seekToPlayhead(true);
         } else {
           player.pause();
@@ -1188,10 +1221,17 @@ const WorkbenchPage = {
       return Math.max(0, toSec(end) - toSec(start));
     },
     openWizard() {
-      // Open creative wizard for this existing project
-      const root = this.$root;
-      root.wizardEditProjectId = this.projectId;
-      root.showCreativeWizard = true;
+      Quasar.Dialog.create({
+        title: t('wb.regenerate_title'),
+        message: t('wb.regenerate_msg'),
+        cancel: true,
+        persistent: false,
+        ok: { label: t('wb.regenerate_ok'), color: 'accent', unelevated: true },
+      }).onOk(() => {
+        const root = this.$root;
+        root.wizardEditProjectId = this.projectId;
+        root.showCreativeWizard = true;
+      });
     },
     async deleteProject() {
       if (!this.project) return;
@@ -1224,6 +1264,19 @@ const WorkbenchPage = {
       return parseFloat(str);
     },
     segBlockStyle(seg) {
+      if (this.timelinePlayMode) {
+        const total = this.displayDuration;
+        if (!total) return {};
+        const s = this._timeToSec(seg._tlTimeStart);
+        const e = this._timeToSec(seg._tlTimeEnd);
+        const gapPx = 2;
+        const pctPerPx = 100 / (this.$refs.wbSeekbar?.clientWidth || 1);
+        const gap = Math.min(gapPx * pctPerPx, 0.3);
+        return {
+          left: (s / total * 100) + '%',
+          width: Math.max(0.5, (e - s) / total * 100 - gap) + '%',
+        };
+      }
       const total = this.selectedMedia?.duration;
       if (!total) return {};
       const s = this.parseTime(seg.time_start);
@@ -1267,9 +1320,23 @@ const WorkbenchPage = {
     },
     onWbSeekStart(e) {
       const bar = this.$refs.wbSeekbar;
-      const p = this.$refs.wbPlayer;
-      if (!bar || !p) return;
+      if (!bar) return;
       const rect = bar.getBoundingClientRect();
+      if (this.timelinePlayMode) {
+        const seek = (ev) => {
+          const x = Math.max(0, Math.min(ev.clientX - rect.left, rect.width));
+          this.playheadTime = (x / rect.width) * this.displayDuration;
+          this.seekToPlayhead(true);
+        };
+        seek(e);
+        const onMove = (ev) => seek(ev);
+        const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+        return;
+      }
+      const p = this.$refs.wbPlayer;
+      if (!p) return;
       const seek = (ev) => {
         const x = Math.max(0, Math.min(ev.clientX - rect.left, rect.width));
         p.currentTime = (x / rect.width) * this.wbDuration;
@@ -1283,17 +1350,44 @@ const WorkbenchPage = {
     },
     onWbSeekHover(e) {
       const bar = this.$refs.wbSeekbar;
-      if (!bar || !this.wbDuration) return;
+      const total = this.timelinePlayMode ? this.displayDuration : this.wbDuration;
+      if (!bar || !total) return;
       const rect = bar.getBoundingClientRect();
       const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
-      this.wbHoverTime = (x / rect.width) * this.wbDuration;
+      this.wbHoverTime = (x / rect.width) * total;
     },
     startSegTrack() {
       if (this._segTrackInterval) return;
       this._segTrackInterval = setInterval(() => this.updateActiveSeg(), 250);
+      this._startPlayheadAnim();
     },
     stopSegTrack() {
       if (this._segTrackInterval) { clearInterval(this._segTrackInterval); this._segTrackInterval = null; }
+      this._stopPlayheadAnim();
+    },
+    _startPlayheadAnim() {
+      if (this._playheadAnim) return;
+      const tick = () => {
+        const player = this.$refs.wbPlayer;
+        if (!player || player.paused || !this.timelinePlayMode || !this._currentTlItem) {
+          this._playheadAnim = null;
+          return;
+        }
+        let meta = {};
+        try { meta = JSON.parse(this._currentTlItem.metadata || '{}'); } catch(e) {}
+        const srcStart = this._timeToSec(meta.srcStart || '0:00');
+        const tlStart = this._timeToSec(this._currentTlItem.time_start);
+        const tlEnd = this._timeToSec(this._currentTlItem.time_end);
+        const tlDur = tlEnd - tlStart;
+        const t = player.currentTime;
+        const elapsed = Math.max(0, Math.min(t - srcStart, tlDur));
+        this.playheadTime = tlStart + elapsed;
+        this._playheadAnim = requestAnimationFrame(tick);
+      };
+      this._playheadAnim = requestAnimationFrame(tick);
+    },
+    _stopPlayheadAnim() {
+      if (this._playheadAnim) { cancelAnimationFrame(this._playheadAnim); this._playheadAnim = null; }
     },
     updateActiveSeg() {
       const player = this.$refs.wbPlayer;
@@ -1409,7 +1503,6 @@ const WorkbenchPage = {
     onWbVideoLoaded() {
       const p = this.$refs.wbPlayer;
       if (p) { this.wbDuration = p.duration; this.wbCurrentTime = 0; }
-      // Execute pending timeline seek (video just switched)
       if (this._pendingTlSeek) {
         const { time, play } = this._pendingTlSeek;
         this._pendingTlSeek = null;
@@ -1431,6 +1524,19 @@ const WorkbenchPage = {
     },
     onWbVideoPlay() { this.wbPlaying = true; this.trackPlaying = true; this.startSegTrack(); this.startWbWaveformAnim(); this.startWbScopes(); },
     onWbVideoPause() { this.wbPlaying = false; this.trackPlaying = false; this.stopSegTrack(); this.stopWbWaveformAnim(); this.stopWbScopes(); this.drawWbWaveform(); if (this._wbScopeOffscreen) this.drawWbScopesOnce(); },
+    onWbVideoEnded() {
+      // Timeline mode: video ended means this segment's source is done — jump to next
+      if (this.timelinePlayMode && this._currentTlItem) {
+        const tlEnd = this._timeToSec(this._currentTlItem.time_end);
+        const items = this.getTrackItems('video').sort((a, b) => this._timeToSec(a.time_start) - this._timeToSec(b.time_start));
+        const next = items.find(it => this._timeToSec(it.time_start) >= tlEnd - 0.01);
+        if (next) {
+          this.playheadTime = this._timeToSec(next.time_start);
+          this.seekToPlayhead(true);
+        }
+        return;
+      }
+    },
     onWbVideoSeeked() { this.initWbScopes(); this.drawWbWaveform(); this.drawWbScopesOnce(); this.updateActiveSeg(); },
     async loadWbWaveform() {
       const player = this.$refs.wbPlayer;
@@ -1484,9 +1590,10 @@ const WorkbenchPage = {
       const mid = h / 2;
       const time = player.currentTime;
       const played = (time / this._wbWfDuration) * w;
+      const borderClr = getComputedStyle(document.documentElement).getPropertyValue('--border2').trim();
       for (let i = 0; i < this._wbWfPeaks.length; i++) {
         const barH = Math.max(1, this._wbWfPeaks[i] * mid * 0.85);
-        ctx.fillStyle = i < played ? 'rgba(108,140,255,0.5)' : getComputedStyle(document.documentElement).getPropertyValue('--border2').trim();
+        ctx.fillStyle = i < played ? 'rgba(108,140,255,0.5)' : borderClr;
         ctx.fillRect(i, mid - barH, 1, barH * 2);
       }
       const x = (time / this._wbWfDuration) * w;

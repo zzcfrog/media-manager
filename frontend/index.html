@@ -1020,6 +1020,10 @@ const app = Vue.createApp({
     onCreativeDone(pid) {
       this.wizardEditProjectId = null;
       this.loadProjectList();
+      // Reload workbench if currently showing this project
+      if (this.$refs.workbench && this.$refs.workbench.projectId === pid) {
+        this.$refs.workbench.load();
+      }
     },
     showProjectCtx(e, project) {
       this.projectCtx = { show: true, project, x: e.clientX, y: e.clientY };

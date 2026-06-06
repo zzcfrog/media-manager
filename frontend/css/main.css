@@ -898,7 +898,10 @@ body:not(.body--dark) .wb-mat-sort-group { background: #e0e0e0; }
   flex-shrink: 0;
   height: 28px;
 }
-.wb-track-toolbar .q-btn { min-height: unset; padding: 0; }
+.wb-track-toolbar .q-btn { min-height: unset; padding: 4px; border-radius: 4px; }
+.wb-track-toolbar .q-btn:hover { background: var(--accent-dim); }
+.wb-track-toolbar .q-btn .q-focus-helper { display: none; }
+.wb-track-toolbar .q-btn svg { margin-top: 3px; }
 .wb-track-toolbar .q-select { font-size: 11px; }
 .wb-track-toolbar .q-slider { height: 16px; padding: 0; margin: 0 4px; }
 
@@ -943,23 +946,36 @@ body:not(.body--dark) .wb-mat-sort-group { background: #e0e0e0; }
   display: flex;
   height: 24px;
   flex-shrink: 0;
+  min-width: max-content;
   border-bottom: 1px solid var(--border);
 }
 
 .wb-ruler-content {
   position: relative;
+  flex-shrink: 0;
 }
 
-.wb-ruler-content canvas {
+.wb-ruler-tick {
   position: absolute;
   top: 0;
-  left: 0;
+  height: 100%;
+  border-left: 1px solid var(--border2);
+}
+
+.wb-ruler-label {
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  font-size: 10px;
+  color: var(--text3);
+  white-space: nowrap;
 }
 
 .wb-track-row {
   display: flex;
   align-items: stretch;
   min-height: 32px;
+  min-width: max-content;
   border-bottom: 1px solid var(--border);
 }
 
@@ -1023,6 +1039,7 @@ body:not(.body--dark) .wb-mat-sort-group { background: #e0e0e0; }
 .wb-track-content {
   position: relative;
   min-height: 32px;
+  flex-shrink: 0;
 }
 
 .wb-track-item {
@@ -1050,7 +1067,7 @@ body:not(.body--dark) .wb-mat-sort-group { background: #e0e0e0; }
 }
 
 .wb-track-video {
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  background: var(--surface2);
 }
 
 .wb-track-thumb {
