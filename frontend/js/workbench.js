@@ -385,7 +385,9 @@ const WorkbenchPage = {
         <div v-for="tt in trackTypes" :key="tt.key" class="wb-track-row" :class="{'wb-track-row-video': tt.key === 'video'}">
           <div class="wb-track-label">{{ t('wb.track_' + tt.key) }}</div>
           <div class="wb-track-content" :style="{width: timelineWidth + 'px'}"
-               @dragover.prevent @drop="onTrackDrop($event, tt.key)">
+               @dragover="onTrackDragOver($event, tt.key)"
+               @dragleave="clearDragShift()"
+               @drop="onTrackDrop($event, tt.key)">
             <svg v-if="tt.key === 'emotion' && emotionCurvePath.line"
                  class="wb-emotion-curve" :viewBox="'0 0 ' + timelineWidth + ' 28'"
                  preserveAspectRatio="none">
@@ -397,6 +399,7 @@ const WorkbenchPage = {
                  :style="trackItemPos(item)"
                  @click="trackSelectedItem = item.id"
                  @mousedown="onTrackItemDown($event, item, tt.key)"
+                 @contextmenu.prevent="onTrackItemContext($event, item)"
                  @mousemove="onTrackItemHover">
               <template v-if="tt.key === 'video'">
                 <div v-if="item._segment" class="wb-track-filmstrip"
@@ -412,6 +415,13 @@ const WorkbenchPage = {
                 <span class="wb-track-text">{{ item.content || '...' }}</span>
                 <q-tooltip v-if="item.content" :delay="400" :offset="[0, 4]">{{ item.content }}</q-tooltip>
               </template>
+              <q-menu touch-position context-menu>
+                <q-list dense style="min-width: 80px">
+                  <q-item clickable v-close-popup @click="trackDelete()">
+                    <q-item-section>{{ t('wb.ctx_delete') || '删除' }}</q-item-section>
+                  </q-item>
+                </q-list>
+              </q-menu>
             </div>
             <div class="wb-track-add" :style="trackAddPos(tt.key)" @click="addTrackItem(tt.key)">
               <q-icon name="add" size="14px" color="grey-6"></q-icon>
@@ -721,6 +731,9 @@ const WorkbenchPage = {
         const p = this.$refs.wbPlayer;
         if (!p) return;
         p.paused ? p.play().catch(() => {}) : p.pause();
+      } else if (e.code === 'Delete' || e.code === 'Backspace') {
+        e.preventDefault();
+        this.trackDelete();
       }
     };
     document.addEventListener('keydown', this._onWbKey);
@@ -1099,10 +1112,12 @@ const WorkbenchPage = {
     onSegDragStart(e, seg) {
       e.dataTransfer.setData('application/json', JSON.stringify({ type: 'segment', ...seg }));
       e.dataTransfer.effectAllowed = 'copy';
+      this._extDragDur = this._parseDuration(seg.time_start, seg.time_end) || 5;
     },
     onMatDragStart(e, m) {
       e.dataTransfer.setData('application/json', JSON.stringify({ type: 'media', id: m.id, file_name: m.file_name, media_type: m.media_type, duration: m.duration }));
       e.dataTransfer.effectAllowed = 'copy';
+      this._extDragDur = Math.min(m.duration || 5, 5);
     },
     _secToStr(sec) {
       const m = Math.floor(sec / 60);
@@ -1180,8 +1195,29 @@ const WorkbenchPage = {
           }
           this.tracks.push(newItem);
         }
+        this.clearDragShift();
+        this._extDragDur = null;
         this._trackSave();
       } catch(err) { console.error('onTrackDrop', err); }
+    },
+    onTrackDragOver(e, trackType) {
+      e.preventDefault();
+      this.clearDragShift();
+      if (!this._extDragDur) return;
+      const gapWidth = this._extDragDur * this.pps;
+      const contentEl = e.currentTarget;
+      const children = Array.from(contentEl.querySelectorAll('.wb-track-item'));
+      // Find insertion index based on mouse position relative to item centers
+      let insertIdx = children.length;
+      for (let i = 0; i < children.length; i++) {
+        const cr = children[i].getBoundingClientRect();
+        if (e.clientX < cr.left + cr.width / 2) { insertIdx = i; break; }
+      }
+      // Shift items at and after insertion point to create gap
+      for (let i = insertIdx; i < children.length; i++) {
+        children[i].style.transition = 'transform 0.15s ease';
+        children[i].style.transform = `translateX(${gapWidth}px)`;
+      }
     },
     addTrackItem(type) {
       this._trackSnapshot();
@@ -1240,6 +1276,14 @@ const WorkbenchPage = {
       document.addEventListener('mouseup', this._onDragEnd);
       e.preventDefault();
     },
+    clearDragShift() {
+      const el = this.$refs.wbTimelineScroll;
+      if (!el) return;
+      for (const it of el.querySelectorAll('.wb-track-item')) {
+        it.style.transition = '';
+        it.style.transform = '';
+      }
+    },
     _handleDragMove(e) {
       const d = this._drag;
       if (!d) return;
@@ -1248,12 +1292,58 @@ const WorkbenchPage = {
         d.el.style.transform = `translateX(${dx}px)`;
         d.el.style.opacity = '0.5';
         d.el.style.zIndex = '10';
+        // Reorder animation: shift siblings to show insertion gap
+        const contentEl = d.el.parentElement;
+        const children = Array.from(contentEl.querySelectorAll('.wb-track-item'));
+        const fromIdx = children.indexOf(d.el);
+        let toIdx = 0;
+        for (let i = 0; i < children.length; i++) {
+          if (children[i] === d.el) continue;
+          const cr = children[i].getBoundingClientRect();
+          if (e.clientX > cr.left + cr.width / 2) toIdx = i;
+          else break;
+        }
+        // Adjust toIdx: if mouse is past the last non-dragged item, toIdx = last position
+        let adjIdx = toIdx;
+        if (fromIdx <= toIdx) adjIdx = Math.min(toIdx, children.length - 1);
+        const itemW = d.startWidth;
+        for (let i = 0; i < children.length; i++) {
+          if (children[i] === d.el) continue;
+          children[i].style.transition = 'transform 0.15s ease';
+          if (fromIdx < adjIdx) {
+            // Dragging right: items between fromIdx and adjIdx shift left
+            children[i].style.transform = (i > fromIdx && i <= adjIdx) ? `translateX(${-itemW}px)` : '';
+          } else if (fromIdx > adjIdx) {
+            // Dragging left: items between adjIdx and fromIdx shift right
+            children[i].style.transform = (i >= adjIdx && i < fromIdx) ? `translateX(${itemW}px)` : '';
+          } else {
+            children[i].style.transform = '';
+          }
+        }
       } else {
         if (d.edge === 'right') {
           d.el.style.width = Math.max(30, d.startWidth + dx) + 'px';
         } else {
           d.el.style.width = Math.max(30, d.startWidth - dx) + 'px';
           d.el.style.transform = `translateX(${dx}px)`;
+        }
+        // Resize push animation: shift subsequent items on all tracks
+        if (d.trackType === 'video' && d.edge === 'right') {
+          const rightEdge = parseFloat(d.el.style.left) + d.startWidth;
+          const timelineEl = this.$refs.wbTimelineScroll;
+          if (timelineEl) {
+            for (const it of timelineEl.querySelectorAll('.wb-track-item')) {
+              if (it === d.el) continue;
+              const itLeft = parseFloat(it.style.left);
+              if (itLeft >= rightEdge - 1) {
+                it.style.transition = 'transform 0.1s ease';
+                it.style.transform = `translateX(${dx}px)`;
+              } else {
+                it.style.transition = 'transform 0.1s ease';
+                it.style.transform = '';
+              }
+            }
+          }
         }
       }
     },
@@ -1262,6 +1352,7 @@ const WorkbenchPage = {
       document.removeEventListener('mouseup', this._onDragEnd);
       const d = this._drag;
       if (!d) return;
+      this.clearDragShift();
       d.el.style.transform = '';
       d.el.style.opacity = '';
       d.el.style.zIndex = '';

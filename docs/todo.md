@@ -1,5 +1,21 @@
 # TODO
 
+## 已完成：时间线拖拽动画 + 右键菜单 + 快捷键（2026-06-07）
+
+时间线编辑交互增强：拖拽/缩放实时动画、右键删除菜单、Delete/Backspace 快捷键、片段拖放到时间线的插入动画。
+
+**改动文件：**
+- `frontend/js/workbench.js` — `_handleDragMove()` 增加 reorder 动画（拖拽时兄弟元素移位显示插入空隙）和 resize push 动画（右边缘拖拽时后续所有轨道块平移）；`onTrackDragOver()` 新增外部拖放插入动画（片段从素材面板拖入时后续块让出空隙）；`clearDragShift()` 清除所有动画 transform；`onTrackItemContext()` 右键菜单（Quasar q-menu context-menu）；`_onWbKey` 增加 Delete/Backspace 删除快捷键；`onSegDragStart/onMatDragStart` 存储 `_extDragDur` 供拖放动画使用
+- `frontend/js/i18n.js` — 新增 `wb.ctx_delete` 中英文翻译
+- `frontend/css/main.css` — 无额外 CSS（动画通过 JS inline style + transition 实现）
+
+**功能说明：**
+- Reorder 动画：向后拖时，中间的块前移让出空隙；向前拖时同理
+- Resize push 动画：右边缘拖长时，后续所有轨道块实时平移
+- 拖放插入动画：从素材面板拖片段到时间线时，后续块让出空隙
+- 右键菜单：轨道项右键弹出「删除」选项
+- Delete/Backspace：选中轨道项后按键盘删除
+
 ## 已完成：视频轨道编排重构 — 左对齐 + Resize + Reorder（2026-06-07）
 
 视频轨道时间线位置改为派生数据（数组顺序 + srcEnd-srcStart），resize 更新源视频截取范围，reorder 使用数组顺序而非 time_start 排序。
