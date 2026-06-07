@@ -54,6 +54,17 @@ const WorkbenchPage = {
               <q-tooltip :delay="1000">{{ t('wb.type_video') }}</q-tooltip>
             </q-btn>
           </q-btn-group>
+          <q-btn-group unelevated>
+            <q-btn unelevated dense size="sm" :label="t('wb.all')"
+                   :class="{'mat-type-active': matAdded===''}"
+                   @click="matAdded=''"></q-btn>
+            <q-btn unelevated dense size="sm" :label="t('wb.added')"
+                   :class="{'mat-type-active': matAdded==='added'}"
+                   @click="matAdded='added'"></q-btn>
+            <q-btn unelevated dense size="sm" :label="t('wb.not_added')"
+                   :class="{'mat-type-active': matAdded==='not_added'}"
+                   @click="matAdded='not_added'"></q-btn>
+          </q-btn-group>
           <div class="sort-group wb-mat-sort-group">
             <q-select v-model="matSort" dense filled flat
                       :options="matSortOptions" emit-value map-options
@@ -76,6 +87,7 @@ const WorkbenchPage = {
                  draggable="true"
                  @dragstart="onMatDragStart($event, m)">
               <img :src="'/media/thumbnail/' + m.id" class="wb-mat-thumb" loading="lazy">
+              <span v-if="isMediaOnTimeline(m.id)" class="wb-mat-badge">{{ t('wb.added') }}</span>
               <div class="wb-mat-overlay">
                 <div class="wb-mat-meta">
                   <span v-if="m.duration">{{ fmtDur(m.duration) }}</span>
@@ -303,6 +315,7 @@ const WorkbenchPage = {
                       <span class="seg-time"><span class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'time_start', e.target.innerText.trim())" v-text="seg.time_start"></span> → <span class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'time_end', e.target.innerText.trim())" v-text="seg.time_end"></span></span>
                     </div>
                     <div style="display:flex;align-items:center;gap:6px">
+                      <span v-if="isSegOnTimeline(seg.id)" class="seg-added-badge">{{ t('wb.added') }}</span>
                       <span class="seg-dur">{{ fmtSegDur(seg.time_start, seg.time_end) }}</span>
                     </div>
                   </div>
@@ -471,6 +484,7 @@ const WorkbenchPage = {
       previewLoading: false,
       matSearch: "",
       matType: "",
+      matAdded: "",
       matSort: "file_name",
       matSortOrder: "asc",
       matCols: parseInt(localStorage.getItem('wb_matCols')) || 3,
@@ -512,6 +526,21 @@ const WorkbenchPage = {
 
   computed: {
     t() { return t; },
+    _timelineMediaIds() {
+      const ids = new Set();
+      for (const tr of this.tracks) {
+        if (tr.track_type !== 'video') continue;
+        try {
+          const m = JSON.parse(tr.metadata || '{}');
+          if (m.srcMediaId) ids.add(m.srcMediaId);
+        } catch(e) {}
+        if (tr.segment_id) {
+          const seg = this.segments.find(s => s.id === tr.segment_id);
+          if (seg) ids.add(seg.media_id);
+        }
+      }
+      return ids;
+    },
     matCollapsed: {
       get() { return this.$root.matCollapsed; },
       set(v) { this.$root.matCollapsed = v; }
@@ -520,6 +549,8 @@ const WorkbenchPage = {
       if (!this.project || !this.project.media) return [];
       let list = this.project.media;
       if (this.matType) list = list.filter(m => m.media_type === this.matType);
+      if (this.matAdded === 'added') list = list.filter(m => this._timelineMediaIds.has(m.id));
+      else if (this.matAdded === 'not_added') list = list.filter(m => !this._timelineMediaIds.has(m.id));
       const key = this.matSort;
       const desc = this.matSortOrder === 'desc';
       list = [...list].sort((a, b) => {
@@ -795,6 +826,12 @@ const WorkbenchPage = {
     },
     getTrackItems(trackType) {
       return this.tracks.filter(tr => tr.track_type === trackType);
+    },
+    isMediaOnTimeline(mediaId) {
+      return this._timelineMediaIds.has(mediaId);
+    },
+    isSegOnTimeline(segId) {
+      return this.tracks.some(tr => tr.segment_id === segId);
     },
     trackSkipStart() {
       const p = this.$refs.wbPlayer;
