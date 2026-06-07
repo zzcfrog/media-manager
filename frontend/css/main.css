@@ -611,9 +611,13 @@ body:not(.body--dark) .sidebar-action-btn {
 }
 .wb-mat-toolbar {
   display: flex; align-items: center; gap: 6px;
-  padding: 6px 8px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  padding: 4px 8px; border-bottom: 1px solid var(--border); flex-shrink: 0;
 }
 .wb-mat-search { flex: 1; min-width: 0; }
+.wb-mat-filters {
+  display: flex; align-items: center; gap: 6px;
+  padding: 2px 8px 4px; flex-shrink: 0;
+}
 .wb-mat-search .q-field__control { min-height: 28px !important; height: 28px; padding: 0 8px !important; border-radius: 6px !important; align-items: center !important; }
 .wb-mat-search .q-field__control::before,
 .wb-mat-search .q-field__control::after { border: none !important; }
