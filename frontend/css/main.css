@@ -629,6 +629,10 @@ body:not(.body--dark) .wb-mat-search .q-field__control::before { background: #e0
 body.body--dark .wb-mat-toolbar .q-btn-group { background: #222; }
 body:not(.body--dark) .wb-mat-toolbar .q-btn-group { background: #e0e0e0; }
 .wb-mat-toolbar .q-btn-group .q-btn { padding: 2px 6px; min-height: 28px; font-size: 11px; background: transparent; }
+.wb-mat-filters .q-btn-group { flex-shrink: 0; border-radius: 6px; overflow: hidden; }
+body.body--dark .wb-mat-filters .q-btn-group { background: #222; }
+body:not(.body--dark) .wb-mat-filters .q-btn-group { background: #e0e0e0; }
+.wb-mat-filters .q-btn-group .q-btn { padding: 2px 6px; min-height: 28px; font-size: 11px; background: transparent; }
 .mat-type-active { background: var(--accent) !important; color: #fff !important; }
 .wb-mat-sort-group { flex-shrink: 0; }
 body.body--dark .wb-mat-sort-group { background: #222; }
