@@ -824,22 +824,28 @@ const WorkbenchPage = {
       this.trackCanUndo = true;
       this.trackCanRedo = false;
     },
+    _getVideoDur(item) {
+      try {
+        const m = JSON.parse(item.metadata || '{}');
+        if (m.srcStart != null && m.srcEnd != null)
+          return Math.max(this._timeToSec(m.srcEnd) - this._timeToSec(m.srcStart), 0.1);
+      } catch(e) {}
+      return Math.max(this._timeToSec(item.time_end) - this._timeToSec(item.time_start), 0.1);
+    },
     _normalizeVideoTrack() {
       const videos = this.tracks.filter(t => t.track_type === 'video');
       if (!videos.length) return;
-      // Sort by start time, record old ranges
-      videos.sort((a, b) => this._timeToSec(a.time_start) - this._timeToSec(b.time_start));
+      // Use array order (user intent), not time-based sort
       const mapping = []; // { oldStart, oldEnd, newStart, newEnd }
       let pos = 0;
       for (const v of videos) {
         const oldStart = this._timeToSec(v.time_start);
-        const oldEnd = this._timeToSec(v.time_end);
-        const dur = Math.max(oldEnd - oldStart, 0.1);
+        const dur = this._getVideoDur(v);
         const newStart = pos;
         const newEnd = pos + dur;
         v.time_start = this._secToStr(newStart);
         v.time_end = this._secToStr(newEnd);
-        mapping.push({ oldStart, oldEnd, newStart, newEnd });
+        mapping.push({ oldStart, oldEnd: oldStart + dur, newStart, newEnd });
         pos = newEnd;
       }
       // Sync other tracks: match by [oldStart, oldEnd) left-closed right-open
@@ -895,15 +901,33 @@ const WorkbenchPage = {
       const idx = this.tracks.findIndex(t => t.id === this.trackSelectedItem);
       if (idx < 0) return;
       const item = this.tracks[idx];
-      const ts = this._parseDuration(item.time_start, item.time_end);
-      if (ts < 2) return;
-      this._trackSnapshot();
-      const half = ts / 2;
-      const tsNum = parseFloat(item.time_start) || 0;
-      const mid = tsNum + half;
-      const part1 = { ...item, id: Date.now(), time_end: String(mid.toFixed(2)) };
-      const part2 = { ...item, id: Date.now() + 1, time_start: String(mid.toFixed(2)) };
-      this.tracks.splice(idx, 1, part1, part2);
+      if (item.track_type === 'video') {
+        // Video split: divide srcStart/srcEnd at midpoint
+        let meta = {};
+        try { meta = JSON.parse(item.metadata || '{}'); } catch(e) {}
+        const srcS = this._timeToSec(meta.srcStart || '0');
+        const srcE = this._timeToSec(meta.srcEnd || '5');
+        const dur = srcE - srcS;
+        if (dur < 1) return;
+        const mid = (srcS + srcE) / 2;
+        const meta1 = { ...meta, srcEnd: this._secToStr(mid) };
+        const meta2 = { ...meta, srcStart: this._secToStr(mid) };
+        this._trackSnapshot();
+        const part1 = { ...item, id: Date.now(), metadata: JSON.stringify(meta1) };
+        const part2 = { ...item, id: Date.now() + 1, metadata: JSON.stringify(meta2) };
+        this.tracks.splice(idx, 1, part1, part2);
+      } else {
+        // Non-video split: divide time_start/time_end at midpoint
+        const ts = this._parseDuration(item.time_start, item.time_end);
+        if (ts < 2) return;
+        this._trackSnapshot();
+        const half = ts / 2;
+        const tsNum = this._timeToSec(item.time_start);
+        const mid = tsNum + half;
+        const part1 = { ...item, id: Date.now(), time_end: this._secToStr(mid) };
+        const part2 = { ...item, id: Date.now() + 1, time_start: this._secToStr(mid) };
+        this.tracks.splice(idx, 1, part1, part2);
+      }
       this.trackSelectedItem = null;
       this._trackSave();
     },
@@ -1091,84 +1115,104 @@ const WorkbenchPage = {
       try {
         const payload = JSON.parse(data);
         this._trackSnapshot();
-        // 计算放置位置对应的轨道时间
-        const contentEl = e.currentTarget;
-        const rect = contentEl.getBoundingClientRect();
-        const dropSec = Math.max(0, (e.clientX - rect.left) / this.pps);
-        // 计算新块的时长
+        // Compute duration from source segment or media
         let dur;
         if (payload.type === 'segment') {
           dur = this._parseDuration(payload.time_start, payload.time_end) || 5;
         } else {
           dur = Math.min(payload.duration || 5, 5);
         }
-        // 找到该轨道的所有 items 并按轨道时间排序
-        const items = this.getTrackItems(trackType)
-          .map(item => ({ item, start: this._timeToSec(item.time_start), end: this._timeToSec(item.time_end) }))
-          .sort((a, b) => a.start - b.start);
-        // 找插入点：dropSec 应插入的位置
-        let insertIdx = items.length; // 默认在末尾
-        for (let i = 0; i < items.length; i++) {
-          if (dropSec < items[i].end) { insertIdx = i; break; }
-        }
-        // 从插入点开始，后续所有块的 time_start/time_end 后移 dur
-        for (let i = insertIdx; i < items.length; i++) {
-          const it = items[i].item;
-          const s = this._timeToSec(it.time_start) + dur;
-          const e = this._timeToSec(it.time_end) + dur;
-          it.time_start = this._secToStr(s);
-          it.time_end = this._secToStr(e);
-        }
-        // 确定新块的轨道起始时间
-        let newStart = dropSec;
-        if (insertIdx > 0 && dropSec < items[insertIdx - 1].end) {
-          newStart = items[insertIdx - 1].end; // 贴紧前一个块的末尾
-        }
-        // 创建新块
-        const newItem = {
-          id: Date.now(),
-          track_type: trackType,
-          content: payload.visual || '',
-          time_start: this._secToStr(newStart),
-          time_end: this._secToStr(newStart + dur),
-          emotion_value: 0.5,
-          metadata: '{}',
-        };
-        if (payload.type === 'segment') {
-          newItem.segment_id = payload.id;
-          newItem._segment = payload;
-          newItem.metadata = JSON.stringify({ srcStart: payload.time_start, srcEnd: payload.time_end, srcMediaId: payload.media_id });
+        if (trackType === 'video') {
+          // Video track: just create item with srcStart/srcEnd, normalization handles position
+          const newItem = {
+            id: Date.now(),
+            track_type: 'video',
+            content: payload.visual || '',
+            time_start: '0:00.0',
+            time_end: this._secToStr(dur),
+            emotion_value: 0.5,
+            metadata: '{}',
+          };
+          if (payload.type === 'segment') {
+            newItem.segment_id = payload.id;
+            newItem._segment = payload;
+            newItem.metadata = JSON.stringify({ srcStart: payload.time_start, srcEnd: payload.time_end, srcMediaId: payload.media_id });
+          } else {
+            newItem.metadata = JSON.stringify({ srcMediaId: payload.id, srcStart: '0:00', srcEnd: this._secToStr(dur) });
+          }
+          this.tracks.push(newItem);
         } else {
-          newItem.metadata = JSON.stringify({ srcMediaId: payload.id, srcStart: '0:00', srcEnd: this._secToStr(dur) });
+          // Non-video track: compute drop position and insert
+          const contentEl = e.currentTarget;
+          const rect = contentEl.getBoundingClientRect();
+          const dropSec = Math.max(0, (e.clientX - rect.left) / this.pps);
+          const items = this.getTrackItems(trackType)
+            .map(item => ({ item, start: this._timeToSec(item.time_start), end: this._timeToSec(item.time_end) }))
+            .sort((a, b) => a.start - b.start);
+          let insertIdx = items.length;
+          for (let i = 0; i < items.length; i++) {
+            if (dropSec < items[i].end) { insertIdx = i; break; }
+          }
+          for (let i = insertIdx; i < items.length; i++) {
+            const it = items[i].item;
+            it.time_start = this._secToStr(this._timeToSec(it.time_start) + dur);
+            it.time_end = this._secToStr(this._timeToSec(it.time_end) + dur);
+          }
+          let newStart = dropSec;
+          if (insertIdx > 0 && dropSec < items[insertIdx - 1].end) {
+            newStart = items[insertIdx - 1].end;
+          }
+          const newItem = {
+            id: Date.now(),
+            track_type: trackType,
+            content: payload.visual || '',
+            time_start: this._secToStr(newStart),
+            time_end: this._secToStr(newStart + dur),
+            emotion_value: 0.5,
+            metadata: '{}',
+          };
+          if (payload.type === 'segment') {
+            newItem.segment_id = payload.id;
+            newItem._segment = payload;
+            newItem.metadata = JSON.stringify({ srcStart: payload.time_start, srcEnd: payload.time_end, srcMediaId: payload.media_id });
+          } else {
+            newItem.metadata = JSON.stringify({ srcMediaId: payload.id, srcStart: '0:00', srcEnd: this._secToStr(dur) });
+          }
+          this.tracks.push(newItem);
         }
-        this.tracks.push(newItem);
         this._trackSave();
       } catch(err) { console.error('onTrackDrop', err); }
     },
     addTrackItem(type) {
       this._trackSnapshot();
-      const items = this.getTrackItems(type);
-      let maxEnd = 0;
-      for (const item of items) {
-        const e = this._timeToSec(item.time_end);
-        if (e > maxEnd) maxEnd = e;
+      if (type === 'video') {
+        // Video track: srcStart/srcEnd in metadata, normalization handles timeline position
+        this.tracks.push({
+          id: Date.now(),
+          track_type: 'video',
+          content: '',
+          time_start: '0:00.0',
+          time_end: '0:05.0',
+          emotion_value: 0.5,
+          metadata: JSON.stringify({ srcStart: '0:00.0', srcEnd: '0:05.0', srcMediaId: null }),
+        });
+      } else {
+        const items = this.getTrackItems(type);
+        let maxEnd = 0;
+        for (const item of items) {
+          const e = this._timeToSec(item.time_end);
+          if (e > maxEnd) maxEnd = e;
+        }
+        this.tracks.push({
+          id: Date.now(),
+          track_type: type,
+          content: '',
+          time_start: this._secToStr(maxEnd),
+          time_end: this._secToStr(maxEnd + 5),
+          emotion_value: 0.5,
+          metadata: '{}',
+        });
       }
-      const m = Math.floor(maxEnd / 60);
-      const s = maxEnd % 60;
-      const startStr = m + ':' + String(Math.round(s)).padStart(2, '0');
-      const endSec = maxEnd + 5;
-      const em = Math.floor(endSec / 60);
-      const es = endSec % 60;
-      const endStr = em + ':' + String(Math.round(es)).padStart(2, '0');
-      this.tracks.push({
-        id: Date.now(),
-        track_type: type,
-        content: '',
-        time_start: startStr,
-        time_end: endStr,
-        emotion_value: 0.5,
-        metadata: '{}',
-      });
       this._trackSave();
     },
     onTrackItemHover(e) {
@@ -1245,18 +1289,41 @@ const WorkbenchPage = {
         this._trackSave();
       } else {
         const dx = e.clientX - d.startX;
-        let newWidth;
-        if (d.edge === 'right') {
-          newWidth = Math.max(30, d.startWidth + dx);
-        } else {
-          newWidth = Math.max(30, d.startWidth - dx);
-        }
+        if (Math.abs(dx) < 3) { this._drag = null; return; }
         this._trackSnapshot();
-        try {
-          const meta = JSON.parse(d.item.metadata || '{}');
-          meta.width = Math.round(newWidth);
+        if (d.trackType === 'video') {
+          // Video resize: update srcStart/srcEnd in metadata
+          let meta = {};
+          try { meta = JSON.parse(d.item.metadata || '{}'); } catch(e) {}
+          let srcStart = this._timeToSec(meta.srcStart || '0');
+          let srcEnd = this._timeToSec(meta.srcEnd || '5');
+          const media = this.project?.media?.find(m => m.id === meta.srcMediaId);
+          const maxDur = media?.duration || Infinity;
+          const deltaSec = dx / this.pps;
+          if (d.edge === 'right') {
+            srcEnd = Math.min(srcEnd + deltaSec, maxDur);
+            if (srcEnd <= srcStart + 0.1) srcEnd = srcStart + 0.1;
+          } else {
+            srcStart = Math.max(srcStart + deltaSec, 0);
+            if (srcStart >= srcEnd - 0.1) srcStart = srcEnd - 0.1;
+          }
+          meta.srcStart = this._secToStr(srcStart);
+          meta.srcEnd = this._secToStr(srcEnd);
           d.item.metadata = JSON.stringify(meta);
-        } catch(e) {}
+        } else {
+          // Non-video resize: update time_start/time_end directly
+          const deltaSec = dx / this.pps;
+          let ts = this._timeToSec(d.item.time_start);
+          let te = this._timeToSec(d.item.time_end);
+          if (d.edge === 'right') {
+            te = Math.max(te + deltaSec, ts + 0.1);
+          } else {
+            ts = Math.min(ts + deltaSec, te - 0.1);
+            if (ts < 0) ts = 0;
+          }
+          d.item.time_start = this._secToStr(ts);
+          d.item.time_end = this._secToStr(te);
+        }
         this._trackSave();
       }
       this._drag = null;

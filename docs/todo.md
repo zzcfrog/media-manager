@@ -1,17 +1,19 @@
 # TODO
 
-## 已完成：视频轨道片段左对齐 + 其他轨道联动（2026-06-07）
+## 已完成：视频轨道编排重构 — 左对齐 + Resize + Reorder（2026-06-07）
 
-视频轨道片段始终从 0 秒开始紧密排列，无间隙。每次保存前自动归一化，其他轨道块按左开右闭区间 `[oldStart, oldEnd)` 匹配视频项并同步平移。
+视频轨道时间线位置改为派生数据（数组顺序 + srcEnd-srcStart），resize 更新源视频截取范围，reorder 使用数组顺序而非 time_start 排序。
 
 **改动文件：**
-- `frontend/js/workbench.js` — `_normalizeVideoTrack()` 扩展：记录视频项旧→新时间映射，其他轨道块按 `[oldStart, oldEnd)` 匹配后整体平移；`_trackSave()` 在持久化前自动调用
+- `frontend/js/workbench.js` — 新增 `_getVideoDur()` 辅助函数（从 metadata.srcEnd-srcStart 取时长，fallback 到 time_end-time_start）；`_normalizeVideoTrack()` 重写（用数组顺序而非 time_start 排序、用 srcEnd-srcStart 算时长）；`_handleDragEnd()` resize 模式重写（视频轨道更新 metadata.srcStart/srcEnd，受源视频边界约束；其他轨道更新 time_start/time_end）；`trackSplit()` 更新（视频轨道分割 srcStart/srcEnd）；`onTrackDrop()` 简化（视频轨道只设 metadata，归一化自动处理位置）；`addTrackItem()` 更新（视频轨道设默认 srcStart/srcEnd）
 
-**功能说明：**
-- 视频轨道：从 0 开始紧密排列，源时长不变
-- 其他轨道：块与视频项联动平移，间隙保留（不存在对应视频项的位置本来就没有块）
-- 区间匹配用左开右闭 `[start, end)`，边界无歧义
-- 覆盖所有编辑路径（删除/分割/拖放/撤销重做）
+**设计原则：**
+- 视频轨道 `time_start/time_end` 是派生数据——由数组顺序 + `metadata.srcEnd - srcStart` 计算
+- Resize 更新 `srcStart/srcEnd`，受源视频边界约束（≥0, ≤duration）
+- Reorder 改变数组顺序，归一化用数组顺序
+- 其他轨道独立存储 `time_start/time_end`，可与视频项联动
+- `segment_id` 保留为原始分析数据引用（重新分析后可能断，不影响播放）
+- 所有文本内容独立存储在 `content` 列
 
 ## 已完成：LLM 分片时间重叠修正（2026-06-06）
 
