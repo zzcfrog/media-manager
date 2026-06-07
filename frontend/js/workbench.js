@@ -37,11 +37,11 @@ const WorkbenchPage = {
                    @keyup.enter="searchMedia">
             <template v-slot:prepend><q-icon name="search" size="14px"></q-icon></template>
             <template v-slot:append>
-              <q-icon :name="matAdded==='' ? 'filter_list' : matAdded==='added' ? 'check_circle' : 'cancel'"
+              <q-icon name="filter_list"
                       size="16px" style="cursor:pointer"
                       :style="{color: matAdded!=='' ? 'var(--accent)' : 'var(--text3)'}"
                       @click="matAdded = matAdded==='' ? 'added' : matAdded==='added' ? 'not_added' : ''">
-                <q-tooltip :delay="600">{{ t('wb.filter_added_tip') }}</q-tooltip>
+                <q-tooltip :delay="600">{{ matAdded==='' ? t('wb.filter_added_tip') : matAdded==='added' ? t('wb.added') : t('wb.not_added') }}</q-tooltip>
               </q-icon>
             </template>
           </q-input>
