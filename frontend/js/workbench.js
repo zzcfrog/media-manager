@@ -399,7 +399,6 @@ const WorkbenchPage = {
                  :style="trackItemPos(item)"
                  @click="trackSelectedItem = item.id"
                  @mousedown="onTrackItemDown($event, item, tt.key)"
-                 @contextmenu.prevent="onTrackItemContext($event, item)"
                  @mousemove="onTrackItemHover">
               <template v-if="tt.key === 'video'">
                 <div v-if="item._segment" class="wb-track-filmstrip"
@@ -1206,14 +1205,16 @@ const WorkbenchPage = {
       if (!this._extDragDur) return;
       const gapWidth = this._extDragDur * this.pps;
       const contentEl = e.currentTarget;
+      const contentRect = contentEl.getBoundingClientRect();
+      const mouseX = e.clientX - contentRect.left;
       const children = Array.from(contentEl.querySelectorAll('.wb-track-item'));
-      // Find insertion index based on mouse position relative to item centers
+      // Use CSS left (original position) not getBoundingClientRect to avoid jitter
       let insertIdx = children.length;
       for (let i = 0; i < children.length; i++) {
-        const cr = children[i].getBoundingClientRect();
-        if (e.clientX < cr.left + cr.width / 2) { insertIdx = i; break; }
+        const itLeft = parseFloat(children[i].style.left) || 0;
+        const itWidth = children[i].offsetWidth;
+        if (mouseX < itLeft + itWidth / 2) { insertIdx = i; break; }
       }
-      // Shift items at and after insertion point to create gap
       for (let i = insertIdx; i < children.length; i++) {
         children[i].style.transition = 'transform 0.15s ease';
         children[i].style.transform = `translateX(${gapWidth}px)`;
@@ -1267,6 +1268,7 @@ const WorkbenchPage = {
         edge: nearLeft ? 'left' : nearRight ? 'right' : null,
         trackType, item,
         startX: e.clientX,
+        startY: e.clientY,
         startWidth: rect.width,
         el: e.currentTarget,
       };
@@ -1298,25 +1300,33 @@ const WorkbenchPage = {
             if (mediaId) thumbUrl = `/media/thumbnail/${mediaId}`;
           } catch(e) {}
           const ghost = document.createElement('div');
-          ghost.style.cssText = `position:fixed;z-index:9999;pointer-events:none;width:80px;height:50px;border-radius:6px;background:var(--bg,#222) center/cover no-repeat;box-shadow:0 4px 16px rgba(0,0,0,0.4);opacity:0.9;transition:none;`;
+          ghost.style.cssText = `position:fixed;z-index:9999;pointer-events:none;width:80px;height:50px;border-radius:6px;background:var(--bg,#222) center/cover no-repeat;box-shadow:0 4px 16px rgba(0,0,0,0.4);opacity:0.9;transition:none;cursor:grabbing;`;
           if (thumbUrl) ghost.style.backgroundImage = `url(${thumbUrl})`;
           else ghost.style.background = 'var(--bg,#333)';
           document.body.appendChild(ghost);
           d.ghost = ghost;
           d.el.style.opacity = '0.25';
+          d.el.style.cursor = 'grabbing';
+          // Store click offset within the element so ghost stays at press point
+          const rect = d.el.getBoundingClientRect();
+          d.ghostOffX = d.startX - rect.left - 40; // offset to center ghost 80px wide
+          d.ghostOffY = d.startY - rect.top - 25;  // offset to center ghost 50px tall
         }
-        // Move ghost with cursor (centered above)
+        // Move ghost centered on press point (no jump)
         d.ghost.style.left = (e.clientX - 40) + 'px';
-        d.ghost.style.top = (e.clientY - 60) + 'px';
+        d.ghost.style.top = (e.clientY - 25) + 'px';
         // Reorder animation: shift siblings to show insertion gap
+        // Use CSS left (original position) not getBoundingClientRect (affected by transforms)
         const contentEl = d.el.parentElement;
         const children = Array.from(contentEl.querySelectorAll('.wb-track-item'));
         const fromIdx = children.indexOf(d.el);
         let toIdx = 0;
         for (let i = 0; i < children.length; i++) {
           if (children[i] === d.el) continue;
-          const cr = children[i].getBoundingClientRect();
-          if (e.clientX > cr.left + cr.width / 2) toIdx = i;
+          const itLeft = parseFloat(children[i].style.left) || 0;
+          const itWidth = children[i].offsetWidth;
+          const itCenter = itLeft + itWidth / 2;
+          if (e.clientX - contentEl.getBoundingClientRect().left > itCenter) toIdx = i;
           else break;
         }
         let adjIdx = toIdx;
@@ -1370,6 +1380,7 @@ const WorkbenchPage = {
       d.el.style.transform = '';
       d.el.style.opacity = '';
       d.el.style.zIndex = '';
+      d.el.style.cursor = '';
       if (d.mode === 'reorder') {
         const dx = e.clientX - d.startX;
         if (Math.abs(dx) < 5) { this._drag = null; return; }
