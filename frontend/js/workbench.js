@@ -55,7 +55,7 @@ const WorkbenchPage = {
             </q-btn>
           </q-btn-group>
           <q-btn unelevated dense size="sm"
-                 :icon="matAdded==='' ? 'o_playlist_add' : matAdded==='added' ? 'playlist_add_check' : 'playlist_remove'"
+                 :icon="matAdded==='' ? 'filter_list' : matAdded==='added' ? 'check_circle' : 'cancel'"
                  :label="matAdded==='' ? '' : t(matAdded==='added' ? 'wb.added' : 'wb.not_added')"
                  :class="{'mat-type-active': matAdded!==''}"
                  @click="matAdded = matAdded==='' ? 'added' : matAdded==='added' ? 'not_added' : ''">
