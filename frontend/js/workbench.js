@@ -37,48 +37,41 @@ const WorkbenchPage = {
                    @keyup.enter="searchMedia">
             <template v-slot:prepend><q-icon name="search" size="14px"></q-icon></template>
           </q-input>
-          </div>
-          <div class="wb-mat-filters">
-            <q-btn-group unelevated>
-              <q-btn unelevated dense size="sm" label="ALL"
-                     :class="{'mat-type-active': matType===''}"
-                     @click="matType=''">
-                <q-tooltip :delay="1000">{{ t('wb.all') }}</q-tooltip>
-              </q-btn>
-              <q-btn unelevated dense size="sm" icon="image"
-                     :class="{'mat-type-active': matType==='image'}"
-                     @click="matType='image'">
-                <q-tooltip :delay="1000">{{ t('wb.type_image') }}</q-tooltip>
-              </q-btn>
-              <q-btn unelevated dense size="sm" icon="smart_display"
-                     :class="{'mat-type-active': matType==='video'}"
-                     @click="matType='video'">
-                <q-tooltip :delay="1000">{{ t('wb.type_video') }}</q-tooltip>
-              </q-btn>
-            </q-btn-group>
-            <q-btn-group unelevated>
-              <q-btn unelevated dense size="sm" :label="t('wb.all')"
-                     :class="{'mat-type-active': matAdded===''}"
-                     @click="matAdded=''"></q-btn>
-              <q-btn unelevated dense size="sm" :label="t('wb.added')"
-                     :class="{'mat-type-active': matAdded==='added'}"
-                     @click="matAdded='added'"></q-btn>
-              <q-btn unelevated dense size="sm" :label="t('wb.not_added')"
-                     :class="{'mat-type-active': matAdded==='not_added'}"
-                     @click="matAdded='not_added'"></q-btn>
-            </q-btn-group>
-            <div style="flex:1"></div>
-            <div class="sort-group wb-mat-sort-group">
-              <q-select v-model="matSort" dense filled flat
-                        :options="matSortOptions" emit-value map-options
-                        popup-content-class="wb-mat-sort-popup"></q-select>
-              <q-btn flat dense :icon="matSortOrder==='desc' ? 'arrow_downward' : 'arrow_upward'"
-                     color="grey-6" size="sm" @click="matSortOrder=matSortOrder==='desc'?'asc':'desc'"></q-btn>
-            </div>
-            <q-btn flat round dense icon="add_circle_outline" size="xs" style="color:var(--accent);flex-shrink:0"
-                   @click="openMediaPicker">
-              <q-tooltip>{{ t('wb.add_media') }}</q-tooltip>
+          <q-btn-group unelevated>
+            <q-btn unelevated dense size="sm" label="ALL"
+                   :class="{'mat-type-active': matType===''}"
+                   @click="matType=''">
+              <q-tooltip :delay="1000">{{ t('wb.all') }}</q-tooltip>
             </q-btn>
+            <q-btn unelevated dense size="sm" icon="image"
+                   :class="{'mat-type-active': matType==='image'}"
+                   @click="matType='image'">
+              <q-tooltip :delay="1000">{{ t('wb.type_image') }}</q-tooltip>
+            </q-btn>
+            <q-btn unelevated dense size="sm" icon="smart_display"
+                   :class="{'mat-type-active': matType==='video'}"
+                   @click="matType='video'">
+              <q-tooltip :delay="1000">{{ t('wb.type_video') }}</q-tooltip>
+            </q-btn>
+          </q-btn-group>
+          <q-btn unelevated dense size="sm"
+                 :icon="matAdded==='' ? 'o_playlist_add' : matAdded==='added' ? 'playlist_add_check' : 'playlist_remove'"
+                 :label="matAdded==='' ? '' : t(matAdded==='added' ? 'wb.added' : 'wb.not_added')"
+                 :class="{'mat-type-active': matAdded!==''}"
+                 @click="matAdded = matAdded==='' ? 'added' : matAdded==='added' ? 'not_added' : ''">
+            <q-tooltip :delay="600">{{ t('wb.filter_added_tip') }}</q-tooltip>
+          </q-btn>
+          <div class="sort-group wb-mat-sort-group">
+            <q-select v-model="matSort" dense filled flat
+                      :options="matSortOptions" emit-value map-options
+                      popup-content-class="wb-mat-sort-popup"></q-select>
+            <q-btn flat dense :icon="matSortOrder==='desc' ? 'arrow_downward' : 'arrow_upward'"
+                   color="grey-6" size="sm" @click="matSortOrder=matSortOrder==='desc'?'asc':'desc'"></q-btn>
+          </div>
+          <q-btn flat round dense icon="add_circle_outline" size="xs" style="color:var(--accent);flex-shrink:0"
+                 @click="openMediaPicker">
+            <q-tooltip>{{ t('wb.add_media') }}</q-tooltip>
+          </q-btn>
           </div>
         <div class="wb-material-list">
           <div class="wb-mat-grid" :style="matGridStyle">
