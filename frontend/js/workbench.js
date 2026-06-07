@@ -825,15 +825,36 @@ const WorkbenchPage = {
       this.trackCanRedo = false;
     },
     _normalizeVideoTrack() {
-      const items = this.tracks.filter(t => t.track_type === 'video');
-      if (items.length <= 1) return;
-      items.sort((a, b) => this._timeToSec(a.time_start) - this._timeToSec(b.time_start));
+      const videos = this.tracks.filter(t => t.track_type === 'video');
+      if (!videos.length) return;
+      // Sort by start time, record old ranges
+      videos.sort((a, b) => this._timeToSec(a.time_start) - this._timeToSec(b.time_start));
+      const mapping = []; // { oldStart, oldEnd, newStart, newEnd }
       let pos = 0;
-      for (const it of items) {
-        const dur = this._timeToSec(it.time_end) - this._timeToSec(it.time_start);
-        it.time_start = this._secToStr(pos);
-        it.time_end = this._secToStr(pos + Math.max(dur, 0.1));
-        pos += Math.max(dur, 0.1);
+      for (const v of videos) {
+        const oldStart = this._timeToSec(v.time_start);
+        const oldEnd = this._timeToSec(v.time_end);
+        const dur = Math.max(oldEnd - oldStart, 0.1);
+        const newStart = pos;
+        const newEnd = pos + dur;
+        v.time_start = this._secToStr(newStart);
+        v.time_end = this._secToStr(newEnd);
+        mapping.push({ oldStart, oldEnd, newStart, newEnd });
+        pos = newEnd;
+      }
+      // Sync other tracks: match by [oldStart, oldEnd) left-closed right-open
+      for (const tr of this.tracks) {
+        if (tr.track_type === 'video') continue;
+        const ts = this._timeToSec(tr.time_start);
+        const te = this._timeToSec(tr.time_end);
+        for (const m of mapping) {
+          if (ts >= m.oldStart && ts < m.oldEnd) {
+            const offset = m.newStart - m.oldStart;
+            tr.time_start = this._secToStr(ts + offset);
+            tr.time_end = this._secToStr(te + offset);
+            break;
+          }
+        }
       }
     },
     async _trackSave() {
