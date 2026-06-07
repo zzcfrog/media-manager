@@ -36,6 +36,14 @@ const WorkbenchPage = {
                    class="wb-mat-search"
                    @keyup.enter="searchMedia">
             <template v-slot:prepend><q-icon name="search" size="14px"></q-icon></template>
+            <template v-slot:append>
+              <q-icon :name="matAdded==='' ? 'filter_list' : matAdded==='added' ? 'check_circle' : 'cancel'"
+                      size="16px" style="cursor:pointer"
+                      :style="{color: matAdded!=='' ? 'var(--accent)' : 'var(--text3)'}"
+                      @click="matAdded = matAdded==='' ? 'added' : matAdded==='added' ? 'not_added' : ''">
+                <q-tooltip :delay="600">{{ t('wb.filter_added_tip') }}</q-tooltip>
+              </q-icon>
+            </template>
           </q-input>
           <q-btn-group unelevated>
             <q-btn unelevated dense size="sm" label="ALL"
@@ -54,13 +62,6 @@ const WorkbenchPage = {
               <q-tooltip :delay="1000">{{ t('wb.type_video') }}</q-tooltip>
             </q-btn>
           </q-btn-group>
-          <q-btn unelevated dense size="sm"
-                 :icon="matAdded==='' ? 'filter_list' : matAdded==='added' ? 'check_circle' : 'cancel'"
-                 :label="matAdded==='' ? '' : t(matAdded==='added' ? 'wb.added' : 'wb.not_added')"
-                 :class="{'mat-type-active': matAdded!==''}"
-                 @click="matAdded = matAdded==='' ? 'added' : matAdded==='added' ? 'not_added' : ''">
-            <q-tooltip :delay="600">{{ t('wb.filter_added_tip') }}</q-tooltip>
-          </q-btn>
           <div class="sort-group wb-mat-sort-group">
             <q-select v-model="matSort" dense filled flat
                       :options="matSortOptions" emit-value map-options
