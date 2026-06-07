@@ -824,8 +824,21 @@ const WorkbenchPage = {
       this.trackCanUndo = true;
       this.trackCanRedo = false;
     },
+    _normalizeVideoTrack() {
+      const items = this.tracks.filter(t => t.track_type === 'video');
+      if (items.length <= 1) return;
+      items.sort((a, b) => this._timeToSec(a.time_start) - this._timeToSec(b.time_start));
+      let pos = 0;
+      for (const it of items) {
+        const dur = this._timeToSec(it.time_end) - this._timeToSec(it.time_start);
+        it.time_start = this._secToStr(pos);
+        it.time_end = this._secToStr(pos + Math.max(dur, 0.1));
+        pos += Math.max(dur, 0.1);
+      }
+    },
     async _trackSave() {
       if (!this.projectId) return;
+      this._normalizeVideoTrack();
       const payload = this.tracks.map(t => {
         const o = { ...t };
         delete o._segment;
