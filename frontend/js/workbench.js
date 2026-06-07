@@ -1289,9 +1289,25 @@ const WorkbenchPage = {
       if (!d) return;
       const dx = e.clientX - d.startX;
       if (d.mode === 'reorder') {
-        d.el.style.transform = `translateX(${dx}px)`;
-        d.el.style.opacity = '0.5';
-        d.el.style.zIndex = '10';
+        // Create floating thumbnail ghost on first move
+        if (!d.ghost) {
+          let thumbUrl = '';
+          try {
+            const meta = JSON.parse(d.item.metadata || '{}');
+            const mediaId = meta.srcMediaId || (d.item._segment?.media_id);
+            if (mediaId) thumbUrl = `/media/thumbnail/${mediaId}`;
+          } catch(e) {}
+          const ghost = document.createElement('div');
+          ghost.style.cssText = `position:fixed;z-index:9999;pointer-events:none;width:80px;height:50px;border-radius:6px;background:var(--bg,#222) center/cover no-repeat;box-shadow:0 4px 16px rgba(0,0,0,0.4);opacity:0.9;transition:none;`;
+          if (thumbUrl) ghost.style.backgroundImage = `url(${thumbUrl})`;
+          else ghost.style.background = 'var(--bg,#333)';
+          document.body.appendChild(ghost);
+          d.ghost = ghost;
+          d.el.style.opacity = '0.25';
+        }
+        // Move ghost with cursor (centered above)
+        d.ghost.style.left = (e.clientX - 40) + 'px';
+        d.ghost.style.top = (e.clientY - 60) + 'px';
         // Reorder animation: shift siblings to show insertion gap
         const contentEl = d.el.parentElement;
         const children = Array.from(contentEl.querySelectorAll('.wb-track-item'));
@@ -1303,7 +1319,6 @@ const WorkbenchPage = {
           if (e.clientX > cr.left + cr.width / 2) toIdx = i;
           else break;
         }
-        // Adjust toIdx: if mouse is past the last non-dragged item, toIdx = last position
         let adjIdx = toIdx;
         if (fromIdx <= toIdx) adjIdx = Math.min(toIdx, children.length - 1);
         const itemW = d.startWidth;
@@ -1311,10 +1326,8 @@ const WorkbenchPage = {
           if (children[i] === d.el) continue;
           children[i].style.transition = 'transform 0.15s ease';
           if (fromIdx < adjIdx) {
-            // Dragging right: items between fromIdx and adjIdx shift left
             children[i].style.transform = (i > fromIdx && i <= adjIdx) ? `translateX(${-itemW}px)` : '';
           } else if (fromIdx > adjIdx) {
-            // Dragging left: items between adjIdx and fromIdx shift right
             children[i].style.transform = (i >= adjIdx && i < fromIdx) ? `translateX(${itemW}px)` : '';
           } else {
             children[i].style.transform = '';
@@ -1353,6 +1366,7 @@ const WorkbenchPage = {
       const d = this._drag;
       if (!d) return;
       this.clearDragShift();
+      if (d.ghost) { d.ghost.remove(); d.ghost = null; }
       d.el.style.transform = '';
       d.el.style.opacity = '';
       d.el.style.zIndex = '';
