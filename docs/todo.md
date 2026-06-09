@@ -1,5 +1,18 @@
 # TODO
 
+## 已完成：素材利用率优化 — 多用素材 + 长分片关键时刻（2026-06-09）
+
+两个方向优化素材利用率：Prompt 鼓励多用素材 + 长分片增加关键时刻描述。
+
+**改动文件：**
+- `backend/creative_prompt.txt` — 选片原则增强：每叙事 3-8 个镜头（原 2-5）；鼓励多用不同 segment（如 704 片段至少用 100+）；长片段参考 highlights 截取精华
+- `backend/blueprints/creative.py` — 取消 visual 描述 100 字截断（发送完整描述）；segment 数据增加 highlights 字段
+- `backend/video_prompt.txt` — 新增第 17 维度 `highlights`：超过 20 秒的分片标注 2-4 个关键时刻（time + desc），附带示例
+- `backend/db.py` — media_segment 表新增 `highlights` 列 + 迁移
+- `backend/blueprints/analysis.py` — INSERT 增加 highlights 字段；`_segment_to_dict` 解析 highlights JSON
+
+**注意：** 已有分片的 highlights 为空，需重新分析才能生成。新分析的素材会自动包含 highlights。
+
 ## 已完成：AI 子片段截取 — 提升素材利用率（2026-06-09）
 
 AI 可以指定 segment 的子区间（src_start/src_end），不用整个 segment 从头用到尾。这样同一个长 segment 的不同部分可以分别用于多个镜头，大幅提升素材利用率。

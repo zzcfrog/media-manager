@@ -248,21 +248,25 @@ def generate_plan(pid):
     segments_json = []
     for r in seg_rows:
         d = dict(r)
-        visual = (d.get("visual") or "")[:100]
         asr_text = (d.get("asr") or "")[:50]
-        segments_json.append({
+        seg_item = {
             "segment_id": d["id"],
             "media_id": d["media_id"],
             "time_start": d["time_start"],
             "time_end": d["time_end"],
-            "visual": visual,
+            "visual": d.get("visual") or "",
             "mood": d.get("mood", ""),
             "scene_type": d.get("scene_type", ""),
             "shot_type": d.get("shot_type", ""),
             "dominant_colors": _parse_json_field(d.get("dominant_colors")),
             "main_subjects": _parse_json_field(d.get("main_subjects")),
             "asr": asr_text if asr_text else None,
-        })
+        }
+        # Include highlights for long segments (key moments with timestamps)
+        highlights = _parse_json_field(d.get("highlights"))
+        if highlights:
+            seg_item["highlights"] = highlights
+        segments_json.append(seg_item)
 
     # Load prompt template
     import os

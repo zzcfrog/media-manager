@@ -19,7 +19,7 @@ _analysis_pool = ThreadPoolExecutor(max_workers=ANALYSIS_THREAD_POOL_SIZE)
 _active_progress = {}  # media_id → progress dict (registered by thread, cleaned up on exit)
 
 
-_SEGMENT_COLS = "id, media_id, time_start, time_end, visual, asr, subtitle, dominant_colors, main_subjects, shot_type, focal_length, camera_angle, camera_movement, perspective, scene_type, mood, lighting, weather, color_tone, tone, dof, style, composition, seq"
+_SEGMENT_COLS = "id, media_id, time_start, time_end, visual, asr, subtitle, dominant_colors, main_subjects, shot_type, focal_length, camera_angle, camera_movement, perspective, scene_type, mood, lighting, weather, color_tone, tone, dof, style, composition, highlights, seq"
 
 
 def _cleanup_temp(path):
@@ -518,8 +518,8 @@ def save_segments(media_id, segments, model=""):
 
     for i, seg in enumerate(segments):
         db.execute(
-            "INSERT INTO media_segment (media_id, time_start, time_end, visual, asr, subtitle, dominant_colors, main_subjects, shot_type, focal_length, camera_angle, camera_movement, perspective, scene_type, mood, lighting, weather, color_tone, tone, dof, style, composition, seq) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO media_segment (media_id, time_start, time_end, visual, asr, subtitle, dominant_colors, main_subjects, shot_type, focal_length, camera_angle, camera_movement, perspective, scene_type, mood, lighting, weather, color_tone, tone, dof, style, composition, highlights, seq) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 media_id,
                 _normalize_timestamp(seg.get("time_start", "")),
@@ -543,6 +543,7 @@ def save_segments(media_id, segments, model=""):
                 seg.get("dof", ""),
                 seg.get("style", ""),
                 seg.get("composition", ""),
+                json.dumps(seg.get("highlights", []), ensure_ascii=False) if seg.get("highlights") else "",
                 i,
             ),
         )
@@ -588,15 +589,15 @@ def _refresh_fts(db, media_id, segments):
 
 def _segment_to_dict(row):
     d = dict(row)
-    for col in ("dominant_colors", "main_subjects"):
+    for col in ("dominant_colors", "main_subjects", "highlights"):
         v = d.get(col, "")
         if isinstance(v, str) and v:
             try:
                 d[col] = json.loads(v)
             except json.JSONDecodeError:
-                d[col] = [v]
+                d[col] = [v] if col != "highlights" else []
         elif not v:
-            d[col] = []
+            d[col] = [] if col in ("dominant_colors", "main_subjects") else None
     return d
 
 
