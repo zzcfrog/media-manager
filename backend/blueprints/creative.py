@@ -334,6 +334,7 @@ def generate_plan(pid):
             # Parse JSON from response
             plan = _parse_creative_response(full_text)
             if plan is None:
+                logger.error("Creative plan parse failed [pid={}]. Response length={}, first 500 chars:\n{}", pid, len(full_text), full_text[:500])
                 progress["error"] = "AI 返回格式无效，请重试"
                 progress["done"] = True
                 return
@@ -879,6 +880,9 @@ def _parse_creative_response(text):
     """Extract JSON from LLM response text."""
     # Try to find JSON block
     text = text.strip()
+    if not text:
+        logger.warning("Empty response from LLM")
+        return None
     # Remove markdown code fences if present
     if text.startswith("```"):
         lines = text.split("\n")
@@ -891,15 +895,18 @@ def _parse_creative_response(text):
 
     try:
         return json.loads(text)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        logger.warning("Direct JSON parse failed: {}. Trying to extract JSON substring...", e)
         # Try to find JSON object in text
         start = text.find("{")
         end = text.rfind("}") + 1
         if start >= 0 and end > start:
             try:
                 return json.loads(text[start:end])
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e2:
+                logger.error("JSON substring parse also failed: {}. Substring length={}, first 300 chars:\n{}", e2, end - start, text[start:start+300])
                 return None
+        logger.error("No JSON object found in response. Text length={}, first 300 chars:\n{}", len(text), text[:300])
         return None
 
 
