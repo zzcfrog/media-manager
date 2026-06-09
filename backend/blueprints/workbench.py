@@ -76,7 +76,7 @@ def get_project(pid):
         from .library import _segment_query
         seg_q = _segment_query(q)
         media = db.execute(
-            "SELECT m.id, m.file_name, m.media_type, m.thumbnail_path, m.duration, m.date_taken "
+            "SELECT m.id, m.file_name, m.media_type, m.thumbnail_path, m.duration, m.date_taken, m.analysis_status "
             "FROM media m JOIN project_media pm ON pm.media_id = m.id "
             "JOIN media_fts fts ON fts.media_id = m.id "
             "WHERE pm.project_id = ? AND media_fts MATCH ?",
@@ -84,7 +84,7 @@ def get_project(pid):
         ).fetchall()
     else:
         media = db.execute(
-            "SELECT m.id, m.file_name, m.media_type, m.thumbnail_path, m.duration, m.date_taken "
+            "SELECT m.id, m.file_name, m.media_type, m.thumbnail_path, m.duration, m.date_taken, m.analysis_status "
             "FROM media m JOIN project_media pm ON pm.media_id = m.id "
             "WHERE pm.project_id = ?",
             (pid,),

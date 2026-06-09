@@ -1,5 +1,14 @@
 # TODO
 
+## 已完成：素材面板 AI 分析按钮（2026-06-09）
+
+工作台素材面板预览区：未分析的视频显示"AI 分析"按钮，已分析的视频分片列表上方显示"重新分析"按钮。分析进度通过全局 bgTasks 进度条展示。
+
+**改动文件：**
+- `backend/blueprints/workbench.py` — `GET /api/workbench/<pid>` SQL 增加 `m.analysis_status` 字段
+- `frontend/js/workbench.js` — 预览区 sidebar：未分析显示 AI 分析按钮（auto_awesome 图标），已分析显示重新分析按钮（refresh 图标）；新增 `wbAnalyzing` data 和 `analyzeMedia(media)` 方法（SSE 流式分析 + bgTasks 进度跟踪 + 完成后自动 load 刷新数据）
+- `frontend/js/i18n.js` — 新增 `wb.analyze/reanalyze/analyzing/analyze_done` 中英文翻译
+
 ## 已完成：素材利用率优化 — 多用素材 + 长分片关键时刻（2026-06-09）
 
 两个方向优化素材利用率：Prompt 鼓励多用素材 + 长分片增加关键时刻描述。

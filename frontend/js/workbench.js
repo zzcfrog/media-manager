@@ -330,6 +330,13 @@ const WorkbenchPage = {
             </template>
             <!-- Media mode: editable segments with original positions -->
             <template v-else-if="!timelinePlayMode && mediaSegments(selectedMedia.id).length">
+              <div style="padding:4px 8px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+                <span style="font-size:11px;color:var(--text3)">{{ mediaSegments(selectedMedia.id).length }} {{ t('wb.seg_unit') }}</span>
+                <q-btn flat dense size="xs" color="grey-6" :loading="wbAnalyzing" @click="analyzeMedia(selectedMedia)">
+                  <q-icon name="refresh" size="13px" style="margin-right:3px"></q-icon>
+                  {{ t('wb.reanalyze') }}
+                </q-btn>
+              </div>
               <q-scroll-area ref="wbSegScroll" style="flex:1">
                 <div v-for="(seg,i) in mediaSegments(selectedMedia.id)" :key="seg.id" class="segment"
                      :class="{ active: activeSegIndex === i }"
@@ -371,8 +378,22 @@ const WorkbenchPage = {
           </div>
         </template>
         <div v-else class="wb-preview-empty">
-          <q-icon name="play_circle_outline" size="48px" color="grey-6" style="opacity:0.3"></q-icon>
-          <span style="font-size:12px;color:var(--text3)">{{ t('wb.no_segments') }}</span>
+          <template v-if="selectedMedia.analysis_status === 'done'">
+            <!-- analyzed but no segments in this project — shouldn't normally happen, but handle gracefully -->
+            <q-icon name="play_circle_outline" size="48px" color="grey-6" style="opacity:0.3"></q-icon>
+            <span style="font-size:12px;color:var(--text3)">{{ t('wb.no_segments') }}</span>
+          </template>
+          <template v-else-if="selectedMedia.analysis_status === 'processing'">
+            <q-spinner-dots size="32px" color="accent"></q-spinner-dots>
+            <span style="font-size:12px;color:var(--text3)">{{ t('wb.analyzing') }}</span>
+          </template>
+          <template v-else>
+            <q-icon name="auto_awesome" size="48px" color="accent" style="opacity:0.4"></q-icon>
+            <q-btn unelevated color="accent" size="sm" :loading="wbAnalyzing" @click="analyzeMedia(selectedMedia)">
+              <q-icon name="auto_awesome" size="16px" style="margin-right:4px"></q-icon>
+              {{ t('wb.analyze') }}
+            </q-btn>
+          </template>
         </div>
       </div>
     </div>
@@ -508,6 +529,7 @@ const WorkbenchPage = {
       wbCurrentTime: 0,
       wbDuration: 0,
       wbHoverTime: -1,
+      wbAnalyzing: false,
       previewLoading: false,
       matSearch: "",
       matType: "",
@@ -2072,5 +2094,66 @@ const WorkbenchPage = {
       this._wbScopeFrame = requestAnimationFrame(loop);
     },
     stopWbScopes() { if (this._wbScopeFrame) { cancelAnimationFrame(this._wbScopeFrame); this._wbScopeFrame = null; } },
+
+    async analyzeMedia(media) {
+      if (this.wbAnalyzing) return;
+      this.wbAnalyzing = true;
+      const root = this.$root;
+      const mid = media.id;
+      // Register global bg task
+      const oldIdx = root.bgTasks.findIndex(t => t.id === mid);
+      if (oldIdx >= 0) root.bgTasks.splice(oldIdx, 1);
+      const task = { id: mid, fileName: media.file_name, mediaType: media.media_type, status: "running", percent: 0, stageLabel: t('g.preparing') || '准备中', startTime: Date.now() };
+      root.bgTasks.push(task);
+      root.bgTasks = [...root.bgTasks];
+      // Update local status for UI
+      media.analysis_status = 'processing';
+      try {
+        const resp = await API.startAnalysis(mid);
+        if (!resp.ok) {
+          let msg = t('g.request_fail');
+          try { const body = await resp.json(); if (body.error) msg = body.error; } catch {}
+          throw new Error(msg);
+        }
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split("\n");
+          buf = lines.pop();
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data: ")) continue;
+            let evt;
+            try { evt = JSON.parse(trimmed.slice(6)); } catch { continue; }
+            if (evt.type === "progress") {
+              const labels = { queued: t('g.queued') || '排队中', compressing: t('g.compressing') || '压缩中', analyzing: t('g.analyzing') || '分析中' };
+              task.stageLabel = labels[evt.step] || labels.analyzing;
+              if (evt.percent != null) task.percent = evt.percent;
+              root.bgTasks = [...root.bgTasks];
+            } else if (evt.type === "done") {
+              task.status = "done";
+              task.percent = 100;
+              task.stageLabel = t('g.analysis_done') || '分析完成';
+              root.bgTasks = [...root.bgTasks];
+            } else if (evt.type === "error") {
+              throw new Error(evt.message || "Analysis failed");
+            }
+          }
+        }
+        // Reload project data to refresh segments and analysis_status
+        await this.load();
+        // Notify success
+        Quasar.Notify.create({ type: "positive", message: t('wb.analyze_done'), position: "top", timeout: 2000 });
+      } catch (e) {
+        media.analysis_status = 'error';
+        Quasar.Notify.create({ type: "negative", message: String(e.message || e), position: "top", timeout: 4000 });
+      } finally {
+        this.wbAnalyzing = false;
+      }
+    },
   },
 };
