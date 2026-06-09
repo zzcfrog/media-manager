@@ -522,10 +522,10 @@ const WorkbenchPage = {
       ],
       trackTypes: [
         { key: "theme" },
+        { key: "text" },
         { key: "emotion" },
         { key: "narration" },
         { key: "subtitle" },
-        { key: "text" },
         { key: "video" },
       ],
       camFields: [
