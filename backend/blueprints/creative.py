@@ -440,11 +440,15 @@ def apply_plan(pid):
                 if not seg:
                     continue
 
-                # Calculate duration from segment
+                # Use src_start/src_end if provided (sub-clip), otherwise full segment
+                src_start = shot.get("src_start") or seg["time_start"]
+                src_end = shot.get("src_end") or seg["time_end"]
                 try:
-                    dur = _parse_time(seg["time_end"]) - _parse_time(seg["time_start"])
+                    dur = _parse_time(src_end) - _parse_time(src_start)
                 except (ValueError, TypeError):
                     dur = 5.0  # fallback 5 seconds
+                if dur <= 0:
+                    dur = 5.0
 
                 ts = _fmt_time(position)
                 te = _fmt_time(position + dur)
@@ -461,8 +465,8 @@ def apply_plan(pid):
                         "act_id": act.get("act_id", ""),
                         "narrative_id": narrative.get("narrative_id", ""),
                         "srcMediaId": seg["media_id"],
-                        "srcStart": seg["time_start"],
-                        "srcEnd": seg["time_end"],
+                        "srcStart": src_start,
+                        "srcEnd": src_end,
                     }, ensure_ascii=False),
                 })
 

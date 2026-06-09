@@ -1,5 +1,13 @@
 # TODO
 
+## 已完成：AI 子片段截取 — 提升素材利用率（2026-06-09）
+
+AI 可以指定 segment 的子区间（src_start/src_end），不用整个 segment 从头用到尾。这样同一个长 segment 的不同部分可以分别用于多个镜头，大幅提升素材利用率。
+
+**改动文件：**
+- `backend/creative_prompt.txt` — shot schema 新增 `src_start`/`src_end` 可选字段；选片原则增加"充分利用素材"指引（截取 3-15 秒精华片段，同一 segment 不同子区间可复用）
+- `backend/blueprints/creative.py` — 组装逻辑读取 shot 的 `src_start`/`src_end`（有则用，无则用完整 segment）；时长从截取区间计算而非完整 segment
+
 ## 已完成：轨道顺序调整 — 叙事线移至主旨线下方（2026-06-09）
 
 轨道自上而下顺序调整为：主旨线 → 叙事线 → 情绪线 → 旁白线 → 字幕线 → 视频线（叙事线从第5位移至第2位，紧跟主旨线）。
