@@ -431,81 +431,85 @@ def apply_plan(pid):
     for act in ai_plan.get("acts", []):
         act_start = position
 
-        for shot in act.get("shots", []):
-            seg_id = shot.get("segment_id")
-            seg = seg_map.get(seg_id)
-            if not seg:
-                continue
+        for narrative in act.get("narratives", []):
+            nar_start = position
 
-            # Calculate duration from segment
-            try:
-                dur = _parse_time(seg["time_end"]) - _parse_time(seg["time_start"])
-            except (ValueError, TypeError):
-                dur = 5.0  # fallback 5 seconds
+            for shot in narrative.get("shots", []):
+                seg_id = shot.get("segment_id")
+                seg = seg_map.get(seg_id)
+                if not seg:
+                    continue
 
-            ts = _fmt_time(position)
-            te = _fmt_time(position + dur)
+                # Calculate duration from segment
+                try:
+                    dur = _parse_time(seg["time_end"]) - _parse_time(seg["time_start"])
+                except (ValueError, TypeError):
+                    dur = 5.0  # fallback 5 seconds
 
-            # Video track item
-            tracks.append({
-                "track_type": "video",
-                "segment_id": seg_id,
-                "position": len(tracks),
-                "time_start": ts,
-                "time_end": te,
-                "metadata": json.dumps({
-                    "purpose": shot.get("purpose", ""),
-                    "act_id": act.get("act_id", ""),
-                    "srcMediaId": seg["media_id"],
-                    "srcStart": seg["time_start"],
-                    "srcEnd": seg["time_end"],
-                }, ensure_ascii=False),
-            })
+                ts = _fmt_time(position)
+                te = _fmt_time(position + dur)
 
-            # Emotion track item
-            tracks.append({
-                "track_type": "emotion",
-                "emotion_value": shot.get("emotion", 0.5),
-                "content": shot.get("purpose", ""),
-                "position": len(tracks),
-                "time_start": ts,
-                "time_end": te,
-            })
-
-            # Narration track item
-            narration = shot.get("narration", "")
-            if narration:
+                # Video track item
                 tracks.append({
-                    "track_type": "narration",
-                    "content": narration,
-                    "position": len(tracks),
-                    "time_start": ts,
-                    "time_end": te,
-                })
-
-            # Subtitle track item (use ASR)
-            if shot.get("use_asr") and seg.get("asr"):
-                tracks.append({
-                    "track_type": "subtitle",
+                    "track_type": "video",
                     "segment_id": seg_id,
-                    "content": seg["asr"],
+                    "position": len(tracks),
+                    "time_start": ts,
+                    "time_end": te,
+                    "metadata": json.dumps({
+                        "purpose": shot.get("purpose", ""),
+                        "act_id": act.get("act_id", ""),
+                        "narrative_id": narrative.get("narrative_id", ""),
+                        "srcMediaId": seg["media_id"],
+                        "srcStart": seg["time_start"],
+                        "srcEnd": seg["time_end"],
+                    }, ensure_ascii=False),
+                })
+
+                # Emotion track item
+                tracks.append({
+                    "track_type": "emotion",
+                    "emotion_value": shot.get("emotion", 0.5),
+                    "content": shot.get("purpose", ""),
                     "position": len(tracks),
                     "time_start": ts,
                     "time_end": te,
                 })
 
-            # Narrative track item (one per shot)
-            narrative = shot.get("narrative", "")
-            if narrative:
+                # Narration track item
+                narration = shot.get("narration", "")
+                if narration:
+                    tracks.append({
+                        "track_type": "narration",
+                        "content": narration,
+                        "position": len(tracks),
+                        "time_start": ts,
+                        "time_end": te,
+                    })
+
+                # Subtitle track item (use ASR)
+                if shot.get("use_asr") and seg.get("asr"):
+                    tracks.append({
+                        "track_type": "subtitle",
+                        "segment_id": seg_id,
+                        "content": seg["asr"],
+                        "position": len(tracks),
+                        "time_start": ts,
+                        "time_end": te,
+                    })
+
+                position += dur
+
+            # Narrative track item (one per narrative group, spans all its shots)
+            nar_text = narrative.get("text", "")
+            if nar_text and nar_start < position:
                 tracks.append({
                     "track_type": "text",
-                    "content": narrative,
+                    "content": nar_text,
                     "position": len(tracks),
-                    "time_start": ts,
-                    "time_end": te,
+                    "time_start": _fmt_time(nar_start),
+                    "time_end": _fmt_time(position),
                 })
-
-            position += dur
 
         # Theme track item (one per act)
         if act_start < position:

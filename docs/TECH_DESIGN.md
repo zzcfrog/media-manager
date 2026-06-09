@@ -636,19 +636,19 @@ Body: { template, duration_target, opening, structure, emotion_arc, voice, music
 ```
 AI 方案 JSON
     │
-    │  遍历 acts → shots
+    │  遍历 acts → narratives → shots（三层结构）
     ▼
 acts[i] → theme track item（标题 + purpose）
     │
-shots[j] → video track item（segment_id + 时间范围）
+narratives[j].text → text track item（叙事段落，跨多个 shot）
     │
-shots[j].narration → narration track item
+narratives[j].shots[k] → video track item（segment_id + 时间范围）
     │
-shots[j].emotion → emotion track item
+shots[k].narration → narration track item
     │
-shots[j].use_asr + segment.asr → subtitle track item
+shots[k].emotion → emotion track item
     │
-acts[i].title → text track item（叙事文案，per-shot）
+shots[k].use_asr + segment.asr → subtitle track item
     │
     ▼
 PUT /api/workbench/<pid>/tracks（批量替换）

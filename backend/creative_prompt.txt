@@ -18,14 +18,16 @@
 - 每幕的 title 要精炼有力，purpose 要说清这幕要达成什么
 
 ### 第二步：叙事
-基于主旨，为每个镜头撰写叙事文字（narrative）。
-- 所有镜头的 narrative 串联起来应读作一篇完整、流畅的文章
-- narrative 不是旁白，而是叙事性描述：讲述这一刻发生了什么、看到了什么、感受到了什么
-- 相邻镜头的 narrative 之间要有自然的过渡和衔接
+基于主旨，将每幕拆分为若干叙事段落（narrative）。
+- 主旨 = 章节，叙事 = 段落，镜头 = 句子
+- 每个叙事段落是一组连贯的表述：可能代表一系列动作、一系列场景、一段情绪或一段描述
+- 同一叙事段落内的镜头在内容上紧密关联
+- 所有叙事段落串联起来应读作一篇完整、流畅的文章
 - 叙事文字应有画面感和文学性，像散文而非说明文
 
 ### 第三步：选片
-基于叙事内容和时间线结构，为每段叙事选择最匹配的 segment。
+基于叙事内容，为每个叙事段落选择最匹配的镜头（segment）。
+- 每个叙事段落包含 2-5 个镜头，共同支撑该段叙事
 - segment 的画面内容、情绪、色调应与叙事文字契合
 - 参考引导步骤中用户表达的偏好（结构、节奏、情绪弧线等）
 - 优先选择视觉表现力强、与叙事氛围匹配的片段
@@ -56,21 +58,26 @@
       "purpose": "这幕的创作意图",
       "emotion_start": 0.2,
       "emotion_end": 0.4,
-      "shots": [
+      "narratives": [
         {
-          "segment_id": 实际存在的segment_id,
-          "narrative": "这幕镜头的叙事段落——叙事性文字，多个镜头串联成完整文章",
-          "purpose": "这个镜头的创作意图",
-          "narration": "烘托情绪的旁白文案——与叙事互补，而非重复叙事内容",
-          "use_asr": false,
-          "emotion": 0.3,
-          "music": {
-            "mood": "情绪描述",
-            "tempo": "slow/medium/fast",
-            "instruments": ["钢琴"],
-            "note": "音乐指导备注"
-          },
-          "transition": "fade_in/cut/dissolve"
+          "narrative_id": "nar_1_1",
+          "text": "这组镜头的叙事文字——一段连贯的表述，像作文的一个段落",
+          "shots": [
+            {
+              "segment_id": 实际存在的segment_id,
+              "purpose": "这个镜头的创作意图",
+              "narration": "烘托情绪的旁白文案——与叙事互补，而非重复叙事内容",
+              "use_asr": false,
+              "emotion": 0.3,
+              "music": {
+                "mood": "情绪描述",
+                "tempo": "slow/medium/fast",
+                "instruments": ["钢琴"],
+                "note": "音乐指导备注"
+              },
+              "transition": "fade_in/cut/dissolve"
+            }
+          ]
         }
       ]
     }

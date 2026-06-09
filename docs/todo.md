@@ -11,22 +11,27 @@
 
 ## 已完成：文字线 → 叙事线 — 概念升级 + 四层创作流程（2026-06-09）
 
-将"文字线"重定义为"叙事线"：主旨线是作文大纲，叙事线是作文正文。每个镜头生成一段叙事文字，多段串联成完整文章。Prompt 增加四层创作流程（立意→叙事→选片→串联）。
+将"文字线"重定义为"叙事线"，建立三层结构：主旨（章节）→ 叙事（段落）→ 分镜（句子）。Prompt 增加四层创作流程（立意→叙事→选片→串联）。JSON Schema 从 `acts → shots` 改为 `acts → narratives → shots`。
 
 **改动文件：**
-- `backend/creative_prompt.txt` — 创作原则重写为四层流程（立意→叙事→选片→串联）；JSON Schema 每个 shot 新增 `narrative` 字段（叙事段落）；`narration` 字段定位调整为"烘托情绪的旁白文案"
-- `backend/blueprints/creative.py` — 组装逻辑：删除 per-act 2秒标题卡，改为 per-shot 叙事线条目（`shot.narrative` → `track_type='text'`，时长与镜头一致）
+- `backend/creative_prompt.txt` — 创作原则重写为四层流程（立意→叙事→选片→串联）；JSON Schema 改为三层嵌套（`acts[].narratives[].shots[]`）；每个 narrative 有 `text` 字段（叙事段落文字）；`narration` 字段定位调整为"烘托情绪的旁白文案"
+- `backend/blueprints/creative.py` — 组装逻辑改为三层遍历（acts → narratives → shots）；叙事线条目改为 per-narrative（跨多个 shot，时长覆盖整组镜头）；video metadata 增加 `narrative_id`
 - `frontend/js/i18n.js` — `"文字线"` → `"叙事线"`，`"Text"` → `"Narrative"`
-- `docs/PRD_AI_CREATIVE.md` — 更新组装规则映射表（`acts[i].title → 文字线` 改为 `shots[j].narrative → 叙事线`）+ 伪代码更新
-- `docs/PRD_CREATIVE_WORKBENCH.md` — 轨道描述改为叙事线（"每个镜头的叙事文字，多段串联成完整文章"）+ ASCII 图示更新
-- `docs/TECH_DESIGN.md` — 技术映射更新
+- `docs/PRD_AI_CREATIVE.md` — 更新组装规则映射表（三层结构）+ 伪代码重写
+- `docs/PRD_CREATIVE_WORKBENCH.md` — 轨道描述改为叙事线 + ASCII 图示更新
+- `docs/TECH_DESIGN.md` — 技术映射更新为三层结构
 - `docs/inspiration.md` — 轨道名称和描述全部更新
 
 **DB key `track_type='text'` 保持不变**，仅 UI 标签改名，避免数据迁移。
 
+**三层结构：**
+- 主旨（act）= 章节：每幕一个条目，跨多个叙事段落
+- 叙事（narrative）= 段落：一组连贯的镜头（2-5个），有独立的叙事文字
+- 分镜（shot）= 句子：单个视频片段，有旁白、情绪、转场
+
 **四层创作流程：**
 1. 立意：创意描述 + 素材分析 → 确定主旨（幕结构）
-2. 叙事：主旨细化 → 每个镜头的叙事文字（串联成完整文章）
+2. 叙事：主旨细化 → 每幕拆分为叙事段落（连贯表述）
 3. 选片：叙事 + 时间线 + 用户偏好 → 选择匹配的 segment
 4. 串联：情绪弧线 + 编排设计 → 撰写旁白 + 设计转场
 
