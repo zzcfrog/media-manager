@@ -31,44 +31,74 @@ const WorkbenchPage = {
       <div style="position:relative;display:flex;flex-shrink:0">
         <div class="wb-material" :class="{'mat-collapsed': matCollapsed}">
           <div class="wb-mat-toolbar">
-          <q-input v-model="matSearch" dense filled clearable
+          <q-input v-model="matSearch" dense filled
                    :placeholder="t('wb.search_placeholder', {n: filteredMedia.length})"
                    class="wb-mat-search"
                    @keyup.enter="searchMedia">
             <template v-slot:prepend><q-icon name="search" size="14px"></q-icon></template>
             <template v-slot:append>
-              <q-icon name="filter_list"
-                      size="16px" style="cursor:pointer"
-                      :style="{color: matAdded!=='' ? 'var(--accent)' : 'var(--text3)'}"
-                      @click="matAdded = matAdded==='' ? 'added' : matAdded==='added' ? 'not_added' : ''">
-                <q-tooltip :delay="600">{{ matAdded==='' ? t('wb.filter_added_tip') : matAdded==='added' ? t('wb.added') : t('wb.not_added') }}</q-tooltip>
+              <q-icon v-if="matSearch" name="close" size="14px" class="wb-mat-clear" @click="matSearch=''">
+                <q-tooltip :delay="600">{{ t('wb.clear_filter') }}</q-tooltip>
               </q-icon>
             </template>
           </q-input>
-          <q-btn-group unelevated>
-            <q-btn unelevated dense size="sm" label="ALL"
-                   :class="{'mat-type-active': matType===''}"
-                   @click="matType=''">
-              <q-tooltip :delay="1000">{{ t('wb.all') }}</q-tooltip>
-            </q-btn>
-            <q-btn unelevated dense size="sm" icon="image"
-                   :class="{'mat-type-active': matType==='image'}"
-                   @click="matType='image'">
-              <q-tooltip :delay="1000">{{ t('wb.type_image') }}</q-tooltip>
-            </q-btn>
-            <q-btn unelevated dense size="sm" icon="smart_display"
-                   :class="{'mat-type-active': matType==='video'}"
-                   @click="matType='video'">
-              <q-tooltip :delay="1000">{{ t('wb.type_video') }}</q-tooltip>
-            </q-btn>
-          </q-btn-group>
-          <div class="sort-group wb-mat-sort-group">
-            <q-select v-model="matSort" dense filled flat
-                      :options="matSortOptions" emit-value map-options
-                      popup-content-class="wb-mat-sort-popup"></q-select>
-            <q-btn flat dense :icon="matSortOrder==='desc' ? 'arrow_downward' : 'arrow_upward'"
-                   color="grey-6" size="sm" @click="matSortOrder=matSortOrder==='desc'?'asc':'desc'"></q-btn>
-          </div>
+          <q-btn-dropdown unelevated dense size="sm" auto-close class="wb-mat-added-dd"
+                          icon="filter_list"
+                          dropdown-icon="arrow_drop_down"
+                          style="min-height:28px;height:28px;padding:0 4px">            <q-list dense>
+              <q-item clickable :active="matAdded===''" @click="matAdded=''" active-class="bg-accent text-white">
+                <q-item-section side><q-icon name="filter_list" size="16px"/></q-item-section>
+                <q-item-section>{{ t('wb.all') }}</q-item-section>
+              </q-item>
+              <q-item clickable :active="matAdded==='added'" @click="matAdded='added'" active-class="bg-accent text-white">
+                <q-item-section side><q-icon name="download_done" size="16px"/></q-item-section>
+                <q-item-section>{{ t('wb.added') }}</q-item-section>
+              </q-item>
+              <q-item clickable :active="matAdded==='not_added'" @click="matAdded='not_added'" active-class="bg-accent text-white">
+                <q-item-section side><q-icon name="file_download_off" size="16px"/></q-item-section>
+                <q-item-section>{{ t('wb.not_added') }}</q-item-section>
+              </q-item>
+            </q-list>
+          </q-btn-dropdown>
+          <q-btn-dropdown unelevated dense size="sm" auto-close class="wb-mat-type-dd"
+                          :icon="matType==='' ? 'category' : matType==='image' ? 'image' : 'smart_display'"
+                          dropdown-icon="arrow_drop_down"
+                          style="min-height:28px;height:28px;padding:0 4px">
+            <q-list dense>
+              <q-item clickable :active="matType===''" @click="matType=''" active-class="bg-accent text-white">
+                <q-item-section side><q-icon name="category" size="16px"/></q-item-section>
+                <q-item-section>{{ t('wb.all') }}</q-item-section>
+              </q-item>
+              <q-item clickable :active="matType==='image'" @click="matType='image'" active-class="bg-accent text-white">
+                <q-item-section side><q-icon name="image" size="16px"/></q-item-section>
+                <q-item-section>{{ t('wb.type_image') }}</q-item-section>
+              </q-item>
+              <q-item clickable :active="matType==='video'" @click="matType='video'" active-class="bg-accent text-white">
+                <q-item-section side><q-icon name="smart_display" size="16px"/></q-item-section>
+                <q-item-section>{{ t('wb.type_video') }}</q-item-section>
+              </q-item>
+            </q-list>
+          </q-btn-dropdown>
+          <q-btn-dropdown unelevated dense size="sm" auto-close class="wb-mat-sort-dd"
+                          :icon="currentSortIcon"
+                          dropdown-icon="arrow_drop_down"
+                          style="min-height:28px;height:28px;padding:0 4px">
+            <q-list dense>
+              <q-item v-for="opt in matSortOptions" :key="opt.value"
+                      clickable :active="matSort===opt.value"
+                      @click="matSort=opt.value"
+                      active-class="bg-accent text-white">
+                <q-item-section side><q-icon :name="opt.icon" size="16px"/></q-item-section>
+                <q-item-section>{{ opt.label }}</q-item-section>
+                <q-item-section side>
+                  <q-icon v-if="matSort===opt.value"
+                          :name="matSortOrder==='desc' ? 'arrow_downward' : 'arrow_upward'"
+                          size="14px" style="cursor:pointer"
+                          @click.stop="matSortOrder=matSortOrder==='desc'?'asc':'desc'"/>
+                </q-item-section>
+              </q-item>
+            </q-list>
+          </q-btn-dropdown>
           <q-btn flat round dense icon="add_circle_outline" size="xs" style="color:var(--accent);flex-shrink:0"
                  @click="openMediaPicker">
             <q-tooltip>{{ t('wb.add_media') }}</q-tooltip>
@@ -396,7 +426,7 @@ const WorkbenchPage = {
           <div class="wb-track-label">{{ t('wb.track_' + tt.key) }}</div>
           <div class="wb-track-content" :style="{width: timelineWidth + 'px'}"
                @dragover="onTrackDragOver($event, tt.key)"
-               @dragleave="clearDragShift()"
+               @dragleave="onTrackDragLeave($event)"
                @drop="onTrackDrop($event, tt.key)">
             <svg v-if="tt.key === 'emotion' && emotionCurvePath.line"
                  class="wb-emotion-curve" :viewBox="'0 0 ' + timelineWidth + ' 28'"
@@ -486,9 +516,9 @@ const WorkbenchPage = {
       matSortOrder: "asc",
       matCols: parseInt(localStorage.getItem('wb_matCols')) || 3,
       matSortOptions: [
-        { label: t('wb.sort_name'), value: "file_name" },
-        { label: t('wb.sort_duration'), value: "duration" },
-        { label: t('wb.sort_date'), value: "date_taken" },
+        { label: t('wb.sort_name'), value: "file_name", icon: "sort_by_alpha" },
+        { label: t('wb.sort_duration'), value: "duration", icon: "timer" },
+        { label: t('wb.sort_date'), value: "date_taken", icon: "calendar_today" },
       ],
       trackTypes: [
         { key: "theme" },
@@ -559,6 +589,14 @@ const WorkbenchPage = {
       });
       return list;
     },
+    currentSortLabel() {
+      var opt = this.matSortOptions.find(function(o) { return o.value === this.matSort; }.bind(this));
+      return opt ? opt.label : '';
+    },
+    currentSortIcon() {
+      var opt = this.matSortOptions.find(function(o) { return o.value === this.matSort; }.bind(this));
+      return opt ? opt.icon : 'sort';
+    },
     totalDuration() {
       const videoItems = this.getTrackItems("video");
       if (!videoItems.length) return "00:00";
@@ -590,7 +628,8 @@ const WorkbenchPage = {
         const s = this._timeToSec(tr.time_end);
         if (s > max) max = s;
       }
-      return max + 30;
+      // Round up to nearest 10s + 30s buffer to prevent width jitter
+      return Math.ceil(max / 10) * 10 + 30;
     },
     timelineWidth() { return Math.round(this.zoomPps * this.timelineDuration); },
     emotionCurvePath() {
@@ -745,7 +784,6 @@ const WorkbenchPage = {
       if (this._zoomAnim) cancelAnimationFrame(this._zoomAnim);
       animate();
     },
-    tracks: { deep: true },
   },
 
   created() {
@@ -889,8 +927,10 @@ const WorkbenchPage = {
         const dur = this._getVideoDur(v);
         const newStart = pos;
         const newEnd = pos + dur;
-        v.time_start = this._secToStr(newStart);
-        v.time_end = this._secToStr(newEnd);
+        const ns = this._secToStr(newStart);
+        const ne = this._secToStr(newEnd);
+        if (v.time_start !== ns) v.time_start = ns;
+        if (v.time_end !== ne) v.time_end = ne;
         mapping.push({ oldStart, oldEnd: oldStart + dur, newStart, newEnd });
         pos = newEnd;
       }
@@ -902,8 +942,10 @@ const WorkbenchPage = {
         for (const m of mapping) {
           if (ts >= m.oldStart && ts < m.oldEnd) {
             const offset = m.newStart - m.oldStart;
-            tr.time_start = this._secToStr(ts + offset);
-            tr.time_end = this._secToStr(te + offset);
+            const ns2 = this._secToStr(ts + offset);
+            const ne2 = this._secToStr(te + offset);
+            if (tr.time_start !== ns2) tr.time_start = ns2;
+            if (tr.time_end !== ne2) tr.time_end = ne2;
             break;
           }
         }
@@ -1146,11 +1188,20 @@ const WorkbenchPage = {
       e.dataTransfer.setData('application/json', JSON.stringify({ type: 'segment', ...seg }));
       e.dataTransfer.effectAllowed = 'copy';
       this._extDragDur = this._parseDuration(seg.time_start, seg.time_end) || 5;
+      this._extDragType = 'segment';
+      // Custom drag image: thumbnail preview
+      const img = document.createElement('div');
+      img.style.cssText = 'position:fixed;top:-9999px;width:80px;height:50px;border-radius:6px;background:var(--bg,#222) center/cover no-repeat;box-shadow:0 4px 16px rgba(0,0,0,0.4);';
+      if (seg.media_id) img.style.backgroundImage = `url(/media/thumbnail/${seg.media_id})`;
+      document.body.appendChild(img);
+      e.dataTransfer.setDragImage(img, 40, 25);
+      setTimeout(() => img.remove(), 0);
     },
     onMatDragStart(e, m) {
       e.dataTransfer.setData('application/json', JSON.stringify({ type: 'media', id: m.id, file_name: m.file_name, media_type: m.media_type, duration: m.duration }));
       e.dataTransfer.effectAllowed = 'copy';
       this._extDragDur = Math.min(m.duration || 5, 5);
+      this._extDragType = 'media';
     },
     _secToStr(sec) {
       const m = Math.floor(sec / 60);
@@ -1162,6 +1213,8 @@ const WorkbenchPage = {
       if (!data) return;
       try {
         const payload = JSON.parse(data);
+        // Both segments and media can only be dropped on video track
+        if (trackType !== 'video') return;
         this._trackSnapshot();
         // Compute duration from source segment or media
         let dur;
@@ -1171,7 +1224,18 @@ const WorkbenchPage = {
           dur = Math.min(payload.duration || 5, 5);
         }
         if (trackType === 'video') {
-          // Video track: just create item with srcStart/srcEnd, normalization handles position
+          // Video track: compute drop position and insert at correct index
+          const contentEl = e.currentTarget;
+          const rect = contentEl.getBoundingClientRect();
+          const dropSec = Math.max(0, (e.clientX - rect.left) / this.pps);
+          const videoItems = this.getTrackItems('video');
+          let videoPos = 0;
+          let insertIdx = videoItems.length;
+          for (let i = 0; i < videoItems.length; i++) {
+            const vDur = this._getVideoDur(videoItems[i]);
+            if (dropSec < videoPos + vDur / 2) { insertIdx = i; break; }
+            videoPos += vDur;
+          }
           const newItem = {
             id: Date.now(),
             track_type: 'video',
@@ -1188,7 +1252,13 @@ const WorkbenchPage = {
           } else {
             newItem.metadata = JSON.stringify({ srcMediaId: payload.id, srcStart: '0:00', srcEnd: this._secToStr(dur) });
           }
-          this.tracks.push(newItem);
+          // Insert at the correct position so _normalizeVideoTrack positions it properly
+          if (insertIdx >= videoItems.length) {
+            this.tracks.push(newItem);
+          } else {
+            const actualIdx = this.tracks.indexOf(videoItems[insertIdx]);
+            this.tracks.splice(actualIdx, 0, newItem);
+          }
         } else {
           // Non-video track: compute drop position and insert
           const contentEl = e.currentTarget;
@@ -1230,15 +1300,25 @@ const WorkbenchPage = {
         }
         this.clearDragShift();
         this._extDragDur = null;
+        this._extDragType = null;
         this._trackSave();
       } catch(err) { console.error('onTrackDrop', err); }
     },
     onTrackDragOver(e, trackType) {
+      // Both segments and media can only be dropped on video track
+      if (this._extDragType && trackType !== 'video') return;
       e.preventDefault();
-      this.clearDragShift();
       if (!this._extDragDur) return;
-      const gapWidth = this._extDragDur * this.pps;
+      const gapWidth = Math.round(this._extDragDur * this.pps);
       const contentEl = e.currentTarget;
+      // Clear previous lane when switching lanes
+      if (this._lastDragLane && this._lastDragLane !== contentEl) {
+        for (const it of this._lastDragLane.querySelectorAll('.wb-track-item')) {
+          it.style.transition = '';
+          it.style.transform = '';
+        }
+      }
+      this._lastDragLane = contentEl;
       const contentRect = contentEl.getBoundingClientRect();
       const mouseX = e.clientX - contentRect.left;
       const children = Array.from(contentEl.querySelectorAll('.wb-track-item'));
@@ -1249,9 +1329,21 @@ const WorkbenchPage = {
         const itWidth = children[i].offsetWidth;
         if (mouseX < itLeft + itWidth / 2) { insertIdx = i; break; }
       }
-      for (let i = insertIdx; i < children.length; i++) {
-        children[i].style.transition = 'transform 0.15s ease';
-        children[i].style.transform = `translateX(${gapWidth}px)`;
+      // Targeted update: only touch items whose transform changed — no transition
+      for (let i = 0; i < children.length; i++) {
+        const target = (i >= insertIdx) ? `translateX(${gapWidth}px)` : '';
+        if (children[i].style.transform !== target) {
+          children[i].style.transition = '';
+          children[i].style.transform = target;
+        }
+      }
+    },
+    onTrackDragLeave(e) {
+      // Skip when moving to a child element (dragleave fires on parent when entering child)
+      if (e.relatedTarget && e.currentTarget.contains(e.relatedTarget)) return;
+      for (const it of e.currentTarget.querySelectorAll('.wb-track-item')) {
+        it.style.transition = '';
+        it.style.transform = '';
       }
     },
     addTrackItem(type) {
@@ -1319,6 +1411,7 @@ const WorkbenchPage = {
         it.style.transition = '';
         it.style.transform = '';
       }
+      this._lastDragLane = null;
     },
     _handleDragMove(e) {
       const d = this._drag;
@@ -1549,12 +1642,9 @@ const WorkbenchPage = {
         if (!total) return {};
         const s = this._timeToSec(seg._tlTimeStart);
         const e = this._timeToSec(seg._tlTimeEnd);
-        const gapPx = 2;
-        const pctPerPx = 100 / (this.$refs.wbSeekbar?.clientWidth || 1);
-        const gap = Math.min(gapPx * pctPerPx, 0.3);
         return {
           left: (s / total * 100) + '%',
-          width: Math.max(0.5, (e - s) / total * 100 - gap) + '%',
+          width: Math.max(0.5, (e - s) / total * 100 - 0.2) + '%',
         };
       }
       const total = this.selectedMedia?.duration;
@@ -1562,12 +1652,9 @@ const WorkbenchPage = {
       const s = this.parseTime(seg.time_start);
       const e = this.parseTime(seg.time_end);
       if (isNaN(s) || isNaN(e)) return {};
-      const gapPx = 2;
-      const pctPerPx = 100 / (this.$refs.wbSeekbar?.clientWidth || 1);
-      const gap = Math.min(gapPx * pctPerPx, 0.3);
       return {
         left: (s / total * 100) + '%',
-        width: Math.max(0.5, (e - s) / total * 100 - gap) + '%',
+        width: Math.max(0.5, (e - s) / total * 100 - 0.2) + '%',
       };
     },
     onSegClick(seg, i) {

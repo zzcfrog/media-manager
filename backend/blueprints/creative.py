@@ -494,6 +494,17 @@ def apply_plan(pid):
                     "time_end": te,
                 })
 
+            # Narrative track item (one per shot)
+            narrative = shot.get("narrative", "")
+            if narrative:
+                tracks.append({
+                    "track_type": "text",
+                    "content": narrative,
+                    "position": len(tracks),
+                    "time_start": ts,
+                    "time_end": te,
+                })
+
             position += dur
 
         # Theme track item (one per act)
@@ -505,16 +516,6 @@ def apply_plan(pid):
                 "time_start": _fmt_time(act_start),
                 "time_end": _fmt_time(position),
                 "metadata": json.dumps({"purpose": act.get("purpose", ""), "act_id": act.get("act_id", "")}, ensure_ascii=False),
-            })
-
-            # Text track item (title card, 2 seconds)
-            title_dur = min(2.0, position - act_start)
-            tracks.append({
-                "track_type": "text",
-                "content": act.get("title", ""),
-                "position": len(tracks),
-                "time_start": _fmt_time(act_start),
-                "time_end": _fmt_time(act_start + title_dur),
             })
 
     # Write tracks (atomic replace)

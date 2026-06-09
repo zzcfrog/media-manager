@@ -1,5 +1,46 @@
 # TODO
 
+## 已完成：文字线 → 叙事线 — 概念升级 + 四层创作流程（2026-06-09）
+
+将"文字线"重定义为"叙事线"：主旨线是作文大纲，叙事线是作文正文。每个镜头生成一段叙事文字，多段串联成完整文章。Prompt 增加四层创作流程（立意→叙事→选片→串联）。
+
+**改动文件：**
+- `backend/creative_prompt.txt` — 创作原则重写为四层流程（立意→叙事→选片→串联）；JSON Schema 每个 shot 新增 `narrative` 字段（叙事段落）；`narration` 字段定位调整为"烘托情绪的旁白文案"
+- `backend/blueprints/creative.py` — 组装逻辑：删除 per-act 2秒标题卡，改为 per-shot 叙事线条目（`shot.narrative` → `track_type='text'`，时长与镜头一致）
+- `frontend/js/i18n.js` — `"文字线"` → `"叙事线"`，`"Text"` → `"Narrative"`
+- `docs/PRD_AI_CREATIVE.md` — 更新组装规则映射表（`acts[i].title → 文字线` 改为 `shots[j].narrative → 叙事线`）+ 伪代码更新
+- `docs/PRD_CREATIVE_WORKBENCH.md` — 轨道描述改为叙事线（"每个镜头的叙事文字，多段串联成完整文章"）+ ASCII 图示更新
+- `docs/TECH_DESIGN.md` — 技术映射更新
+- `docs/inspiration.md` — 轨道名称和描述全部更新
+
+**DB key `track_type='text'` 保持不变**，仅 UI 标签改名，避免数据迁移。
+
+**四层创作流程：**
+1. 立意：创意描述 + 素材分析 → 确定主旨（幕结构）
+2. 叙事：主旨细化 → 每个镜头的叙事文字（串联成完整文章）
+3. 选片：叙事 + 时间线 + 用户偏好 → 选择匹配的 segment
+4. 串联：情绪弧线 + 编排设计 → 撰写旁白 + 设计转场
+
+## 已完成：分片拖放限制 + 拖拽预览图（2026-06-08）
+
+素材分片只能拖放到视频轨道，拖拽时显示缩略图预览。
+
+**改动文件：**
+- `frontend/js/workbench.js` — `onSegDragStart` 新增 `_extDragType = 'segment'` 标记和自定义拖拽预览图（`setDragImage` 80×50px 缩略图）；`onMatDragStart` 新增 `_extDragType = 'media'`；`onTrackDragOver` 非视频轨道对 segment 直接 return（不调 `e.preventDefault()`，浏览器显示禁止光标）；`onTrackDrop` 非视频轨道对 segment 直接 return；`onTrackDrop` 结束时清理 `_extDragType`
+
+## 已完成：时间线拖放闪动修复（2026-06-08）
+
+素材片段拖放到时间线时，主视频时间线闪动、片段间空隙跳动。
+
+**根因：**
+1. **HTML5 `dragleave` 子元素穿透**：`@dragleave="clearDragShift()"` 在鼠标移入子元素（.wb-track-item）时也触发父元素的 dragleave，导致每次经过一个片段就清除所有 transform，再由 dragover 重新设置 → 持续清除/重设循环 = 频繁抖动
+2. `onTrackDragOver` 每次都调用 `clearDragShift()` 清除**所有轨道**的所有项，远超必要范围
+3. 拖拽过程中使用 CSS transition `0.15s ease`，配合高频 dragover 事件（~60次/秒）形成不完整动画 → 视觉抖动
+4. `_normalizeVideoTrack()` 无条件重写所有项触发响应式级联；空 deep watcher 增加开销；`timelineDuration` 不稳定
+
+**改动文件：**
+- `frontend/js/workbench.js` — 新增 `onTrackDragLeave(e)` 替代 `@dragleave="clearDragShift()"`，用 `relatedTarget` 判断是否真正离开轨道；`onTrackDragOver` 重写为定向更新（只改 transform 变化的项，不用 transition）；`onTrackDrop` 视频轨道修复：计算 dropSec 和 insertIdx，在正确位置 splice 插入新片段而非 push 到末尾，`_normalizeVideoTrack()` 自动重排位置并联动其他轨道；移除空 deep watcher；`_normalizeVideoTrack()` 加 guard；`timelineDuration` 取整稳定；`clearDragShift()` 重置 `_lastDragLane`
+
 ## 已完成：时间线拖拽动画 + 右键菜单 + 快捷键（2026-06-07）
 
 时间线编辑交互增强：拖拽/缩放实时动画、右键删除菜单、Delete/Backspace 快捷键、片段拖放到时间线的插入动画。

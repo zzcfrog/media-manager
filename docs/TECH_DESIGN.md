@@ -648,7 +648,7 @@ shots[j].emotion → emotion track item
     │
 shots[j].use_asr + segment.asr → subtitle track item
     │
-acts[i].title → text track item（标题卡）
+acts[i].title → text track item（叙事文案，per-shot）
     │
     ▼
 PUT /api/workbench/<pid>/tracks（批量替换）
