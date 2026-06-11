@@ -262,14 +262,7 @@
     <q-tooltip :delay="1000">{{ t('side.collapse') }}</q-tooltip>
   </q-btn>
 
-  <!-- Workbench material panel toggle -->
-  <q-btn v-if="currentView==='workbench'" flat round dense
-          :icon="$root.matCollapsed ? 'chevron_right' : 'chevron_left'"
-          size="xs" color="grey-6"
-          class="drawer-toggle-btn"
-          @click="$root.matCollapsed = !$root.matCollapsed"
-          :style="{position:'fixed', left: (drawerMini ? 54 : 258) + ($root.matCollapsed ? 0 : 400) - 8 + 'px', top: '45%', zIndex: 2000}">
-  </q-btn>
+  <!-- Workbench material panel toggle (moved into workbench component) -->
 
   <!-- Settings modal -->
   <q-dialog v-model="showSettings" @show="loadSettings">
@@ -557,6 +550,7 @@
 <script src="/static/js/duplicates.js"></script>
 <script src="/static/js/workbench.js"></script>
 <script src="/static/js/creative-wizard.js"></script>
+<script src="/static/js/mindmap.js"></script>
 <script>
 const app = Vue.createApp({
   data() {
@@ -1386,6 +1380,7 @@ app.component("detail-page", DetailPage);
 app.component("duplicates-page", DuplicatesPage);
 app.component("workbench-page", WorkbenchPage);
 app.component("creative-wizard", CreativeWizard);
+app.component("mind-map", MindMap);
 app.mount("#app");
 </script>
 </body>

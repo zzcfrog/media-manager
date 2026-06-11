@@ -233,7 +233,7 @@ def generate_plan(pid):
     # Load all segments for this project's media
     from .workbench import _SEG_COLS
     seg_rows = db.execute(
-        f"SELECT {_SEG_COLS} "
+        f"SELECT {_SEG_COLS}, m.file_name "
         "FROM media_segment ms "
         "JOIN project_media pm ON pm.media_id = ms.media_id "
         "JOIN media m ON m.id = ms.media_id "
@@ -252,6 +252,7 @@ def generate_plan(pid):
         seg_item = {
             "segment_id": d["id"],
             "media_id": d["media_id"],
+            "video_name": d.get("file_name", ""),
             "time_start": d["time_start"],
             "time_end": d["time_end"],
             "visual": d.get("visual") or "",
@@ -405,6 +406,19 @@ def generate_plan(pid):
 
 
 # ── Apply plan to tracks ───────────────────────────────────────
+
+
+@bp.route("/<int:pid>/plan", methods=["PUT"])
+def save_plan(pid):
+    """Save updated AI plan (from mindmap edits)."""
+    db = get_db()
+    proj = db.execute("SELECT id FROM projects WHERE id = ?", (pid,)).fetchone()
+    if not proj:
+        return jsonify({"error": "Not found"}), 404
+    plan = request.get_json(force=True)
+    db.execute("UPDATE projects SET ai_plan = ? WHERE id = ?", (json.dumps(plan, ensure_ascii=False), pid))
+    db.commit()
+    return jsonify({"ok": True})
 
 
 @bp.route("/<int:pid>/apply", methods=["POST"])

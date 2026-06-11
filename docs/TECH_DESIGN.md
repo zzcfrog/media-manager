@@ -59,6 +59,7 @@ video_analyzer/
 │       ├── gallery.js         # Gallery 页组件
 │       ├── detail.js          # Detail 页组件
 │       ├── workbench.js       # 创作工作台页组件
+│       ├── mindmap.js         # 脑图视图组件（三级层次、编辑、拖拽、删除）
 │       ├── folder-tree.js     # FolderTree 可复用组件（q-tree 封装）
 │       ├── format.js          # 共享格式化函数（fmtSize/fmtDur）
 │       └── duplicates.js      # 查找重复页组件
@@ -599,6 +600,17 @@ backend/
 | `/api/workbench/<pid>/creative-brief` | POST | 组装素材数据 + 创作指令 → 调用大模型 → SSE 流式返回方案 |
 | `/api/workbench/<pid>/creative-brief/preview` | POST | 仅组装输入 JSON 预览（不调用大模型，用于调试） |
 | `/api/workbench/<pid>/creative-brief/apply` | POST | 接收 AI 方案 JSON → 组装为 tracks → 写入 project_tracks |
+| `/api/creative/<pid>/plan` | PUT | 保存脑图编辑后的 ai_plan JSON |
+
+### 9.2.1 脑图分镜拖拽实现要点（mindmap.js）
+
+拖拽交互采用 **FLIP 重排 + 非响应式状态** 组合，避免 Vue 重渲染覆盖直接 DOM 操作：
+
+- **稳定 key**：每个 shot 分配 `_mmid`（watch plan 时分配），v-for 用 `shot._mmid` 而非数组索引。Vue 据此真正移动 DOM 元素，使 FLIP 动画成为可能
+- **非响应式拖拽状态**：`_dropHint`（非 `data()` 属性）+ 直接操作 hint 元素的 `style.display/left/src`。拖拽全程不触发 Vue 重新渲染，避免 patch 覆盖 transform/class
+- **被拖卡片用 `:class` 绑定**：`.dragging` 通过 `isShotDragging(ai,ni,si)` 响应式绑定，跨重渲染保持（区别于会被擦掉的 `classList.add`）
+- **FLIP 重排**：`onFlowDragOver` 中每个卡片按"松手后目标位置"设置 `--tx`（CSS 变量），translate 与 scale 通过 `var(--tx)` 分离，不互相覆盖
+- **无缝释放**：`onFlowDrop` 释放前记录视觉位置 → 更新数据（Vue 移动元素）→ `_flipSettle` 在 `$nextTick` 清 stale `--tx` 并对残余 delta 做 FLIP。因拖拽时已就位，delta≈0 无多余动画。`_dropHandled` 标志让 `onDragEnd` 在成功 drop 后跳过 `--tx` 清理
 
 ### 9.3 creative-brief 端点流程
 

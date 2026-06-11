@@ -28,7 +28,15 @@ const WorkbenchPage = {
     <!-- Top: Material (left) + Preview (right) -->
     <div class="wb-top">
       <!-- Left: Material panel -->
-      <div style="position:relative;display:flex;flex-shrink:0">
+      <div style="position:relative;display:flex;flex-shrink:0;min-height:0">
+        <q-btn flat round dense
+                :icon="matCollapsed ? 'chevron_right' : 'chevron_left'"
+                size="xs" color="grey-6"
+                class="wb-collapse-btn"
+                style="position:absolute;top:50%;right:-8px;transform:translateY(-50%);z-index:5"
+                @click="matCollapsed=!matCollapsed">
+          <q-tooltip :delay="500">{{ t('side.collapse') }}</q-tooltip>
+        </q-btn>
         <div class="wb-material" :class="{'mat-collapsed': matCollapsed}">
           <div class="wb-mat-toolbar">
           <q-input v-model="matSearch" dense filled
@@ -288,7 +296,7 @@ const WorkbenchPage = {
             </template>
           </div>
           <!-- Right: segment info -->
-          <div style="position:relative;flex-shrink:0;display:flex">
+          <div style="position:relative;flex-shrink:0;display:flex;min-height:0;overflow:visible">
             <q-btn flat round dense :icon="segCompact?'unfold_more':'unfold_less'"
                    size="xs" class="wb-collapse-btn" style="position:absolute;top:50%;left:-8px;transform:translateY(-50%);z-index:5"
                    @click="segCompact=!segCompact">
@@ -398,10 +406,13 @@ const WorkbenchPage = {
       </div>
     </div>
 
-    <!-- Bottom: Tracks -->
-    <div class="wb-tracks">
+    <!-- Bottom: Tracks / MindMap -->
+    <div class="wb-tracks" :style="{height: tracksHeight + 'px'}">
+      <div class="wb-tracks-resize-handle" @mousedown="onTracksResizeStart"></div>
       <div class="wb-track-toolbar">
-        <div style="display:flex;align-items:center;gap:2px">
+
+        <template v-if="bottomViewMode === 'timeline'">
+        <div style="display:flex;align-items:center;gap:2px;margin-left:8px">
           <q-btn flat dense icon="undo" size="sm" color="grey-6" :disable="!trackCanUndo" @click="trackUndo">
             <q-tooltip :delay="500">{{ t('wb.undo') }}</q-tooltip>
           </q-btn>
@@ -415,7 +426,9 @@ const WorkbenchPage = {
             <q-tooltip :delay="500">{{ t('wb.delete') }}</q-tooltip>
           </q-btn>
         </div>
+        </template>
         <div style="flex:1"></div>
+        <template v-if="bottomViewMode === 'timeline'">
         <div style="display:flex;align-items:center;gap:2px">
           <q-btn flat dense size="sm" color="grey-6" @click="zoomToFit">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="22" height="9" rx="2"/><line x1="5" y1="3" x2="5" y2="7"/><line x1="9" y1="3" x2="9" y2="9"/><line x1="13" y1="3" x2="13" y2="7"/><line x1="17" y1="3" x2="17" y2="9"/><line x1="21" y1="3" x2="21" y2="7"/><line x1="2" y1="16.5" x2="2" y2="20.5"/><line x1="22" y1="16.5" x2="22" y2="20.5"/><line x1="4.5" y1="18.5" x2="19.5" y2="18.5"/><polyline points="4.5,18.5 7,17"/><polyline points="4.5,18.5 7,20"/><polyline points="19.5,18.5 17,17"/><polyline points="19.5,18.5 17,20"/></svg>
@@ -432,7 +445,23 @@ const WorkbenchPage = {
             <q-tooltip :delay="500">{{ t('wb.zoom_in') }}</q-tooltip>
           </q-btn>
         </div>
+        </template>
+        <template v-else>
+        <div style="display:flex;align-items:center;gap:2px;margin-left:8px">
+          <q-btn flat dense size="sm" color="grey-6"
+                 :icon="$refs.mindMap?.expandedNarratives?.length ? 'unfold_less' : 'unfold_more'"
+                 @click="$refs.mindMap?.[($refs.mindMap?.expandedNarratives?.length ? 'collapseAll' : 'expandAll')]()">
+            <q-tooltip :delay="500">{{ $refs.mindMap?.expandedNarratives?.length ? '收起叙事' : '展开叙事' }}</q-tooltip>
+          </q-btn>
+          <q-btn flat dense size="sm" color="grey-6"
+                 :icon="$refs.mindMap?.expandedActs?.length ? 'compress' : 'expand'"
+                 @click="$refs.mindMap?.[($refs.mindMap?.expandedActs?.length ? 'collapseAllActs' : 'expandAllActs')]()">
+            <q-tooltip :delay="500">{{ $refs.mindMap?.expandedActs?.length ? '收起主旨' : '展开主旨' }}</q-tooltip>
+          </q-btn>
+        </div>
+        </template>
       </div>
+      <template v-if="bottomViewMode === 'timeline'">
       <div class="wb-timeline-scroll" ref="wbTimelineScroll" @click="onTimelineClick">
         <div class="wb-playhead" :style="{left: (60 + Math.round(playheadTime * pps)) + 'px'}" @mousedown.stop="onPlayheadDown"></div>
         <div class="wb-ruler-row">
@@ -489,6 +518,11 @@ const WorkbenchPage = {
           </div>
         </div>
       </div>
+      </template>
+      <template v-else>
+        <mind-map ref="mindMap" v-if="mindMapData" :plan="mindMapData" :segments="segments"
+                  @shot-click="onMindMapShotClick" @plan-changed="onPlanChanged"></mind-map>
+      </template>
     </div>
 
   </template>
@@ -497,6 +531,17 @@ const WorkbenchPage = {
   <div class="wb-statusbar">
     <span>{{ t('wb.total_duration') }}：{{ totalDuration }}</span>
     <span>{{ t('wb.segment_count') }}：{{ videoTrackCount }}</span>
+    <span style="flex:1"></span>
+    <q-btn flat round dense size="sm" icon="view_timeline"
+           :color="bottomViewMode==='timeline'?'accent':'grey-6'"
+           @click="bottomViewMode='timeline'">
+      <q-tooltip :delay="500">{{ t('wb.view_timeline') }}视图</q-tooltip>
+    </q-btn>
+    <q-btn flat round dense size="sm" icon="account_tree"
+           :color="bottomViewMode==='mindmap'?'accent':'grey-6'"
+           @click="bottomViewMode='mindmap'">
+      <q-tooltip :delay="500">{{ t('wb.view_mindmap') }}视图</q-tooltip>
+    </q-btn>
   </div>
 </div>
   `,
@@ -536,6 +581,8 @@ const WorkbenchPage = {
       matAdded: "",
       matSort: "file_name",
       matSortOrder: "asc",
+      bottomViewMode: "timeline",
+      tracksHeight: 300,
       matCols: parseInt(localStorage.getItem('wb_matCols')) || 3,
       matSortOptions: [
         { label: t('wb.sort_name'), value: "file_name", icon: "sort_by_alpha" },
@@ -575,6 +622,13 @@ const WorkbenchPage = {
 
   computed: {
     t() { return t; },
+    mindMapData() {
+      if (!this.project?.ai_plan) return null;
+      try {
+        return typeof this.project.ai_plan === 'string'
+          ? JSON.parse(this.project.ai_plan) : this.project.ai_plan;
+      } catch(e) { return null; }
+    },
     _timelineMediaIds() {
       const ids = new Set();
       for (const tr of this.tracks) {
@@ -827,11 +881,67 @@ const WorkbenchPage = {
   },
 
   methods: {
+    onTracksResizeStart(e) {
+      e.preventDefault();
+      const startY = e.clientY;
+      const startH = this.tracksHeight;
+      const onMove = (ev) => {
+        this.tracksHeight = Math.max(120, startH + (startY - ev.clientY));
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    },
+    onMindMapShotClick(shot) {
+      if (!shot || !shot.segment_id) return;
+      const videoTrack = this.tracks.find(tr =>
+        tr.track_type === 'video' && tr.segment_id === shot.segment_id
+      );
+      if (videoTrack) {
+        this.timelinePlayMode = true;
+        this.playheadTime = this._timeToSec(videoTrack.time_start);
+        this.seekToPlayhead(false);
+      }
+    },
+    async onPlanChanged() {
+      if (!this.project || !this.mindMapData) return;
+      try {
+        const planStr = JSON.stringify(this.mindMapData);
+        await fetch(`/api/creative/${this.project.id}/plan`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: planStr,
+        });
+        // Update local ai_plan so mindMapData computed doesn't revert to old data
+        this.project.ai_plan = planStr;
+        const applyRes = await fetch(`/api/creative/${this.project.id}/apply`, { method: 'POST' });
+        if (!applyRes.ok) throw new Error('apply failed');
+        await this.loadTracks();
+      } catch(e) {
+        console.error('mindmap save failed:', e);
+      }
+    },
     zoomToFit() {
       const el = this.$refs.wbTimelineScroll;
       if (!el) return;
       const availWidth = el.clientWidth - 60;
       this.zoomPps = availWidth / this.timelineDuration;
+    },
+    async loadTracks() {
+      try {
+        const trackRes = await API.getProjectTracks(this.projectId);
+        this.tracks = trackRes.data;
+        for (const tr of this.tracks) {
+          if (tr.segment_id) {
+            tr._segment = this.segments.find(s => s.id === tr.segment_id) || null;
+          }
+        }
+      } catch (e) {
+        console.error('loadTracks failed:', e);
+      }
     },
     async load() {
       if (!this.projectId) return;

@@ -1,5 +1,39 @@
 # TODO
 
+## 已完成：脑图分镜拖拽交互打磨 — FLIP 重排 + 无缝释放（2026-06-11）
+
+打磨脑图视图分镜（shot）的拖拽体验：拖动时兄弟卡片丝滑让出空隙、被拖卡片缩小变虚影并跟随重排、释放时无多余回弹动画。
+
+**改动文件：**
+- `frontend/js/mindmap.js` — 拖拽逻辑全面重构：
+  - **稳定 key**：watch plan 时给每个 shot 分配 `_mmid`，v-for key 从数组索引 `si` 改为 `shot._mmid`，让 Vue 真正移动 DOM 元素（而非交换内容），这是 FLIP 动画的前提
+  - **非响应式拖拽状态**：`dropHint` 从 `data()` 移除，改用非响应式 `_dropHint` + 直接 DOM 操作 hint 元素（显示/隐藏/定位/缩略图），整个拖拽过程不触发 Vue 重新渲染
+  - **FLIP 重排模型**：`onFlowDragOver` 中每个卡片（含被拖卡片）都移动到"假设松手后"的目标位置 —— 被拖卡片移到插入点，被跨越的卡片移到被拖卡片原位，其余不动。这样虚影会和其他卡片一起连贯重排
+  - **no-op 检测**：同一叙事内、插入位置等于原 shot 位置时不显示空隙（用 `dragState` 索引识别被拖卡片，不依赖可能被 Vue 擦掉的 `.dragging` class）
+  - **被拖卡片视觉**：`.dragging` class 改用 Vue `:class` 绑定（`isShotDragging`）+ CSS `opacity:0.3; scale(0.9)`，响应式驱动，跨重渲染保持
+  - **hover 详情隐藏**：`onDragStart` 中 `hoverShot=null` 清空悬停详情弹窗（避免遮挡目标位置；因 `.dragging` 改用 `:class` 绑定，设 `hoverShot` 不再擦掉拖拽状态）；`showShotDetail`/`scheduleHideDetail` 拖拽期间跳过
+  - **无缝释放**：`onFlowDrop` + `_flipSettle` 用 FLIP 技术 —— 释放前记录视觉位置 → 更新数据（Vue 移动元素）→ 因拖拽时 FLIP 已让卡片就位，delta≈0，无多余回弹动画；`_dropHandled` 标志防止 `onDragEnd` 重复清理
+- `frontend/css/main.css` — 分镜卡片改用 CSS 变量分离位移与缩放：
+  - `.mm-shot-card` 基础规则加 `transform: translateX(var(--tx,0px))` 和 `transition: transform 0.15s`
+  - `.mm-shot-card.dragging` 改为 `opacity:0.3; transform: translateX(var(--tx,0px)) scale(0.9)`（translate 和 scale 通过 `--tx` 分离，JS 只设 `--tx`，不互相覆盖）
+
+**技术要点：**
+- **为什么用非响应式**：拖拽时直接操作 DOM（transform/class），若触发 Vue 重渲染，Vue 的虚拟 DOM patch 会覆盖这些直接修改 → 拖拽视觉效果瞬间消失
+- **为什么用稳定 key**：数组索引作 key 时 Vue 不移动 DOM 元素只交换内容，无法实现"元素直接就位"的 FLIP 动画
+- **为什么用 `--tx` 变量**：translate（JS 控制）和 scale（被拖卡片样式）都作用于 transform，用 CSS 变量分离避免互相覆盖
+
+## 已完成：脑图视图 — 时间线/脑图双视图切换（2026-06-10）
+
+工作台底部面板新增"脑图"视图，以三级层次结构（主旨线→叙事线→分镜）展示创意方案，支持内联编辑、拖拽排序、删除，修改后自动同步到时间线。
+
+**改动文件：**
+- `frontend/js/mindmap.js` — **新建**：MindMap 组件（三级层级展示、缩略图、情绪渐变、旁白/音乐/转场标签、内联编辑、HTML5 拖拽排序、删除）
+- `frontend/js/workbench.js` — 新增 `bottomViewMode` data（timeline/mindmap 切换）；新增 `mindMapData` computed（解析 `project.ai_plan`）；新增 `onMindMapShotClick`（点击 shot 定位播放器）；新增 `onPlanChanged`（保存 ai_plan → apply → 重新加载）；模板增加 `q-btn-toggle` 切换按钮和条件渲染
+- `frontend/css/main.css` — 新增 `.mm-*` 脑图样式（act/narrative/shot 层级、情绪条、sparkline、拖拽反馈、内联编辑、删除按钮 hover 显示）
+- `frontend/js/i18n.js` — 新增 20 个 `wb.mm_*` / `wb.view_*` 中英文翻译 key
+- `frontend/index.html` — 新增 `<script src="mindmap.js">` 和 `app.component("mind-map", MindMap)`
+- `backend/blueprints/creative.py` — 新增 `PUT /<int:pid>/plan` 端点（保存脑图编辑后的 ai_plan）
+
 ## 已完成：素材面板 AI 分析按钮（2026-06-09）
 
 工作台素材面板预览区：未分析的视频显示"AI 分析"按钮，已分析的视频分片列表上方显示"重新分析"按钮。分析进度通过全局 bgTasks 进度条展示。
