@@ -250,6 +250,12 @@ def generate_plan(pid):
     for r in seg_rows:
         d = dict(r)
         asr_text = (d.get("asr") or "")[:50]
+        # Derived arousal/valence from the emotion distribution (curve-alignment axes).
+        # NOTE: we deliberately do NOT ship the full emotions array here — it was the
+        # single largest field and bloated the prompt past the model context limit.
+        # arousal+valence+mood carry the matchable signal; the full distribution stays
+        # in the DB for display (seg-emotions component).
+        agg = aggregate_emotions(_parse_json_field(d.get("emotions")))
         seg_item = {
             "segment_id": d["id"],
             "media_id": d["media_id"],
@@ -258,23 +264,14 @@ def generate_plan(pid):
             "time_end": d["time_end"],
             "visual": d.get("visual") or "",
             "mood": d.get("mood", ""),
+            "arousal": agg["arousal"],
+            "valence": agg["valence"],
             "scene_type": d.get("scene_type", ""),
             "shot_type": d.get("shot_type", ""),
-            "camera_movement": d.get("camera_movement", ""),
-            "color_tone": d.get("color_tone", ""),
-            "lighting": d.get("lighting", ""),
             "dominant_colors": _parse_json_field(d.get("dominant_colors")),
             "main_subjects": _parse_json_field(d.get("main_subjects")),
             "asr": asr_text if asr_text else None,
         }
-        # Emotion distribution → derived arousal/valence (axes aligned with the emotion curve)
-        emotions = _parse_json_field(d.get("emotions"))
-        if emotions:
-            seg_item["emotions"] = emotions
-            agg = aggregate_emotions(emotions)
-            if agg["arousal"] is not None:
-                seg_item["arousal"] = agg["arousal"]
-                seg_item["valence"] = agg["valence"]
         # Include highlights for long segments (key moments with timestamps)
         highlights = _parse_json_field(d.get("highlights"))
         if highlights:
@@ -289,7 +286,9 @@ def generate_plan(pid):
 
     # Build messages
     brief_text = render_brief_text(creative_brief)
-    segments_part = json.dumps(segments_json, ensure_ascii=False, indent=2)
+    # Compact JSON (no indent) — indent=2 added ~150K chars of whitespace and pushed
+    # the prompt past the model context limit (empty response). Compact is parsed fine.
+    segments_part = json.dumps(segments_json, ensure_ascii=False)
     user_content = prompt_template.replace(
         "{brief_text}", brief_text
     ).replace(

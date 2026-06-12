@@ -1,5 +1,16 @@
 # TODO
 
+## 已完成：修复创作生成"AI 返回格式无效"——prompt 超模型上下文（2026-06-12）
+
+青海(776 分片)生成时报"AI 返回格式无效"。根因**不是 JSON 结构错误**，而是 LLM 返回**空响应(Response length=0)**：重分析后全分片带 emotions，先前给创作 seg_item 加了完整 emotions 数组 + camera_movement/color_tone/lighting + valence，叠加 `json.dumps(indent=2)`，prompt 撑到 598K 字符(~15 万 token)，超出 glm-5-turbo 上下文。历史成功约 280–327K。
+
+**改动 `backend/blueprints/creative.py`：**
+- seg_item 去掉**完整 emotions 数组**、camera_movement、color_tone、lighting（保留派生的 arousal+valence+mood 供按情绪曲线选片；完整分布仍存 DB，前端由 seg-emotions 组件展示）
+- segments_json 改 **compact 输出**（去 `indent=2`，省 ~150K 缩进白空）
+- 效果：青海 prompt 598K → **299K**（回到安全区）
+
+**注意**：creative.py 改动需**重启应用**（或 debug 自动重载）后生效。
+
 ## 已完成：移除构思期情绪懒回填，改为重分析覆盖（2026-06-12）
 
 实践发现 A″ 懒回填（依赖 LLM 逐 shot 吐 segment_emotions）覆盖率不稳：青海项目时间线 98 个分片仅 41 个拿到情绪——LLM 对这个可选字段吐得不全（漏 57 个）。改为不回填，直接重跑 AI 视频分析让 B 路径给全部分片产 emotions，覆盖更彻底。
