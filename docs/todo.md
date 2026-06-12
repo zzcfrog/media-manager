@@ -1,5 +1,11 @@
 # TODO
 
+## 已完成：修复工作台单视频重分析崩溃——pool.shutdown NameError（2026-06-12）
+
+工作台对单个视频点"重新分析"，分析完成后 SSE `generate` 收尾时报 `NameError: name 'pool' is not defined`（analysis.py 原 354/412 两处，图片+视频 generate 各一）。`pool` 从未定义（应为模块级共享的 `_analysis_pool`），且对共享池做 per-task `shutdown` 本就错误（会拖垮后续所有分析）。直接删除这两行。
+
+**改动 `backend/blueprints/analysis.py`：** 删除 `pool.shutdown(wait=False)` ×2（图片/视频 SSE generate 收尾处）。
+
 ## 已完成：修复创作生成"AI 返回格式无效"——prompt 超模型上下文（2026-06-12）
 
 青海(776 分片)生成时报"AI 返回格式无效"。根因**不是 JSON 结构错误**，而是 LLM 返回**空响应(Response length=0)**：重分析后全分片带 emotions，先前给创作 seg_item 加了完整 emotions 数组 + camera_movement/color_tone/lighting + valence，叠加 `json.dumps(indent=2)`，prompt 撑到 598K 字符(~15 万 token)，超出 glm-5-turbo 上下文。历史成功约 280–327K。

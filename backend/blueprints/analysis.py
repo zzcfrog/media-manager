@@ -351,7 +351,6 @@ def _start_image_analysis(media_id, media, app):
                             'chars': progress.get('chars', 0)})
             time.sleep(0.3)
 
-        pool.shutdown(wait=False)
         if progress["step"] == "done":
             r = progress.get("result", {})
             yield _sse({'type': 'done', 'message': '分析完成',
@@ -409,7 +408,6 @@ def _start_video_analysis(media_id, media, app):
                             'chars': progress.get('chars', 0)})
             time.sleep(0.3)
 
-        pool.shutdown(wait=False)
         if progress["step"] == "done":
             r = progress.get("result", {})
             yield _sse({'type': 'done', 'message': '分析完成',
