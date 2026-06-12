@@ -5,9 +5,9 @@
 青海(776 分片)生成时报"AI 返回格式无效"。根因**不是 JSON 结构错误**，而是 LLM 返回**空响应(Response length=0)**：重分析后全分片带 emotions，先前给创作 seg_item 加了完整 emotions 数组 + camera_movement/color_tone/lighting + valence，叠加 `json.dumps(indent=2)`，prompt 撑到 598K 字符(~15 万 token)，超出 glm-5-turbo 上下文。历史成功约 280–327K。
 
 **改动 `backend/blueprints/creative.py`：**
-- seg_item 去掉**完整 emotions 数组**、camera_movement、color_tone、lighting（保留派生的 arousal+valence+mood 供按情绪曲线选片；完整分布仍存 DB，前端由 seg-emotions 组件展示）
+- seg_item 去掉**完整 emotions 数组**、camera_movement、color_tone、lighting、dominant_colors、main_subjects、asr（保留派生的 arousal+valence+mood 供按情绪曲线选片；完整分布仍存 DB，前端由 seg-emotions 组件展示）
 - segments_json 改 **compact 输出**（去 `indent=2`，省 ~150K 缩进白空）
-- 效果：青海 prompt 598K → **299K**（回到安全区）
+- 效果：青海 prompt 598K → 299K → **225K**。第一轮砍到 299K 仍失败（实测 glm-5-turbo 上限 ~285–300K，历史成功 284K），再砍 dominant_colors/main_subjects/asr 到 225K 才稳稳低于历史成功线
 
 **注意**：creative.py 改动需**重启应用**（或 debug 自动重载）后生效。
 

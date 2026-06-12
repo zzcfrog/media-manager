@@ -249,7 +249,6 @@ def generate_plan(pid):
     segments_json = []
     for r in seg_rows:
         d = dict(r)
-        asr_text = (d.get("asr") or "")[:50]
         # Derived arousal/valence from the emotion distribution (curve-alignment axes).
         # NOTE: we deliberately do NOT ship the full emotions array here — it was the
         # single largest field and bloated the prompt past the model context limit.
@@ -268,9 +267,6 @@ def generate_plan(pid):
             "valence": agg["valence"],
             "scene_type": d.get("scene_type", ""),
             "shot_type": d.get("shot_type", ""),
-            "dominant_colors": _parse_json_field(d.get("dominant_colors")),
-            "main_subjects": _parse_json_field(d.get("main_subjects")),
-            "asr": asr_text if asr_text else None,
         }
         # Include highlights for long segments (key moments with timestamps)
         highlights = _parse_json_field(d.get("highlights"))
