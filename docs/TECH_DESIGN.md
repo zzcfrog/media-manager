@@ -121,7 +121,7 @@ media_segment (id, media_id, time_start, time_end,
                visual, asr, subtitle, dominant_colors, main_subjects,
                shot_type, focal_length, camera_angle, camera_movement,
                perspective, scene_type, mood, lighting, weather,
-               style, color_tone, tone, dof, composition, seq)
+               style, color_tone, tone, dof, composition, highlights, emotions, seq)
 
 -- 标签
 tags (id, name UNIQUE)
@@ -206,7 +206,7 @@ project_tracks (id PK, project_id FK, version INT, position INT, track_type TEXT
 |------|------|------|
 | `/api/analysis/<media_id>/segments/<seg_id>` | PATCH | 更新单个分段的部分字段 |
 
-**`_EDITABLE_COLS` 白名单**：`visual`, `asr`, `subtitle`, `shot_type`, `focal_length`, `camera_angle`, `camera_movement`, `perspective`, `scene_type`, `mood`, `lighting`, `weather`, `style`, `color_tone`, `tone`, `dof`, `composition`, `dominant_colors`, `main_subjects`
+**`_EDITABLE_COLS` 白名单**：`visual`, `asr`, `subtitle`, `shot_type`, `focal_length`, `camera_angle`, `camera_movement`, `perspective`, `scene_type`, `mood`, `emotions`, `lighting`, `weather`, `style`, `color_tone`, `tone`, `dof`, `composition`, `dominant_colors`, `main_subjects`
 
 **逻辑**：
 1. 验证 `seg_id` 和 `media_id` 匹配
@@ -636,7 +636,7 @@ Body: { template, duration_target, opening, structure, emotion_arc, voice, music
 
 | 策略 | 说明 |
 |------|------|
-| 精简维度 | 仅发送 AI 导演需要的维度：segment_id, duration, visual(截断100字), mood, scene_type, shot_type, asr(截断50字), dominant_colors |
+| 精简维度 | 发送 AI 导演需要的维度：segment_id, duration, visual(完整), mood, emotions(分布)+派生 arousal/valence, scene_type, shot_type, camera_movement, color_tone, lighting, asr(截断50字), dominant_colors, highlights |
 | 去除空值 | ASR 为空的不发送 |
 | 时长聚合 | 用秒数替代 MM:SS 格式 |
 | 预估 | 每个 segment 约 50-80 tokens，200 segments ≈ 10k-16k tokens |

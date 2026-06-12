@@ -4,6 +4,7 @@ import json
 from flask import Blueprint, jsonify, request
 from loguru import logger
 from ..db import get_db, get_setting
+from ..emotion_labels import aggregate_emotions, render_label_table
 
 bp = Blueprint("creative", __name__)
 
@@ -259,10 +260,21 @@ def generate_plan(pid):
             "mood": d.get("mood", ""),
             "scene_type": d.get("scene_type", ""),
             "shot_type": d.get("shot_type", ""),
+            "camera_movement": d.get("camera_movement", ""),
+            "color_tone": d.get("color_tone", ""),
+            "lighting": d.get("lighting", ""),
             "dominant_colors": _parse_json_field(d.get("dominant_colors")),
             "main_subjects": _parse_json_field(d.get("main_subjects")),
             "asr": asr_text if asr_text else None,
         }
+        # Emotion distribution → derived arousal/valence (axes aligned with the emotion curve)
+        emotions = _parse_json_field(d.get("emotions"))
+        if emotions:
+            seg_item["emotions"] = emotions
+            agg = aggregate_emotions(emotions)
+            if agg["arousal"] is not None:
+                seg_item["arousal"] = agg["arousal"]
+                seg_item["valence"] = agg["valence"]
         # Include highlights for long segments (key moments with timestamps)
         highlights = _parse_json_field(d.get("highlights"))
         if highlights:
@@ -282,9 +294,11 @@ def generate_plan(pid):
         "{brief_text}", brief_text
     ).replace(
         "{segments_json}", segments_part
+    ).replace(
+        "{emotion_labels}", render_label_table()
     )
     # Log prompt without segments (too noisy)
-    prompt_without_segments = prompt_template.replace("{brief_text}", brief_text).replace("{segments_json}", "... ({} segments) ...".format(len(segments_json)))
+    prompt_without_segments = prompt_template.replace("{brief_text}", brief_text).replace("{segments_json}", "... ({} segments) ...".format(len(segments_json))).replace("{emotion_labels}", render_label_table())
     logger.info("Creative generate [pid={}]: model={}, segments_count={}, prompt_length={}\n--- PROMPT ---\n{}\n--- END ---", pid, model, len(segments_json), len(user_content), prompt_without_segments)
 
     # SSE streaming response
@@ -343,6 +357,22 @@ def generate_plan(pid):
             # Validate segment references
             valid_ids = {s["segment_id"] for s in segments_json}
             _validate_plan(plan, valid_ids)
+
+            # Lazy backfill (A″): persist LLM-inferred intrinsic emotion distribution
+            # for source segments that lack one (write-if-empty — never overwrite B's
+            # analysis truth or a prior judgment). Intrinsic only; never the timeline emotion.
+            for act in plan.get("acts", []):
+                for nar in act.get("narratives", []):
+                    for shot in nar.get("shots", []):
+                        seg_id = shot.get("segment_id")
+                        seg_emotions = shot.get("segment_emotions")
+                        if not seg_id or seg_id not in valid_ids or not seg_emotions:
+                            continue
+                        thread_db.execute(
+                            "UPDATE media_segment SET emotions = ? "
+                            "WHERE id = ? AND (emotions IS NULL OR emotions = '')",
+                            (json.dumps(seg_emotions, ensure_ascii=False), seg_id),
+                        )
 
             # Save to database
             thread_db.execute(

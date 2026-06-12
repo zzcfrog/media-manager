@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS media_segment (
     style           TEXT DEFAULT '',
     composition     TEXT DEFAULT '',
     highlights      TEXT DEFAULT '',
+    emotions        TEXT DEFAULT '',
     seq             INTEGER DEFAULT 0
 );
 
@@ -181,6 +182,7 @@ _MIGRATIONS = [
     ("style", "ALTER TABLE media_segment ADD COLUMN style TEXT DEFAULT ''"),
     ("composition", "ALTER TABLE media_segment ADD COLUMN composition TEXT DEFAULT ''"),
     ("highlights", "ALTER TABLE media_segment ADD COLUMN highlights TEXT DEFAULT ''"),
+    ("emotions", "ALTER TABLE media_segment ADD COLUMN emotions TEXT DEFAULT ''"),
     ("creative_brief", "ALTER TABLE projects ADD COLUMN creative_brief TEXT"),
     ("ai_plan", "ALTER TABLE projects ADD COLUMN ai_plan TEXT"),
 ]

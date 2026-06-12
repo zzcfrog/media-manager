@@ -11,6 +11,7 @@ from ..compressor import compress_video, compress_image
 from ..config import HEIF_EXTS, ANALYSIS_API_CONCURRENCY, ANALYSIS_THREAD_POOL_SIZE
 from ..analyzer import analyze_video, analyze_image, CODING_BASE_URL
 from ..asr import get_engine as get_asr_engine, preload_all, reload_engine
+from ..emotion_labels import dominant_mood
 
 bp = Blueprint("analysis", __name__)
 
@@ -19,7 +20,7 @@ _analysis_pool = ThreadPoolExecutor(max_workers=ANALYSIS_THREAD_POOL_SIZE)
 _active_progress = {}  # media_id → progress dict (registered by thread, cleaned up on exit)
 
 
-_SEGMENT_COLS = "id, media_id, time_start, time_end, visual, asr, subtitle, dominant_colors, main_subjects, shot_type, focal_length, camera_angle, camera_movement, perspective, scene_type, mood, lighting, weather, color_tone, tone, dof, style, composition, highlights, seq"
+_SEGMENT_COLS = "id, media_id, time_start, time_end, visual, asr, subtitle, dominant_colors, main_subjects, shot_type, focal_length, camera_angle, camera_movement, perspective, scene_type, mood, lighting, weather, color_tone, tone, dof, style, composition, highlights, emotions, seq"
 
 
 def _cleanup_temp(path):
@@ -518,8 +519,8 @@ def save_segments(media_id, segments, model=""):
 
     for i, seg in enumerate(segments):
         db.execute(
-            "INSERT INTO media_segment (media_id, time_start, time_end, visual, asr, subtitle, dominant_colors, main_subjects, shot_type, focal_length, camera_angle, camera_movement, perspective, scene_type, mood, lighting, weather, color_tone, tone, dof, style, composition, highlights, seq) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO media_segment (media_id, time_start, time_end, visual, asr, subtitle, dominant_colors, main_subjects, shot_type, focal_length, camera_angle, camera_movement, perspective, scene_type, mood, lighting, weather, color_tone, tone, dof, style, composition, highlights, emotions, seq) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 media_id,
                 _normalize_timestamp(seg.get("time_start", "")),
@@ -535,7 +536,7 @@ def save_segments(media_id, segments, model=""):
                 seg.get("camera_movement", ""),
                 seg.get("perspective", ""),
                 seg.get("scene_type", ""),
-                seg.get("mood", ""),
+                dominant_mood(seg.get("emotions")) or seg.get("mood", ""),
                 seg.get("lighting", ""),
                 seg.get("weather", ""),
                 seg.get("color_tone", ""),
@@ -544,6 +545,7 @@ def save_segments(media_id, segments, model=""):
                 seg.get("style", ""),
                 seg.get("composition", ""),
                 json.dumps(seg.get("highlights", []), ensure_ascii=False) if seg.get("highlights") else "",
+                json.dumps(seg.get("emotions", []), ensure_ascii=False) if seg.get("emotions") else "",
                 i,
             ),
         )
@@ -604,7 +606,7 @@ def _segment_to_dict(row):
 _EDITABLE_COLS = {
     "time_start", "time_end", "visual", "asr", "subtitle", "shot_type", "focal_length",
     "camera_angle", "camera_movement", "perspective", "scene_type",
-    "mood", "lighting", "weather", "color_tone", "tone", "dof", "style", "composition",
+    "mood", "emotions", "lighting", "weather", "color_tone", "tone", "dof", "style", "composition",
     "dominant_colors", "main_subjects",
 }
 
@@ -622,7 +624,7 @@ def update_segment(media_id, seg_id):
         if col not in data:
             continue
         val = data[col]
-        if col in ("dominant_colors", "main_subjects"):
+        if col in ("dominant_colors", "main_subjects", "emotions"):
             val = json.dumps(val if isinstance(val, list) else [val], ensure_ascii=False)
         fields.append(f"{col} = ?")
         params.append(val)

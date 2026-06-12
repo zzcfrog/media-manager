@@ -18,12 +18,15 @@
 11. camera_movement: 运镜，只能填以下之一：推 | 拉 | 摇 | 移 | 绕 | 固定
 12. perspective: 透视，只能填以下之一：主观 | 客观 | 旁听
 13. scene_type: 场景类型，只能填以下之一：室内 | 室外 | 自然 | 城市 | 水下 | 晨昏
-14. mood: 情绪氛围，只能填以下之一：欢快 | 忧伤 | 紧张 | 平静 | 浪漫 | 温馨 | 恐怖 | 神秘 | 壮丽 | 孤独 | 怀旧 | 梦幻
+14. mood: 主导情绪氛围（emotions 中 weight 最大的成分），只能填下方情绪标签词表中的标签之一
 15. lighting: 光线，只能填以下之一：自然光 | 逆光 | 侧光 | 室内光 | 顶光 | 混合光
 16. weather: 天气环境，只能填以下之一：晴天 | 多云 | 阴天 | 雨 | 雪 | 夜景 | 雾
 17. highlights: 关键时刻（仅当时长超过 20 秒时填写）。标注该时间段内 2-4 个视觉上最有表现力的瞬间，每个包含 time（相对于视频起始的时间戳）和 desc（该瞬间的画面描述）。时长不超过 20 秒的分段不需要此字段
+18. emotions: 情绪分布。情绪常由多种成分按权重交织，请输出 2-3 个成分的数组（按 weight 从大到小），每个成分为 {"mood": 标签, "weight": 0-1 占比, "intensity": 0-1 该成分在此片段的实际唤醒强度}，所有成分 weight 之和≈1。例如壮丽日落可写 [{"mood":"壮丽","weight":0.7,"intensity":0.9},{"mood":"怀旧","weight":0.3,"intensity":0.5}]。主导情绪（mood 字段）必须等于 weight 最大的成分
 
-严格约束：字段 8-16 的值必须从上述枚举中精确选取，不得使用其他任何值。
+{emotion_labels}
+
+严格约束：字段 8-16 的值必须从上述枚举中精确选取，不得使用其他任何值；emotions 中每个成分的 mood 也必须来自上方情绪标签词表。
 
 重要：时间格式说明
 - 格式为 HH:MM:SS.ss（时:分:秒.百分之一秒），四个部分各自独立，不会互相进位
@@ -51,6 +54,7 @@
     "perspective": "客观",
     "scene_type": "自然",
     "mood": "平静",
+    "emotions": [{"mood": "平静", "weight": 0.8, "intensity": 0.3}, {"mood": "宁静", "weight": 0.2, "intensity": 0.2}],
     "lighting": "自然光",
     "weather": "晴天"
   },
@@ -69,6 +73,7 @@
     "perspective": "客观",
     "scene_type": "室内",
     "mood": "紧张",
+    "emotions": [{"mood": "紧张", "weight": 0.7, "intensity": 0.8}, {"mood": "悬疑", "weight": 0.3, "intensity": 0.6}],
     "lighting": "室内光",
     "weather": "晴天"
   },
@@ -87,6 +92,7 @@
     "perspective": "客观",
     "scene_type": "自然",
     "mood": "壮丽",
+    "emotions": [{"mood": "壮丽", "weight": 0.7, "intensity": 0.85}, {"mood": "宁静", "weight": 0.3, "intensity": 0.2}],
     "lighting": "逆光",
     "weather": "晴天",
     "highlights": [

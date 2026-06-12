@@ -6,6 +6,8 @@ from pathlib import Path
 from loguru import logger
 from openai import OpenAI
 
+from .emotion_labels import render_label_table
+
 # VLM (Vision Language Model) API calls for video/image analysis.
 
 PROMPT_FILE = Path(__file__).parent / "video_prompt.txt"
@@ -13,11 +15,11 @@ IMG_PROMPT_FILE = Path(__file__).parent / "img_prompt.txt"
 
 
 def load_prompt() -> str:
-    return PROMPT_FILE.read_text(encoding="utf-8")
+    return PROMPT_FILE.read_text(encoding="utf-8").replace("{emotion_labels}", render_label_table())
 
 
 def load_img_prompt() -> str:
-    return IMG_PROMPT_FILE.read_text(encoding="utf-8")
+    return IMG_PROMPT_FILE.read_text(encoding="utf-8").replace("{emotion_labels}", render_label_table())
 
 
 def encode_image_base64(image_path: str | Path) -> str:

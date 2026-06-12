@@ -1,5 +1,32 @@
 # TODO
 
+## 已完成：情绪分布模型 — 单标签 mood → 效价×唤醒二维情绪分布（2026-06-12）
+
+把素材分片的情绪从单标签 `mood`（12 选 1；库内 4177 片 65% 平静、22% 壮丽，近乎双峰、无梯度）升级为**多成分情绪分布 `emotions`**，基于学界维度模型（Russell 效价×唤醒为骨架 + Plutchik/Parrott 式分类标签），让情绪曲线能真正驱动选片。
+
+**根因**：单标签把"效价(正/负)"和"唤醒(强/弱)"两根独立维度搅进一个词，且情绪本应多成分交织（如 30% 平静 + 70% 壮丽）；分片侧又缺与曲线（0–1 arousal）同轴的量化值，导致 mood 这根轴带不动选片。
+
+**模型设计**：
+- 每分片存分布 `emotions: [{mood, weight, intensity}, ...]`（2-3 成分，weight 求和≈1）
+- 派生（读取时算）：综合唤醒度 `arousal=Σ(weight×intensity)`（与时间线情绪曲线同轴）、综合效价 `valence=Σ(weight×锚点valence)`、主导情绪（回填老 mood 列）
+- **32 标签词表**单一事实源，按效价×唤醒四象限铺开（正高 8 / 正低 8 / 中性 4 / 负高 5 / 负低 7），覆盖全品类；停在 32 是为避免坐标平面上标签拥挤导致的标注噪声（64 会塌方）
+- 两个"情绪"严格分离：分片**内在** arousal（项目无关、稳定）vs **时间线** arousal（`project_tracks.emotion_value`，自上而下设计）；回填只写内在、绝不写时间线
+
+**改动文件：**
+- `backend/emotion_labels.py` — **新建**：32 标签锚点表 + `render_label_table()`（prompt 注入）+ `aggregate_emotions()`（分布→arousal/valence/dominant）+ `dominant_mood()`
+- `backend/db.py` — media_segment 加 `emotions` 列 + `_MIGRATIONS` 迁移项（老库启动自动 ALTER；旧 mood 列与 `idx_segment_mood` 索引保留）
+- `backend/blueprints/analysis.py` — `_SEGMENT_COLS`/INSERT 写 emotions；mood 改为 `dominant_mood(emotions) or mood`（回填主导）；`_EDITABLE_COLS` + PATCH JSON 序列化加 emotions
+- `backend/analyzer.py` — `load_prompt`/`load_img_prompt` 注入 `{emotion_labels}` 占位符（顺手消除 video/img 两处 12 标签重复硬编码）
+- `backend/video_prompt.txt` / `backend/img_prompt.txt` — mood 枚举换 `{emotion_labels}` 占位 + 新增 `emotions` 字段说明 + JSON 示例
+- `backend/blueprints/creative.py` — seg_item 加 emotions + 派生 arousal/valence + 补回 camera_movement/color_tone/lighting；注入 `{emotion_labels}`；方案解析后 write-if-empty 懒回填（A″）
+- `backend/creative_prompt.txt` — 第三步选片改为按 arousal 对齐曲线 + mood 类型匹配；新增 `segment_emotions` 输出字段（仅无 emotions 的老素材填，供回填），与时间线 `emotion` 严格区分
+
+**老数据迁移（零批处理脚本）**：老分片 mood 原样保留、emotions 为空。填充途径：① 新素材分析期产真值（B）② 老素材首次被构思用到时懒回填（A″，write-if-empty）③ 画廊手动重分析覆盖（`save_segments` 先 DELETE 再 INSERT）。回填 write-if-empty：值一旦写入不覆盖（综合 arousal 近似项目无关；偶发首判偏差靠手动重分析纠正）。
+
+**验证**：`py_compile` 全过；`aggregate_emotions` 样例 `{壮丽0.7@0.9, 平静0.3@0.6}`→arousal 0.81 / valence 0.49 / dominant 壮丽（精确命中），边界（空/未知 mood/缺省 intensity 回落锚点）均正确；副本迁移加列成功、老行 emotions 空、mood 完好、二次迁移幂等；三处 prompt 占位符全替换、32 标签就位；回填 write-if-empty 首次写入/二次不覆盖。（真实 LLM 跑分析/构思需 API Key，未在此端到端触发，但其代码路径均已单测。）
+
+**不在本次范围**：前端 emotions 展示/编辑面板（现有 mood 展示照旧，故 UE_DESIGN 无改动）；批量回填老库。
+
 ## 已完成：脑图分镜拖拽交互打磨 — FLIP 重排 + 无缝释放（2026-06-11）
 
 打磨脑图视图分镜（shot）的拖拽体验：拖动时兄弟卡片丝滑让出空隙、被拖卡片缩小变虚影并跟随重排、释放时无多余回弹动画。
