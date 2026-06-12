@@ -1,5 +1,14 @@
 # TODO
 
+## 已完成：移除构思期情绪懒回填，改为重分析覆盖（2026-06-12）
+
+实践发现 A″ 懒回填（依赖 LLM 逐 shot 吐 segment_emotions）覆盖率不稳：青海项目时间线 98 个分片仅 41 个拿到情绪——LLM 对这个可选字段吐得不全（漏 57 个）。改为不回填，直接重跑 AI 视频分析让 B 路径给全部分片产 emotions，覆盖更彻底。
+
+**改动：**
+- `backend/blueprints/creative.py` — 删除方案解析后的 write-if-empty 懒回填循环
+- `backend/creative_prompt.txt` — 删除已无用的 `segment_emotions` 输出字段定义与示例（保留"读取 seg.emotions 按 arousal 选片"的选片逻辑，那不是回填）
+- 数据：重跑青海项目 166 个视频的 AI 分析（B 路径，全分片产 emotions）
+
 ## 已完成：片段列表情绪分布展示 — seg-emotions 组件（2026-06-12）
 
 素材库预览右侧分析片段列表、工作台预览区右侧片段列表，把「氛围(mood)」从通用维度 chip 里拿出来，改成独立的情绪分布展示：每个成分一颗药丸(标签+占比) + 唤醒条(arousal) + 效价(valence 正/负着色)。紧凑版（时间轴列表 / 素材 hover 提示气泡）省略占比与标签文字。

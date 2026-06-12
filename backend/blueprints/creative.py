@@ -358,22 +358,6 @@ def generate_plan(pid):
             valid_ids = {s["segment_id"] for s in segments_json}
             _validate_plan(plan, valid_ids)
 
-            # Lazy backfill (A″): persist LLM-inferred intrinsic emotion distribution
-            # for source segments that lack one (write-if-empty — never overwrite B's
-            # analysis truth or a prior judgment). Intrinsic only; never the timeline emotion.
-            for act in plan.get("acts", []):
-                for nar in act.get("narratives", []):
-                    for shot in nar.get("shots", []):
-                        seg_id = shot.get("segment_id")
-                        seg_emotions = shot.get("segment_emotions")
-                        if not seg_id or seg_id not in valid_ids or not seg_emotions:
-                            continue
-                        thread_db.execute(
-                            "UPDATE media_segment SET emotions = ? "
-                            "WHERE id = ? AND (emotions IS NULL OR emotions = '')",
-                            (json.dumps(seg_emotions, ensure_ascii=False), seg_id),
-                        )
-
             # Save to database
             thread_db.execute(
                 "UPDATE projects SET ai_plan = ?, updated_at = datetime('now') WHERE id = ?",

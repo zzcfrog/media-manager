@@ -86,7 +86,6 @@
 - `src_end`: 从原始分片的什么时间点结束截取（格式 HH:MM:SS.ss）。这是源素材上的时间戳，不是成片时间线
 - `src_start` 和 `src_end`：≥15s 的长分片必须设置（截取 3-6 秒精华）；<15s 的短分片可设可不设，根据叙事需要灵活决定
 - `emotion`: 该 shot 在成片时间线上的情绪强度（曲线位置），0.0（最低）到 1.0（最高）。这是"放在曲线哪里"，由所在幕的 emotion_start/emotion_end 引导
-- `segment_emotions`: 仅当该 segment 在"可用素材"里**没有** emotions 分布时才填——按内容推断这条素材**本身**的内在情绪分布（2-3 个成分，格式同素材侧：[{mood, weight, intensity}]）。这是素材的内在属性，与 `emotion`（时间线位置）是两回事，切勿混淆
 - `transition`: 与下一个镜头之间的转场方式
 
 ### 输出格式
@@ -115,7 +114,6 @@
               "narration": "烘托情绪的旁白文案——与叙事互补，而非重复叙事内容",
               "use_asr": false,
               "emotion": 0.3,
-              "segment_emotions": [{"mood": "壮丽", "weight": 0.7, "intensity": 0.9}],
               "music": {
                 "mood": "情绪描述",
                 "tempo": "slow/medium/fast",
