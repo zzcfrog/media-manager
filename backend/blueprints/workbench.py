@@ -1,12 +1,13 @@
 from flask import Blueprint, jsonify, request
 from ..db import get_db
+from ..emotion_labels import aggregate_emotions
 
 bp = Blueprint("workbench", __name__)
 
 _SEG_COLS = (
     "ms.id, ms.media_id, ms.time_start, ms.time_end, ms.visual, ms.asr, ms.subtitle, "
     "ms.dominant_colors, ms.main_subjects, ms.shot_type, ms.focal_length, ms.camera_angle, "
-    "ms.camera_movement, ms.perspective, ms.scene_type, ms.mood, ms.lighting, ms.weather, "
+    "ms.camera_movement, ms.perspective, ms.scene_type, ms.mood, ms.emotions, ms.lighting, ms.weather, "
     "ms.color_tone, ms.tone, ms.dof, ms.style, ms.composition, ms.seq"
 )
 
@@ -21,6 +22,19 @@ def _segment_to_dict(r):
                 d[k] = json.loads(v)
             except (ValueError, TypeError):
                 d[k] = v
+    # Emotion distribution → parsed list + derived arousal/valence
+    import json
+    emo = d.get("emotions", "")
+    if isinstance(emo, str) and emo:
+        try:
+            emo = json.loads(emo)
+        except (ValueError, TypeError):
+            emo = []
+    d["emotions"] = emo if isinstance(emo, list) else []
+    if d["emotions"]:
+        agg = aggregate_emotions(d["emotions"])
+        d["arousal"] = agg["arousal"]
+        d["valence"] = agg["valence"]
     return d
 
 

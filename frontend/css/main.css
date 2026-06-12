@@ -261,6 +261,20 @@ body:not(.body--dark) .exclude-scroll-hint { background: #fff; }
 .array-pills { display: flex; flex-wrap: wrap; gap: 4px; }
 .array-pills .pill { font-size: 10px; padding: 2px 7px; border-radius: 10px; }
 .pill.color { background: rgba(144,164,174,0.12); color: #90a4ae; border: 1px solid rgba(144,164,174,0.2); }
+/* 情绪分布块（seg-emotions 组件） */
+.seg-emotions { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin-top: 6px; line-height: 1.5; }
+.seg-emotions.compact { margin-top: 4px; gap: 3px 6px; }
+.seg-emotions .emo-label { font-size: 10px; color: var(--text3); }
+.seg-emotions .emo-pills { display: inline-flex; flex-wrap: wrap; gap: 3px; }
+.seg-emotions .emo-pill { display: inline-flex; align-items: baseline; gap: 3px; font-size: 10px; padding: 2px 7px; border-radius: 10px; background: rgba(206,147,216,0.16); color: #ce93d8; border: 1px solid rgba(206,147,216,0.3); }
+.seg-emotions .emo-pill .emo-weight { font-size: 9px; opacity: 0.65; }
+.seg-emotions .emo-metric { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; color: var(--text3); }
+.seg-emotions .emo-metric-label { opacity: 0.7; }
+.seg-emotions .emo-metric-val { font-variant-numeric: tabular-nums; }
+.seg-emotions .arousal-bar { display: inline-block; width: 34px; height: 5px; background: rgba(128,128,128,0.25); border-radius: 3px; overflow: hidden; }
+.seg-emotions .arousal-bar i { display: block; height: 100%; background: linear-gradient(90deg, #9575cd, #ce93d8); }
+.seg-emotions .emo-valence.pos .emo-metric-val { color: #81c784; }
+.seg-emotions .emo-valence.neg .emo-metric-val { color: #e57373; }
 .pill.subject { background: rgba(176,190,197,0.1); color: #b0bec5; border: 1px solid rgba(176,190,197,0.15); }
 
 /* Analysis progress timeline */

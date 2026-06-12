@@ -11,7 +11,7 @@ from ..compressor import compress_video, compress_image
 from ..config import HEIF_EXTS, ANALYSIS_API_CONCURRENCY, ANALYSIS_THREAD_POOL_SIZE
 from ..analyzer import analyze_video, analyze_image, CODING_BASE_URL
 from ..asr import get_engine as get_asr_engine, preload_all, reload_engine
-from ..emotion_labels import dominant_mood
+from ..emotion_labels import dominant_mood, aggregate_emotions
 
 bp = Blueprint("analysis", __name__)
 
@@ -600,6 +600,18 @@ def _segment_to_dict(row):
                 d[col] = [v] if col != "highlights" else []
         elif not v:
             d[col] = [] if col in ("dominant_colors", "main_subjects") else None
+    # Emotion distribution → parsed list + derived arousal/valence
+    emo = d.get("emotions", "")
+    if isinstance(emo, str) and emo:
+        try:
+            emo = json.loads(emo)
+        except json.JSONDecodeError:
+            emo = []
+    d["emotions"] = emo if isinstance(emo, list) else []
+    if d["emotions"]:
+        agg = aggregate_emotions(d["emotions"])
+        d["arousal"] = agg["arousal"]
+        d["valence"] = agg["valence"]
     return d
 
 

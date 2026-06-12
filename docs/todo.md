@@ -1,5 +1,21 @@
 # TODO
 
+## 已完成：片段列表情绪分布展示 — seg-emotions 组件（2026-06-12）
+
+素材库预览右侧分析片段列表、工作台预览区右侧片段列表，把「氛围(mood)」从通用维度 chip 里拿出来，改成独立的情绪分布展示：每个成分一颗药丸(标签+占比) + 唤醒条(arousal) + 效价(valence 正/负着色)。紧凑版（时间轴列表 / 素材 hover 提示气泡）省略占比与标签文字。
+
+**改动文件：**
+- `backend/blueprints/analysis.py` / `backend/blueprints/workbench.py` — 两处 `_segment_to_dict` 解析 `emotions` JSON 为数组，并用 `aggregate_emotions` 派生 `arousal`/`valence` 注入每个 seg；workbench `_SEG_COLS` 补 `ms.emotions` 列。空情绪时优雅降级（emotions=[]、不输出 arousal/valence、mood 保留）
+- `frontend/js/seg-emotions.js` — **新建**全局组件 `<seg-emotions :seg="seg" [compact]>`，渲染药丸+唤醒条+效价；`t()` 经 `this.$root.t` 复用（同 mind-map 组件范式）
+- `frontend/index.html` — 引入脚本 + `app.component("seg-emotions", SegEmotions)`
+- `frontend/js/detail.js` / `frontend/js/workbench.js` — sceneFields 移除 mood（不再作通用 chip）；主列表与提示接入 `<seg-emotions>`（workbench 三处：右侧可编辑列表、时间线只读列表、hover 提示）
+- `frontend/js/i18n.js` — 新增 `d.dim.emotions/arousal/valence`（中英）
+- `frontend/css/main.css` — `.seg-emotions` 药丸/唤醒条/效价着色样式（紫色药丸承接原 mood 配色，效价正绿负红）
+
+**验证**：JS 语法（node --check）全过；后端两处 `_segment_to_dict` 对样例分布正确产出 arousal 0.81/valence 0.49，空情绪优雅降级、mood 保留；模板插入点/sceneFields/组件注册/i18n 键 grep 核对无误。
+
+**注意**：情绪块仅在分片有 `emotions` 数据时渲染（`v-if="seg.emotions.length"`）。现有老分片 emotions 为空，需经新素材分析或构思期懒回填（见上一条变更）填充后才会显示。
+
 ## 已完成：情绪分布模型 — 单标签 mood → 效价×唤醒二维情绪分布（2026-06-12）
 
 把素材分片的情绪从单标签 `mood`（12 选 1；库内 4177 片 65% 平静、22% 壮丽，近乎双峰、无梯度）升级为**多成分情绪分布 `emotions`**，基于学界维度模型（Russell 效价×唤醒为骨架 + Plutchik/Parrott 式分类标签），让情绪曲线能真正驱动选片。
