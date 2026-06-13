@@ -276,7 +276,7 @@ def generate_plan(pid):
 
     # Load prompt template
     import os
-    prompt_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "creative_prompt.txt")
+    prompt_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "prompts", "creative_prompt.txt")
     with open(prompt_path, "r") as f:
         prompt_template = f.read()
 

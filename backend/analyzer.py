@@ -10,8 +10,8 @@ from .emotion_labels import render_label_table
 
 # VLM (Vision Language Model) API calls for video/image analysis.
 
-PROMPT_FILE = Path(__file__).parent / "video_prompt.txt"
-IMG_PROMPT_FILE = Path(__file__).parent / "img_prompt.txt"
+PROMPT_FILE = Path(__file__).parent / "prompts" / "video_prompt.txt"
+IMG_PROMPT_FILE = Path(__file__).parent / "prompts" / "img_prompt.txt"
 
 
 def load_prompt() -> str:

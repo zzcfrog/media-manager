@@ -1,5 +1,14 @@
 # TODO
 
+## 已完成：prompt 文件归集到 backend/prompts/ 目录（2026-06-13）
+
+把原本散在 backend/ 根目录的三个 prompt 文件归到一个目录，便于统一管理：
+- `backend/prompts/video_prompt.txt`（视频分析）
+- `backend/prompts/img_prompt.txt`（图片分析）
+- `backend/prompts/creative_prompt.txt`（创作构思）
+
+**改动：** `git mv` 移动三文件（保留 git 历史）；`analyzer.py`（`PROMPT_FILE`/`IMG_PROMPT_FILE` 路径）、`creative.py`（`prompt_path`）改为读 `prompts/` 子目录。`{emotion_labels}` / `{brief_text}` / `{segments_json}` 占位符注入机制不变。
+
 ## 已完成：修复工作台单视频重分析崩溃——pool.shutdown NameError（2026-06-12）
 
 工作台对单个视频点"重新分析"，分析完成后 SSE `generate` 收尾时报 `NameError: name 'pool' is not defined`（analysis.py 原 354/412 两处，图片+视频 generate 各一）。`pool` 从未定义（应为模块级共享的 `_analysis_pool`），且对共享池做 per-task `shutdown` 本就错误（会拖垮后续所有分析）。直接删除这两行。
