@@ -13,6 +13,15 @@
 
 验证：项目 62 实测——emotion 独立行 + content-group(3 lane) + 主旨框(3)/叙事框(21) 覆盖 area 全高(120px=3 lane)；点框标题选中框、点块选中块（pointer-events 穿透正确：框 none/标题 auto/块 z5）、块框互斥。
 
+## 已完成：主旨/叙事 overlay 框高度+z-index+配色完善（2026-06-14）
+
+overlay 框上线后发现三个显示问题：①框标题挤在 narration lane 顶部，与旁白块重叠 15.5px；②框 z-index(3/4) 低于块(5)，边框/标题被块遮挡；③主旨/叙事配色未区分深浅。修复（[frontend/css/main.css](frontend/css/main.css)）：
+- `.wb-content-group` 加 `margin-top: 20px`（标题区），`.wb-overlay-frame` 改 `top: -20px`（覆盖标题区+area），`.wb-frame-label` 改 `top: 2px`——标题上移到专属标题区，不再挤 lane。
+- `.wb-frame-theme` z-index 6、`.wb-frame-text` 7（高于块 5），边框/标题在最上层。
+- 主旨 `var(--accent)`（深主题色），叙事 `color-mix(in srgb, var(--accent) 50%, transparent)`（浅），标题文字同色系。
+
+验证：标题(654-670) 与旁白块(672+) 不再重叠；框 z6 > 块 z5，边框在最上层。
+
 ## 已完成：修复 video 块被 padding 撑大致视频轨道比主旨/叙述长（2026-06-14）
 
 缩小比例尺后主旨/叙述轨道视觉短于视频轨道（放大正常，数据正常）。根因：`.wb-track-item` 有 `padding: 2px 8px`，`box-sizing: border-box` 下当块宽 < padding(16px) 时元素最小宽被提升到 padding——小 zoom 下大量短 video 块（inline 3px）被撑到 16px，视频轨道总长偏大；主旨/叙述块大不受影响。实测视频线 maxRight 2891.4 vs 主旨/叙述 2878.4（差 13px）。

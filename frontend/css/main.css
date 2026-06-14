@@ -1151,6 +1151,7 @@ body:not(.body--dark) .wb-mat-toolbar .q-btn-dropdown { background: #e0e0e0; }
   display: flex;
   align-items: stretch;
   min-width: max-content;
+  margin-top: 20px;
   border-bottom: 1px solid var(--border);
 }
 .wb-content-group-labels {
@@ -1197,7 +1198,7 @@ body:not(.body--dark) .wb-mat-toolbar .q-btn-dropdown { background: #e0e0e0; }
 /* ── 主旨/叙事 overlay 框（覆盖内容组） ── */
 .wb-overlay-frame {
   position: absolute;
-  top: 0;
+  top: -20px;
   bottom: 0;
   box-sizing: border-box;
   pointer-events: none;
@@ -1206,12 +1207,12 @@ body:not(.body--dark) .wb-mat-toolbar .q-btn-dropdown { background: #e0e0e0; }
 .wb-frame-theme {
   border: 2px solid var(--accent);
   background: transparent;
-  z-index: 3;
+  z-index: 6;
 }
 .wb-frame-text {
-  border: 2px dashed var(--accent);
+  border: 2px dashed color-mix(in srgb, var(--accent) 50%, transparent);
   background: transparent;
-  z-index: 4;
+  z-index: 7;
 }
 .wb-overlay-frame.selected {
   background: var(--accent-dim);
@@ -1222,7 +1223,7 @@ body:not(.body--dark) .wb-mat-toolbar .q-btn-dropdown { background: #e0e0e0; }
 }
 .wb-frame-label {
   position: absolute;
-  top: -1px;
+  top: 2px;
   left: 4px;
   max-width: calc(100% - 8px);
   font-size: 11px;
@@ -1238,7 +1239,7 @@ body:not(.body--dark) .wb-mat-toolbar .q-btn-dropdown { background: #e0e0e0; }
   text-overflow: ellipsis;
 }
 .wb-frame-text .wb-frame-label {
-  opacity: 0.8;
+  color: color-mix(in srgb, var(--accent) 65%, var(--text2));
 }
 .wb-frame-label-input {
   font-size: 11px;
