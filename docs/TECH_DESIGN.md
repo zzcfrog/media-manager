@@ -497,6 +497,8 @@ confirmPicker()
 
 **缩放**：`trackZoom`（1-10x）通过内联 `transform: scaleX()` + `minWidth` 百分比缩放 `.wb-track-content` 内容区域，超出时横向滚动。
 
+**块定位 `trackItemPos(item)`**：返回 `{left, width}` **浮点 px**（亚像素），`left = time_start*pps`、`width = max(0.5, dur*pps)`。连续块 `time_end[i]==time_start[i+1]`，浮点保证右边界 `e*pps` 精确等于下一块左边界，避免 `round(s)+round(dur)` 偶尔超过 `round(s+dur)` 的 1px 重叠（小 zoom 尤甚，曾导致 137/170 块视觉重叠）。`.wb-track-item` 用 `box-sizing: border-box`（width 即视觉宽度，padding 不额外撑宽），`.wb-track-item-label` `min-width:0` 防 flex 文字撑大块。
+
 **编辑操作**：
 - **撤销/重做**：JSON 快照栈（`_undoStack` / `_redoStack`），每次编辑前调用 `_trackSnapshot()` 保存当前状态。`trackUndo`/`trackRedo` 弹栈还原 `this.tracks` 后调用 `_hydrateSegments()` 重挂运行时 `_segment` 引用（快照深拷贝会切断与 `this.segments` 的引用，否则 video 块缩略图/标签显示 `?`）。`load`/`loadTracks` 整体替换 tracks 后调 `_hydrateSegments()` + `_resetUndoStacks()`，避免脑图 apply 后残留脏快照
 - **分割**：`trackSplit()` **仅对 video 生效**（按 `metadata.srcStart/srcEnd` 中点一分为二）；非视频块禁止分割——plan 一个 shot 只存一个情绪/旁白值，分割出的第二段会在 apply 时丢失，故提示 `wb.track_split_disabled` 并返回。

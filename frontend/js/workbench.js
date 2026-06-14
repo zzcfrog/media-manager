@@ -1417,9 +1417,13 @@ const WorkbenchPage = {
       const s = this._timeToSec(item.time_start);
       const e = this._timeToSec(item.time_end);
       if (e <= s) return { left: '0px', width: '40px' };
+      // Float (sub-pixel) positioning: adjacent timeline blocks are continuous
+      // (time_end[i] == time_start[i+1]), so rounding left/width separately makes
+      // round(s)+round(dur) occasionally exceed round(s+dur) by 1px → visual overlap
+      // at small zoom. Float keeps block right edge == next block left edge exactly.
       return {
-        left: Math.round(s * this.pps) + 'px',
-        width: Math.max(30, Math.round((e - s) * this.pps)) + 'px',
+        left: (s * this.pps) + 'px',
+        width: Math.max(0.5, (e - s) * this.pps) + 'px',
       };
     },
     trackAddPos(trackType) {

@@ -1,5 +1,15 @@
 # TODO
 
+## 已完成：修复小 zoom 时间线块视觉重叠（2026-06-14）
+
+小比例尺下时间线块视觉重叠（实际不重叠）。根因：`trackItemPos` 的 width 用 `Math.max(30, Math.round(dur*pps))`——最小 30px 且取整；连续块（`time_end[i]==time_start[i+1]`）因 `round(s)+round(dur)` 偶尔 > `round(s+dur)` 差 1px，小 zoom 时 30px 最小宽度远大于块间距导致大面积重叠（项目 62 实测 video 重叠 137/170）。
+
+改动：
+- `trackItemPos`（[frontend/js/workbench.js](frontend/js/workbench.js)）改为浮点定位（不 round），连续块右边界 `e*pps` 精确等于下一块左边界；width 最小 0.5px（亚像素可见）。
+- `.wb-track-item`（[frontend/css/main.css](frontend/css/main.css)）加 `box-sizing: border-box`（padding 不额外撑宽，width 即视觉宽度）；`.wb-track-item-label` 加 `min-width: 0`（防 flex 文字撑大块）。
+
+验证：video 重叠 137→0（pps=3/1.2/0.5），emotion/narration/theme 同样 0。text 剩 1 处是 narrative 数据本身区间重叠 0.1s（非布局问题）。
+
 ## 已完成：删除叙事/主旨时区间由 apply 重算（修复规则4）（2026-06-14）
 
 规则4 的 `_cascadeDelete` 原走 `_trackSave`（normalize + sync），但删叙事后 `_syncTracksToPlan` 从残缺 tracks 反推 narrative 边界会误算（被删叙事的 video 已不在，fallback `_shotDur`），导致所属主旨块区间不缩反长。改为：结构性删除（act/narrative 消失）直接从 plan 移除对应项（theme 用 `metadata.act_id`，text 按新增 `_narrativeDuration` 累加边界匹配起点，算法与 apply 一致），再 `onPlanChanged`（PUT plan + apply + loadTracks），让所有 theme/text/video 区间由 plan 正确重算。
