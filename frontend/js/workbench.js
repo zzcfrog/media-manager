@@ -475,48 +475,104 @@ const WorkbenchPage = {
             </span>
           </div>
         </div>
-        <div v-for="tt in trackTypes" :key="tt.key" class="wb-track-row" :class="{'wb-track-row-video': tt.key === 'video'}">
-          <div class="wb-track-label">{{ t('wb.track_' + tt.key) }}</div>
+        <!-- 情绪轨道：独立最上，不被主旨框覆盖 -->
+        <div class="wb-track-row">
+          <div class="wb-track-label">{{ t('wb.track_emotion') }}</div>
           <div class="wb-track-content" :style="{width: timelineWidth + 'px'}"
-               @dragover="onTrackDragOver($event, tt.key)"
+               @dragover="onTrackDragOver($event, 'emotion')"
                @dragleave="onTrackDragLeave($event)"
-               @drop="onTrackDrop($event, tt.key)">
-            <svg v-if="tt.key === 'emotion' && emotionCurvePath.line"
-                 class="wb-emotion-curve" :viewBox="'0 0 ' + timelineWidth + ' 28'"
-                 preserveAspectRatio="none">
+               @drop="onTrackDrop($event, 'emotion')">
+            <svg v-if="emotionCurvePath.line" class="wb-emotion-curve"
+                 :viewBox="'0 0 ' + timelineWidth + ' 28'" preserveAspectRatio="none">
               <path :d="emotionCurvePath.fill" fill="var(--accent)" fill-opacity="0.12"/>
               <path :d="emotionCurvePath.line" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
             </svg>
-            <div v-for="item in getTrackItems(tt.key)" :key="item.id" class="wb-track-item"
-                 :class="['wb-track-' + tt.key, {selected: trackSelectedItem === item.id}]"
+            <div v-for="item in getTrackItems('emotion')" :key="item.id" class="wb-track-item wb-track-emotion"
+                 :class="{selected: trackSelectedItem === item.id}"
                  :style="trackItemPos(item)"
                  @click="trackSelectedItem = item.id"
-                 @mousedown="onTrackItemDown($event, item, tt.key)"
-                 @mousemove="onTrackItemHover($event, tt.key)">
-              <template v-if="tt.key === 'video'">
-                <div v-if="item._segment" class="wb-track-filmstrip"
-                     :style="filmstripStyle(item)"></div>
-                <span class="wb-track-item-label">{{ item._segment ? (item._segment.mood || item._segment.shot_type || '...') : '?' }}</span>
-              </template>
-              <template v-else-if="tt.key === 'emotion'">
-                <q-tooltip :delay="300" :offset="[0, 4]">
-                  {{ (item.emotion_value ?? 0.5).toFixed(2) }}<span v-if="item.content"> · {{ item.content }}</span>
-                </q-tooltip>
-              </template>
-              <template v-else>
-                <span class="wb-track-text">{{ item.content || '...' }}</span>
-                <q-tooltip v-if="item.content" :delay="400" :offset="[0, 4]">{{ item.content }}</q-tooltip>
-              </template>
-              <q-menu touch-position context-menu>
-                <q-list dense style="min-width: 80px">
-                  <q-item clickable v-close-popup @click="trackDelete()">
-                    <q-item-section>{{ t('wb.ctx_delete') || '删除' }}</q-item-section>
-                  </q-item>
-                </q-list>
-              </q-menu>
+                 @mousedown="onTrackItemDown($event, item, 'emotion')"
+                 @mousemove="onTrackItemHover($event, 'emotion')">
+              <q-tooltip :delay="300" :offset="[0, 4]">
+                {{ (item.emotion_value ?? 0.5).toFixed(2) }}<span v-if="item.content"> · {{ item.content }}</span>
+              </q-tooltip>
             </div>
-            <div class="wb-track-add" :style="trackAddPos(tt.key)" @click="addTrackItem(tt.key)">
+            <div class="wb-track-add" :style="trackAddPos('emotion')" @click="addTrackItem('emotion')">
               <q-icon name="add" size="14px" color="grey-6"></q-icon>
+            </div>
+          </div>
+        </div>
+        <!-- 内容组：旁白/字幕/分镜贯穿轨道 + 主旨/叙事 overlay 框 -->
+        <div class="wb-content-group">
+          <div class="wb-content-group-labels">
+            <div v-for="tt in contentTrackTypes" :key="tt.key" class="wb-track-label" :class="tt.key">{{ t('wb.track_' + tt.key) }}</div>
+          </div>
+          <div class="wb-content-group-area" :style="{width: timelineWidth + 'px'}">
+            <div v-for="tt in contentTrackTypes" :key="tt.key" class="wb-content-lane" :class="tt.key"
+                 @dragover="onTrackDragOver($event, tt.key)"
+                 @dragleave="onTrackDragLeave($event)"
+                 @drop="onTrackDrop($event, tt.key)">
+              <div v-for="item in getTrackItems(tt.key)" :key="item.id" class="wb-track-item"
+                   :class="['wb-track-' + tt.key, {selected: trackSelectedItem === item.id}]"
+                   :style="trackItemPos(item)"
+                   @click="trackSelectedItem = item.id"
+                   @mousedown="onTrackItemDown($event, item, tt.key)"
+                   @mousemove="onTrackItemHover($event, tt.key)">
+                <template v-if="tt.key === 'video'">
+                  <div v-if="item._segment" class="wb-track-filmstrip" :style="filmstripStyle(item)"></div>
+                  <span class="wb-track-item-label">{{ item._segment ? (item._segment.mood || item._segment.shot_type || '...') : '?' }}</span>
+                </template>
+                <template v-else>
+                  <span class="wb-track-text">{{ item.content || '...' }}</span>
+                  <q-tooltip v-if="item.content" :delay="400" :offset="[0, 4]">{{ item.content }}</q-tooltip>
+                </template>
+                <q-menu touch-position context-menu>
+                  <q-list dense style="min-width: 80px">
+                    <q-item clickable v-close-popup @click="trackDelete()">
+                      <q-item-section>{{ t('wb.ctx_delete') || '删除' }}</q-item-section>
+                    </q-item>
+                  </q-list>
+                </q-menu>
+              </div>
+              <div class="wb-track-add" :style="trackAddPos(tt.key)" @click="addTrackItem(tt.key)">
+                <q-icon name="add" size="14px" color="grey-6"></q-icon>
+              </div>
+            </div>
+            <!-- 主旨 overlay 框（横跨整个 act，纵向包住 3 条内容轨道） -->
+            <div v-for="th in getTrackItems('theme')" :key="'frame-th-' + th.id"
+                 class="wb-overlay-frame wb-frame-theme" :class="{selected: trackSelectedItem === th.id}"
+                 :style="trackItemPos(th)">
+              <div class="wb-frame-label" @click.stop="trackSelectedItem = th.id">
+                <input v-if="frameEditing === th.id" class="wb-frame-label-input"
+                       v-model="frameRenameText" @blur="commitFrameRename(th)"
+                       @keydown.enter.prevent="commitFrameRename(th)" @keydown.esc="cancelFrameRename">
+                <span v-else @dblclick.stop="startFrameRename(th)">{{ th.content || '...' }}</span>
+                <q-menu touch-position context-menu>
+                  <q-list dense style="min-width: 80px">
+                    <q-item clickable v-close-popup @click="trackSelectedItem = th.id; trackDelete()">
+                      <q-item-section>{{ t('wb.ctx_delete') || '删除' }}</q-item-section>
+                    </q-item>
+                  </q-list>
+                </q-menu>
+              </div>
+            </div>
+            <!-- 叙事 overlay 框（在主旨框内，横跨单个叙事） -->
+            <div v-for="tx in getTrackItems('text')" :key="'frame-tx-' + tx.id"
+                 class="wb-overlay-frame wb-frame-text" :class="{selected: trackSelectedItem === tx.id}"
+                 :style="trackItemPos(tx)">
+              <div class="wb-frame-label" @click.stop="trackSelectedItem = tx.id">
+                <input v-if="frameEditing === tx.id" class="wb-frame-label-input"
+                       v-model="frameRenameText" @blur="commitFrameRename(tx)"
+                       @keydown.enter.prevent="commitFrameRename(tx)" @keydown.esc="cancelFrameRename">
+                <span v-else @dblclick.stop="startFrameRename(tx)">{{ tx.content || '...' }}</span>
+                <q-menu touch-position context-menu>
+                  <q-list dense style="min-width: 80px">
+                    <q-item clickable v-close-popup @click="trackSelectedItem = tx.id; trackDelete()">
+                      <q-item-section>{{ t('wb.ctx_delete') || '删除' }}</q-item-section>
+                    </q-item>
+                  </q-list>
+                </q-menu>
+              </div>
             </div>
           </div>
         </div>
@@ -592,14 +648,13 @@ const WorkbenchPage = {
         { label: t('wb.sort_duration'), value: "duration", icon: "timer" },
         { label: t('wb.sort_date'), value: "date_taken", icon: "calendar_today" },
       ],
-      trackTypes: [
-        { key: "theme" },
-        { key: "text" },
-        { key: "emotion" },
+      contentTrackTypes: [
         { key: "narration" },
         { key: "subtitle" },
         { key: "video" },
       ],
+      frameEditing: null,
+      frameRenameText: "",
       camFields: [
         { key: "shot_type", cls: "shot" },
         { key: "focal_length", cls: "lens" },
@@ -1351,6 +1406,27 @@ const WorkbenchPage = {
       this.trackSelectedItem = null;
       this._trackSave();
     },
+    // Overlay-frame rename (主旨/叙事 标题内联编辑)。改名后经 _trackSave → _syncTracksToPlan
+    // 回写 plan 的 act.title / narrative.text（theme 按 metadata.act_id，text 按时间区间）。
+    startFrameRename(item) {
+      this.frameEditing = item.id;
+      this.frameRenameText = item.content || '';
+      this.$nextTick(() => {
+        const inp = document.querySelector('.wb-frame-label-input');
+        if (inp) { inp.focus(); inp.select(); }
+      });
+    },
+    commitFrameRename(item) {
+      const v = (this.frameRenameText || '').trim();
+      this.frameEditing = null;
+      if (!v || v === (item.content || '')) return;
+      this._trackSnapshot();
+      item.content = v;
+      this._trackSave();
+    },
+    cancelFrameRename() {
+      this.frameEditing = null;
+    },
     // Rule 4 helper: remove every block whose time_start falls in anchor's
     // [time_start, time_end) — the whole act (theme) or narrative (text) plus all
     // shots under it. Adjacent act/narrative blocks start exactly at time_end and are kept.
@@ -1729,6 +1805,8 @@ const WorkbenchPage = {
       }
     },
     addTrackItem(type) {
+      // 主旨/叙事是 overlay 框（apply 从 plan 生成），不手动添加
+      if (type === 'theme' || type === 'text') return;
       this._trackSnapshot();
       if (type === 'video') {
         // Video track: srcStart/srcEnd in metadata, normalization handles timeline position

@@ -1,5 +1,18 @@
 # TODO
 
+## 已完成：时间线主旨/叙事 overlay 框重构——对齐脑图层级（2026-06-14）
+
+把主旨/叙事从「独立平行轨道」改成「覆盖框」——主旨框横跨整个主旨时长、纵向包住分镜/旁白/字幕；叙事框在主旨框内、横跨单个叙事；情绪线独立在最上（不被框包）。这样时间线和脑图的 act→narrative→shot 层级一致。
+
+改动（[frontend/js/workbench.js](frontend/js/workbench.js) + [frontend/css/main.css](frontend/css/main.css)）：
+- `trackTypes` 移除 theme/text，拆为 emotion 独立行 + `contentTrackTypes`(narration/subtitle/video)。
+- 模板：emotion 保留独立 `.wb-track-row`（svg 曲线不动）+ 新 `.wb-content-group`（共享 labels 列 + area）容纳 3 条贯穿 `.wb-content-lane` + 主旨/叙事 `.wb-overlay-frame`（absolute 覆盖 area，`trackItemPos` 定位，area 是统一定位基准零换算）。
+- **pointer-events**（关键）：框主体 `none`（不挡块拖拽/点击/drop）+ 框标题 `auto`（点选/双击改名/右键）+ 块 `z-index:5`（高于框）。
+- 框编辑：点标题选中、Delete/右键删（复用 `_cascadeDelete` 级联）、双击标题内联改名（`startFrameRename`→`_trackSave`→`_syncTracksToPlan` 回写 plan 的 act.title/narrative.text）。`addTrackItem` 对 theme/text return（Part B 留作后续）。
+- 复用零改动：`trackItemPos`、`_cascadeDelete`、`_syncTracksToPlan`、`_normalizeVideoTrack`、emotion 曲线、undo/redo、双向同步、规则1/2/4。
+
+验证：项目 62 实测——emotion 独立行 + content-group(3 lane) + 主旨框(3)/叙事框(21) 覆盖 area 全高(120px=3 lane)；点框标题选中框、点块选中块（pointer-events 穿透正确：框 none/标题 auto/块 z5）、块框互斥。
+
 ## 已完成：修复 video 块被 padding 撑大致视频轨道比主旨/叙述长（2026-06-14）
 
 缩小比例尺后主旨/叙述轨道视觉短于视频轨道（放大正常，数据正常）。根因：`.wb-track-item` 有 `padding: 2px 8px`，`box-sizing: border-box` 下当块宽 < padding(16px) 时元素最小宽被提升到 padding——小 zoom 下大量短 video 块（inline 3px）被撑到 16px，视频轨道总长偏大；主旨/叙述块大不受影响。实测视频线 maxRight 2891.4 vs 主旨/叙述 2878.4（差 13px）。

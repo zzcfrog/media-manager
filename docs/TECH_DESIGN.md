@@ -495,6 +495,8 @@ confirmPicker()
 
 **播放控制**：`trackTogglePlay`/`trackSkipStart`/`trackSkipEnd` 联动预览区 `$refs.wbPlayer`，`trackSpeed` watch 同步 `playbackRate`。
 
+**轨道布局**：时间线分两层——情绪轨道独立 `.wb-track-row`（最上，svg 曲线）；下方 `.wb-content-group`（共享 labels 列 + `.wb-content-group-area`）容纳旁白/字幕/分镜 3 条贯穿 `.wb-content-lane`，area 是统一定位基准（`width=timelineWidth`，框/lane 共用 `trackItemPos` 零换算）。主旨/叙事是 `.wb-overlay-frame`（absolute 覆盖 area），主旨框（实线边框, z3）包叙事框（虚线, z4）。pointer-events：框主体 `none`（不挡块拖拽/点击/drop）、标题 `auto`（点选/改名/右键）、块 `z-index:5`。框编辑：点标题选中、Delete 删（`_cascadeDelete` 级联）、双击标题改名（`startFrameRename`→`_trackSave`→`_syncTracksToPlan` 回写 plan）。`addTrackItem` 对 theme/text return（由 apply 生成）。
+
 **缩放**：`trackZoom`（1-10x）通过内联 `transform: scaleX()` + `minWidth` 百分比缩放 `.wb-track-content` 内容区域，超出时横向滚动。
 
 **块定位 `trackItemPos(item)`**：返回 `{left, width}` **浮点 px**（亚像素），`left = time_start*pps`、`width = max(0.5, dur*pps)`。连续块 `time_end[i]==time_start[i+1]`，浮点保证右边界 `e*pps` 精确等于下一块左边界，避免 `round(s)+round(dur)` 偶尔超过 `round(s+dur)` 的 1px 重叠（小 zoom 尤甚，曾导致 137/170 块视觉重叠）。`.wb-track-item` 用 `box-sizing: border-box`，但**水平 padding 不放在块本体**（`padding: 2px 0`）——border-box 下块宽 < padding 时元素最小宽会被提升到 padding、撑大短块（曾让小 zoom 下短 video 块从 3px 撑到 16px，视频轨道比主旨/叙述长）；水平间距改放文字元素 `.wb-track-item-label` / `.wb-track-text`（`padding: 0 8px` + `min-width:0`，flex item + overflow hidden 不会撑大块）。
