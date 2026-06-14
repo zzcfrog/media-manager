@@ -522,6 +522,7 @@ const MindMap = {
         this.$el.querySelectorAll(".mm-shots-flow").forEach(f => {
           f.querySelectorAll(".mm-shot-card").forEach(c => {
             c.style.removeProperty("--tx");
+            c.style.removeProperty("--ty");
           });
         });
       }
@@ -534,13 +535,14 @@ const MindMap = {
       this._dropHint = null;
       this.$el.querySelectorAll(".mm-drop-hint").forEach(h => { h.style.display = "none"; });
     },
-    _showDropHint(narKey, insertIdx, hintLeft, thumbUrl) {
+    _showDropHint(narKey, insertIdx, hintLeft, hintTop, thumbUrl) {
       this._dropHint = { narKey, insertIdx };
       this.$el.querySelectorAll(".mm-drop-hint").forEach(h => { h.style.display = "none"; });
       const hint = this.$el.querySelector(`.mm-drop-hint[data-nar="${narKey}"]`);
       if (!hint) return;
       hint.style.display = "flex";
       hint.style.left = hintLeft + "px";
+      hint.style.top = hintTop + "px";
       const img = hint.querySelector(".mm-drop-hint-img");
       const icon = hint.querySelector(".mm-drop-hint-icon");
       if (thumbUrl) {
@@ -573,40 +575,69 @@ const MindMap = {
       const cardW = this._dragCardWidth || cards[0]?.offsetWidth || 140;
       const gapW = cardW + 5;
 
-      // Find insert position among non-dragging cards using offsetLeft (ignores transforms)
-      let insertIdx = cards.length;
-      for (let i = 0; i < cards.length; i++) {
-        if (relX < cards[i].offsetLeft + cards[i].offsetWidth / 2) {
-          insertIdx = i;
-          break;
+      // 二维 insertIdx：flex-wrap 多行，先按 clientY 找行，再按 clientX 找列
+      const cardRects = cards.map(c => c.getBoundingClientRect());
+      let rowTop = null;
+      for (let i = 0; i < cardRects.length; i++) {
+        const r = cardRects[i];
+        if (e.clientY >= r.top - 2 && e.clientY < r.bottom + 2) { rowTop = r.top; break; }
+      }
+      if (rowTop === null) {
+        for (let i = 0; i < cardRects.length; i++) {
+          if (cardRects[i].top > e.clientY) { rowTop = cardRects[i].top; break; }
         }
+        rowTop = rowTop ?? cardRects[cardRects.length - 1]?.top;
+      }
+      const rowCards = [];
+      for (let i = 0; i < cardRects.length; i++) {
+        if (Math.abs(cardRects[i].top - rowTop) < 2) rowCards.push({ i, r: cardRects[i] });
+      }
+      let insertIdx = cards.length;
+      for (const { i, r } of rowCards) {
+        if (e.clientX < r.left + r.width / 2) { insertIdx = i; break; }
+      }
+      if (rowCards.length && e.clientX >= rowCards[rowCards.length - 1].r.left + rowCards[rowCards.length - 1].r.width / 2) {
+        insertIdx = Math.min(rowCards[rowCards.length - 1].i + 1, cards.length);
       }
 
       if (isSourceFlow) {
-        // FLIP model: each card moves to where it would be after the drop.
-        // The dragged card (scaled/dimmed) itself shows the target position.
+        // FLIP：每卡移到 drop 后的目标位置（二维，跨行带 Y）。offsetLeft/Top 不含 transform。
         allCards.forEach((card, i) => {
           let targetIdx;
           if (i === dragIdx) {
-            targetIdx = insertIdx; // dragged card moves to insertion point
+            targetIdx = insertIdx;
           } else {
             const nonDragIdx = i < dragIdx ? i : i - 1;
             targetIdx = nonDragIdx < insertIdx ? nonDragIdx : nonDragIdx + 1;
           }
-          const delta = (targetIdx - i) * gapW;
-          card.style.setProperty("--tx", delta + "px");
+          let tx = 0, ty = 0;
+          const tgt = cards[targetIdx];
+          if (tgt) {
+            tx = tgt.offsetLeft - card.offsetLeft;
+            ty = tgt.offsetTop - card.offsetTop;
+          } else if (cards.length) {
+            const last = cards[cards.length - 1];
+            tx = (last.offsetLeft + cardW + 5) - card.offsetLeft;
+            ty = last.offsetTop - card.offsetTop;
+          }
+          card.style.setProperty("--tx", tx + "px");
+          card.style.setProperty("--ty", ty + "px");
         });
-        // No separate hint needed — the dragged card IS the placeholder.
-        // Always store insertIdx so onFlowDrop knows the correct position (fixes no-op drop bug).
         if (this._dropHint?.narKey !== narKey || this._dropHint?.insertIdx !== insertIdx) {
           this.$el.querySelectorAll(".mm-drop-hint").forEach(h => { h.style.display = "none"; });
           this._dropHint = { narKey, insertIdx };
         }
       } else {
-        // External/cross-narrative drop: shift siblings, show hint with thumbnail
+        // 外部/跨叙事拖入：兄弟让位（二维），显示带缩略图的 hint
         for (let i = 0; i < cards.length; i++) {
-          const delta = (i >= insertIdx) ? gapW : 0;
-          cards[i].style.setProperty("--tx", delta + "px");
+          let tx = 0, ty = 0;
+          if (i >= insertIdx) {
+            const next = cards[i + 1];
+            if (next) { tx = next.offsetLeft - cards[i].offsetLeft; ty = next.offsetTop - cards[i].offsetTop; }
+            else { tx = cardW + 5; }
+          }
+          cards[i].style.setProperty("--tx", tx + "px");
+          cards[i].style.setProperty("--ty", ty + "px");
         }
         if (this._dropHint?.narKey === narKey && this._dropHint?.insertIdx === insertIdx) return;
 
@@ -616,20 +647,22 @@ const MindMap = {
           if (shot) thumbUrl = this.getThumbUrl(shot.segment_id) || "";
         }
 
-        let hintLeft;
+        let hintLeft, hintTop;
         if (cards.length === 0) {
-          hintLeft = 44;
+          hintLeft = 44; hintTop = 4;
         } else if (insertIdx === 0) {
           hintLeft = (4 + cards[0].offsetLeft + gapW) / 2;
+          hintTop = cardRects[0].top - flowRect.top + cardRects[0].height / 2;
         } else if (insertIdx >= cards.length) {
-          const last = cards[cards.length - 1];
+          const last = cards[cards.length - 1], lastR = cardRects[cardRects.length - 1];
           hintLeft = last.offsetLeft + last.offsetWidth + 43;
+          hintTop = lastR.top - flowRect.top + lastR.height / 2;
         } else {
-          const prev = cards[insertIdx - 1];
-          const next = cards[insertIdx];
+          const prev = cards[insertIdx - 1], next = cards[insertIdx], nextR = cardRects[insertIdx];
           hintLeft = (prev.offsetLeft + prev.offsetWidth + next.offsetLeft + gapW) / 2;
+          hintTop = nextR.top - flowRect.top + nextR.height / 2;
         }
-        this._showDropHint(narKey, insertIdx, hintLeft, thumbUrl);
+        this._showDropHint(narKey, insertIdx, hintLeft, hintTop, thumbUrl);
       }
     },
     onFlowDragLeave(e) {
@@ -640,6 +673,7 @@ const MindMap = {
         this._hideDropHint();
         flow.querySelectorAll(".mm-shot-card").forEach(c => {
           c.style.removeProperty("--tx");
+          c.style.removeProperty("--ty");
         });
       }
     },
@@ -655,7 +689,7 @@ const MindMap = {
       const flow = e.target.closest(".mm-shots-flow");
       const cards = flow ? Array.from(flow.querySelectorAll(".mm-shot-card")) : [];
       const oldRects = new Map();
-      cards.forEach(c => oldRects.set(c, c.getBoundingClientRect().left));
+      cards.forEach(c => oldRects.set(c, c.getBoundingClientRect()));
 
       // External segment drop
       if (!this.dragState) {
@@ -695,18 +729,22 @@ const MindMap = {
         this.$el.querySelectorAll(".mm-shot-card").forEach(c => {
           c.style.transition = "none";
           c.style.removeProperty("--tx");
+          c.style.removeProperty("--ty");
         });
         if (oldRects && oldRects.size) {
           this.$el.offsetHeight; // force reflow so the cleared state applies
-          oldRects.forEach((oldLeft, c) => {
+          oldRects.forEach((oldRect, c) => {
             if (!c.isConnected) return;
-            const newLeft = c.getBoundingClientRect().left;
-            const delta = oldLeft - newLeft;
-            if (Math.abs(delta) > 0.5) {
-              c.style.setProperty("--tx", delta + "px");
+            const newRect = c.getBoundingClientRect();
+            const dx = oldRect.left - newRect.left;
+            const dy = oldRect.top - newRect.top;
+            if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+              c.style.setProperty("--tx", dx + "px");
+              c.style.setProperty("--ty", dy + "px");
               c.offsetHeight; // reflow to lock the inverted position
               c.style.transition = "";
               c.style.setProperty("--tx", "0px"); // animate to natural
+              c.style.setProperty("--ty", "0px");
             } else {
               c.style.transition = "";
             }

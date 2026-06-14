@@ -1226,6 +1226,14 @@ body:not(.body--dark) .wb-mat-toolbar .q-btn-dropdown { background: #e0e0e0; }
 .wb-overlay-frame.selected {
   background: var(--accent-dim);
 }
+.wb-overlay-frame.drag-target {
+  background: color-mix(in srgb, var(--accent-dim) 60%, transparent);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.wb-frame-text.drag-target {
+  border-style: solid;
+  border-color: var(--accent);
+}
 .wb-overlay-frame.selected.wb-frame-theme,
 .wb-overlay-frame.selected.wb-frame-text {
   border-width: 3px;
@@ -1867,7 +1875,7 @@ body:not(.body--dark) .wb-mat-toolbar .q-btn-dropdown { background: #e0e0e0; }
   cursor: pointer;
   background: var(--border);
   border: 1px solid transparent;
-  transform: translateX(var(--tx, 0px));
+  transform: translate(var(--tx, 0px), var(--ty, 0px));
   transition: border-color 0.15s, transform 0.15s ease, opacity 0.15s ease;
 }
 .mm-shot-card:hover { border-color: var(--border); }
@@ -2127,7 +2135,7 @@ body:not(.body--dark) .wb-mat-toolbar .q-btn-dropdown { background: #e0e0e0; }
 /* Shot drag feedback */
 .mm-shot-card.dragging {
   opacity: 0.3;
-  transform: translateX(var(--tx, 0px)) scale(0.9);
+  transform: translate(var(--tx, 0px), var(--ty, 0px)) scale(0.9);
 }
 .mm-drop-hint {
   position: absolute;

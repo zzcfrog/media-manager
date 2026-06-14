@@ -543,7 +543,7 @@ const WorkbenchPage = {
             </div>
             <!-- 主旨 overlay 框（横跨整个 act，纵向包住 3 条内容轨道） -->
             <div v-for="th in getTrackItems('theme')" :key="'frame-th-' + th.id"
-                 class="wb-overlay-frame wb-frame-theme" :class="{selected: trackSelectedItem === th.id}"
+                 class="wb-overlay-frame wb-frame-theme" :class="{selected: trackSelectedItem === th.id, 'drag-target': dragTargetActId === th.id}"
                  :style="trackItemPos(th)">
               <div class="wb-frame-label" @click.stop="trackSelectedItem = th.id">
                 <input v-if="frameEditing === th.id" class="wb-frame-label-input"
@@ -561,7 +561,7 @@ const WorkbenchPage = {
             </div>
             <!-- 叙事 overlay 框（在主旨框内，横跨单个叙事） -->
             <div v-for="tx in getTrackItems('text')" :key="'frame-tx-' + tx.id"
-                 class="wb-overlay-frame wb-frame-text" :class="{selected: trackSelectedItem === tx.id}"
+                 class="wb-overlay-frame wb-frame-text" :class="{selected: trackSelectedItem === tx.id, 'drag-target': dragTargetNarId === tx.id}"
                  :style="trackItemPos(tx)">
               <div class="wb-frame-label" @click.stop="trackSelectedItem = tx.id">
                 <input v-if="frameEditing === tx.id" class="wb-frame-label-input"
@@ -631,6 +631,8 @@ const WorkbenchPage = {
       trackCanUndo: false,
       trackCanRedo: false,
       trackSelectedItem: null,
+      dragTargetNarId: null,
+      dragTargetActId: null,
       playheadTime: 0,
       wbPlaying: false,
       wbCurrentTime: 0,
@@ -1325,6 +1327,27 @@ const WorkbenchPage = {
         catch (e) { Quasar.Notify.create({ message: t('wb.track_save_fail'), color: 'negative', position: 'top' }); }
       }
     },
+    // 拖动 video 时高亮目标叙事/主旨框：鼠标时间命中 text/theme 区间。
+    _highlightDragTarget(e) {
+      const area = this.$refs.wbTimelineScroll?.querySelector('.wb-content-group-area');
+      if (!area) { this.dragTargetNarId = null; this.dragTargetActId = null; return; }
+      const areaRect = area.getBoundingClientRect();
+      const mouseXPx = e.clientX - areaRect.left;
+      const mouseSec = mouseXPx / this.pps;
+      let narId = null, actId = null;
+      if (mouseXPx >= 0) {
+        for (const tx of this.getTrackItems('text')) {
+          const s = this._timeToSec(tx.time_start), en = this._timeToSec(tx.time_end);
+          if (mouseSec >= s && mouseSec < en) { narId = tx.id; break; }
+        }
+        for (const th of this.getTrackItems('theme')) {
+          const s = this._timeToSec(th.time_start), en = this._timeToSec(th.time_end);
+          if (mouseSec >= s && mouseSec < en) { actId = th.id; break; }
+        }
+      }
+      if (this.dragTargetNarId !== narId) this.dragTargetNarId = narId;
+      if (this.dragTargetActId !== actId) this.dragTargetActId = actId;
+    },
     trackUndo() {
       if (!this._undoStack || !this._undoStack.length) return;
       if (!this._redoStack) this._redoStack = [];
@@ -1926,6 +1949,7 @@ const WorkbenchPage = {
             children[i].style.transform = '';
           }
         }
+        this._highlightDragTarget(e);
       } else {
         if (d.edge === 'right') {
           d.el.style.width = Math.max(30, d.startWidth + dx) + 'px';
@@ -1959,6 +1983,8 @@ const WorkbenchPage = {
       const d = this._drag;
       if (!d) return;
       this.clearDragShift();
+      this.dragTargetNarId = null;
+      this.dragTargetActId = null;
       if (d.ghost) { d.ghost.remove(); d.ghost = null; }
       d.el.style.transform = '';
       d.el.style.opacity = '';
