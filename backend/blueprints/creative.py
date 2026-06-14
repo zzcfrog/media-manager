@@ -853,7 +853,7 @@ def render_brief_text(brief):
     # Duration
     dur = brief.get("duration_target")
     if dur:
-        parts.append(f"目标总时长：{dur} 分钟（可 ±10% 浮动）。请合理分配各幕时长，确保总时长接近目标。")
+        parts.append(f"目标总时长：{dur} 分钟（约 {float(dur)*60:g} 秒，可 ±10% 浮动）。请合理分配各幕时长，确保总时长接近目标。")
 
     # Opening
     opening_type = (brief.get("opening") or {}).get("type", "atmosphere")

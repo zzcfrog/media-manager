@@ -1,5 +1,15 @@
 # TODO
 
+## 已完成：删除叙事/主旨时区间由 apply 重算（修复规则4）（2026-06-14）
+
+规则4 的 `_cascadeDelete` 原走 `_trackSave`（normalize + sync），但删叙事后 `_syncTracksToPlan` 从残缺 tracks 反推 narrative 边界会误算（被删叙事的 video 已不在，fallback `_shotDur`），导致所属主旨块区间不缩反长。改为：结构性删除（act/narrative 消失）直接从 plan 移除对应项（theme 用 `metadata.act_id`，text 按新增 `_narrativeDuration` 累加边界匹配起点，算法与 apply 一致），再 `onPlanChanged`（PUT plan + apply + loadTracks），让所有 theme/text/video 区间由 plan 正确重算。
+
+**验证**：项目 62 实测，删 act_1 的一个叙事（19.5s）→ act_1 主旨块精确缩短 19.5s（294.49→274.99），总时长同步减少。
+
+## 已完成：创作 prompt 目标时长同时给分钟+秒（2026-06-14）
+
+`render_brief_text` 注入的目标总时长原只给分钟（"X 分钟"），但 shot 时长约束（3-10 秒）与输出 `total_duration` 都是秒级，模型需心算分钟→秒。改为"X 分钟（约 Y 秒）"（`backend/blueprints/creative.py:856`，`float(dur)*60:g` 去尾零），减少单位换算误差。
+
 ## 已完成：脑图↔时间线双向同步端到端验证 + 非视频块编辑约束（2026-06-13）
 
 继"四项修复"之后，对脑图↔时间线双向同步做端到端验证，并落实非视频块编辑约束（消除"plan 一个 shot 只存一个情绪/旁白值"与时间线多块编辑的冲突）。改动集中于 `frontend/js/workbench.js` 与 `frontend/js/i18n.js`。

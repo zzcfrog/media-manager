@@ -500,7 +500,7 @@ confirmPicker()
 **编辑操作**：
 - **撤销/重做**：JSON 快照栈（`_undoStack` / `_redoStack`），每次编辑前调用 `_trackSnapshot()` 保存当前状态。`trackUndo`/`trackRedo` 弹栈还原 `this.tracks` 后调用 `_hydrateSegments()` 重挂运行时 `_segment` 引用（快照深拷贝会切断与 `this.segments` 的引用，否则 video 块缩略图/标签显示 `?`）。`load`/`loadTracks` 整体替换 tracks 后调 `_hydrateSegments()` + `_resetUndoStacks()`，避免脑图 apply 后残留脏快照
 - **分割**：`trackSplit()` **仅对 video 生效**（按 `metadata.srcStart/srcEnd` 中点一分为二）；非视频块禁止分割——plan 一个 shot 只存一个情绪/旁白值，分割出的第二段会在 apply 时丢失，故提示 `wb.track_split_disabled` 并返回。
-- **删除**：`trackDelete()` 对普通块直接移除；对 theme（主旨）/text（叙述）弹 `Quasar.Dialog` 确认后由 `_cascadeDelete(anchor)` 按区间 `[time_start, time_end)` 级联删除其内所有块（相邻主旨/叙述从 `time_end` 起保留），`_syncTracksToPlan` 随后清理 plan 中空 act/narrative。
+- **删除**：`trackDelete()` 对普通块直接移除；对 theme（主旨）/text（叙述）弹 `Quasar.Dialog` 确认后由 `_cascadeDelete(anchor)` 处理——结构性删除直接从 plan 移除对应 act/narrative（theme 用 `metadata.act_id`，text 按 `_narrativeDuration` 累加边界匹配起点），再 `onPlanChanged`（PUT plan + apply + loadTracks），让 theme/text/video 区间由 plan 正确重算（删叙事后所属主旨块缩短该叙事时长）。走 apply 而非 `_syncTracksToPlan`，因后者从残缺 tracks 反推会误算 narrative 边界（被删叙事的 video 已不在）。
 - **缩放**：`onTrackItemDown` 仅 video 块在左右边缘进入 resize mode（改 `metadata.srcStart/srcEnd`）；非视频块边缘不进入 resize（时长由 `_normalizeVideoTrack` 跟随 video）。`onTrackItemHover` 只在 video 边缘显示 col-resize 光标。
 - 所有编辑操作调用 `_trackSave()` 持久化：先 `_normalizeVideoTrack()` 归一化，`API.updateProjectTracks(id, tracks)` PUT 成功后再调 `_syncTracksToPlan()` 回写脑图（二者错误隔离，plan 回写失败不影响 tracks 已存）
 

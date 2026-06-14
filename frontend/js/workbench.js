@@ -1354,16 +1354,57 @@ const WorkbenchPage = {
     // Rule 4 helper: remove every block whose time_start falls in anchor's
     // [time_start, time_end) — the whole act (theme) or narrative (text) plus all
     // shots under it. Adjacent act/narrative blocks start exactly at time_end and are kept.
-    _cascadeDelete(anchor) {
-      const s = this._timeToSec(anchor.time_start);
-      const e = this._timeToSec(anchor.time_end);
+    // Rule 4 helper: deleting a theme (主旨) / text (叙述) block is a STRUCTURAL change
+    // (an act/narrative disappears), so we remove it directly from the plan and APPLY — this
+    // recomputes every theme/text/video range from plan (e.g. the owning act's theme block
+    // shortens by the deleted narrative's duration). Routing through _syncTracksToPlan instead
+    // mis-derives boundaries because the deleted narrative's videos are already gone.
+    async _cascadeDelete(anchor) {
       this._trackSnapshot();
-      this.tracks = this.tracks.filter(t => {
-        const ts = this._timeToSec(t.time_start);
-        return ts < s - 0.05 || ts >= e - 0.05;
-      });
+      const plan = JSON.parse(JSON.stringify(this.mindMapData));
+      const s = this._timeToSec(anchor.time_start);
+      let removed = false;
+      if (anchor.track_type === 'theme') {
+        let aid = null;
+        try { aid = (JSON.parse(anchor.metadata || '{}') || {}).act_id; } catch (e) {}
+        let acc = 0;
+        plan.acts = plan.acts.filter(act => {
+          const actDur = (act.narratives || []).reduce((sum, n) => sum + this._narrativeDuration(n), 0);
+          const match = aid ? act.act_id === aid : Math.abs(acc - s) < 1.0;
+          acc += actDur;
+          if (match) { removed = true; return false; }
+          return true;
+        });
+      } else if (anchor.track_type === 'text') {
+        let acc = 0;
+        for (const act of plan.acts) {
+          for (let i = 0; i < (act.narratives || []).length; i++) {
+            const d = this._narrativeDuration(act.narratives[i]);
+            if (Math.abs(acc - s) < 1.0) { act.narratives.splice(i, 1); removed = true; break; }
+            acc += d;
+          }
+          if (removed) break;
+        }
+      }
       this.trackSelectedItem = null;
-      this._trackSave();
+      if (!removed) { this._trackSave(); return; }
+      this.project.ai_plan = JSON.stringify(plan);   // mindMapData recomputes from this
+      await this.onPlanChanged();                     // PUT plan + POST apply + loadTracks
+    },
+    // Duration of a plan narrative, matching apply_plan's calc (src_start/src_end or segment
+    // range; shots whose segment is missing are skipped just like apply; dur<=0 → 5s).
+    _narrativeDuration(nar) {
+      let total = 0;
+      for (const shot of (nar.shots || [])) {
+        const seg = this.segments.find(sg => sg.id === shot.segment_id);
+        if (!seg) continue;
+        const srcS = shot.src_start || seg.time_start;
+        const srcE = shot.src_end || seg.time_end;
+        let d = this._timeToSec(srcE) - this._timeToSec(srcS);
+        if (d <= 0) d = 5.0;
+        total += d;
+      }
+      return total;
     },
     _timeToSec(t) {
       if (!t) return 0;
