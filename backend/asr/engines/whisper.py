@@ -43,8 +43,11 @@ def _get_model(model_name: str | None = None):
 def preload(model_name: str | None = None):
     """Preload model (call directly from a background thread)."""
     t0 = time.time()
-    _get_model(model_name)
-    logger.info("Whisper 预加载完成，总耗时 {:.1f}s", time.time() - t0)
+    try:
+        _get_model(model_name)
+        logger.info("Whisper 预加载完成，总耗时 {:.1f}s", time.time() - t0)
+    except Exception as e:
+        logger.warning("Whisper 预加载失败（{}）—— 首次使用 ASR 时会重试", e)
 
 
 def unload():
@@ -73,8 +76,11 @@ class WhisperEngine(AsrEngine):
 
     def preload(self, model_name=None):
         t0 = time.time()
-        _get_model(model_name)
-        logger.info("ASR 模型预加载完成，总耗时 {:.1f}s", time.time() - t0)
+        try:
+            _get_model(model_name)
+            logger.info("ASR 模型预加载完成，总耗时 {:.1f}s", time.time() - t0)
+        except Exception as e:
+            logger.warning("Whisper 预加载失败（{}）—— 首次使用 ASR 时会重试", e)
 
     def transcribe(self, audio_path: str | Path, on_progress=None, model_name: str | None = None) -> list[AsrSegment]:
         if on_progress and not _model_loaded:

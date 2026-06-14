@@ -1218,7 +1218,8 @@ body:not(.body--dark) .wb-mat-toolbar .q-btn-dropdown { background: #e0e0e0; }
   z-index: 6;
 }
 .wb-frame-text {
-  border: 1px dashed color-mix(in srgb, var(--accent) 50%, transparent);
+  top: 20px;
+  border: 1px dotted color-mix(in srgb, var(--accent) 50%, transparent);
   background: transparent;
   z-index: 7;
 }
@@ -1247,6 +1248,7 @@ body:not(.body--dark) .wb-mat-toolbar .q-btn-dropdown { background: #e0e0e0; }
   text-overflow: ellipsis;
 }
 .wb-frame-text .wb-frame-label {
+  top: 22px;
   color: color-mix(in srgb, var(--accent) 65%, var(--text2));
 }
 .wb-frame-label-input {
