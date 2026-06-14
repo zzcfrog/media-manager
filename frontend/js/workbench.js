@@ -1317,9 +1317,20 @@ const WorkbenchPage = {
       try { planStr = this._syncTracksToPlan(); }
       catch (e) { console.error('syncTracksToPlan failed:', e); }
       if (planStr && this.project) {
-        // sync 更新了 plan → apply 重建 tracks，让主旨/叙事框（text/theme 块）的
-        // 起止时间随 shot 归属/时长变化重算（拖拽 video 跨叙事/主旨时尤其需要）。
-        await this.onPlanChanged();
+        // sync 更新了 plan → apply 重建 tracks，让主旨/叙事框时间随 plan 重算。
+        // 不走 onPlanChanged（它 loadTracks → _resetUndoStacks 清栈），自己 apply +
+        // 拉新 tracks 但保留 undo 栈——时间线编辑必须能 undo。
+        try {
+          await fetch(`/api/creative/${this.project.id}/plan`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: planStr,
+          });
+          const applyRes = await fetch(`/api/creative/${this.project.id}/apply`, { method: 'POST' });
+          if (applyRes.ok) {
+            const trackRes = await API.getProjectTracks(this.projectId);
+            this.tracks = trackRes.data;
+            this._hydrateSegments();
+          }
+        } catch(e) { console.error('trackSave apply failed:', e); }
       } else {
         // fallback：sync 没产出 plan（无 mindMapData），直接存 tracks
         const payload = this.tracks.map(t => { const o = { ...t }; delete o._segment; return o; });
