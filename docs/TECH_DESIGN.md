@@ -497,7 +497,7 @@ confirmPicker()
 
 **缩放**：`trackZoom`（1-10x）通过内联 `transform: scaleX()` + `minWidth` 百分比缩放 `.wb-track-content` 内容区域，超出时横向滚动。
 
-**块定位 `trackItemPos(item)`**：返回 `{left, width}` **浮点 px**（亚像素），`left = time_start*pps`、`width = max(0.5, dur*pps)`。连续块 `time_end[i]==time_start[i+1]`，浮点保证右边界 `e*pps` 精确等于下一块左边界，避免 `round(s)+round(dur)` 偶尔超过 `round(s+dur)` 的 1px 重叠（小 zoom 尤甚，曾导致 137/170 块视觉重叠）。`.wb-track-item` 用 `box-sizing: border-box`（width 即视觉宽度，padding 不额外撑宽），`.wb-track-item-label` `min-width:0` 防 flex 文字撑大块。
+**块定位 `trackItemPos(item)`**：返回 `{left, width}` **浮点 px**（亚像素），`left = time_start*pps`、`width = max(0.5, dur*pps)`。连续块 `time_end[i]==time_start[i+1]`，浮点保证右边界 `e*pps` 精确等于下一块左边界，避免 `round(s)+round(dur)` 偶尔超过 `round(s+dur)` 的 1px 重叠（小 zoom 尤甚，曾导致 137/170 块视觉重叠）。`.wb-track-item` 用 `box-sizing: border-box`，但**水平 padding 不放在块本体**（`padding: 2px 0`）——border-box 下块宽 < padding 时元素最小宽会被提升到 padding、撑大短块（曾让小 zoom 下短 video 块从 3px 撑到 16px，视频轨道比主旨/叙述长）；水平间距改放文字元素 `.wb-track-item-label` / `.wb-track-text`（`padding: 0 8px` + `min-width:0`，flex item + overflow hidden 不会撑大块）。
 
 **编辑操作**：
 - **撤销/重做**：JSON 快照栈（`_undoStack` / `_redoStack`），每次编辑前调用 `_trackSnapshot()` 保存当前状态。`trackUndo`/`trackRedo` 弹栈还原 `this.tracks` 后调用 `_hydrateSegments()` 重挂运行时 `_segment` 引用（快照深拷贝会切断与 `this.segments` 的引用，否则 video 块缩略图/标签显示 `?`）。`load`/`loadTracks` 整体替换 tracks 后调 `_hydrateSegments()` + `_resetUndoStacks()`，避免脑图 apply 后残留脏快照

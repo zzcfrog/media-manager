@@ -1,5 +1,13 @@
 # TODO
 
+## 已完成：修复 video 块被 padding 撑大致视频轨道比主旨/叙述长（2026-06-14）
+
+缩小比例尺后主旨/叙述轨道视觉短于视频轨道（放大正常，数据正常）。根因：`.wb-track-item` 有 `padding: 2px 8px`，`box-sizing: border-box` 下当块宽 < padding(16px) 时元素最小宽被提升到 padding——小 zoom 下大量短 video 块（inline 3px）被撑到 16px，视频轨道总长偏大；主旨/叙述块大不受影响。实测视频线 maxRight 2891.4 vs 主旨/叙述 2878.4（差 13px）。
+
+改动（[frontend/css/main.css](frontend/css/main.css)）：水平 padding 从块本体移到文字元素——`.wb-track-item` 改 `padding: 2px 0`，`.wb-track-item-label` / `.wb-track-text` 加 `padding: 0 8px`（flex item + `min-width:0` + overflow hidden，不会撑大块）。
+
+验证：注入新 CSS 后 video 块 computed width=3px（=inline，不再撑大），主旨/叙事/情绪/旁白/视频轨道 maxRight 全部 2878.4 等长。
+
 ## 已完成：修复小 zoom 时间线块视觉重叠（2026-06-14）
 
 小比例尺下时间线块视觉重叠（实际不重叠）。根因：`trackItemPos` 的 width 用 `Math.max(30, Math.round(dur*pps))`——最小 30px 且取整；连续块（`time_end[i]==time_start[i+1]`）因 `round(s)+round(dur)` 偶尔 > `round(s+dur)` 差 1px，小 zoom 时 30px 最小宽度远大于块间距导致大面积重叠（项目 62 实测 video 重叠 137/170）。
