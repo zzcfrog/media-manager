@@ -1311,30 +1311,18 @@ const WorkbenchPage = {
     async _trackSave() {
       if (!this.projectId) return;
       this._normalizeVideoTrack();
-      // Sync plan + rewrite video metadata BEFORE saving tracks, so the persisted
-      // tracks carry the updated act_id/narrative_id (keeps DB tracks + plan in sync).
       let planStr = null;
       try { planStr = this._syncTracksToPlan(); }
       catch (e) { console.error('syncTracksToPlan failed:', e); }
-      const payload = this.tracks.map(t => {
-        const o = { ...t };
-        delete o._segment;
-        return o;
-      });
-      try {
-        await API.updateProjectTracks(this.projectId, payload);
-      } catch (e) {
-        Quasar.Notify.create({ message: t('wb.track_save_fail'), color: 'negative', position: 'top' });
-        return;
-      }
-      if (planStr) {
-        try {
-          await fetch(`/api/creative/${this.project.id}/plan`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: planStr,
-          });
-        } catch(e) { /* local ai_plan already updated */ }
+      if (planStr && this.project) {
+        // sync 更新了 plan → apply 重建 tracks，让主旨/叙事框（text/theme 块）的
+        // 起止时间随 shot 归属/时长变化重算（拖拽 video 跨叙事/主旨时尤其需要）。
+        await this.onPlanChanged();
+      } else {
+        // fallback：sync 没产出 plan（无 mindMapData），直接存 tracks
+        const payload = this.tracks.map(t => { const o = { ...t }; delete o._segment; return o; });
+        try { await API.updateProjectTracks(this.projectId, payload); }
+        catch (e) { Quasar.Notify.create({ message: t('wb.track_save_fail'), color: 'negative', position: 'top' }); }
       }
     },
     trackUndo() {
