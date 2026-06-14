@@ -492,7 +492,7 @@ const WorkbenchPage = {
                  :style="trackItemPos(item)"
                  @click="trackSelectedItem = item.id"
                  @mousedown="onTrackItemDown($event, item, tt.key)"
-                 @mousemove="onTrackItemHover">
+                 @mousemove="onTrackItemHover($event, tt.key)">
               <template v-if="tt.key === 'video'">
                 <div v-if="item._segment" class="wb-track-filmstrip"
                      :style="filmstripStyle(item)"></div>
@@ -936,11 +936,8 @@ const WorkbenchPage = {
       try {
         const trackRes = await API.getProjectTracks(this.projectId);
         this.tracks = trackRes.data;
-        for (const tr of this.tracks) {
-          if (tr.segment_id) {
-            tr._segment = this.segments.find(s => s.id === tr.segment_id) || null;
-          }
-        }
+        this._hydrateSegments();
+        this._resetUndoStacks();
       } catch (e) {
         console.error('loadTracks failed:', e);
       }
@@ -957,11 +954,8 @@ const WorkbenchPage = {
         this.project = projRes.data;
         this.segments = segRes.data;
         this.tracks = trackRes.data;
-        for (const tr of this.tracks) {
-          if (tr.segment_id) {
-            tr._segment = this.segments.find(s => s.id === tr.segment_id) || null;
-          }
-        }
+        this._hydrateSegments();
+        this._resetUndoStacks();
       } catch (e) {
         console.error(e);
         Quasar.Notify.create({ message: e.message, color: "negative", position: "top" });
@@ -1042,6 +1036,22 @@ const WorkbenchPage = {
       this.trackCanUndo = true;
       this.trackCanRedo = false;
     },
+    // Re-attach the runtime-only _segment reference on each track item. Needed
+    // after tracks are replaced wholesale (load, undo/redo) so video blocks keep
+    // their thumbnails/labels instead of showing '?'.
+    _hydrateSegments() {
+      for (const tr of this.tracks) {
+        tr._segment = tr.segment_id
+          ? (this.segments.find(s => s.id === tr.segment_id) || null)
+          : null;
+      }
+    },
+    _resetUndoStacks() {
+      this._undoStack = [];
+      this._redoStack = [];
+      this.trackCanUndo = false;
+      this.trackCanRedo = false;
+    },
     _getVideoDur(item) {
       try {
         const m = JSON.parse(item.metadata || '{}');
@@ -1054,10 +1064,14 @@ const WorkbenchPage = {
       const videos = this.tracks.filter(t => t.track_type === 'video');
       if (!videos.length) return;
       // Use array order (user intent), not time-based sort
+      // oldEnd = pre-normalize time_end (the segment's ORIGINAL range), so that
+      // resizing a video segment scales associated tracks proportionally rather
+      // than just translating them.
       const mapping = []; // { oldStart, oldEnd, newStart, newEnd }
       let pos = 0;
       for (const v of videos) {
         const oldStart = this._timeToSec(v.time_start);
+        const oldEnd = this._timeToSec(v.time_end);
         const dur = this._getVideoDur(v);
         const newStart = pos;
         const newEnd = pos + dur;
@@ -1065,29 +1079,185 @@ const WorkbenchPage = {
         const ne = this._secToStr(newEnd);
         if (v.time_start !== ns) v.time_start = ns;
         if (v.time_end !== ne) v.time_end = ne;
-        mapping.push({ oldStart, oldEnd: oldStart + dur, newStart, newEnd });
+        mapping.push({ oldStart, oldEnd, newStart, newEnd });
         pos = newEnd;
       }
-      // Sync other tracks: match by [oldStart, oldEnd) left-closed right-open
+      // Sync other tracks: match by [oldStart, oldEnd) left-closed right-open,
+      // then map start/end proportionally into the video segment's new range.
       for (const tr of this.tracks) {
         if (tr.track_type === 'video') continue;
         const ts = this._timeToSec(tr.time_start);
         const te = this._timeToSec(tr.time_end);
         for (const m of mapping) {
           if (ts >= m.oldStart && ts < m.oldEnd) {
-            const offset = m.newStart - m.oldStart;
-            const ns2 = this._secToStr(ts + offset);
-            const ne2 = this._secToStr(te + offset);
-            if (tr.time_start !== ns2) tr.time_start = ns2;
-            if (tr.time_end !== ne2) tr.time_end = ne2;
+            const oldRange = m.oldEnd - m.oldStart;
+            const newRange = m.newEnd - m.newStart;
+            let ns2, ne2;
+            if (oldRange > 0.01) {
+              const scale = newRange / oldRange;
+              ns2 = m.newStart + (ts - m.oldStart) * scale;
+              ne2 = m.newStart + (te - m.oldStart) * scale;
+            } else {
+              const offset = m.newStart - m.oldStart;
+              ns2 = ts + offset;
+              ne2 = te + offset;
+            }
+            const s = this._secToStr(ns2);
+            const e = this._secToStr(ne2);
+            if (tr.time_start !== s) tr.time_start = s;
+            if (tr.time_end !== e) tr.time_end = e;
             break;
           }
         }
       }
     },
+    _shotDur(shot) {
+      if (shot.src_start != null && shot.src_end != null) {
+        const d = this._timeToSec(shot.src_end) - this._timeToSec(shot.src_start);
+        if (d > 0) return d;
+      }
+      const seg = this.segments.find(s => s.id === shot.segment_id);
+      if (seg) {
+        const d = this._timeToSec(seg.time_end) - this._timeToSec(seg.time_start);
+        if (d > 0) return d;
+      }
+      return 0;
+    },
+    // Derive plan (acts/narratives/shots) from the timeline tracks so the mindmap
+    // view reflects timeline edits. Position-driven: each video track's timeline
+    // position decides which narrative/act its shot belongs to. Boundaries use
+    // the videos' ACTUAL durations (reflects resizes); each video's metadata
+    // .act_id/.narrative_id is rewritten to match. Synchronous — returns the new
+    // plan string (or null) so the caller persists it AFTER saving tracks.
+    _syncTracksToPlan() {
+      if (!this.mindMapData || !this.project) return null;
+      const plan = JSON.parse(JSON.stringify(this.mindMapData));
+      if (!plan.acts || !plan.acts.length) return null;
+
+      // Global shot lookup (preserves shot props when a shot moves between narratives)
+      const shotMap = {};
+      for (const act of plan.acts) {
+        for (const nar of (act.narratives || [])) {
+          for (const shot of (nar.shots || [])) {
+            if (shot.segment_id) shotMap[shot.segment_id] = shot;
+          }
+        }
+      }
+
+      // Actual per-segment video durations (from track metadata — reflects resizes)
+      const videos = this.tracks.filter(t => t.track_type === 'video' && t.segment_id);
+      const videoDurBySeg = {};
+      for (const vt of videos) videoDurBySeg[vt.segment_id] = this._getVideoDur(vt);
+
+      // Narrative boundaries from ACTUAL video durations (cumulative, plan order).
+      // Using actual durations (not stale plan shot durations) keeps the boundaries
+      // aligned with the timeline after a resize, so videos stay in the right narrative.
+      const narRanges = [];
+      let acc = 0;
+      for (const act of plan.acts) {
+        for (const nar of (act.narratives || [])) {
+          const nStart = acc;
+          for (const shot of (nar.shots || [])) acc += videoDurBySeg[shot.segment_id] || this._shotDur(shot);
+          narRanges.push({ actId: act.act_id, narId: nar.narrative_id, start: nStart, end: acc });
+        }
+      }
+      const totalPlanDur = acc;
+      const findNarrative = (ts) => {
+        for (const nr of narRanges) if (ts >= nr.start && ts < nr.end) return nr;
+        if (!narRanges.length) return null;
+        if (ts >= totalPlanDur) return narRanges[narRanges.length - 1];
+        if (ts <= 0) return narRanges[0];
+        let best = narRanges[0], bestDist = Infinity;
+        for (const nr of narRanges) {
+          const d = Math.min(Math.abs(ts - nr.start), Math.abs(ts - nr.end));
+          if (d < bestDist) { bestDist = d; best = nr; }
+        }
+        return best;
+      };
+
+      // Assign videos to narratives by position (videos declared above). Rewrite each
+      // video's metadata .act_id/.narrative_id to match its assignment so the next
+      // sync + any metadata reader stay consistent.
+      const keyOf = (a, n) => a + '::' + n;
+      const groups = {};
+      for (const vt of videos) {
+        const target = findNarrative(this._timeToSec(vt.time_start));
+        if (!target) continue;
+        let meta = {};
+        try { meta = JSON.parse(vt.metadata || '{}'); } catch(e) {}
+        if (meta.act_id !== target.actId || meta.narrative_id !== target.narId) {
+          meta.act_id = target.actId;
+          meta.narrative_id = target.narId;
+          vt.metadata = JSON.stringify(meta);
+        }
+        const key = keyOf(target.actId, target.narId);
+        if (!groups[key]) groups[key] = { actId: target.actId, narId: target.narId, vids: [] };
+        groups[key].vids.push(vt);
+      }
+
+      const findAuxTrack = (type, vt) => {
+        const vs = this._timeToSec(vt.time_start), ve = this._timeToSec(vt.time_end);
+        return this.tracks.find(t => {
+          if (t.track_type !== type) return false;
+          const ts = this._timeToSec(t.time_start);
+          return ts >= vs - 0.1 && ts < ve + 0.1;
+        });
+      };
+
+      // Rebuild acts/narratives; drop empties (delete sync)
+      const newActs = [];
+      for (const act of plan.acts) {
+        const newNars = [];
+        for (const nar of (act.narratives || [])) {
+          const grp = groups[keyOf(act.act_id, nar.narrative_id)];
+          if (!grp || !grp.vids.length) continue;
+          const newShots = grp.vids.map(vt => {
+            const old = shotMap[vt.segment_id] || {};
+            let meta = {};
+            try { meta = JSON.parse(vt.metadata || '{}'); } catch(e) {}
+            const shot = { ...old, segment_id: vt.segment_id };
+            if (meta.srcStart) shot.src_start = meta.srcStart;
+            if (meta.srcEnd) shot.src_end = meta.srcEnd;
+            const emo = findAuxTrack('emotion', vt);
+            if (emo) shot.emotion = emo.emotion_value;
+            const narT = findAuxTrack('narration', vt);
+            if (narT && narT.content != null) shot.narration = narT.content;
+            return shot;
+          });
+          const nStart = this._timeToSec(grp.vids[0].time_start);
+          const nEnd = this._timeToSec(grp.vids[grp.vids.length - 1].time_end);
+          const textT = this.tracks.find(t => {
+            if (t.track_type !== 'text') return false;
+            const ts = this._timeToSec(t.time_start);
+            return ts >= nStart - 0.5 && ts <= nEnd + 0.5;
+          });
+          const newNar = { ...nar, shots: newShots };
+          if (textT && textT.content) newNar.text = textT.content;
+          newNars.push(newNar);
+        }
+        if (!newNars.length) continue;
+        const newAct = { ...act, narratives: newNars };
+        const themeT = this.tracks.find(t => {
+          if (t.track_type !== 'theme') return false;
+          try { return JSON.parse(t.metadata || '{}').act_id === act.act_id; } catch(e) { return false; }
+        });
+        if (themeT && themeT.content) newAct.title = themeT.content;
+        newActs.push(newAct);
+      }
+      if (!newActs.length) return null; // safety: never wipe the whole plan
+
+      const planStr = JSON.stringify({ ...plan, acts: newActs });
+      this.project.ai_plan = planStr;
+      return planStr;
+    },
     async _trackSave() {
       if (!this.projectId) return;
       this._normalizeVideoTrack();
+      // Sync plan + rewrite video metadata BEFORE saving tracks, so the persisted
+      // tracks carry the updated act_id/narrative_id (keeps DB tracks + plan in sync).
+      let planStr = null;
+      try { planStr = this._syncTracksToPlan(); }
+      catch (e) { console.error('syncTracksToPlan failed:', e); }
       const payload = this.tracks.map(t => {
         const o = { ...t };
         delete o._segment;
@@ -1097,6 +1267,16 @@ const WorkbenchPage = {
         await API.updateProjectTracks(this.projectId, payload);
       } catch (e) {
         Quasar.Notify.create({ message: t('wb.track_save_fail'), color: 'negative', position: 'top' });
+        return;
+      }
+      if (planStr) {
+        try {
+          await fetch(`/api/creative/${this.project.id}/plan`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: planStr,
+          });
+        } catch(e) { /* local ai_plan already updated */ }
       }
     },
     trackUndo() {
@@ -1104,6 +1284,7 @@ const WorkbenchPage = {
       if (!this._redoStack) this._redoStack = [];
       this._redoStack.push(JSON.parse(JSON.stringify(this.tracks)));
       this.tracks = this._undoStack.pop();
+      this._hydrateSegments();
       this.trackCanUndo = this._undoStack.length > 0;
       this.trackCanRedo = true;
       this.trackSelectedItem = null;
@@ -1113,6 +1294,7 @@ const WorkbenchPage = {
       if (!this._redoStack || !this._redoStack.length) return;
       this._undoStack.push(JSON.parse(JSON.stringify(this.tracks)));
       this.tracks = this._redoStack.pop();
+      this._hydrateSegments();
       this.trackCanUndo = true;
       this.trackCanRedo = this._redoStack.length > 0;
       this.trackSelectedItem = null;
@@ -1123,33 +1305,26 @@ const WorkbenchPage = {
       const idx = this.tracks.findIndex(t => t.id === this.trackSelectedItem);
       if (idx < 0) return;
       const item = this.tracks[idx];
-      if (item.track_type === 'video') {
-        // Video split: divide srcStart/srcEnd at midpoint
-        let meta = {};
-        try { meta = JSON.parse(item.metadata || '{}'); } catch(e) {}
-        const srcS = this._timeToSec(meta.srcStart || '0');
-        const srcE = this._timeToSec(meta.srcEnd || '5');
-        const dur = srcE - srcS;
-        if (dur < 1) return;
-        const mid = (srcS + srcE) / 2;
-        const meta1 = { ...meta, srcEnd: this._secToStr(mid) };
-        const meta2 = { ...meta, srcStart: this._secToStr(mid) };
-        this._trackSnapshot();
-        const part1 = { ...item, id: Date.now(), metadata: JSON.stringify(meta1) };
-        const part2 = { ...item, id: Date.now() + 1, metadata: JSON.stringify(meta2) };
-        this.tracks.splice(idx, 1, part1, part2);
-      } else {
-        // Non-video split: divide time_start/time_end at midpoint
-        const ts = this._parseDuration(item.time_start, item.time_end);
-        if (ts < 2) return;
-        this._trackSnapshot();
-        const half = ts / 2;
-        const tsNum = this._timeToSec(item.time_start);
-        const mid = tsNum + half;
-        const part1 = { ...item, id: Date.now(), time_end: this._secToStr(mid) };
-        const part2 = { ...item, id: Date.now() + 1, time_start: this._secToStr(mid) };
-        this.tracks.splice(idx, 1, part1, part2);
+      if (item.track_type !== 'video') {
+        // Rule 1: non-video blocks (emotion/narration/subtitle/text/theme) can't be
+        // split — the plan stores one value per shot, splitting would be lost on apply.
+        Quasar.Notify.create({ message: t('wb.track_split_disabled'), color: 'warning', position: 'top', timeout: 2500 });
+        return;
       }
+      // Video split: divide srcStart/srcEnd at midpoint
+      let meta = {};
+      try { meta = JSON.parse(item.metadata || '{}'); } catch(e) {}
+      const srcS = this._timeToSec(meta.srcStart || '0');
+      const srcE = this._timeToSec(meta.srcEnd || '5');
+      const dur = srcE - srcS;
+      if (dur < 1) return;
+      const mid = (srcS + srcE) / 2;
+      const meta1 = { ...meta, srcEnd: this._secToStr(mid) };
+      const meta2 = { ...meta, srcStart: this._secToStr(mid) };
+      this._trackSnapshot();
+      const part1 = { ...item, id: Date.now(), metadata: JSON.stringify(meta1) };
+      const part2 = { ...item, id: Date.now() + 1, metadata: JSON.stringify(meta2) };
+      this.tracks.splice(idx, 1, part1, part2);
       this.trackSelectedItem = null;
       this._trackSave();
     },
@@ -1157,8 +1332,36 @@ const WorkbenchPage = {
       if (!this.trackSelectedItem) return;
       const idx = this.tracks.findIndex(t => t.id === this.trackSelectedItem);
       if (idx < 0) return;
+      const item = this.tracks[idx];
+      // Rule 4: deleting a theme (主旨) / text (叙述) cascades to all blocks inside,
+      // gated by a confirm dialog.
+      if (item.track_type === 'theme' || item.track_type === 'text') {
+        const isAct = item.track_type === 'theme';
+        Quasar.Dialog.create({
+          title: t('wb.delete'),
+          message: t(isAct ? 'wb.track_delete_act_confirm' : 'wb.track_delete_narrative_confirm', { name: item.content || '' }),
+          cancel: true,
+          persistent: false,
+          ok: { label: t('wb.delete'), color: 'negative', unelevated: true },
+        }).onOk(() => this._cascadeDelete(item));
+        return;
+      }
       this._trackSnapshot();
       this.tracks.splice(idx, 1);
+      this.trackSelectedItem = null;
+      this._trackSave();
+    },
+    // Rule 4 helper: remove every block whose time_start falls in anchor's
+    // [time_start, time_end) — the whole act (theme) or narrative (text) plus all
+    // shots under it. Adjacent act/narrative blocks start exactly at time_end and are kept.
+    _cascadeDelete(anchor) {
+      const s = this._timeToSec(anchor.time_start);
+      const e = this._timeToSec(anchor.time_end);
+      this._trackSnapshot();
+      this.tracks = this.tracks.filter(t => {
+        const ts = this._timeToSec(t.time_start);
+        return ts < s - 0.05 || ts >= e - 0.05;
+      });
       this.trackSelectedItem = null;
       this._trackSave();
     },
@@ -1512,10 +1715,12 @@ const WorkbenchPage = {
       }
       this._trackSave();
     },
-    onTrackItemHover(e) {
+    onTrackItemHover(e, trackType) {
       const rect = e.currentTarget.getBoundingClientRect();
       const x = e.clientX - rect.left;
-      e.currentTarget.style.cursor = (x < 5 || rect.width - x < 5) ? 'col-resize' : 'grab';
+      const onEdge = x < 5 || rect.width - x < 5;
+      // Rule 2: only video blocks show the resize cursor at edges.
+      e.currentTarget.style.cursor = (trackType === 'video' && onEdge) ? 'col-resize' : 'grab';
     },
     onTrackItemDown(e, item, trackType) {
       if (e.button !== 0) return;
@@ -1523,9 +1728,12 @@ const WorkbenchPage = {
       const x = e.clientX - rect.left;
       const nearLeft = x < 5;
       const nearRight = rect.width - x < 5;
+      // Rule 2: only video blocks can be resized; non-video block duration
+      // follows its video via _normalizeVideoTrack and can't be hand-edited.
+      const isVideo = trackType === 'video';
       this._drag = {
-        mode: nearLeft || nearRight ? 'resize' : 'reorder',
-        edge: nearLeft ? 'left' : nearRight ? 'right' : null,
+        mode: isVideo && (nearLeft || nearRight) ? 'resize' : 'reorder',
+        edge: isVideo ? (nearLeft ? 'left' : nearRight ? 'right' : null) : null,
         trackType, item,
         startX: e.clientX,
         startY: e.clientY,

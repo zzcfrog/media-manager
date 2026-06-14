@@ -1050,6 +1050,9 @@ body:not(.body--dark) .wb-mat-toolbar .q-btn-dropdown { background: #e0e0e0; }
 }
 
 .wb-track-label {
+  position: sticky;
+  left: 0;
+  z-index: 6;
   width: 60px;
   flex-shrink: 0;
   display: flex;

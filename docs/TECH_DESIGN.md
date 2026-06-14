@@ -498,10 +498,17 @@ confirmPicker()
 **缩放**：`trackZoom`（1-10x）通过内联 `transform: scaleX()` + `minWidth` 百分比缩放 `.wb-track-content` 内容区域，超出时横向滚动。
 
 **编辑操作**：
-- **撤销/重做**：JSON 快照栈（`_undoStack` / `_redoStack`），每次编辑前调用 `_trackSnapshot()` 保存当前状态
-- **分割**：`trackSplit()` 将选中轨道项按时间中点一分为二，插入两个新项替换原项
-- **删除**：`trackDelete()` 从 `this.tracks` 移除选中项
-- 所有编辑操作调用 `_trackSave()` 持久化，内部通过 `API.updateProjectTracks(id, tracks)` 发送 PUT 请求
+- **撤销/重做**：JSON 快照栈（`_undoStack` / `_redoStack`），每次编辑前调用 `_trackSnapshot()` 保存当前状态。`trackUndo`/`trackRedo` 弹栈还原 `this.tracks` 后调用 `_hydrateSegments()` 重挂运行时 `_segment` 引用（快照深拷贝会切断与 `this.segments` 的引用，否则 video 块缩略图/标签显示 `?`）。`load`/`loadTracks` 整体替换 tracks 后调 `_hydrateSegments()` + `_resetUndoStacks()`，避免脑图 apply 后残留脏快照
+- **分割**：`trackSplit()` **仅对 video 生效**（按 `metadata.srcStart/srcEnd` 中点一分为二）；非视频块禁止分割——plan 一个 shot 只存一个情绪/旁白值，分割出的第二段会在 apply 时丢失，故提示 `wb.track_split_disabled` 并返回。
+- **删除**：`trackDelete()` 对普通块直接移除；对 theme（主旨）/text（叙述）弹 `Quasar.Dialog` 确认后由 `_cascadeDelete(anchor)` 按区间 `[time_start, time_end)` 级联删除其内所有块（相邻主旨/叙述从 `time_end` 起保留），`_syncTracksToPlan` 随后清理 plan 中空 act/narrative。
+- **缩放**：`onTrackItemDown` 仅 video 块在左右边缘进入 resize mode（改 `metadata.srcStart/srcEnd`）；非视频块边缘不进入 resize（时长由 `_normalizeVideoTrack` 跟随 video）。`onTrackItemHover` 只在 video 边缘显示 col-resize 光标。
+- 所有编辑操作调用 `_trackSave()` 持久化：先 `_normalizeVideoTrack()` 归一化，`API.updateProjectTracks(id, tracks)` PUT 成功后再调 `_syncTracksToPlan()` 回写脑图（二者错误隔离，plan 回写失败不影响 tracks 已存）
+
+**归一化与缩放联动 `_normalizeVideoTrack()`**：按数组顺序把 video 轨道排成从 0 起的连续段，记录每个段的 `{oldStart, oldEnd, newStart, newEnd}`（`oldEnd` 取归一化前的 `time_end`，即调整前的原始区间）。非 video 轨道按 start 落入某段 `[oldStart, oldEnd)` 命中后，**按比例缩放**映射进 `[newStart, newEnd]`（`scale = newRange/oldRange`，start 和 end 都映射），而非仅平移——这样拖短 video 片段时同区间的 emotion/旁白/字幕/文字块等比缩短。`oldRange≈0` 退化回平移。
+
+**时间线→脑图回写 `_syncTracksToPlan()`**：深拷贝 `mindMapData`，先按当前 plan 的 shot 时长累加算出各 narrative 边界 `[nStart, nEnd)`，再用每个归一化后 video 的 `time_start` 落入区间决定 shot 的新 `act_id`/`narrative_id`（**位置驱动移动**）；按 narrative 重建 shots（按 timeline 顺序，同步 `src_start`/`src_end`，按时间区间匹配同段 emotion→`shot.emotion`、narration→`shot.narration`，匹配 text→`nar.text`，按 `metadata.act_id` 匹配 theme→`act.title`）；无 video 归属的空 shot/narrative/act 移除（删除同步）；`this.project.ai_plan = JSON.stringify(plan)` 触发 `mindMapData` 重算，并 `PUT /api/creative/<id>/plan` 持久化（**不调 apply**——tracks 已是权威源）。仅当存在 `mindMapData` 时执行。
+
+**双向链路（已端到端验证）**：脑图→时间线靠 `apply_plan` 全量重建（时间由 plan shot 的 src 区间累加派生），时间线→脑图靠 `_normalizeVideoTrack`→`_syncTracksToPlan` 顺序执行（normalize 先重写 time_start，sync 再按新位置分配叙事）。两方向都从 0 绝对重算，来回编辑不累积漂移。非视频块的分割/手调时长被禁，避免其超出 plan 表达力（一个 shot 一个情绪/旁白值）导致 apply 时丢失。
 
 **选中状态**：`trackSelectedItem` 记录选中轨道项 id，点击轨道项设置，编辑/删除后重置为 null。
 
@@ -600,7 +607,7 @@ backend/
 | `/api/workbench/<pid>/creative-brief` | POST | 组装素材数据 + 创作指令 → 调用大模型 → SSE 流式返回方案 |
 | `/api/workbench/<pid>/creative-brief/preview` | POST | 仅组装输入 JSON 预览（不调用大模型，用于调试） |
 | `/api/workbench/<pid>/creative-brief/apply` | POST | 接收 AI 方案 JSON → 组装为 tracks → 写入 project_tracks |
-| `/api/creative/<pid>/plan` | PUT | 保存脑图编辑后的 ai_plan JSON |
+| `/api/creative/<pid>/plan` | PUT | 保存脑图编辑后的 ai_plan JSON（脑图内联编辑 + 时间线 `_syncTracksToPlan` 回写共用） |
 
 ### 9.2.1 脑图分镜拖拽实现要点（mindmap.js）
 

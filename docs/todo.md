@@ -1,5 +1,40 @@
 # TODO
 
+## 已完成：脑图↔时间线双向同步端到端验证 + 非视频块编辑约束（2026-06-13）
+
+继"四项修复"之后，对脑图↔时间线双向同步做端到端验证，并落实非视频块编辑约束（消除"plan 一个 shot 只存一个情绪/旁白值"与时间线多块编辑的冲突）。改动集中于 `frontend/js/workbench.js` 与 `frontend/js/i18n.js`。
+
+**双向同步验证**（项目 62 青海实测）：
+1. 脑图→时间线（`apply_plan` 全量重建）：跨叙事/跨主旨拖 shot 后，所在/跨过叙事区间与 video 起始时间全部重算，video 严格连续不重叠（gap=0），总时长守恒 → 需求"挪入挪出→所在/跨过/视频时间变动、不重叠、都在叙事内"满足。
+2. 时间线→脑图（`_syncTracksToPlan` 位置驱动）：reorder video 后按新位置重新分配 narrative 归属，video 连续不重叠，plan 结构保留（安全阀未误删）。
+3. 两方向都从 0 绝对重算，来回编辑不累积漂移。此前担心的"缩放误触发归属重算""来回漂移"经数据流追踪均不成立。
+
+**非视频块编辑约束**（消除 `_syncTracksToPlan` 的 `findAuxTrack` 只回写第一个块导致的多块丢失）：
+1. 禁止分割非视频块：`trackSplit()` 对非 video（情绪/旁白/字幕/文字/主旨）提示 `wb.track_split_disabled` 并返回，仅 video 可中点切分。
+2. 禁止手动调整非视频块时长：`onTrackItemDown` 的 mode 判定加 `isVideo` 条件——非视频块边缘不进入 resize（只走 reorder），时长由 `_normalizeVideoTrack` 跟随 video；`onTrackItemHover` 同步只在 video 边缘显示 col-resize 光标。
+3. 删除主旨/叙述级联+弹窗：`trackDelete()` 检测 theme（主旨）/text（叙述）弹 `Quasar.Dialog` 确认，确认后 `_cascadeDelete(anchor)` 按区间 `[time_start, time_end)` 删除其内所有块（相邻主旨/叙述从 `time_end` 起保留），`_syncTracksToPlan` 随后清理 plan 中空 act/narrative。
+- i18n：新增 `wb.track_split_disabled` / `wb.track_resize_disabled` / `wb.track_delete_act_confirm` / `wb.track_delete_narrative_confirm`（中英）。
+
+**验证**：node --check 通过；浏览器构造 method 上下文调真实代码实测——emotion 块 trackSplit 被拦（tracks 不变）、video 块仍正常 +1；删第一个主旨（0–185s）区间内 130 块全删、区间外全保留。DB 已用备份还原。
+
+**未做（Part B，后续）**：规则3"手动添加主旨/叙述"——当前 `addTrackItem` 对 theme/text 是孤立 push（`_syncTracksToPlan` 匹配不到 act 被丢弃），让它有效需在 plan 插入结构层 + apply 重建，属新增功能，拆为独立任务。
+
+## 已完成：工作台四项修复——撤销/重做、缩放联动、脑图同步、冻结行头（2026-06-13）
+
+工作台时间线/脑图视图存在四个缺陷，集中修复于 `frontend/js/workbench.js` 与 `frontend/css/main.css`：
+
+1. **撤销/重做失效**：`trackUndo/Redo` 本身逻辑正确，但回滚后 video 轨道的运行时 `_segment` 引用未回水（缩略图/标签显示 `?`）；且脑图改动经 `loadTracks()` 整体替换 `this.tracks` 后未清空快照栈，撤销会还原到"脑图应用前"的脏状态。
+   - 新增 `_hydrateSegments()`（按 `segment_id` 重挂 `_segment`）/ `_resetUndoStacks()`（清栈 + 重置按钮态），抽离复用三处；`load`/`loadTracks` 替换 tracks 后调 `_hydrateSegments` + `_resetUndoStacks`；`trackUndo`/`trackRedo` 在 `_trackSave()` 前调 `_hydrateSegments`。
+
+2. **缩放不联动**：`_normalizeVideoTrack` 同步非 video 轨道时只做平移（`oldEnd = oldStart + dur`，dur 取自已变更 metadata，缩放比恒 1），调整 video 片段长度时 emotion/narration/subtitle/text 块不跟着变。
+   - mapping 的 `oldEnd` 改用归一化前的 `time_end`（原始区间）；同步逻辑从平移改为**按比例缩放**（`scale = newRange/oldRange`，start/end 都映射）；`oldRange≈0` 退化回平移。
+
+3. **时间线↔脑图不同步**：脑图→时间线已有（`onPlanChanged` → apply → `loadTracks`）；时间线→脑图缺失。新增 `_syncTracksToPlan()`，在 `_trackSave()` 存 tracks 后调用：按当前 plan 的叙事时长累加算边界，用每个 video 的 `time_start` 落入区间决定 shot 归属（**位置驱动移动**），按 narrative 重建 shots（同步 src_start/src_end、按时间区间匹配 emotion/narration/text、按 act_id 匹配 theme），移除空 shot/narrative/act（删除同步），最后 `PUT /api/creative/<id>/plan` 持久化（不调 apply，tracks 已是权威源）。
+
+4. **横向滚动行头不冻结**：`.wb-track-label` 加 `position: sticky; left: 0; z-index: 6`（已有 `background` 遮挡滚动内容），playhead z-index 10 仍在上。
+
+**验证**：node --check 通过；启动 Flask 进工作台 62（青海）实测——横滚 200px 行头 left 不变（内容 320→120）、split 后 undo/redo 全循环 237↔238 且首个 video 标签保持"壮丽"非 `?`、DB 末态 517 tracks/3 acts/237 shots 与初始一致（同步未污染数据）。
+
 ## 已完成：prompt 文件归集到 backend/prompts/ 目录（2026-06-13）
 
 把原本散在 backend/ 根目录的三个 prompt 文件归到一个目录，便于统一管理：
