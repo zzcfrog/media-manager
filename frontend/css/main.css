@@ -1248,7 +1248,6 @@ body:not(.body--dark) .wb-mat-toolbar .q-btn-dropdown { background: #e0e0e0; }
   text-overflow: ellipsis;
 }
 .wb-frame-text .wb-frame-label {
-  top: 22px;
   color: color-mix(in srgb, var(--accent) 65%, var(--text2));
 }
 .wb-frame-label-input {
