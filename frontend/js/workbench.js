@@ -1937,14 +1937,13 @@ const WorkbenchPage = {
         const contentEl = d.el.parentElement;
         const children = Array.from(contentEl.querySelectorAll('.wb-track-item'));
         const fromIdx = children.indexOf(d.el);
-        let toIdx = 0;
+        let toIdx = children.length;
         for (let i = 0; i < children.length; i++) {
           if (children[i] === d.el) continue;
           const itLeft = parseFloat(children[i].style.left) || 0;
           const itWidth = children[i].offsetWidth;
           const itCenter = itLeft + itWidth / 2;
-          if (e.clientX - contentEl.getBoundingClientRect().left > itCenter) toIdx = i;
-          else break;
+          if (e.clientX - contentEl.getBoundingClientRect().left < itCenter) { toIdx = i; break; }
         }
         let adjIdx = toIdx;
         if (fromIdx <= toIdx) adjIdx = Math.min(toIdx, children.length - 1);
@@ -2006,13 +2005,14 @@ const WorkbenchPage = {
         if (Math.abs(dx) < 5) { this._drag = null; return; }
         const items = this.getTrackItems(d.trackType);
         const fromIdx = items.indexOf(d.item);
-        let toIdx = 0;
         const contentEl = d.el.parentElement;
         const children = Array.from(contentEl.querySelectorAll('.wb-track-item'));
+        let toIdx = children.length;
         for (let i = 0; i < children.length; i++) {
           const cr = children[i].getBoundingClientRect();
-          if (e.clientX > cr.left + cr.width / 2) toIdx = i;
+          if (e.clientX < cr.left + cr.width / 2) { toIdx = i; break; }
         }
+        if (fromIdx < toIdx) toIdx--;
         if (fromIdx === toIdx) { this._drag = null; return; }
         this._trackSnapshot();
         const actualFrom = this.tracks.indexOf(d.item);
