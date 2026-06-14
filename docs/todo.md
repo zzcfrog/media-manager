@@ -1,5 +1,12 @@
 # TODO
 
+## 已完成：行头补主旨/叙事 + 标题区对齐 + 叙事虚线调细（2026-06-14）
+
+overlay 框上线后用户反馈：①左侧行头只显示情绪/旁白/字幕/分镜，缺主旨/叙事；②叙事虚线 2px 偏粗。修复（[workbench.js](frontend/js/workbench.js) + [main.css](frontend/css/main.css)）：
+- content-group labels 列顶部加主旨线/叙事线行头（各 20px），area 顶部加 `.wb-frame-title-zone`（40px）与之对齐；content-group 去掉 margin-top（标题区纳入 area），框 `top:0` 覆盖标题区+area。
+- 叙事框虚线 2px → 1px。
+验证：行头显示主旨线/叙事线/旁白线/字幕线/视频线（20/20/32/32/56），标题区 40px 对齐，叙事虚线 1px。
+
 ## 已完成：时间线主旨/叙事 overlay 框重构——对齐脑图层级（2026-06-14）
 
 把主旨/叙事从「独立平行轨道」改成「覆盖框」——主旨框横跨整个主旨时长、纵向包住分镜/旁白/字幕；叙事框在主旨框内、横跨单个叙事；情绪线独立在最上（不被框包）。这样时间线和脑图的 act→narrative→shot 层级一致。

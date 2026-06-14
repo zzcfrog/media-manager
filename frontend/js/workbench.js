@@ -505,9 +505,12 @@ const WorkbenchPage = {
         <!-- 内容组：旁白/字幕/分镜贯穿轨道 + 主旨/叙事 overlay 框 -->
         <div class="wb-content-group">
           <div class="wb-content-group-labels">
+            <div class="wb-track-label wb-frame-row-label">{{ t('wb.track_theme') }}</div>
+            <div class="wb-track-label wb-frame-row-label">{{ t('wb.track_text') }}</div>
             <div v-for="tt in contentTrackTypes" :key="tt.key" class="wb-track-label" :class="tt.key">{{ t('wb.track_' + tt.key) }}</div>
           </div>
           <div class="wb-content-group-area" :style="{width: timelineWidth + 'px'}">
+            <div class="wb-frame-title-zone"></div>
             <div v-for="tt in contentTrackTypes" :key="tt.key" class="wb-content-lane" :class="tt.key"
                  @dragover="onTrackDragOver($event, tt.key)"
                  @dragleave="onTrackDragLeave($event)"

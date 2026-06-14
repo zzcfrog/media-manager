@@ -1151,7 +1151,6 @@ body:not(.body--dark) .wb-mat-toolbar .q-btn-dropdown { background: #e0e0e0; }
   display: flex;
   align-items: stretch;
   min-width: max-content;
-  margin-top: 20px;
   border-bottom: 1px solid var(--border);
 }
 .wb-content-group-labels {
@@ -1175,9 +1174,18 @@ body:not(.body--dark) .wb-mat-toolbar .q-btn-dropdown { background: #e0e0e0; }
   height: 56px;
   border-bottom: none;
 }
+.wb-content-group-labels .wb-frame-row-label {
+  height: 20px;
+  font-size: 10px;
+  color: var(--text3);
+}
 .wb-content-group-area {
   position: relative;
   flex-shrink: 0;
+}
+.wb-frame-title-zone {
+  height: 40px;
+  border-bottom: 1px solid var(--border);
 }
 .wb-content-lane {
   position: relative;
@@ -1198,7 +1206,7 @@ body:not(.body--dark) .wb-mat-toolbar .q-btn-dropdown { background: #e0e0e0; }
 /* ── 主旨/叙事 overlay 框（覆盖内容组） ── */
 .wb-overlay-frame {
   position: absolute;
-  top: -20px;
+  top: 0;
   bottom: 0;
   box-sizing: border-box;
   pointer-events: none;
@@ -1210,7 +1218,7 @@ body:not(.body--dark) .wb-mat-toolbar .q-btn-dropdown { background: #e0e0e0; }
   z-index: 6;
 }
 .wb-frame-text {
-  border: 2px dashed color-mix(in srgb, var(--accent) 50%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--accent) 50%, transparent);
   background: transparent;
   z-index: 7;
 }
