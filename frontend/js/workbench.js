@@ -1317,26 +1317,68 @@ const WorkbenchPage = {
       try { planStr = this._syncTracksToPlan(); }
       catch (e) { console.error('syncTracksToPlan failed:', e); }
       if (planStr && this.project) {
-        // sync 更新了 plan → apply 重建 tracks，让主旨/叙事框时间随 plan 重算。
-        // 不走 onPlanChanged（它 loadTracks → _resetUndoStacks 清栈），自己 apply +
-        // 拉新 tracks 但保留 undo 栈——时间线编辑必须能 undo。
+        // 只重建 text/theme overlay 框（位置需随 plan 结构变），不做 apply 全量重建——
+        // apply 会从 plan 的 shot.narration/emotion 重新生成所有旁白/情绪块，
+        // 导致用户删掉的旁白被复活、拖拽时多出幻影旁白。
+        this._rebuildFrameBlocks(planStr);
+        this.project.ai_plan = planStr;
+        const payload = this.tracks.map(t => { const o = { ...t }; delete o._segment; return o; });
         try {
+          await API.updateProjectTracks(this.projectId, payload);
           await fetch(`/api/creative/${this.project.id}/plan`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: planStr,
           });
-          const applyRes = await fetch(`/api/creative/${this.project.id}/apply`, { method: 'POST' });
-          if (applyRes.ok) {
-            const trackRes = await API.getProjectTracks(this.projectId);
-            this.tracks = trackRes.data;
-            this._hydrateSegments();
-          }
-        } catch(e) { console.error('trackSave apply failed:', e); }
+        } catch(e) { console.error('trackSave failed:', e); }
       } else {
         // fallback：sync 没产出 plan（无 mindMapData），直接存 tracks
         const payload = this.tracks.map(t => { const o = { ...t }; delete o._segment; return o; });
         try { await API.updateProjectTracks(this.projectId, payload); }
         catch (e) { Quasar.Notify.create({ message: t('wb.track_save_fail'), color: 'negative', position: 'top' }); }
       }
+    },
+    // 只重建 text/theme overlay 框（位置随 plan 结构），保留其他轨道（video/emotion/
+    // narration/subtitle）不动——替代 apply 全量重建，避免旁白/情绪块被 plan 重新生成。
+    _rebuildFrameBlocks(planStr) {
+      if (!planStr) return;
+      const plan = JSON.parse(planStr);
+      const others = this.tracks.filter(t => t.track_type !== 'text' && t.track_type !== 'theme');
+      const frames = [];
+      let position = 0;
+      for (const act of (plan.acts || [])) {
+        const actStart = position;
+        for (const nar of (act.narratives || [])) {
+          const narStart = position;
+          for (const shot of (nar.shots || [])) {
+            const seg = this.segments.find(s => s.id === shot.segment_id);
+            if (!seg) continue;
+            const srcS = shot.src_start || seg.time_start;
+            const srcE = shot.src_end || seg.time_end;
+            let dur = this._timeToSec(srcE) - this._timeToSec(srcS);
+            if (dur <= 0) dur = 5;
+            position += dur;
+          }
+          if (nar.text && narStart < position) {
+            frames.push({
+              id: Date.now() + frames.length,
+              track_type: 'text',
+              content: nar.text,
+              time_start: this._secToStr(narStart),
+              time_end: this._secToStr(position),
+            });
+          }
+        }
+        if (actStart < position) {
+          frames.push({
+            id: Date.now() + frames.length + 500,
+            track_type: 'theme',
+            content: act.title || '',
+            time_start: this._secToStr(actStart),
+            time_end: this._secToStr(position),
+            metadata: JSON.stringify({ act_id: act.act_id || '', purpose: act.purpose || '' }),
+          });
+        }
+      }
+      this.tracks = [...others, ...frames];
     },
     // 拖动 video 时高亮目标叙事/主旨框：鼠标时间命中 text/theme 区间。
     _highlightDragTarget(e) {
