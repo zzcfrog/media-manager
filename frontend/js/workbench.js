@@ -627,7 +627,7 @@ const WorkbenchPage = {
       trackPlaying: false,
       trackSpeed: 1,
       trackZoom: 1,
-      zoomPps: 2,
+      zoomPps: 8,
       trackCanUndo: false,
       trackCanRedo: false,
       trackSelectedItem: null,
@@ -990,7 +990,8 @@ const WorkbenchPage = {
       const el = this.$refs.wbTimelineScroll;
       if (!el) return;
       const availWidth = el.clientWidth - 60;
-      this.zoomPps = availWidth / this.timelineDuration;
+      // 最小 pps 8（块至少 ~24px），保证拖拽有足够命中区
+      this.zoomPps = Math.max(8, availWidth / this.timelineDuration);
     },
     async loadTracks() {
       try {
