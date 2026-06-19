@@ -1451,13 +1451,35 @@ const WorkbenchPage = {
         srcEl.style.width = Math.max(4, srcWidth - shiftPx) + 'px';
         tgtEl.style.left = (tgtLeft - shiftPx) + 'px';
         tgtEl.style.width = (tgtWidth + shiftPx) + 'px';
+        // 中间叙事块整体左移（宽度不变）
+        const previewEls = [srcEl, tgtEl];
+        for (const tx of textBlocks) {
+          if (tx.id === srcText.id || tx.id === tgtText.id) continue;
+          const txPos = this.trackItemPos(tx);
+          const txLeft = parseFloat(txPos.left);
+          if (txLeft > srcLeft && txLeft < tgtLeft) {
+            const txEl = area.querySelector(`.wb-frame-text[data-tid="${tx.id}"]`);
+            if (txEl) { txEl.style.left = (txLeft - shiftPx) + 'px'; previewEls.push(txEl); }
+          }
+        }
+        this._framePreviewEls = previewEls;
       } else {
         // 目标在源左边：边界右移 → 源从左缩、目标向右扩张
         srcEl.style.left = (srcLeft + shiftPx) + 'px';
         srcEl.style.width = Math.max(4, srcWidth - shiftPx) + 'px';
         tgtEl.style.width = (tgtWidth + shiftPx) + 'px';
+        const previewEls = [srcEl, tgtEl];
+        for (const tx of textBlocks) {
+          if (tx.id === srcText.id || tx.id === tgtText.id) continue;
+          const txPos = this.trackItemPos(tx);
+          const txLeft = parseFloat(txPos.left);
+          if (txLeft > tgtLeft && txLeft < srcLeft) {
+            const txEl = area.querySelector(`.wb-frame-text[data-tid="${tx.id}"]`);
+            if (txEl) { txEl.style.left = (txLeft + shiftPx) + 'px'; previewEls.push(txEl); }
+          }
+        }
+        this._framePreviewEls = previewEls;
       }
-      this._framePreviewEls = [srcEl, tgtEl];
     },
     _clearFramePreview() {
       if (!this._framePreviewEls) return;
