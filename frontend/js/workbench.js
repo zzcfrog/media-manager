@@ -2345,11 +2345,11 @@ const WorkbenchPage = {
       this.syncPlayheadFromPlayer();
     },
     fmtSec(s) {
-      if (!s && s !== 0) return '--:--';
-      s = Math.floor(s);
-      const m = Math.floor(s / 60);
-      const sec = s % 60;
-      return m + ':' + String(sec).padStart(2, '0');
+      if (s == null || (s !== 0 && !s)) return '--:--:--';
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sec = (s % 60).toFixed(1);
+      return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(sec).padStart(4, '0');
     },
     onWbSeekStart(e) {
       const bar = this.$refs.wbSeekbar;
