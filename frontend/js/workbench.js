@@ -1975,33 +1975,32 @@ const WorkbenchPage = {
         // Move ghost centered on press point (no jump)
         d.ghost.style.left = (e.clientX - 40) + 'px';
         d.ghost.style.top = (e.clientY - 25) + 'px';
-        // Reorder animation: shift siblings to show insertion gap
-        // Use CSS left (original position) not getBoundingClientRect (affected by transforms)
+        // Reorder animation: shift siblings to show insertion gap.
+        // 用 remaining（排除 d.el）算插入点——和 _handleDragEnd 完全一致，
+        // 保证"动画显示移动 ↔ splice 真的移动"不出现偏差。
         const contentEl = d.el.parentElement;
         const children = Array.from(contentEl.querySelectorAll('.wb-track-item'));
-        const fromIdx = children.indexOf(d.el);
-        let toIdx = children.length;
-        for (let i = 0; i < children.length; i++) {
-          if (children[i] === d.el) continue;
-          const itLeft = parseFloat(children[i].style.left) || 0;
-          const itWidth = children[i].offsetWidth;
-          const itCenter = itLeft + itWidth / 2;
+        const remaining = children.filter(c => c !== d.el);
+        const fromIdx = children.indexOf(d.el); // full index = remaining gap index
+        let toIdx = remaining.length;
+        for (let i = 0; i < remaining.length; i++) {
+          const itLeft = parseFloat(remaining[i].style.left) || 0;
+          const itCenter = itLeft + remaining[i].offsetWidth / 2;
           if (e.clientX - contentEl.getBoundingClientRect().left < itCenter) { toIdx = i; break; }
         }
-        let adjIdx = toIdx;
-        if (fromIdx <= toIdx) adjIdx = Math.min(toIdx, children.length - 1);
         const itemW = d.startWidth;
-        for (let i = 0; i < children.length; i++) {
-          if (children[i] === d.el) continue;
-          children[i].style.transition = 'transform 0.15s ease';
-          if (fromIdx < adjIdx) {
-            children[i].style.transform = (i > fromIdx && i <= adjIdx) ? `translateX(${-itemW}px)` : '';
-          } else if (fromIdx > adjIdx) {
-            children[i].style.transform = (i >= adjIdx && i < fromIdx) ? `translateX(${itemW}px)` : '';
+        remaining.forEach((card, ri) => {
+          card.style.transition = 'transform 0.15s ease';
+          if (fromIdx < toIdx) {
+            // 右移：fromIdx..toIdx-1 的块左移腾位
+            card.style.transform = (ri >= fromIdx && ri < toIdx) ? `translateX(${-itemW}px)` : '';
+          } else if (fromIdx > toIdx) {
+            // 左移：toIdx..fromIdx-1 的块右移腾位
+            card.style.transform = (ri >= toIdx && ri < fromIdx) ? `translateX(${itemW}px)` : '';
           } else {
-            children[i].style.transform = '';
+            card.style.transform = '';
           }
-        }
+        });
         this._highlightDragTarget(e);
       } else {
         if (d.edge === 'right') {
@@ -2050,12 +2049,13 @@ const WorkbenchPage = {
         const fromIdx = items.indexOf(d.item);
         const contentEl = d.el.parentElement;
         const children = Array.from(contentEl.querySelectorAll('.wb-track-item'));
-        let toIdx = children.length;
-        for (let i = 0; i < children.length; i++) {
-          const cr = children[i].getBoundingClientRect();
+        // 用 remaining（排除 d.el）算插入点，和 _handleDragMove 一致，无 toIdx-- 调整。
+        const remaining = children.filter(c => c !== d.el);
+        let toIdx = remaining.length;
+        for (let i = 0; i < remaining.length; i++) {
+          const cr = remaining[i].getBoundingClientRect();
           if (e.clientX < cr.left + cr.width / 2) { toIdx = i; break; }
         }
-        if (fromIdx < toIdx) toIdx--;
         if (fromIdx === toIdx) { this._drag = null; return; }
         this._trackSnapshot();
         const actualFrom = this.tracks.indexOf(d.item);
