@@ -1822,9 +1822,10 @@ const WorkbenchPage = {
       this._extDragType = 'media';
     },
     _secToStr(sec) {
-      const m = Math.floor(sec / 60);
-      const s = sec % 60;
-      return m + ':' + String(Math.round(s * 10) / 10).padStart(4, '0');
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = (sec % 60).toFixed(1);
+      return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + s.padStart(4, '0');
     },
     onTrackDrop(e, trackType) {
       const data = e.dataTransfer?.getData('application/json');
