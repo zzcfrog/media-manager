@@ -1207,53 +1207,38 @@ const WorkbenchPage = {
 
       // Actual per-segment video durations (from track metadata — reflects resizes)
       const videos = this.tracks.filter(t => t.track_type === 'video' && t.segment_id);
-      const videoDurBySeg = {};
-      for (const vt of videos) videoDurBySeg[vt.segment_id] = this._getVideoDur(vt);
 
-      // Narrative boundaries from ACTUAL video durations (cumulative, plan order).
-      // Using actual durations (not stale plan shot durations) keeps the boundaries
-      // aligned with the timeline after a resize, so videos stay in the right narrative.
-      const narRanges = [];
-      let acc = 0;
-      for (const act of plan.acts) {
-        for (const nar of (act.narratives || [])) {
-          const nStart = acc;
-          for (const shot of (nar.shots || [])) acc += videoDurBySeg[shot.segment_id] || this._shotDur(shot);
-          narRanges.push({ actId: act.act_id, narId: nar.narrative_id, start: nStart, end: acc });
+      // 用 video 的 metadata.narrative_id/act_id 判定归属（上次 sync 写入，准确）。
+      // 再修孤岛：拖动后某 video 处于不同 narrative 邻居之间（前后邻居 narrative 一致
+      // 但自己不同），说明它被拖到了新 narrative → 归属改为邻居的 narrative。
+      // 这比"用旧 plan 累加时长算 narRanges"可靠：旧 narRanges 包含被移走的 video
+      // 时长，边界没更新，导致 video 被误判回旧 narrative。
+      const vAssign = videos.map(vt => {
+        let m = {}; try { m = JSON.parse(vt.metadata || '{}'); } catch(e) {}
+        return { vt, narId: m.narrative_id || null, actId: m.act_id || null };
+      });
+      for (let i = 0; i < vAssign.length; i++) {
+        const prev = i > 0 ? vAssign[i - 1].narId : null;
+        const next = i < vAssign.length - 1 ? vAssign[i + 1].narId : null;
+        const cur = vAssign[i].narId;
+        if (cur && prev && next && prev === next && cur !== prev) {
+          vAssign[i].narId = prev;
+          vAssign[i].actId = vAssign[i - 1].actId;
         }
       }
-      const totalPlanDur = acc;
-      const findNarrative = (ts) => {
-        for (const nr of narRanges) if (ts >= nr.start && ts < nr.end) return nr;
-        if (!narRanges.length) return null;
-        if (ts >= totalPlanDur) return narRanges[narRanges.length - 1];
-        if (ts <= 0) return narRanges[0];
-        let best = narRanges[0], bestDist = Infinity;
-        for (const nr of narRanges) {
-          const d = Math.min(Math.abs(ts - nr.start), Math.abs(ts - nr.end));
-          if (d < bestDist) { bestDist = d; best = nr; }
-        }
-        return best;
-      };
-
-      // Assign videos to narratives by position (videos declared above). Rewrite each
-      // video's metadata .act_id/.narrative_id to match its assignment so the next
-      // sync + any metadata reader stay consistent.
       const keyOf = (a, n) => a + '::' + n;
       const groups = {};
-      for (const vt of videos) {
-        const target = findNarrative(this._timeToSec(vt.time_start));
-        if (!target) continue;
-        let meta = {};
-        try { meta = JSON.parse(vt.metadata || '{}'); } catch(e) {}
-        if (meta.act_id !== target.actId || meta.narrative_id !== target.narId) {
-          meta.act_id = target.actId;
-          meta.narrative_id = target.narId;
-          vt.metadata = JSON.stringify(meta);
+      for (const va of vAssign) {
+        if (!va.narId) continue;
+        let meta = {}; try { meta = JSON.parse(va.vt.metadata || '{}'); } catch(e) {}
+        if (meta.act_id !== va.actId || meta.narrative_id !== va.narId) {
+          meta.act_id = va.actId;
+          meta.narrative_id = va.narId;
+          va.vt.metadata = JSON.stringify(meta);
         }
-        const key = keyOf(target.actId, target.narId);
-        if (!groups[key]) groups[key] = { actId: target.actId, narId: target.narId, vids: [] };
-        groups[key].vids.push(vt);
+        const key = keyOf(va.actId, va.narId);
+        if (!groups[key]) groups[key] = { actId: va.actId, narId: va.narId, vids: [] };
+        groups[key].vids.push(va.vt);
       }
 
       const findAuxTrack = (type, vt) => {
