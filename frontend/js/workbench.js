@@ -1426,10 +1426,11 @@ const WorkbenchPage = {
       const srcEl = area.querySelector(`.wb-frame-text[data-tid="${srcText.id}"]`);
       const tgtEl = area.querySelector(`.wb-frame-text[data-tid="${tgtText.id}"]`);
       if (!srcEl || !tgtEl) return;
-      const srcLeft = parseFloat(srcEl.style.left) || 0;
-      const srcWidth = parseFloat(srcEl.style.width) || 0;
-      const tgtLeft = parseFloat(tgtEl.style.left) || 0;
-      const tgtWidth = parseFloat(tgtEl.style.width) || 0;
+      // 从 track 数据算位置（不从 DOM 读——上一帧 _clearFramePreview 可能已清空）
+      const srcPos = this.trackItemPos(srcText);
+      const tgtPos = this.trackItemPos(tgtText);
+      const srcLeft = parseFloat(srcPos.left), srcWidth = parseFloat(srcPos.width);
+      const tgtLeft = parseFloat(tgtPos.left), tgtWidth = parseFloat(tgtPos.width);
       if (tgtLeft > srcLeft) {
         // 目标在源右边：边界左移 → 源缩、目标从左扩张
         srcEl.style.width = Math.max(4, srcWidth - shiftPx) + 'px';
@@ -1445,7 +1446,15 @@ const WorkbenchPage = {
     },
     _clearFramePreview() {
       if (!this._framePreviewEls) return;
-      for (const el of this._framePreviewEls) { el.style.left = ''; el.style.width = ''; }
+      for (const el of this._framePreviewEls) {
+        const tid = parseInt(el.dataset.tid);
+        const track = this.tracks.find(t => t.id === tid);
+        if (track) {
+          const pos = this.trackItemPos(track);
+          el.style.left = pos.left;
+          el.style.width = pos.width;
+        }
+      }
       this._framePreviewEls = null;
     },
     trackUndo() {
