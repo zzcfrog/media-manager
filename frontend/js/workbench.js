@@ -414,7 +414,6 @@ const WorkbenchPage = {
       <div class="wb-tracks-resize-handle" @mousedown="onTracksResizeStart"></div>
       <div class="wb-track-toolbar">
 
-        <template v-if="bottomViewMode === 'timeline'">
         <div style="display:flex;align-items:center;gap:2px;margin-left:8px">
           <q-btn flat dense icon="undo" size="sm" color="grey-6" :disable="!trackCanUndo" @click="trackUndo">
             <q-tooltip :delay="500">{{ t('wb.undo') }}</q-tooltip>
@@ -422,14 +421,7 @@ const WorkbenchPage = {
           <q-btn flat dense icon="redo" size="sm" color="grey-6" :disable="!trackCanRedo" @click="trackRedo">
             <q-tooltip :delay="500">{{ t('wb.redo') }}</q-tooltip>
           </q-btn>
-          <q-btn flat dense icon="content_cut" size="sm" color="grey-6" :disable="!trackSelectedItem" @click="trackSplit">
-            <q-tooltip :delay="500">{{ t('wb.split') }}</q-tooltip>
-          </q-btn>
-          <q-btn flat dense icon="delete_outline" size="sm" color="grey-6" :disable="!trackSelectedItem" @click="trackDelete">
-            <q-tooltip :delay="500">{{ t('wb.delete') }}</q-tooltip>
-          </q-btn>
         </div>
-        </template>
         <div style="flex:1"></div>
         <template v-if="bottomViewMode === 'timeline'">
         <div style="display:flex;align-items:center;gap:2px">
@@ -984,6 +976,9 @@ const WorkbenchPage = {
     },
     async onPlanChanged() {
       if (!this.project || !this.mindMapData) return;
+      // Snapshot pre-edit tracks so mindmap edits (drag/rename/delete) are undoable.
+      // _trackSnapshot must run BEFORE loadTracks replaces tracks with the post-apply set.
+      this._trackSnapshot();
       try {
         const planStr = JSON.stringify(this.mindMapData);
         await fetch(`/api/creative/${this.project.id}/plan`, {
@@ -1014,7 +1009,10 @@ const WorkbenchPage = {
         const trackRes = await API.getProjectTracks(this.projectId);
         this.tracks = trackRes.data;
         this._hydrateSegments();
-        this._resetUndoStacks();
+        // NOTE: do NOT reset undo stacks here. loadTracks is only called from
+        // onPlanChanged after a mindmap edit, where we snapshot pre-edit state
+        // just before this. Resetting would wipe that history. Initial load()
+        // resets the stacks itself.
       } catch (e) {
         console.error('loadTracks failed:', e);
       }
@@ -1515,34 +1513,6 @@ const WorkbenchPage = {
       this.trackSelectedItem = null;
       this._trackSave();
     },
-    trackSplit() {
-      if (!this.trackSelectedItem) return;
-      const idx = this.tracks.findIndex(t => t.id === this.trackSelectedItem);
-      if (idx < 0) return;
-      const item = this.tracks[idx];
-      if (item.track_type !== 'video') {
-        // Rule 1: non-video blocks (emotion/narration/subtitle/text/theme) can't be
-        // split — the plan stores one value per shot, splitting would be lost on apply.
-        Quasar.Notify.create({ message: t('wb.track_split_disabled'), color: 'warning', position: 'top', timeout: 2500 });
-        return;
-      }
-      // Video split: divide srcStart/srcEnd at midpoint
-      let meta = {};
-      try { meta = JSON.parse(item.metadata || '{}'); } catch(e) {}
-      const srcS = this._timeToSec(meta.srcStart || '0');
-      const srcE = this._timeToSec(meta.srcEnd || '5');
-      const dur = srcE - srcS;
-      if (dur < 1) return;
-      const mid = (srcS + srcE) / 2;
-      const meta1 = { ...meta, srcEnd: this._secToStr(mid) };
-      const meta2 = { ...meta, srcStart: this._secToStr(mid) };
-      this._trackSnapshot();
-      const part1 = { ...item, id: Date.now(), metadata: JSON.stringify(meta1) };
-      const part2 = { ...item, id: Date.now() + 1, metadata: JSON.stringify(meta2) };
-      this.tracks.splice(idx, 1, part1, part2);
-      this.trackSelectedItem = null;
-      this._trackSave();
-    },
     trackDelete() {
       if (!this.trackSelectedItem) return;
       const idx = this.tracks.findIndex(t => t.id === this.trackSelectedItem);
@@ -1596,7 +1566,8 @@ const WorkbenchPage = {
     // shortens by the deleted narrative's duration). Routing through _syncTracksToPlan instead
     // mis-derives boundaries because the deleted narrative's videos are already gone.
     async _cascadeDelete(anchor) {
-      this._trackSnapshot();
+      // Snapshot happens inside onPlanChanged() below (before loadTracks); snapshotting
+      // here too would push the same pre-edit state twice and create a stuck undo step.
       const plan = JSON.parse(JSON.stringify(this.mindMapData));
       const s = this._timeToSec(anchor.time_start);
       let removed = false;

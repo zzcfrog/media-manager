@@ -1,5 +1,15 @@
 # TODO
 
+## 已完成：工具栏去分割/删除 + 脑图视图接 undo/redo（2026-06-20）
+
+工作台标尺上方操作栏（ToolBar）调整 + 脑图编辑可撤销（[frontend/js/workbench.js](frontend/js/workbench.js)）：
+
+- **时间线视图去掉「分割」「删除」按钮**：ToolBar 左侧只留「撤销/重做」。`分割` 原本只在工具栏存在（无右键/快捷键入口），按钮移除后 `trackSplit()` 方法成为孤立代码，一并删除（非视频块禁分割的约束随分割功能一并退役；视频中点切分不再提供）。`删除` 按钮移除，但删除仍可通过轨道项右键菜单 + Delete/Backspace 快捷键（`trackDelete`/`_cascadeDelete` 保留）。
+- **撤销/重做改为两视图通用**：把 undo/redo 按钮从 `v-if="bottomViewMode==='timeline'"` 模板里拿出来，时间线/脑图视图都显示。
+- **脑图编辑可 undo/redo**：原先脑图编辑走 `onPlanChanged`→`loadTracks`→`_resetUndoStacks()`，每次编辑都清空 undo 栈，脑图视图下撤销/重做形同虚设。改为：①`onPlanChanged` 开头先 `_trackSnapshot()`（保存编辑前 tracks）；②`loadTracks` 不再 `_resetUndoStacks()`（该方法仅被 `onPlanChanged` 调用，初始 `load()` 仍单独 reset）。撤销时 `trackUndo` 弹栈还原 tracks → `_trackSave`→`_syncTracksToPlan` 反推 plan → 写 `ai_plan` → `mindMapData` 重算 → 脑图重渲染到撤销前状态。`_cascadeDelete` 内原有的 `_trackSnapshot()` 删除（否则与 `onPlanChanged` 内的快照重复，导致一个无效的 undo 卡步）。
+
+验证：`node --check` 通过；时间线视图操作栏只剩 undo/redo + 缩放；脑图视图拖动/改名/删除分镜后 undo 能回退到编辑前、redo 能重做。
+
 ## 已完成：行头补主旨/叙事 + 标题区对齐 + 叙事虚线调细（2026-06-14）
 
 overlay 框上线后用户反馈：①左侧行头只显示情绪/旁白/字幕/分镜，缺主旨/叙事；②叙事虚线 2px 偏粗。修复（[workbench.js](frontend/js/workbench.js) + [main.css](frontend/css/main.css)）：

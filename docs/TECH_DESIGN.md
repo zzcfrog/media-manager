@@ -502,9 +502,9 @@ confirmPicker()
 **块定位 `trackItemPos(item)`**：返回 `{left, width}` **浮点 px**（亚像素），`left = time_start*pps`、`width = max(0.5, dur*pps)`。连续块 `time_end[i]==time_start[i+1]`，浮点保证右边界 `e*pps` 精确等于下一块左边界，避免 `round(s)+round(dur)` 偶尔超过 `round(s+dur)` 的 1px 重叠（小 zoom 尤甚，曾导致 137/170 块视觉重叠）。`.wb-track-item` 用 `box-sizing: border-box`，但**水平 padding 不放在块本体**（`padding: 2px 0`）——border-box 下块宽 < padding 时元素最小宽会被提升到 padding、撑大短块（曾让小 zoom 下短 video 块从 3px 撑到 16px，视频轨道比主旨/叙述长）；水平间距改放文字元素 `.wb-track-item-label` / `.wb-track-text`（`padding: 0 8px` + `min-width:0`，flex item + overflow hidden 不会撑大块）。
 
 **编辑操作**：
-- **撤销/重做**：JSON 快照栈（`_undoStack` / `_redoStack`），每次编辑前调用 `_trackSnapshot()` 保存当前状态。`trackUndo`/`trackRedo` 弹栈还原 `this.tracks` 后调用 `_hydrateSegments()` 重挂运行时 `_segment` 引用（快照深拷贝会切断与 `this.segments` 的引用，否则 video 块缩略图/标签显示 `?`）。`load`/`loadTracks` 整体替换 tracks 后调 `_hydrateSegments()` + `_resetUndoStacks()`，避免脑图 apply 后残留脏快照
-- **分割**：`trackSplit()` **仅对 video 生效**（按 `metadata.srcStart/srcEnd` 中点一分为二）；非视频块禁止分割——plan 一个 shot 只存一个情绪/旁白值，分割出的第二段会在 apply 时丢失，故提示 `wb.track_split_disabled` 并返回。
-- **删除**：`trackDelete()` 对普通块直接移除；对 theme（主旨）/text（叙述）弹 `Quasar.Dialog` 确认后由 `_cascadeDelete(anchor)` 处理——结构性删除直接从 plan 移除对应 act/narrative（theme 用 `metadata.act_id`，text 按 `_narrativeDuration` 累加边界匹配起点），再 `onPlanChanged`（PUT plan + apply + loadTracks），让 theme/text/video 区间由 plan 正确重算（删叙事后所属主旨块缩短该叙事时长）。走 apply 而非 `_syncTracksToPlan`，因后者从残缺 tracks 反推会误算 narrative 边界（被删叙事的 video 已不在）。
+- **撤销/重做**（时间线/脑图两视图通用，ToolBar 常驻）：JSON 快照栈（`_undoStack` / `_redoStack`），每次编辑前调用 `_trackSnapshot()` 保存当前 `this.tracks`。`trackUndo`/`trackRedo` 弹栈还原 `this.tracks` 后调用 `_hydrateSegments()` 重挂运行时 `_segment` 引用（快照深拷贝会切断与 `this.segments` 的引用，否则 video 块缩略图/标签显示 `?`），再 `_trackSave()`→`_syncTracksToPlan()` 反推 plan 写 `ai_plan`，`mindMapData` 重算使脑图同步回到撤销前状态。**脑图编辑也可撤销**：`onPlanChanged()` 开头先 `_trackSnapshot()`（保存 apply 前的 tracks），`loadTracks()` 不再 `_resetUndoStacks()`（仅 `load()` 初始加载时整体 reset 一次），保证脑图编辑进入统一的历史栈。`_cascadeDelete` 内不再单独 snapshot（由 `onPlanChanged` 统一快照，避免重复快照产生无效 undo 卡步）。
+- ~~**分割**~~：已移除。ToolBar 原「分割」按钮删除（分割仅此一个入口），`trackSplit()` 方法随之删除。
+- **删除**：ToolBar「删除」按钮已移除，但删除仍可通过轨道项右键菜单 + Delete/Backspace 快捷键。`trackDelete()` 对普通块直接移除；对 theme（主旨）/text（叙述）弹 `Quasar.Dialog` 确认后由 `_cascadeDelete(anchor)` 处理——结构性删除直接从 plan 移除对应 act/narrative（theme 用 `metadata.act_id`，text 按 `_narrativeDuration` 累加边界匹配起点），再 `onPlanChanged`（PUT plan + apply + loadTracks），让 theme/text/video 区间由 plan 正确重算（删叙事后所属主旨块缩短该叙事时长）。走 apply 而非 `_syncTracksToPlan`，因后者从残缺 tracks 反推会误算 narrative 边界（被删叙事的 video 已不在）。
 - **缩放**：`onTrackItemDown` 仅 video 块在左右边缘进入 resize mode（改 `metadata.srcStart/srcEnd`）；非视频块边缘不进入 resize（时长由 `_normalizeVideoTrack` 跟随 video）。`onTrackItemHover` 只在 video 边缘显示 col-resize 光标。
 - 所有编辑操作调用 `_trackSave()` 持久化：先 `_normalizeVideoTrack()` 归一化，`API.updateProjectTracks(id, tracks)` PUT 成功后再调 `_syncTracksToPlan()` 回写脑图（二者错误隔离，plan 回写失败不影响 tracks 已存）
 
@@ -512,7 +512,7 @@ confirmPicker()
 
 **时间线→脑图回写 `_syncTracksToPlan()`**：深拷贝 `mindMapData`，先按当前 plan 的 shot 时长累加算出各 narrative 边界 `[nStart, nEnd)`，再用每个归一化后 video 的 `time_start` 落入区间决定 shot 的新 `act_id`/`narrative_id`（**位置驱动移动**）；按 narrative 重建 shots（按 timeline 顺序，同步 `src_start`/`src_end`，按时间区间匹配同段 emotion→`shot.emotion`、narration→`shot.narration`，匹配 text→`nar.text`，按 `metadata.act_id` 匹配 theme→`act.title`）；无 video 归属的空 shot/narrative/act 移除（删除同步）；`this.project.ai_plan = JSON.stringify(plan)` 触发 `mindMapData` 重算，并 `PUT /api/creative/<id>/plan` 持久化（**不调 apply**——tracks 已是权威源）。仅当存在 `mindMapData` 时执行。
 
-**双向链路（已端到端验证）**：脑图→时间线靠 `apply_plan` 全量重建（时间由 plan shot 的 src 区间累加派生），时间线→脑图靠 `_normalizeVideoTrack`→`_syncTracksToPlan` 顺序执行（normalize 先重写 time_start，sync 再按新位置分配叙事）。两方向都从 0 绝对重算，来回编辑不累积漂移。非视频块的分割/手调时长被禁，避免其超出 plan 表达力（一个 shot 一个情绪/旁白值）导致 apply 时丢失。
+**双向链路（已端到端验证）**：脑图→时间线靠 `apply_plan` 全量重建（时间由 plan shot 的 src 区间累加派生），时间线→脑图靠 `_normalizeVideoTrack`→`_syncTracksToPlan` 顺序执行（normalize 先重写 time_start，sync 再按新位置分配叙事）。两方向都从 0 绝对重算，来回编辑不累积漂移。非视频块的手调时长被禁（时长随所属 video 被动联动），避免其超出 plan 表达力（一个 shot 一个情绪/旁白值）导致 apply 时丢失；分割功能已整体移除。
 
 **选中状态**：`trackSelectedItem` 记录选中轨道项 id，点击轨道项设置，编辑/删除后重置为 null。
 
