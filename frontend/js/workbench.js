@@ -544,6 +544,7 @@ const WorkbenchPage = {
             <!-- 主旨 overlay 框（横跨整个 act，纵向包住 3 条内容轨道） -->
             <div v-for="th in getTrackItems('theme')" :key="'frame-th-' + th.id"
                  class="wb-overlay-frame wb-frame-theme" :class="{selected: trackSelectedItem === th.id, 'drag-target': dragTargetActId === th.id}"
+                 :data-tid="th.id"
                  :style="trackItemPos(th)">
               <div class="wb-frame-label" @click.stop="trackSelectedItem = th.id">
                 <input v-if="frameEditing === th.id" class="wb-frame-label-input"
@@ -1422,7 +1423,7 @@ const WorkbenchPage = {
         }
       }
     },
-    // 拖动时实时预览叙事框伸缩——让用户看到松手后 nar1/nar2 的边界会怎么移。
+    // 拖动时实时预览叙事框/主旨框伸缩——让用户看到松手后边界会怎么移。
     _previewFrameResize(d) {
       this._clearFramePreview();
       if (!this.dragTargetNarId) return;
@@ -1431,55 +1432,44 @@ const WorkbenchPage = {
       const shiftPx = shotDur * this.pps;
       const area = this.$refs.wbTimelineScroll?.querySelector('.wb-content-group-area');
       if (!area) return;
-      // 源叙事 = 被拖 video 当前所在的 text 块（按 time_start 落入区间）
       const dragTs = this._timeToSec(d.item.time_start);
+      const previewEls = [];
+      // 对一组 overlay 块做预览调整：
+      // src 块缩、tgt 块涨、两者之间的块平移。direction: 1=右移(源在左目标在右), -1=左移
+      const applyPreview = (blocks, srcId, tgtId) => {
+        const src = blocks.find(b => b.id === srcId);
+        const tgt = blocks.find(b => b.id === tgtId);
+        if (!src || !tgt || src.id === tgt.id) return;
+        const sLeft = parseFloat(this.trackItemPos(src).left);
+        const tLeft = parseFloat(this.trackItemPos(tgt).left);
+        const dir = tLeft > sLeft ? 1 : -1; // 1: 目标在右边
+        for (const b of blocks) {
+          const bLeft = parseFloat(this.trackItemPos(b).left);
+          const bWidth = parseFloat(this.trackItemPos(b).width);
+          const el = area.querySelector(`[data-tid="${b.id}"]`);
+          if (!el) continue;
+          if (b.id === src.id) {
+            if (dir === 1) { el.style.width = Math.max(4, bWidth - shiftPx) + 'px'; }
+            else { el.style.left = (bLeft + shiftPx) + 'px'; el.style.width = Math.max(4, bWidth - shiftPx) + 'px'; }
+          } else if (b.id === tgt.id) {
+            if (dir === 1) { el.style.left = (bLeft - shiftPx) + 'px'; el.style.width = (bWidth + shiftPx) + 'px'; }
+            else { el.style.width = (bWidth + shiftPx) + 'px'; }
+          } else {
+            const between = dir === 1 ? (bLeft > sLeft && bLeft < tLeft) : (bLeft > tLeft && bLeft < sLeft);
+            if (between) { el.style.left = (bLeft - dir * shiftPx) + 'px'; }
+          }
+          previewEls.push(el);
+        }
+      };
+      // 叙事框
       const textBlocks = this.tracks.filter(t => t.track_type === 'text');
       const srcText = textBlocks.find(t => dragTs >= this._timeToSec(t.time_start) && dragTs < this._timeToSec(t.time_end));
-      if (!srcText) return;
-      const tgtText = textBlocks.find(t => t.id === this.dragTargetNarId);
-      if (!tgtText || srcText.id === tgtText.id) return; // 同叙事不需预览
-      const srcEl = area.querySelector(`.wb-frame-text[data-tid="${srcText.id}"]`);
-      const tgtEl = area.querySelector(`.wb-frame-text[data-tid="${tgtText.id}"]`);
-      if (!srcEl || !tgtEl) return;
-      // 从 track 数据算位置（不从 DOM 读——上一帧 _clearFramePreview 可能已清空）
-      const srcPos = this.trackItemPos(srcText);
-      const tgtPos = this.trackItemPos(tgtText);
-      const srcLeft = parseFloat(srcPos.left), srcWidth = parseFloat(srcPos.width);
-      const tgtLeft = parseFloat(tgtPos.left), tgtWidth = parseFloat(tgtPos.width);
-      if (tgtLeft > srcLeft) {
-        // 目标在源右边：边界左移 → 源缩、目标从左扩张
-        srcEl.style.width = Math.max(4, srcWidth - shiftPx) + 'px';
-        tgtEl.style.left = (tgtLeft - shiftPx) + 'px';
-        tgtEl.style.width = (tgtWidth + shiftPx) + 'px';
-        // 中间叙事块整体左移（宽度不变）
-        const previewEls = [srcEl, tgtEl];
-        for (const tx of textBlocks) {
-          if (tx.id === srcText.id || tx.id === tgtText.id) continue;
-          const txPos = this.trackItemPos(tx);
-          const txLeft = parseFloat(txPos.left);
-          if (txLeft > srcLeft && txLeft < tgtLeft) {
-            const txEl = area.querySelector(`.wb-frame-text[data-tid="${tx.id}"]`);
-            if (txEl) { txEl.style.left = (txLeft - shiftPx) + 'px'; previewEls.push(txEl); }
-          }
-        }
-        this._framePreviewEls = previewEls;
-      } else {
-        // 目标在源左边：边界右移 → 源从左缩、目标向右扩张
-        srcEl.style.left = (srcLeft + shiftPx) + 'px';
-        srcEl.style.width = Math.max(4, srcWidth - shiftPx) + 'px';
-        tgtEl.style.width = (tgtWidth + shiftPx) + 'px';
-        const previewEls = [srcEl, tgtEl];
-        for (const tx of textBlocks) {
-          if (tx.id === srcText.id || tx.id === tgtText.id) continue;
-          const txPos = this.trackItemPos(tx);
-          const txLeft = parseFloat(txPos.left);
-          if (txLeft > tgtLeft && txLeft < srcLeft) {
-            const txEl = area.querySelector(`.wb-frame-text[data-tid="${tx.id}"]`);
-            if (txEl) { txEl.style.left = (txLeft + shiftPx) + 'px'; previewEls.push(txEl); }
-          }
-        }
-        this._framePreviewEls = previewEls;
-      }
+      applyPreview(textBlocks, srcText?.id, this.dragTargetNarId);
+      // 主旨框（只有跨 act 时才变）
+      const themeBlocks = this.tracks.filter(t => t.track_type === 'theme');
+      const srcTheme = themeBlocks.find(t => dragTs >= this._timeToSec(t.time_start) && dragTs < this._timeToSec(t.time_end));
+      applyPreview(themeBlocks, srcTheme?.id, this.dragTargetActId);
+      this._framePreviewEls = previewEls;
     },
     _clearFramePreview() {
       if (!this._framePreviewEls) return;
