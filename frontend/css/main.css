@@ -1204,7 +1204,21 @@ body:not(.body--dark) .wb-mat-toolbar .q-btn-dropdown { background: #e0e0e0; }
   z-index: 10;
 }
 
-/* ── 主旨/叙事 overlay 框（覆盖内容组） ── */
+/* ── 背景填充层（z-index 3，在分镜块之下） ── */
+.wb-overlay-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 3;
+  pointer-events: none;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+.wb-fill-text { top: 20px; }
+.wb-overlay-fill.selected { background: var(--accent-dim); }
+.wb-overlay-fill.drag-target { background: color-mix(in srgb, var(--accent-dim) 50%, transparent); }
+
+/* ── 边框层（z-index 11，在分镜块之上） ── */
 .wb-overlay-frame {
   position: absolute;
   top: 0;
@@ -1212,25 +1226,19 @@ body:not(.body--dark) .wb-mat-toolbar .q-btn-dropdown { background: #e0e0e0; }
   box-sizing: border-box;
   pointer-events: none;
   border-radius: 6px;
+  background: transparent !important;
+  z-index: 11;
 }
 .wb-frame-theme {
   border: 2px solid var(--accent);
-  background: transparent;
-  z-index: 6;
 }
 .wb-frame-text {
   top: 20px;
   border: 1px dotted color-mix(in srgb, var(--accent) 50%, transparent);
-  background: transparent;
-  z-index: 7;
-}
-.wb-overlay-frame.selected {
-  background: var(--accent-dim);
 }
 .wb-overlay-frame.drag-target {
-  background: color-mix(in srgb, var(--accent-dim) 50%, transparent);
-  box-shadow: inset 0 0 0 2px var(--accent), 0 0 12px color-mix(in srgb, var(--accent) 40%, transparent);
-  transition: background 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 40%, transparent);
+  transition: box-shadow 0.15s ease;
 }
 .wb-frame-text.drag-target {
   border-style: solid;

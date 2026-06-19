@@ -541,7 +541,14 @@ const WorkbenchPage = {
                 <q-icon name="add" size="14px" color="grey-6"></q-icon>
               </div>
             </div>
-            <!-- 主旨 overlay 框（横跨整个 act，纵向包住 3 条内容轨道） -->
+            <!-- 主旨/叙事 背景填充层（z-index 3，在分镜块之下） -->
+            <div v-for="th in getTrackItems('theme')" :key="'fill-th-' + th.id"
+                 class="wb-overlay-fill wb-fill-theme" :class="{selected: trackSelectedItem === th.id, 'drag-target': dragTargetActId === th.id}"
+                 :data-fill-tid="th.id" :style="trackItemPos(th)"></div>
+            <div v-for="tx in getTrackItems('text')" :key="'fill-tx-' + tx.id"
+                 class="wb-overlay-fill wb-fill-text" :class="{selected: trackSelectedItem === tx.id, 'drag-target': dragTargetNarId === tx.id}"
+                 :data-fill-tid="tx.id" :style="trackItemPos(tx)"></div>
+            <!-- 主旨 overlay 边框层（z-index 11，在分镜块之上） -->
             <div v-for="th in getTrackItems('theme')" :key="'frame-th-' + th.id"
                  class="wb-overlay-frame wb-frame-theme" :class="{selected: trackSelectedItem === th.id, 'drag-target': dragTargetActId === th.id}"
                  :data-tid="th.id"
@@ -560,7 +567,7 @@ const WorkbenchPage = {
                 </q-menu>
               </div>
             </div>
-            <!-- 叙事 overlay 框（在主旨框内，横跨单个叙事） -->
+            <!-- 叙事 overlay 边框层 -->
             <div v-for="tx in getTrackItems('text')" :key="'frame-tx-' + tx.id"
                  class="wb-overlay-frame wb-frame-text" :class="{selected: trackSelectedItem === tx.id, 'drag-target': dragTargetNarId === tx.id}"
                  :data-tid="tx.id"
@@ -1442,23 +1449,26 @@ const WorkbenchPage = {
         if (!src || !tgt || src.id === tgt.id) return;
         const sLeft = parseFloat(this.trackItemPos(src).left);
         const tLeft = parseFloat(this.trackItemPos(tgt).left);
-        const dir = tLeft > sLeft ? 1 : -1; // 1: 目标在右边
+        const dir = tLeft > sLeft ? 1 : -1;
         for (const b of blocks) {
           const bLeft = parseFloat(this.trackItemPos(b).left);
           const bWidth = parseFloat(this.trackItemPos(b).width);
-          const el = area.querySelector(`[data-tid="${b.id}"]`);
-          if (!el) continue;
-          if (b.id === src.id) {
-            if (dir === 1) { el.style.width = Math.max(4, bWidth - shiftPx) + 'px'; }
-            else { el.style.left = (bLeft + shiftPx) + 'px'; el.style.width = Math.max(4, bWidth - shiftPx) + 'px'; }
-          } else if (b.id === tgt.id) {
-            if (dir === 1) { el.style.left = (bLeft - shiftPx) + 'px'; el.style.width = (bWidth + shiftPx) + 'px'; }
-            else { el.style.width = (bWidth + shiftPx) + 'px'; }
-          } else {
-            const between = dir === 1 ? (bLeft > sLeft && bLeft < tLeft) : (bLeft > tLeft && bLeft < sLeft);
-            if (between) { el.style.left = (bLeft - dir * shiftPx) + 'px'; }
+          // 同时调整边框层和填充层
+          for (const sel of [`[data-tid="${b.id}"]`, `[data-fill-tid="${b.id}"]`]) {
+            const el = area.querySelector(sel);
+            if (!el) continue;
+            if (b.id === src.id) {
+              if (dir === 1) { el.style.width = Math.max(4, bWidth - shiftPx) + 'px'; }
+              else { el.style.left = (bLeft + shiftPx) + 'px'; el.style.width = Math.max(4, bWidth - shiftPx) + 'px'; }
+            } else if (b.id === tgt.id) {
+              if (dir === 1) { el.style.left = (bLeft - shiftPx) + 'px'; el.style.width = (bWidth + shiftPx) + 'px'; }
+              else { el.style.width = (bWidth + shiftPx) + 'px'; }
+            } else {
+              const between = dir === 1 ? (bLeft > sLeft && bLeft < tLeft) : (bLeft > tLeft && bLeft < sLeft);
+              if (between) { el.style.left = (bLeft - dir * shiftPx) + 'px'; }
+            }
+            previewEls.push(el);
           }
-          previewEls.push(el);
         }
       };
       // 叙事框
@@ -1474,7 +1484,7 @@ const WorkbenchPage = {
     _clearFramePreview() {
       if (!this._framePreviewEls) return;
       for (const el of this._framePreviewEls) {
-        const tid = parseInt(el.dataset.tid);
+        const tid = parseInt(el.dataset.tid || el.dataset.fillTid);
         const track = this.tracks.find(t => t.id === tid);
         if (track) {
           const pos = this.trackItemPos(track);
