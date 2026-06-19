@@ -2071,11 +2071,12 @@ const WorkbenchPage = {
           else if (shiftDir === 1) shouldShift = ri >= toIdx && ri < fromIdx;
           card.style.transform = shouldShift ? `translateX(${shiftDir * itemW}px)` : '';
         });
-        // 同步移动旁白/字幕/情绪块——按时间区间匹配 shifted video，同步位移
-        if (shiftDir !== 0) {
-          const scrollEl = this.$refs.wbTimelineScroll;
-          if (scrollEl) {
-            const shiftedRanges = [];
+        // 同步移动旁白/字幕/情绪块——按时间区间匹配 shifted video，同步位移。
+        // shiftDir===0 时也要跑（清上一帧残留的 aux transform）。
+        const scrollEl = this.$refs.wbTimelineScroll;
+        if (scrollEl) {
+          const shiftedRanges = [];
+          if (shiftDir !== 0) {
             remaining.forEach((card, ri) => {
               let shouldShift = false;
               if (shiftDir === -1) shouldShift = ri >= fromIdx && ri < toIdx;
@@ -2085,21 +2086,21 @@ const WorkbenchPage = {
                 shiftedRanges.push({ min: left, max: left + card.offsetWidth });
               }
             });
-            const auxTypes = ['narration', 'subtitle', 'emotion'];
-            for (const type of auxTypes) {
-              const lane = scrollEl.querySelector(`.wb-content-lane.${type}`);
-              if (!lane) continue;
-              for (const aux of lane.querySelectorAll('.wb-track-item')) {
-                const auxLeft = parseFloat(aux.style.left) || 0;
-                const auxRight = auxLeft + aux.offsetWidth;
-                const overlaps = shiftedRanges.some(r => auxRight > r.min && auxLeft < r.max);
-                if (overlaps) {
-                  aux.style.transition = 'transform 0.15s ease';
-                  aux.style.transform = `translateX(${shiftDir * itemW}px)`;
-                } else {
-                  aux.style.transition = '';
-                  aux.style.transform = '';
-                }
+          }
+          const auxTypes = ['narration', 'subtitle', 'emotion'];
+          for (const type of auxTypes) {
+            const lane = scrollEl.querySelector(`.wb-content-lane.${type}`);
+            if (!lane) continue;
+            for (const aux of lane.querySelectorAll('.wb-track-item')) {
+              const auxLeft = parseFloat(aux.style.left) || 0;
+              const auxRight = auxLeft + aux.offsetWidth;
+              const overlaps = shiftedRanges.some(r => auxRight > r.min && auxLeft < r.max);
+              if (overlaps) {
+                aux.style.transition = 'transform 0.15s ease';
+                aux.style.transform = `translateX(${shiftDir * itemW}px)`;
+              } else {
+                aux.style.transition = '';
+                aux.style.transform = '';
               }
             }
           }
