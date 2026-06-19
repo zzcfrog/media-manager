@@ -1064,6 +1064,17 @@ body:not(.body--dark) .wb-mat-toolbar .q-btn-dropdown { background: #e0e0e0; }
   color: var(--text3);
   background: var(--surface2);
   border-right: 1px solid var(--border);
+  position: sticky;
+  left: 0;
+  z-index: 14;
+}
+/* 行头底部加 1px border 色块，覆盖 playhead 在行间分隔线处的 1px 渗漏 */
+.wb-track-label::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 1px;
+  background: var(--border);
 }
 
 .wb-track-content {
