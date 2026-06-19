@@ -1214,38 +1214,24 @@ const WorkbenchPage = {
       // Actual per-segment video durations (from track metadata — reflects resizes)
       const videos = this.tracks.filter(t => t.track_type === 'video' && t.segment_id);
 
-      // 叙事归属 = 分镜 time_start 落入哪个 text 块（叙事框）的领土。
-      // text 块的边界是用户看到的"国界"——分镜落在哪个叙事框内就属于哪个叙事。
-      // 这比 metadata/narRanges/孤岛都可靠：直接用视觉边界判定。
-      const textBlocks = this.tracks
-        .filter(t => t.track_type === 'text')
-        .sort((a, b) => this._timeToSec(a.time_start) - this._timeToSec(b.time_start));
-      const narList = [];
-      for (const act of plan.acts) {
-        for (const nar of (act.narratives || [])) {
-          narList.push({ actId: act.act_id, narId: nar.narrative_id });
-        }
-      }
+      // 非拖动 video：用 metadata.narrative_id/act_id（上次 sync 写入，准确）。
+      // 拖动 video：用高亮目标的 plan narrative_id 覆盖。
       const vAssign = videos.map(vt => {
-        const ts = this._timeToSec(vt.time_start);
-        let idx = textBlocks.length - 1;
-        for (let i = 0; i < textBlocks.length; i++) {
-          if (ts < this._timeToSec(textBlocks[i].time_end)) { idx = i; break; }
-        }
-        const target = narList[Math.min(idx, narList.length - 1)] || {};
-        return { vt, narId: target.narId || null, actId: target.actId || null };
+        let m = {}; try { m = JSON.parse(vt.metadata || '{}'); } catch(e) {}
+        return { vt, narId: m.narrative_id || null, actId: m.act_id || null };
       });
-      // 被拖 video 的归属由拖动时的高亮目标决定（鼠标在哪个叙事框上 = 用户选择）
-      if (this._lastDraggedVid && this.dragTargetNarId) {
+      if (this._lastDraggedVid && this._dragTargetNarPlanId) {
         const di = vAssign.findIndex(va => va.vt === this._lastDraggedVid);
         if (di >= 0) {
-          vAssign[di].narId = this.dragTargetNarId;
-          vAssign[di].actId = this.dragTargetActId;
+          vAssign[di].narId = this._dragTargetNarPlanId;
+          vAssign[di].actId = this._dragTargetActPlanId;
         }
       }
       this._lastDraggedVid = null;
       this.dragTargetNarId = null;
       this.dragTargetActId = null;
+      this._dragTargetNarPlanId = null;
+      this._dragTargetActPlanId = null;
       const keyOf = (a, n) => a + '::' + n;
       const groups = {};
       for (const va of vAssign) {
@@ -1389,23 +1375,40 @@ const WorkbenchPage = {
     // 拖动 video 时高亮目标叙事/主旨框：鼠标时间命中 text/theme 区间。
     _highlightDragTarget(e) {
       const area = this.$refs.wbTimelineScroll?.querySelector('.wb-content-group-area');
-      if (!area) { this.dragTargetNarId = null; this.dragTargetActId = null; return; }
+      if (!area) { this.dragTargetNarId = null; this.dragTargetActId = null; this._dragTargetNarPlanId = null; this._dragTargetActPlanId = null; return; }
       const areaRect = area.getBoundingClientRect();
       const mouseXPx = e.clientX - areaRect.left;
       const mouseSec = mouseXPx / this.pps;
-      let narId = null, actId = null;
+      let narTrackId = null, actTrackId = null;
       if (mouseXPx >= 0) {
         for (const tx of this.getTrackItems('text')) {
           const s = this._timeToSec(tx.time_start), en = this._timeToSec(tx.time_end);
-          if (mouseSec >= s && mouseSec < en) { narId = tx.id; break; }
+          if (mouseSec >= s && mouseSec < en) { narTrackId = tx.id; break; }
         }
         for (const th of this.getTrackItems('theme')) {
           const s = this._timeToSec(th.time_start), en = this._timeToSec(th.time_end);
-          if (mouseSec >= s && mouseSec < en) { actId = th.id; break; }
+          if (mouseSec >= s && mouseSec < en) { actTrackId = th.id; break; }
         }
       }
-      if (this.dragTargetNarId !== narId) this.dragTargetNarId = narId;
-      if (this.dragTargetActId !== actId) this.dragTargetActId = actId;
+      if (this.dragTargetNarId !== narTrackId) this.dragTargetNarId = narTrackId;
+      if (this.dragTargetActId !== actTrackId) this.dragTargetActId = actTrackId;
+      // 映射 text 块索引 → plan narrative_id（_syncTracksToPlan 需要 plan id，非 track id）
+      this._dragTargetNarPlanId = null;
+      this._dragTargetActPlanId = null;
+      if (narTrackId !== null && this.mindMapData) {
+        const textBlocks = this.getTrackItems('text').sort((a, b) => this._timeToSec(a.time_start) - this._timeToSec(b.time_start));
+        const textIdx = textBlocks.findIndex(tx => tx.id === narTrackId);
+        if (textIdx >= 0) {
+          const narList = [];
+          for (const act of this.mindMapData.acts)
+            for (const nar of (act.narratives || []))
+              narList.push({ narId: nar.narrative_id, actId: act.act_id });
+          if (textIdx < narList.length) {
+            this._dragTargetNarPlanId = narList[textIdx].narId;
+            this._dragTargetActPlanId = narList[textIdx].actId;
+          }
+        }
+      }
     },
     // 拖动时实时预览叙事框伸缩——让用户看到松手后 nar1/nar2 的边界会怎么移。
     _previewFrameResize(d) {
