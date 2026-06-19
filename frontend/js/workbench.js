@@ -1209,14 +1209,25 @@ const WorkbenchPage = {
       const videos = this.tracks.filter(t => t.track_type === 'video' && t.segment_id);
 
       // 用 video 的 metadata.narrative_id/act_id 判定归属（上次 sync 写入，准确）。
-      // 再修孤岛：拖动后某 video 处于不同 narrative 邻居之间（前后邻居 narrative 一致
-      // 但自己不同），说明它被拖到了新 narrative → 归属改为邻居的 narrative。
-      // 这比"用旧 plan 累加时长算 narRanges"可靠：旧 narRanges 包含被移走的 video
-      // 时长，边界没更新，导致 video 被误判回旧 narrative。
+      // 拖动的 video（this._lastDraggedVid）根据新位置的邻居重分配 narrative——
+      // 不只靠孤岛检测（边界处前后邻居 narrative 不同时孤岛不触发）。
       const vAssign = videos.map(vt => {
         let m = {}; try { m = JSON.parse(vt.metadata || '{}'); } catch(e) {}
         return { vt, narId: m.narrative_id || null, actId: m.act_id || null };
       });
+      if (this._lastDraggedVid) {
+        const di = vAssign.findIndex(va => va.vt === this._lastDraggedVid);
+        if (di >= 0) {
+          const prev = di > 0 ? vAssign[di - 1] : null;
+          const next = di < vAssign.length - 1 ? vAssign[di + 1] : null;
+          // 优先看后邻居（插入点 = 后邻居之前），再看前邻居
+          const target = (next && next.narId && next.narId !== vAssign[di].narId) ? next
+                       : (prev && prev.narId && prev.narId !== vAssign[di].narId) ? prev : null;
+          if (target) { vAssign[di].narId = target.narId; vAssign[di].actId = target.actId; }
+        }
+        this._lastDraggedVid = null;
+      }
+      // 孤岛修正（非拖动场景：apply/normalize 后可能产生孤岛）
       for (let i = 0; i < vAssign.length; i++) {
         const prev = i > 0 ? vAssign[i - 1].narId : null;
         const next = i < vAssign.length - 1 ? vAssign[i + 1].narId : null;
@@ -2050,6 +2061,7 @@ const WorkbenchPage = {
           ? this.tracks.length
           : this.tracks.indexOf(targetItems[Math.min(toIdx, targetItems.length - 1)]);
         this.tracks.splice(actualTo, 0, d.item);
+        this._lastDraggedVid = d.item; // 告诉 _syncTracksToPlan 哪个 video 被拖动了
         this._trackSave();
       } else {
         const dx = e.clientX - d.startX;
