@@ -771,7 +771,8 @@ const WorkbenchPage = {
     },
     timelineWidth() { return Math.round(this.zoomPps * this.timelineDuration); },
     emotionCurvePath() {
-      const items = this.getTrackItems('emotion')
+      const emoItems = this.getTrackItems('emotion');
+      const items = emoItems
         .map(it => ({
           t: (this._timeToSec(it.time_start) + this._timeToSec(it.time_end)) / 2,
           v: it.emotion_value ?? 0.5,
@@ -780,9 +781,13 @@ const WorkbenchPage = {
       if (!items.length) return { line: '', fill: '' };
       const pps = this.pps;
       const H = 28;
-      const pts = [{ x: 0, y: (1 - items[0].v) * H }];
+      // 锚点用第一个/最后一个情绪块的实际边界，而非 0/timelineWidth——
+      // 避免曲线超出时间线、末尾出现无变化的水平线。
+      const firstX = this._timeToSec(emoItems.sort((a,b) => this._timeToSec(a.time_start) - this._timeToSec(b.time_start))[0].time_start) * pps;
+      const lastX = this._timeToSec(emoItems.sort((a,b) => this._timeToSec(b.time_end) - this._timeToSec(a.time_end))[0].time_end) * pps;
+      const pts = [{ x: firstX, y: (1 - items[0].v) * H }];
       for (const it of items) pts.push({ x: it.t * pps, y: (1 - it.v) * H });
-      pts.push({ x: this.timelineWidth, y: (1 - items[items.length - 1].v) * H });
+      pts.push({ x: lastX, y: (1 - items[items.length - 1].v) * H });
       let d = `M${pts[0].x},${pts[0].y}`;
       for (let i = 1; i < pts.length; i++) {
         const dx = (pts[i].x - pts[i - 1].x) / 3;
@@ -1229,6 +1234,17 @@ const WorkbenchPage = {
         const target = narList[Math.min(idx, narList.length - 1)] || {};
         return { vt, narId: target.narId || null, actId: target.actId || null };
       });
+      // 被拖 video 的归属由拖动时的高亮目标决定（鼠标在哪个叙事框上 = 用户选择）
+      if (this._lastDraggedVid && this.dragTargetNarId) {
+        const di = vAssign.findIndex(va => va.vt === this._lastDraggedVid);
+        if (di >= 0) {
+          vAssign[di].narId = this.dragTargetNarId;
+          vAssign[di].actId = this.dragTargetActId;
+        }
+      }
+      this._lastDraggedVid = null;
+      this.dragTargetNarId = null;
+      this.dragTargetActId = null;
       const keyOf = (a, n) => a + '::' + n;
       const groups = {};
       for (const va of vAssign) {
@@ -2023,8 +2039,8 @@ const WorkbenchPage = {
       const d = this._drag;
       if (!d) return;
       this.clearDragShift();
-      this.dragTargetNarId = null;
-      this.dragTargetActId = null;
+      // 不清 dragTargetNarId/ActId —— _syncTracksToPlan 需要用它判定被拖 video 的叙事归属。
+      // 由 _syncTracksToPlan 消费后清除。
       if (d.ghost) { d.ghost.remove(); d.ghost = null; }
       d.el.style.transform = '';
       d.el.style.opacity = '';
