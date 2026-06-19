@@ -211,7 +211,7 @@ const WorkbenchPage = {
                          :style="segBlockStyle(seg)"
                          @mouseenter="hoverSegIndex=i" @mouseleave="hoverSegIndex=-1">
                       <q-tooltip anchor="top middle" self="bottom middle" :delay="0" :offset="[0,8]" class="wb-seg-tooltip">
-                        <div style="font-weight:600;margin-bottom:4px">{{ fmtSec(_timeToSec(timelinePlayMode ? seg._tlTimeStart : seg.time_start)) }} → {{ fmtSec(_timeToSec(timelinePlayMode ? seg._tlTimeEnd : seg.time_end)) }} <span style="opacity:0.6">{{ fmtSegDur(timelinePlayMode ? seg._tlTimeStart : seg.time_start, timelinePlayMode ? seg._tlTimeEnd : seg.time_end) }}</span></div>
+                        <div style="font-weight:600;margin-bottom:4px">{{ fmtTime(timelinePlayMode ? seg._tlTimeStart : seg.time_start) }} → {{ fmtTime(timelinePlayMode ? seg._tlTimeEnd : seg.time_end) }} <span style="opacity:0.6">{{ fmtSegDur(timelinePlayMode ? seg._tlTimeStart : seg.time_start, timelinePlayMode ? seg._tlTimeEnd : seg.time_end) }}</span></div>
                         <div v-if="seg.visual" style="margin-bottom:3px">{{ seg.visual }}</div>
                         <div v-if="seg.asr && seg.asr!=='无'" style="opacity:0.8;margin-bottom:2px"><span style="opacity:0.5">ASR:</span> {{ seg.asr }}</div>
                         <div v-if="seg.subtitle && seg.subtitle!=='无'" style="opacity:0.8;margin-bottom:2px"><span style="opacity:0.5">SUB:</span> {{ seg.subtitle }}</div>
@@ -311,7 +311,7 @@ const WorkbenchPage = {
                      @click="onSegClick(seg, i)">
                   <div style="display:flex;align-items:center;justify-content:space-between">
                     <div style="display:flex;align-items:center;gap:4px">
-                      <span class="seg-time">{{ fmtSec(_timeToSec(seg._tlTimeStart)) }} → {{ fmtSec(_timeToSec(seg._tlTimeEnd)) }}</span>
+                      <span class="seg-time">{{ fmtTime(seg._tlTimeStart) }} → {{ fmtTime(seg._tlTimeEnd) }}</span>
                     </div>
                     <div style="display:flex;align-items:center;gap:6px">
                       <span class="seg-dur">{{ fmtSegDur(seg._tlTimeStart, seg._tlTimeEnd) }}</span>
@@ -356,7 +356,7 @@ const WorkbenchPage = {
                   <div style="display:flex;align-items:center;justify-content:space-between">
                     <div style="display:flex;align-items:center;gap:4px">
                       <span class="seg-drag-handle" :title="t('wb.drag_to_track')"><q-icon name="drag_indicator" size="16px" color="grey-5"></q-icon></span>
-                      <span class="seg-time"><span class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'time_start', e.target.innerText.trim())" v-text="fmtSec(_timeToSec(seg.time_start))"></span> → <span class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'time_end', e.target.innerText.trim())" v-text="fmtSec(_timeToSec(seg.time_end))"></span></span>
+                      <span class="seg-time"><span class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'time_start', e.target.innerText.trim())" v-text="fmtTime(seg.time_start)"></span> → <span class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'time_end', e.target.innerText.trim())" v-text="fmtTime(seg.time_end)"></span></span>
                     </div>
                     <div style="display:flex;align-items:center;gap:6px">
                       <span v-if="isSegOnTimeline(seg.id)" class="seg-added-badge">{{ t('wb.added') }}</span>
@@ -2350,7 +2350,11 @@ const WorkbenchPage = {
       const h = Math.floor(s / 3600);
       const m = Math.floor((s % 3600) / 60);
       const sec = (s % 60).toFixed(1);
-      return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(sec).padStart(4, '0');
+      return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + sec.padStart(4, '0');
+    },
+    // 公开包装：时间字符串 → 格式化显示（Vue 模板用，_ 前缀方法不在模板暴露）
+    fmtTime(timeStr) {
+      return this.fmtSec(this._timeToSec(timeStr));
     },
     onWbSeekStart(e) {
       const bar = this.$refs.wbSeekbar;
