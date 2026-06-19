@@ -2060,18 +2060,50 @@ const WorkbenchPage = {
           if (e.clientX - contentEl.getBoundingClientRect().left < itCenter) { toIdx = i; break; }
         }
         const itemW = d.startWidth;
+        // 算出哪些 remaining video 块要位移，以及位移方向
+        let shiftDir = 0; // -1=左移, +1=右移, 0=不动
+        if (fromIdx < toIdx) shiftDir = -1;
+        else if (fromIdx > toIdx) shiftDir = 1;
         remaining.forEach((card, ri) => {
           card.style.transition = 'transform 0.15s ease';
-          if (fromIdx < toIdx) {
-            // 右移：fromIdx..toIdx-1 的块左移腾位
-            card.style.transform = (ri >= fromIdx && ri < toIdx) ? `translateX(${-itemW}px)` : '';
-          } else if (fromIdx > toIdx) {
-            // 左移：toIdx..fromIdx-1 的块右移腾位
-            card.style.transform = (ri >= toIdx && ri < fromIdx) ? `translateX(${itemW}px)` : '';
-          } else {
-            card.style.transform = '';
-          }
+          let shouldShift = false;
+          if (shiftDir === -1) shouldShift = ri >= fromIdx && ri < toIdx;
+          else if (shiftDir === 1) shouldShift = ri >= toIdx && ri < fromIdx;
+          card.style.transform = shouldShift ? `translateX(${shiftDir * itemW}px)` : '';
         });
+        // 同步移动旁白/字幕/情绪块——按时间区间匹配 shifted video，同步位移
+        if (shiftDir !== 0) {
+          const scrollEl = this.$refs.wbTimelineScroll;
+          if (scrollEl) {
+            const shiftedRanges = [];
+            remaining.forEach((card, ri) => {
+              let shouldShift = false;
+              if (shiftDir === -1) shouldShift = ri >= fromIdx && ri < toIdx;
+              else if (shiftDir === 1) shouldShift = ri >= toIdx && ri < fromIdx;
+              if (shouldShift) {
+                const left = parseFloat(card.style.left) || 0;
+                shiftedRanges.push({ min: left, max: left + card.offsetWidth });
+              }
+            });
+            const auxTypes = ['narration', 'subtitle', 'emotion'];
+            for (const type of auxTypes) {
+              const lane = scrollEl.querySelector(`.wb-content-lane.${type}`);
+              if (!lane) continue;
+              for (const aux of lane.querySelectorAll('.wb-track-item')) {
+                const auxLeft = parseFloat(aux.style.left) || 0;
+                const auxRight = auxLeft + aux.offsetWidth;
+                const overlaps = shiftedRanges.some(r => auxRight > r.min && auxLeft < r.max);
+                if (overlaps) {
+                  aux.style.transition = 'transform 0.15s ease';
+                  aux.style.transform = `translateX(${shiftDir * itemW}px)`;
+                } else {
+                  aux.style.transition = '';
+                  aux.style.transform = '';
+                }
+              }
+            }
+          }
+        }
         this._highlightDragTarget(e);
         this._previewFrameResize(d);
       } else {
@@ -2128,7 +2160,9 @@ const WorkbenchPage = {
           const cr = remaining[i].getBoundingClientRect();
           if (e.clientX < cr.left + cr.width / 2) { toIdx = i; break; }
         }
-        if (fromIdx === toIdx) { this._drag = null; return; }
+        // 不再 fromIdx===toIdx 时 return——即使数组顺序没变（如 C 本就在 D 前面），
+        // 只要拖到了不同叙事（dragTarget 变了），_trackSave 的 metadata override
+        // 会更新 narrative 归属。
         this._trackSnapshot();
         const actualFrom = this.tracks.indexOf(d.item);
         this.tracks.splice(actualFrom, 1);
