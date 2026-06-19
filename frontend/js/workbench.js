@@ -562,6 +562,7 @@ const WorkbenchPage = {
             <!-- 叙事 overlay 框（在主旨框内，横跨单个叙事） -->
             <div v-for="tx in getTrackItems('text')" :key="'frame-tx-' + tx.id"
                  class="wb-overlay-frame wb-frame-text" :class="{selected: trackSelectedItem === tx.id, 'drag-target': dragTargetNarId === tx.id}"
+                 :data-tid="tx.id"
                  :style="trackItemPos(tx)">
               <div class="wb-frame-label" @click.stop="trackSelectedItem = tx.id">
                 <input v-if="frameEditing === tx.id" class="wb-frame-label-input"
@@ -1406,6 +1407,47 @@ const WorkbenchPage = {
       if (this.dragTargetNarId !== narId) this.dragTargetNarId = narId;
       if (this.dragTargetActId !== actId) this.dragTargetActId = actId;
     },
+    // 拖动时实时预览叙事框伸缩——让用户看到松手后 nar1/nar2 的边界会怎么移。
+    _previewFrameResize(d) {
+      this._clearFramePreview();
+      if (!this.dragTargetNarId) return;
+      const shotDur = this._getVideoDur(d.item);
+      if (shotDur <= 0.01) return;
+      const shiftPx = shotDur * this.pps;
+      const area = this.$refs.wbTimelineScroll?.querySelector('.wb-content-group-area');
+      if (!area) return;
+      // 源叙事 = 被拖 video 当前所在的 text 块（按 time_start 落入区间）
+      const dragTs = this._timeToSec(d.item.time_start);
+      const textBlocks = this.tracks.filter(t => t.track_type === 'text');
+      const srcText = textBlocks.find(t => dragTs >= this._timeToSec(t.time_start) && dragTs < this._timeToSec(t.time_end));
+      if (!srcText) return;
+      const tgtText = textBlocks.find(t => t.id === this.dragTargetNarId);
+      if (!tgtText || srcText.id === tgtText.id) return; // 同叙事不需预览
+      const srcEl = area.querySelector(`.wb-frame-text[data-tid="${srcText.id}"]`);
+      const tgtEl = area.querySelector(`.wb-frame-text[data-tid="${tgtText.id}"]`);
+      if (!srcEl || !tgtEl) return;
+      const srcLeft = parseFloat(srcEl.style.left) || 0;
+      const srcWidth = parseFloat(srcEl.style.width) || 0;
+      const tgtLeft = parseFloat(tgtEl.style.left) || 0;
+      const tgtWidth = parseFloat(tgtEl.style.width) || 0;
+      if (tgtLeft > srcLeft) {
+        // 目标在源右边：边界左移 → 源缩、目标从左扩张
+        srcEl.style.width = Math.max(4, srcWidth - shiftPx) + 'px';
+        tgtEl.style.left = (tgtLeft - shiftPx) + 'px';
+        tgtEl.style.width = (tgtWidth + shiftPx) + 'px';
+      } else {
+        // 目标在源左边：边界右移 → 源从左缩、目标向右扩张
+        srcEl.style.left = (srcLeft + shiftPx) + 'px';
+        srcEl.style.width = Math.max(4, srcWidth - shiftPx) + 'px';
+        tgtEl.style.width = (tgtWidth + shiftPx) + 'px';
+      }
+      this._framePreviewEls = [srcEl, tgtEl];
+    },
+    _clearFramePreview() {
+      if (!this._framePreviewEls) return;
+      for (const el of this._framePreviewEls) { el.style.left = ''; el.style.width = ''; }
+      this._framePreviewEls = null;
+    },
     trackUndo() {
       if (!this._undoStack || !this._undoStack.length) return;
       if (!this._redoStack) this._redoStack = [];
@@ -1948,6 +1990,7 @@ const WorkbenchPage = {
         it.style.transition = '';
         it.style.transform = '';
       }
+      this._clearFramePreview();
       this._lastDragLane = null;
     },
     _handleDragMove(e) {
@@ -2006,6 +2049,7 @@ const WorkbenchPage = {
           }
         });
         this._highlightDragTarget(e);
+        this._previewFrameResize(d);
       } else {
         if (d.edge === 'right') {
           d.el.style.width = Math.max(30, d.startWidth + dx) + 'px';
