@@ -1208,35 +1208,27 @@ const WorkbenchPage = {
       // Actual per-segment video durations (from track metadata — reflects resizes)
       const videos = this.tracks.filter(t => t.track_type === 'video' && t.segment_id);
 
-      // 用 video 的 metadata.narrative_id/act_id 判定归属（上次 sync 写入，准确）。
-      // 拖动的 video（this._lastDraggedVid）根据新位置的邻居重分配 narrative——
-      // 不只靠孤岛检测（边界处前后邻居 narrative 不同时孤岛不触发）。
+      // 叙事归属 = 分镜 time_start 落入哪个 text 块（叙事框）的领土。
+      // text 块的边界是用户看到的"国界"——分镜落在哪个叙事框内就属于哪个叙事。
+      // 这比 metadata/narRanges/孤岛都可靠：直接用视觉边界判定。
+      const textBlocks = this.tracks
+        .filter(t => t.track_type === 'text')
+        .sort((a, b) => this._timeToSec(a.time_start) - this._timeToSec(b.time_start));
+      const narList = [];
+      for (const act of plan.acts) {
+        for (const nar of (act.narratives || [])) {
+          narList.push({ actId: act.act_id, narId: nar.narrative_id });
+        }
+      }
       const vAssign = videos.map(vt => {
-        let m = {}; try { m = JSON.parse(vt.metadata || '{}'); } catch(e) {}
-        return { vt, narId: m.narrative_id || null, actId: m.act_id || null };
+        const ts = this._timeToSec(vt.time_start);
+        let idx = textBlocks.length - 1;
+        for (let i = 0; i < textBlocks.length; i++) {
+          if (ts < this._timeToSec(textBlocks[i].time_end)) { idx = i; break; }
+        }
+        const target = narList[Math.min(idx, narList.length - 1)] || {};
+        return { vt, narId: target.narId || null, actId: target.actId || null };
       });
-      if (this._lastDraggedVid) {
-        const di = vAssign.findIndex(va => va.vt === this._lastDraggedVid);
-        if (di >= 0) {
-          const prev = di > 0 ? vAssign[di - 1] : null;
-          const next = di < vAssign.length - 1 ? vAssign[di + 1] : null;
-          // 优先看后邻居（插入点 = 后邻居之前），再看前邻居
-          const target = (next && next.narId && next.narId !== vAssign[di].narId) ? next
-                       : (prev && prev.narId && prev.narId !== vAssign[di].narId) ? prev : null;
-          if (target) { vAssign[di].narId = target.narId; vAssign[di].actId = target.actId; }
-        }
-        this._lastDraggedVid = null;
-      }
-      // 孤岛修正（非拖动场景：apply/normalize 后可能产生孤岛）
-      for (let i = 0; i < vAssign.length; i++) {
-        const prev = i > 0 ? vAssign[i - 1].narId : null;
-        const next = i < vAssign.length - 1 ? vAssign[i + 1].narId : null;
-        const cur = vAssign[i].narId;
-        if (cur && prev && next && prev === next && cur !== prev) {
-          vAssign[i].narId = prev;
-          vAssign[i].actId = vAssign[i - 1].actId;
-        }
-      }
       const keyOf = (a, n) => a + '::' + n;
       const groups = {};
       for (const va of vAssign) {
