@@ -441,7 +441,7 @@ const WorkbenchPage = {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10" cy="10" r="7"/><line x1="14.95" y1="14.95" x2="18" y2="18"/><line x1="7" y1="10" x2="13" y2="10"/></svg>
             <q-tooltip :delay="500">{{ t('wb.zoom_out') }}</q-tooltip>
           </q-btn>
-          <q-slider v-model="trackZoom" :min="1" :max="10" :step="1"
+          <q-slider v-model="trackZoom" :min="1" :max="15" :step="0.01"
                     style="width:80px;--q-primary:var(--accent);padding:0" color="primary" dense></q-slider>
           <q-btn flat dense size="sm" color="grey-6" style="margin-left:6px" @click="trackZoom = Math.min(10, trackZoom + 1)">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10" cy="10" r="7"/><line x1="14.95" y1="14.95" x2="18" y2="18"/><line x1="10" y1="7" x2="10" y2="13"/><line x1="7" y1="10" x2="13" y2="10"/></svg>
@@ -627,7 +627,7 @@ const WorkbenchPage = {
       segCompact: false,
       trackPlaying: false,
       trackSpeed: 1,
-      trackZoom: 1,
+      trackZoom: 3,
       zoomPps: 8,
       trackCanUndo: false,
       trackCanRedo: false,
@@ -996,8 +996,10 @@ const WorkbenchPage = {
       const el = this.$refs.wbTimelineScroll;
       if (!el) return;
       const availWidth = el.clientWidth - 60;
-      // 最小 pps 8（块至少 ~24px），保证拖拽有足够命中区
-      this.zoomPps = Math.max(8, availWidth / this.timelineDuration);
+      const targetPps = Math.max(8, availWidth / this.timelineDuration);
+      this.zoomPps = targetPps;
+      // 同步滑杆：trackZoom = log2(zoomPps)，让自适应缩放的 pps 落在滑杆位置上
+      this.trackZoom = Math.max(1, Math.min(15, Math.log2(targetPps)));
     },
     async loadTracks() {
       try {
@@ -1044,6 +1046,16 @@ const WorkbenchPage = {
           : this.project.media[0];
         if (m) this.selectedMedia = m;
       }
+      // 默认播放器定位到第一个 video 的首帧，预播放完整时间线
+      if (this.getTrackItems('video').length) {
+        const firstVideo = this.getTrackItems('video')
+          .sort((a, b) => this._timeToSec(a.time_start) - this._timeToSec(b.time_start))[0];
+        this.timelinePlayMode = true;
+        this.playheadTime = this._timeToSec(firstVideo.time_start);
+        this.$nextTick(() => this.seekToPlayhead(false));
+      }
+      // 自适应缩放后同步 trackZoom 滑杆位置
+      this.$nextTick(() => this.zoomToFit());
     },
     async searchMedia() {
       if (!this.projectId) return;
@@ -1077,8 +1089,8 @@ const WorkbenchPage = {
       if (p.paused) { p.play().catch(() => {}); this.trackPlaying = true; }
       else { p.pause(); this.trackPlaying = false; }
     },
-    trackZoomIn() { this.trackZoom = Math.min(10, this.trackZoom + 1); },
-    trackZoomOut() { this.trackZoom = Math.max(1, this.trackZoom - 1); },
+    trackZoomIn() { this.trackZoom = Math.min(15, +(this.trackZoom + 1).toFixed(2)); },
+    trackZoomOut() { this.trackZoom = Math.max(1, +(this.trackZoom - 1).toFixed(2)); },
     trackFitWidth() { this.trackZoom = 1; },
     filmstripStyle(item) {
       const seg = item._segment;
