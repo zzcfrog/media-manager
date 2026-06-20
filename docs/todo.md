@@ -12,6 +12,8 @@
 
 依赖：pyJianYingDraft 经 pymediainfo 读素材时长/尺寸，运行环境需 MediaInfo 库（macOS `brew install mediainfo`）。已通过 Flask test client 在工程 62 实测：3 轨（170 视频 / 10 字幕 / 170 旁白）、170 素材登记、首段 source `{3.5s,6.5s}` target `{0,6.5s}` 正确。
 
+**画布比例跟随首个分镜**：`build_draft` 预扫首个可读 `VideoMaterial` 取 width/height 作 `create_draft` 画布尺寸（缺则回退 1920×1080），避免竖屏/4K 素材出黑边。工程 62 实测画布 3840×2160（4K 无人机素材，ratio=original）。
+
 ## 已完成：脑图删叙事/段落可撤销 + 删除确认改 Quasar 模态框（2026-06-20）
 
 两个问题：①脑图模式下删除叙事（narrative）/段落（act）后无法撤销；②脑图删除确认用的是浏览器原生 `confirm()`，与项目其它弹框（`Quasar.Dialog`）不一致。

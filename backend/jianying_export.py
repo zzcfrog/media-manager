@@ -116,17 +116,33 @@ def build_draft(pid, name, drafts_dir):
         elif r["track_type"] == "narration":
             narrations.append(r)
 
-    folder = J.DraftFolder(drafts_dir)
-    script = folder.create_draft(name, 1920, 1080, fps=30, allow_replace=True)
-    script.add_track(J.TrackType.video)  # 主视频轨（首段须从 0s 起）
-
     warnings = []
+
+    # 预扫：构造每个视频素材（缺素材记 warning），并取首个有效素材尺寸定画布比例。
+    video_segs = []  # (row, meta, VideoMaterial)
+    canvas_w, canvas_h = 1920, 1080
+    canvas_set = False
     for r, meta in videos:
         media_id = seg2media.get(r["segment_id"]) or meta.get("srcMediaId")
         path = media2path.get(media_id)
         if not path or not os.path.exists(path):
             warnings.append(f"视频片段缺失素材文件（segment {r['segment_id']}），已跳过")
             continue
+        try:
+            mat = J.VideoMaterial(path)  # 经 pymediainfo 读时长/尺寸
+        except Exception as e:
+            warnings.append(f"读取素材失败 {os.path.basename(path)}：{e}，已跳过")
+            continue
+        video_segs.append((r, meta, mat))
+        if not canvas_set and mat.width and mat.height:
+            canvas_w, canvas_h = mat.width, mat.height  # 跟随首个分镜比例
+            canvas_set = True
+
+    folder = J.DraftFolder(drafts_dir)
+    script = folder.create_draft(name, canvas_w, canvas_h, fps=30, allow_replace=True)
+    script.add_track(J.TrackType.video)  # 主视频轨（首段须从 0s 起）
+
+    for r, meta, mat in video_segs:
         # 源入/出点 = 绝对媒体时间戳（与 segment.time_start 同坐标系）
         src_s = _parse_time(meta.get("srcStart"))
         src_e = _parse_time(meta.get("srcEnd"))
@@ -134,11 +150,6 @@ def build_draft(pid, name, drafts_dir):
             src_s, src_e = _parse_time(r["time_start"]), _parse_time(r["time_end"])
         dur = max(src_e - src_s, 0.1)
         target_s = max(_parse_time(r["time_start"]), 0.0)
-        try:
-            mat = J.VideoMaterial(path)  # 经 pymediainfo 读时长/尺寸
-        except Exception as e:
-            warnings.append(f"读取素材失败 {os.path.basename(path)}：{e}，已跳过")
-            continue
         src_dur_us = min(_us(dur), max(mat.duration - _us(src_s), 1))  # 钳到素材时长，避免越界
         src_tr = J.Timerange(_us(src_s), src_dur_us)
         tgt_tr = J.Timerange(_us(target_s), src_dur_us)
