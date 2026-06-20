@@ -484,14 +484,28 @@ const MindMap = {
     },
 
     deleteAct(actIdx) {
-      if (!confirm(this.t("wb.mm_delete_act"))) return;
-      this.plan.acts.splice(actIdx, 1);
-      this._changed();
+      Quasar.Dialog.create({
+        title: this.t("wb.delete"),
+        message: this.t("wb.mm_delete_act"),
+        cancel: true,
+        persistent: false,
+        ok: { label: this.t("wb.delete"), color: "negative", unelevated: true },
+      }).onOk(() => {
+        this.plan.acts.splice(actIdx, 1);
+        this._changed();
+      });
     },
     deleteNarrative(actIdx, narIdx) {
-      if (!confirm(this.t("wb.mm_delete_narrative"))) return;
-      this.plan.acts[actIdx].narratives.splice(narIdx, 1);
-      this._changed();
+      Quasar.Dialog.create({
+        title: this.t("wb.delete"),
+        message: this.t("wb.mm_delete_narrative"),
+        cancel: true,
+        persistent: false,
+        ok: { label: this.t("wb.delete"), color: "negative", unelevated: true },
+      }).onOk(() => {
+        this.plan.acts[actIdx].narratives.splice(narIdx, 1);
+        this._changed();
+      });
     },
     deleteShot(actIdx, narIdx, shotIdx) {
       this.plan.acts[actIdx].narratives[narIdx].shots.splice(shotIdx, 1);

@@ -1113,13 +1113,45 @@ const WorkbenchPage = {
       if (!document.fullscreenElement) wrap.requestFullscreen?.();
       else document.exitFullscreen?.();
     },
+    // Snapshot BOTH tracks and the plan (ai_plan). Tracks alone can't reconstruct
+    // structural mindmap edits (a deleted narrative/act is gone from the plan, and
+    // _syncTracksToPlan only reassigns shots within the existing structure — it can't
+    // bring a deleted narrative back). Pairing tracks with its plan snapshot makes
+    // act/narrative deletions undoable: undo restores the pre-delete plan directly.
     _trackSnapshot() {
       if (!this._undoStack) this._undoStack = [];
       if (!this._redoStack) this._redoStack = [];
-      this._undoStack.push(JSON.parse(JSON.stringify(this.tracks)));
+      this._undoStack.push(this._snapshotCurr());
       this._redoStack = [];
       this.trackCanUndo = true;
       this.trackCanRedo = false;
+    },
+    _snapshotCurr() {
+      return {
+        tracks: JSON.parse(JSON.stringify(this.tracks)),
+        plan: this.project?.ai_plan ?? null,
+      };
+    },
+    // Apply a {tracks, plan} snapshot to live state so both views reflect it.
+    _restoreSnapshot(entry) {
+      this.tracks = entry.tracks;
+      this._hydrateSegments();
+      if (entry.plan != null && this.project) this.project.ai_plan = entry.plan;
+    },
+    // Persist a restored snapshot as-is (no normalize/sync/rebuild — the snapshot is
+    // already a consistent tracks+plan pair). Used by undo/redo instead of _trackSave,
+    // which would re-derive the plan from tracks and could lose restored structure.
+    async _persistSnapshot() {
+      if (!this.projectId) return;
+      const payload = this.tracks.map(t => { const o = { ...t }; delete o._segment; return o; });
+      try {
+        await API.updateProjectTracks(this.projectId, payload);
+        if (this.project?.ai_plan != null) {
+          await fetch(`/api/creative/${this.project.id}/plan`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: this.project.ai_plan,
+          });
+        }
+      } catch (e) { console.error('persistSnapshot failed:', e); }
     },
     // Re-attach the runtime-only _segment reference on each track item. Needed
     // after tracks are replaced wholesale (load, undo/redo) so video blocks keep
@@ -1495,23 +1527,22 @@ const WorkbenchPage = {
     trackUndo() {
       if (!this._undoStack || !this._undoStack.length) return;
       if (!this._redoStack) this._redoStack = [];
-      this._redoStack.push(JSON.parse(JSON.stringify(this.tracks)));
-      this.tracks = this._undoStack.pop();
-      this._hydrateSegments();
+      this._redoStack.push(this._snapshotCurr());
+      this._restoreSnapshot(this._undoStack.pop());
       this.trackCanUndo = this._undoStack.length > 0;
       this.trackCanRedo = true;
       this.trackSelectedItem = null;
-      this._trackSave();
+      this._persistSnapshot();
     },
     trackRedo() {
       if (!this._redoStack || !this._redoStack.length) return;
-      this._undoStack.push(JSON.parse(JSON.stringify(this.tracks)));
-      this.tracks = this._redoStack.pop();
-      this._hydrateSegments();
+      if (!this._undoStack) this._undoStack = [];
+      this._undoStack.push(this._snapshotCurr());
+      this._restoreSnapshot(this._redoStack.pop());
       this.trackCanUndo = true;
       this.trackCanRedo = this._redoStack.length > 0;
       this.trackSelectedItem = null;
-      this._trackSave();
+      this._persistSnapshot();
     },
     trackDelete() {
       if (!this.trackSelectedItem) return;

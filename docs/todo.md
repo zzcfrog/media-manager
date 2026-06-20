@@ -1,5 +1,17 @@
 # TODO
 
+## 已完成：脑图删叙事/段落可撤销 + 删除确认改 Quasar 模态框（2026-06-20）
+
+两个问题：①脑图模式下删除叙事（narrative）/段落（act）后无法撤销；②脑图删除确认用的是浏览器原生 `confirm()`，与项目其它弹框（`Quasar.Dialog`）不一致。
+
+**问题①根因**：上一版把 undo 栈改成「快照 tracks」，撤销时 `trackUndo`→`_trackSave`→`_syncTracksToPlan` 从 tracks 反推 plan。但 `_syncTracksToPlan` 是**保结构**的——它以当前 `mindMapData` 为基准遍历 `acts/narratives` 重排 shot。删叙事/段落后该结构已从 plan 消失，反推时被删叙事的 video 无处归属被丢弃，叙事回不来。tracks 单独无法重建已删结构。
+
+**修复（[frontend/js/workbench.js](frontend/js/workbench.js)）**：undo 栈元素从「tracks 数组」改为 `{tracks, plan}` 成对快照——`_trackSnapshot()` 经新增 `_snapshotCurr()` 同时存 `this.tracks` 深拷贝和 `this.project.ai_plan`。`trackUndo`/`trackRedo` 用新增 `_restoreSnapshot(entry)` 同时还原 tracks 与 `ai_plan`（脑图 `mindMapData` 随之重算回到撤销前），再用新增 `_persistSnapshot()` 直接 PUT tracks+plan（**不走 `_trackSave`**，避免其 `_syncTracksToPlan` 反推再把还原的结构抹掉）。时间线编辑撤销同样适用（快照里 plan 与 tracks 本就是一致对）。
+
+**问题②修复（[frontend/js/mindmap.js](frontend/js/mindmap.js)）**：`deleteAct`/`deleteNarrative` 去掉原生 `confirm()`，改用 `Quasar.Dialog.create({title, message, cancel, ok:negative})`，与 workbench `trackDelete` 的级联删除弹框同款。确认后 `.onOk` 才执行 splice + `_changed()`。
+
+验证：`node --check` 通过；脑图删叙事/段落后 undo 能恢复（含其下所有 shot）、redo 能重删；时间线编辑撤销/重做回归正常；删除确认弹框统一为 Quasar 模态框（项目内已无原生 `confirm()`）。
+
 ## 已完成：工具栏去分割/删除 + 脑图视图接 undo/redo（2026-06-20）
 
 工作台标尺上方操作栏（ToolBar）调整 + 脑图编辑可撤销（[frontend/js/workbench.js](frontend/js/workbench.js)）：
