@@ -1,5 +1,17 @@
 # TODO
 
+## 已完成：导出工程到剪映草稿（2026-06-20）
+
+工作台顶栏工程名右侧新增「导出到剪映」按钮：点击弹窗填草稿名 → 后端用 [pyJianYingDraft](https://github.com/GuanYixuan/pyJianYingDraft)（`pip install pyjianyingdraft`，已加 `requirements.txt`）生成剪映草稿，写入剪映草稿目录，打开剪映即可见。
+
+- **新建 [backend/jianying_export.py](backend/jianying_export.py)**：`build_draft(pid,name,drafts_dir)` —— 查 `project_tracks`（version=1，video/subtitle/narration）+ segment→media→file_path 映射；`DraftFolder.create_draft → add_track(video) + add_track(text:subtitle) + add_track(text:narration)`；每分镜 `VideoSegment(VideoMaterial(path), target, source_timerange=...)`，字幕/旁白 `TextSegment(content, timerange)`；`script.save()`。素材由 VideoMaterial 自动登记进 `materials`（剪映素材库可见）。缺 file_path 的分镜跳过 + 计 warnings 返回。`resolve_drafts_dir`：settings 表 `jianying_drafts_dir` > 环境变量 `JIANYING_DRAFTS_DIR` > macOS 默认 `~/Movies/JianyingPro/User Data/Projects/com.lveditor.draft/`。
+- **源点映射（已核实）**：`metadata.srcStart/srcEnd` 是**绝对媒体时间戳**（与 segment.time_start 同坐标系，见 creative.py apply_plan），`track.time_start` 是时间线累加位置；秒→微秒给 pyJianYingDraft。时间格式 `MM:SS.ss`/`HH:MM:SS.ss` 两种混存，`_parse_time`（与 creative.py 一致）都处理。source 时长钳到 material.duration 防越界。
+- **端点 [backend/blueprints/workbench.py](backend/blueprints/workbench.py)**：`POST /api/workbench/<pid>/export-jianying` body `{name?}`（缺省工程名，做文件名安全化），返回 `{ok,name,path,warnings}` 或 `{error}`。
+- **前端 [frontend/js/workbench.js](frontend/js/workbench.js)**：`.wb-toolbar` 工程名右侧加 `q-btn「导出到剪映」`；`exportJianying()` 用 `Quasar.Dialog` prompt 填草稿名（默认工程名）→ POST → 成功 positive notify，失败 negative。
+- i18n 加 `wb.export_jianying*` 中英 key。
+
+依赖：pyJianYingDraft 经 pymediainfo 读素材时长/尺寸，运行环境需 MediaInfo 库（macOS `brew install mediainfo`）。已通过 Flask test client 在工程 62 实测：3 轨（170 视频 / 10 字幕 / 170 旁白）、170 素材登记、首段 source `{3.5s,6.5s}` target `{0,6.5s}` 正确。
+
 ## 已完成：脑图删叙事/段落可撤销 + 删除确认改 Quasar 模态框（2026-06-20）
 
 两个问题：①脑图模式下删除叙事（narrative）/段落（act）后无法撤销；②脑图删除确认用的是浏览器原生 `confirm()`，与项目其它弹框（`Quasar.Dialog`）不一致。

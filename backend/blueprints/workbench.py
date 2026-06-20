@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from ..db import get_db
 from ..emotion_labels import aggregate_emotions
+from ..jianying_export import build_draft, resolve_drafts_dir
 
 bp = Blueprint("workbench", __name__)
 
@@ -231,3 +232,25 @@ def update_project_media(pid):
     db.execute("UPDATE projects SET updated_at = datetime('now') WHERE id = ?", (pid,))
     db.commit()
     return jsonify({"ok": True})
+
+
+# ── Export to JianYing (剪映草稿) ─────────────────────────────
+
+
+@bp.route("/<int:pid>/export-jianying", methods=["POST"])
+def export_jianying(pid):
+    """Export the project as a JianYing draft into the JianYing drafts folder."""
+    import os
+
+    db = get_db()
+    proj = db.execute("SELECT id FROM projects WHERE id = ?", (pid,)).fetchone()
+    if not proj:
+        return jsonify({"error": "Not found"}), 404
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    drafts_dir = resolve_drafts_dir(db)
+    try:
+        os.makedirs(drafts_dir, exist_ok=True)
+        return jsonify(build_draft(pid, name, drafts_dir))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

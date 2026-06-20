@@ -8,6 +8,11 @@ const WorkbenchPage = {
       <q-btn flat round dense icon="arrow_back" size="sm" color="grey-6" @click="$root.nav('#/gallery')"></q-btn>
       <span v-if="project" style="font-size:15px;font-weight:500">{{ project.name }}</span>
       <span v-if="project && project.description" style="font-size:12px;color:var(--text3);margin-left:8px">{{ project.description }}</span>
+      <q-btn v-if="project" flat dense no-caps icon="file_download"
+             :label="t('wb.export_jianying')" size="sm" color="grey-7"
+             style="margin-left:8px;font-size:12px" @click="exportJianying">
+        <q-tooltip :delay="500">{{ t('wb.export_jianying_tip') }}</q-tooltip>
+      </q-btn>
     </div>
     <div style="display:flex;align-items:center;gap:4px">
       <q-btn v-if="project" unelevated no-caps dense icon="auto_awesome"
@@ -2286,6 +2291,38 @@ const WorkbenchPage = {
         await API.deleteProject(this.project.id);
         await this.$root.loadProjectList();
         location.hash = "#/gallery";
+      });
+    },
+    exportJianying() {
+      if (!this.project) return;
+      Quasar.Dialog.create({
+        title: t("wb.export_jianying"),
+        message: t("wb.export_jianying_prompt"),
+        prompt: { model: this.project.name, type: "text", outlined: true, dense: true },
+        cancel: true,
+        persistent: false,
+        ok: { label: t("wb.export_jianying"), color: "accent", unelevated: true },
+      }).onOk(async (name) => {
+        try {
+          const res = await fetch(`/api/workbench/${this.project.id}/export-jianying`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: (name || "").trim() }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.ok) throw new Error(data.error || "export failed");
+          const warns = data.warnings && data.warnings.length;
+          Quasar.Notify.create({
+            type: "positive", position: "top", timeout: 4000,
+            message: t("wb.export_jianying_done", { name: data.name })
+              + (warns ? t("wb.export_jianying_warn", { n: warns }) : ""),
+          });
+        } catch (e) {
+          Quasar.Notify.create({
+            message: t("wb.export_jianying_fail") + (e.message ? ": " + e.message : ""),
+            color: "negative", position: "top", timeout: 6000,
+          });
+        }
       });
     },
     openMediaPicker() {
