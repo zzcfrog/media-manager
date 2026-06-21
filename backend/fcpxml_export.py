@@ -34,9 +34,18 @@ def _parse_time(s):
         return 0.0
 
 
+# 30fps timebase：1 帧 = 100/3000s。FCPXML 时间用帧对齐的有理数（denom=3000），
+# 匹配 FCP 导出风格——剪映导入器对非帧对齐的时间（如微秒 denom=1000000）会把片段丢弃，
+# 表现为「素材进了素材箱但时间线为空」。
+_FRAME_DUR = "100/3000s"
+_FPS = 30
+
+
 def _r(seconds):
-    """秒 → FCPXML 有理时间 "N/1000000s"。"""
-    return f"{int(round(seconds * 1_000_000))}/1000000s"
+    """秒 → FCPXML 帧对齐有理时间 "N/3000s"（30fps）；0 → "0s"。"""
+    if seconds <= 0:
+        return "0s"
+    return f"{round(seconds * _FPS) * 100}/3000s"
 
 
 def _safe_name(name):
@@ -141,13 +150,12 @@ def build_fcpxml(pid, name):
                       offset_s, src_s, dur))
 
     # ── 组装 FCPXML ──
-    frame_dur = "100/3000s"  # 30fps timebase
     rid = 1
     lines = ['<?xml version="1.0" encoding="UTF-8"?>', '<!DOCTYPE fcpxml>', '<fcpxml version="1.10">']
     lines.append("  <resources>")
     fmt_id = f"r{rid}"; rid += 1
     lines.append(f'    <format id="{fmt_id}" name="FFVideoFormatCustom" '
-                 f'frameDuration="{frame_dur}" width="{canvas_w}" height="{canvas_h}"/>')
+                 f'frameDuration="{_FRAME_DUR}" width="{canvas_w}" height="{canvas_h}"/>')
     asset_ids = []
     for media_id, path, aname, adur in asset_entries:
         aid = f"r{rid}"; rid += 1
@@ -158,11 +166,12 @@ def build_fcpxml(pid, name):
                      f'<media-rep kind="original-media" sig="{uid}" src="{_file_url(path)}"/></asset>')
     lines.append("  </resources>")
 
+    total_s = max((o + d for _, _, o, _, d in clips), default=0.0)
     lines.append('  <library>')
     lines.append(f'    <event name="{_esc(name)}">')
     lines.append(f'      <project name="{_esc(name)}">')
-    lines.append(f'        <sequence format="{fmt_id}" tcStart="0s" tcFormat="NDF" '
-                 f'frameDuration="{frame_dur}" renderColorSpace="rec709">')
+    lines.append(f'        <sequence format="{fmt_id}" duration="{_r(total_s)}" tcStart="0s" '
+                 f'tcFormat="NDF" frameDuration="{_FRAME_DUR}" renderColorSpace="rec709">')
     lines.append("          <spine>")
     for aidx, cname, offset_s, src_s, dur in clips:
         lines.append(

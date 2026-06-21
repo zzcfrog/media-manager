@@ -16,6 +16,8 @@
 
 验证：Flask test client 工程62 → fcpxml well-formed（1.10）、画布 3840×2160、112 asset/170 clip、首 clip `start=3.5s duration=6.5s offset=0` 正确；srt 180 条。**待用户在剪映 10.8.7「导入工程」实测**（clips 是核心，先确认导入；字幕/旁白文字随后视导入效果再决定是否也做成 FCPXML title）。
 
+**实测后修一版（时间帧对齐）**：剪映导入后素材进了素材箱但**时间线为空**（asset-clip 被丢）。根因疑为时间用了非帧对齐的微秒有理数 `N/1000000s`，剪映导入器不认。改为 **30fps 帧对齐 `N/3000s`**（`_r` 按 `round(s*30)*100/3000`），并给 `<sequence>` 补 `duration`（=末 clip offset+dur），与 FCP 导出风格一致。再测中。
+
 ## 已完成：导出工程到剪映草稿（2026-06-20）
 
 工作台顶栏工程名右侧新增「导出到剪映」按钮：点击弹窗填草稿名 → 后端用 [pyJianYingDraft](https://github.com/GuanYixuan/pyJianYingDraft)（`pip install pyjianyingdraft`，已加 `requirements.txt`）生成剪映草稿，写入剪映草稿目录，打开剪映即可见。
