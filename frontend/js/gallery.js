@@ -1224,7 +1224,7 @@ const GalleryPage = {
           const res = await API.setFileDateFromExif([...this.selArr]);
           Quasar.Notify.create({
             type: "positive", position: "top", timeout: 4000,
-            message: this.t("g.set_file_date_done", { updated: res.data.updated, skipped: res.data.skipped }),
+            message: this.t("g.set_file_date_done", { updated: res.updated, skipped: res.skipped }),
           });
         } catch (e) {
           Quasar.Notify.create({
