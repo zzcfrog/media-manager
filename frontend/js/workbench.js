@@ -2302,14 +2302,48 @@ const WorkbenchPage = {
         cancel: true,
         persistent: false,
         ok: { label: t("wb.export_fcpxml"), color: "accent", unelevated: true },
-      }).onOk((name) => {
-        // 用原生导航触发下载（最稳：不受异步用户激活/弹窗拦截影响），zip 落到下载目录。
-        const n = encodeURIComponent((name || "").trim());
-        Quasar.Notify.create({
-          type: "info", position: "top", timeout: 2500,
-          message: t("wb.export_fcpxml_exporting"),
-        });
-        window.location.href = `/api/workbench/${this.project.id}/export-fcpxml?name=${n}`;
+      }).onOk(async (name) => {
+        const safe = (name || "").trim() || "project";
+        const url = `/api/workbench/${this.project.id}/export-fcpxml?name=${encodeURIComponent(safe)}`;
+        try {
+          // 1. 先弹原生存盘对话框（趁 onOk 的用户激活还在）；Electron/Chromium 支持。
+          let handle = null;
+          if (window.showSaveFilePicker) {
+            try {
+              handle = await window.showSaveFilePicker({
+                suggestedName: `${safe}.zip`,
+                types: [{ description: "ZIP", accept: { "application/zip": [".zip"] } }],
+              });
+            } catch (e) {
+              if (e && e.name === "AbortError") return;  // 用户取消
+              handle = null;  // 其它异常 → 走回退
+            }
+          }
+          // 2. 取数据
+          Quasar.Notify.create({ type: "info", position: "top", timeout: 2500, message: t("wb.export_fcpxml_exporting") });
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const blob = await res.blob();
+          // 3. 写到用户选的位置；无 showSaveFilePicker 则回退 blob 下载（普通浏览器）
+          if (handle) {
+            const w = await handle.createWritable();
+            await w.write(blob);
+            await w.close();
+            Quasar.Notify.create({ type: "positive", position: "top", timeout: 4000,
+              message: t("wb.export_fcpxml_done", { name: safe }) });
+          } else {
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = `${safe}.zip`;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+          }
+        } catch (e) {
+          Quasar.Notify.create({
+            message: t("wb.export_fcpxml_fail") + (e && e.message ? ": " + e.message : ""),
+            color: "negative", position: "top", timeout: 6000,
+          });
+        }
       });
     },
     openMediaPicker() {
