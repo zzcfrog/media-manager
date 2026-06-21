@@ -115,15 +115,21 @@ def build_fcpxml(pid, name):
     ).fetchall()
 
     videos = []
+    texts = []  # (start_s, dur_s, content) —— 字幕/旁白，导成 FCPXML <caption>
     for r in rows:
-        if r["track_type"] != "video":
-            continue
-        meta = {}
-        try:
-            meta = json.loads(r["metadata"] or "{}")
-        except (ValueError, TypeError):
+        if r["track_type"] == "video":
             meta = {}
-        videos.append((r, meta))
+            try:
+                meta = json.loads(r["metadata"] or "{}")
+            except (ValueError, TypeError):
+                meta = {}
+            videos.append((r, meta))
+        elif r["track_type"] in ("subtitle", "narration"):
+            txt = (r["content"] or "").strip()
+            if not txt:
+                continue
+            s = _parse_time(r["time_start"])
+            texts.append((s, max(_parse_time(r["time_end"]) - s, 0.1), txt))
 
     warnings = []
     # 预扫：取首个可读素材的尺寸定画布比例，并登记用到的 asset。
@@ -197,6 +203,17 @@ def build_fcpxml(pid, name):
         )
         cursor = target + _frames(dur)
     lines.append("          </spine>")
+    # 字幕/旁白：作为 <caption> 放在 sequence 内（spine 之外），无需 effect 引用，
+    # 不影响视频主轨导入。剪映若支持 FCPXML caption 会映射到字幕轨；否则仍可用 .srt。
+    for i, (s, dur, txt) in enumerate(sorted(texts, key=lambda e: e[0]), 1):
+        ts_id = f"tsc{i}"
+        lines.append(f'          <caption name="caption" lane="1" offset="{_r(s)}" '
+                     f'duration="{_r(dur)}" role="captions">')
+        lines.append(f'            <text><text-style ref="{ts_id}">{_esc(txt)}</text-style></text>')
+        lines.append(f'            <text-style-def id="{ts_id}">'
+                     f'<text-style font="PingFang SC" fontSize="40" fontColor="1 1 1 1" '
+                     f'alignment="center"/></text-style-def>')
+        lines.append('          </caption>')
     lines.append("        </sequence>")
     lines.append("      </project>")
     lines.append("    </event>")

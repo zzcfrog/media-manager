@@ -18,7 +18,9 @@
 
 **实测后修一版（时间帧对齐）**：剪映导入后素材进了素材箱但**时间线为空**（asset-clip 被丢）。根因疑为时间用了非帧对齐的微秒有理数 `N/1000000s`，剪映导入器不认。改为 **30fps 帧对齐 `N/3000s`**（`_r` 按 `round(s*30)*100/3000`），并给 `<sequence>` 补 `duration`（=末 clip offset+dur），与 FCP 导出风格一致。再测中。
 
-**再修（主轨 + 连续性）**：剪映导入后片段上时间线了但**不在主轨**。FCPXML `<spine>`（主 storyline）要求片段**严格连续无重叠**，逐个独立帧对齐 offset/duration 会有 1 帧漂移产生微缝隙，剪映把缝隙后的片段降到副轨。改为**按帧累进位置**（cursor）保证连续，遇到真实空隙用 `<gap duration>` 占位（FCPXML 主轨留白的标准写法），asset-clip 显式 `lane="0"`。验证 spine 严格连续（工程62 有 1 处真实 gap 已用 `<gap>` 填，170 clip 全 lane0）。字幕/旁白仍走独立 `.srt`（FCPXML title 需 effect ref、caption 结构复杂，避免弄挂已能用的片段导入）。
+**再修（主轨 + 连续性）**：剪映导入后片段上时间线了但**不在主轨**。FCPXML `<spine>`（主 storyline）要求片段**严格连续无重叠**，逐个独立帧对齐 offset/duration 会有 1 帧漂移产生微缝隙，剪映把缝隙后的片段降到副轨。改为**按帧累进位置**（cursor）保证连续，遇到真实空隙用 `<gap duration>` 占位（FCPXML 主轨留白的标准写法），asset-clip 显式 `lane="0"`。验证 spine 严格连续（工程62 有 1 处真实 gap 已用 `<gap>` 填，170 clip 全 lane0）。
+
+**再修（内嵌字幕）**：主轨仍不在——判断为剪映导入 FCPXML 的固有行为（落到普通轨而非磁性主轨），FCPXML 层面难控，变通=剪映内全选拖到主轨。改为把**字幕/旁白内嵌进 FCPXML**：作为 `<caption>` 元素放在 `<sequence>` 内（spine 之外、`lane="1"`），按 DTD caption 无需 effect 引用（不像 `<title>` 要 Motion 模板 ref，避免 dangling 弄挂视频导入）；每条带 `<text><text-style ref>` + 唯一 `<text-style-def>`。视频 spine 完全不动（170 clip 不变），叠加 180 caption。剪映若支持 FCPXML caption 则字幕直接进；否则仍有 `.srt` 兜底。
 
 ## 已完成：导出工程到剪映草稿（2026-06-20）
 
