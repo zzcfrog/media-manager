@@ -147,7 +147,6 @@ def build_fcpxml(pid, name):
         except (ValueError, TypeError):
             meta = {}
         videos.append((r, meta))
-    texts = _collect_texts(db, pid)  # 主旨/叙事/旁白/字幕
 
     warnings = []
     # 预扫：取首个可读素材的尺寸定画布比例，并登记用到的 asset。
@@ -221,17 +220,8 @@ def build_fcpxml(pid, name):
         )
         cursor = target + _frames(dur)
     lines.append("          </spine>")
-    # 字幕/旁白：作为 <caption> 放在 sequence 内（spine 之外），无需 effect 引用，
-    # 不影响视频主轨导入。剪映若支持 FCPXML caption 会映射到字幕轨；否则仍可用 .srt。
-    for i, (s, dur, txt, label) in enumerate(texts, 1):
-        ts_id = f"tsc{i}"
-        lines.append(f'          <caption name="caption" lane="1" offset="{_r(s)}" '
-                     f'duration="{_r(dur)}" role="captions">')
-        lines.append(f'            <text><text-style ref="{ts_id}">{_esc("【" + label + "】" + txt)}</text-style></text>')
-        lines.append(f'            <text-style-def id="{ts_id}">'
-                     f'<text-style font="PingFang SC" fontSize="40" fontColor="1 1 1 1" '
-                     f'alignment="center"/></text-style-def>')
-        lines.append('          </caption>')
+    # 不在 FCPXML 里放 <caption>/<title>：剪映不读 FCPXML 文字，且 caption 直接放
+    # <sequence> 会让整个文件对剪映结构不合法、连视频都导不进来。文字走独立 .srt。
     lines.append("        </sequence>")
     lines.append("      </project>")
     lines.append("    </event>")
