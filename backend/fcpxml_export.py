@@ -41,11 +41,19 @@ _FRAME_DUR = "100/3000s"
 _FPS = 30
 
 
+def _frames(seconds):
+    """秒 → 30fps 帧数（int）。"""
+    return max(0, round(seconds * _FPS))
+
+
+def _ft(frames):
+    """帧数 → FCPXML 有理时间 "N/3000s"；0 → "0s"。"""
+    return "0s" if frames <= 0 else f"{frames * 100}/3000s"
+
+
 def _r(seconds):
-    """秒 → FCPXML 帧对齐有理时间 "N/3000s"（30fps）；0 → "0s"。"""
-    if seconds <= 0:
-        return "0s"
-    return f"{round(seconds * _FPS) * 100}/3000s"
+    """秒 → FCPXML 帧对齐有理时间。"""
+    return _ft(_frames(seconds))
 
 
 def _safe_name(name):
@@ -173,12 +181,21 @@ def build_fcpxml(pid, name):
     lines.append(f'        <sequence format="{fmt_id}" duration="{_r(total_s)}" tcStart="0s" '
                  f'tcFormat="NDF" frameDuration="{_FRAME_DUR}" renderColorSpace="rec709">')
     lines.append("          <spine>")
-    for aidx, cname, offset_s, src_s, dur in clips:
+    # 主 storyline 要求片段连续无重叠；按帧累进位置，遇到空隙用 <gap> 占位，
+    # 保证所有 asset-clip 留在主轨（lane 0），不被剪映降到副轨。
+    clips_sorted = sorted(clips, key=lambda c: c[2])
+    cursor = 0  # 帧
+    for aidx, cname, offset_s, src_s, dur in clips_sorted:
+        target = _frames(offset_s)
+        if target > cursor:
+            lines.append(f'            <gap name="gap" offset="{_ft(cursor)}" '
+                         f'duration="{_ft(target - cursor)}"/>')
         lines.append(
-            f'            <asset-clip ref="{asset_ids[aidx]}" name="{_esc(cname)}" '
-            f'offset="{_r(offset_s)}" start="{_r(src_s)}" duration="{_r(dur)}" '
+            f'            <asset-clip ref="{asset_ids[aidx]}" name="{_esc(cname)}" lane="0" '
+            f'offset="{_ft(target)}" start="{_r(src_s)}" duration="{_r(dur)}" '
             f'format="{fmt_id}" tcFormat="NDF"/>'
         )
+        cursor = target + _frames(dur)
     lines.append("          </spine>")
     lines.append("        </sequence>")
     lines.append("      </project>")
