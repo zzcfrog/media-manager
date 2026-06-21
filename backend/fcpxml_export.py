@@ -34,6 +34,29 @@ def _parse_time(s):
         return 0.0
 
 
+# 文字轨道 → 中文标签（主旨/叙事/旁白/字幕）
+_TEXT_TYPES = {"theme": "主旨", "text": "叙事", "narration": "旁白", "subtitle": "字幕"}
+
+
+def _collect_texts(db, pid):
+    """收集工程全部文字（主旨/叙事/旁白/字幕）→ [(start_s, dur_s, content, label)]，按时间排序。"""
+    rows = db.execute(
+        "SELECT track_type, content, time_start, time_end FROM project_tracks "
+        "WHERE project_id = ? AND version = 1 AND track_type IN ('theme','text','narration','subtitle') "
+        "ORDER BY position",
+        (pid,),
+    ).fetchall()
+    out = []
+    for r in rows:
+        txt = (r["content"] or "").strip()
+        if not txt:
+            continue
+        s = _parse_time(r["time_start"])
+        out.append((s, max(_parse_time(r["time_end"]) - s, 0.1), txt, _TEXT_TYPES[r["track_type"]]))
+    out.sort(key=lambda e: e[0])
+    return out
+
+
 # 30fps timebase：1 帧 = 100/3000s。FCPXML 时间用帧对齐的有理数（denom=3000），
 # 匹配 FCP 导出风格——剪映导入器对非帧对齐的时间（如微秒 denom=1000000）会把片段丢弃，
 # 表现为「素材进了素材箱但时间线为空」。
@@ -115,21 +138,16 @@ def build_fcpxml(pid, name):
     ).fetchall()
 
     videos = []
-    texts = []  # (start_s, dur_s, content) —— 字幕/旁白，导成 FCPXML <caption>
     for r in rows:
-        if r["track_type"] == "video":
+        if r["track_type"] != "video":
+            continue
+        meta = {}
+        try:
+            meta = json.loads(r["metadata"] or "{}")
+        except (ValueError, TypeError):
             meta = {}
-            try:
-                meta = json.loads(r["metadata"] or "{}")
-            except (ValueError, TypeError):
-                meta = {}
-            videos.append((r, meta))
-        elif r["track_type"] in ("subtitle", "narration"):
-            txt = (r["content"] or "").strip()
-            if not txt:
-                continue
-            s = _parse_time(r["time_start"])
-            texts.append((s, max(_parse_time(r["time_end"]) - s, 0.1), txt))
+        videos.append((r, meta))
+    texts = _collect_texts(db, pid)  # 主旨/叙事/旁白/字幕
 
     warnings = []
     # 预扫：取首个可读素材的尺寸定画布比例，并登记用到的 asset。
@@ -205,11 +223,11 @@ def build_fcpxml(pid, name):
     lines.append("          </spine>")
     # 字幕/旁白：作为 <caption> 放在 sequence 内（spine 之外），无需 effect 引用，
     # 不影响视频主轨导入。剪映若支持 FCPXML caption 会映射到字幕轨；否则仍可用 .srt。
-    for i, (s, dur, txt) in enumerate(sorted(texts, key=lambda e: e[0]), 1):
+    for i, (s, dur, txt, label) in enumerate(texts, 1):
         ts_id = f"tsc{i}"
         lines.append(f'          <caption name="caption" lane="1" offset="{_r(s)}" '
                      f'duration="{_r(dur)}" role="captions">')
-        lines.append(f'            <text><text-style ref="{ts_id}">{_esc(txt)}</text-style></text>')
+        lines.append(f'            <text><text-style ref="{ts_id}">{_esc("【" + label + "】" + txt)}</text-style></text>')
         lines.append(f'            <text-style-def id="{ts_id}">'
                      f'<text-style font="PingFang SC" fontSize="40" fontColor="1 1 1 1" '
                      f'alignment="center"/></text-style-def>')
@@ -224,23 +242,12 @@ def build_fcpxml(pid, name):
 
 
 def build_srt(pid):
-    """把字幕 + 旁白文字导出为 SRT（剪映/Resolve/FCP 均可导入字幕）。"""
+    """把主旨/叙事/旁白/字幕全部文字导出为 SRT（剪映「导入字幕」用；Resolve/FCP 同理）。
+
+    剪映不导入 FCPXML 的 <caption>/<title> 文字，故文字走 SRT（每条带【主旨/叙事/旁白/字幕】标签）。
+    """
     db = get_db()
-    rows = db.execute(
-        "SELECT track_type, content, time_start, time_end "
-        "FROM project_tracks WHERE project_id = ? AND version = 1 ORDER BY position",
-        (pid,),
-    ).fetchall()
-    entries = []
-    for r in rows:
-        if r["track_type"] not in ("subtitle", "narration"):
-            continue
-        txt = (r["content"] or "").strip()
-        if not txt:
-            continue
-        entries.append((_parse_time(r["time_start"]), _parse_time(r["time_end"]),
-                        ("旁白" if r["track_type"] == "narration" else "") + txt))
-    entries.sort(key=lambda e: e[0])
+    entries = _collect_texts(db, pid)  # [(start, dur, content, label)]
 
     def _hhmmss(t):
         if t < 0:
@@ -252,9 +259,9 @@ def build_srt(pid):
         return f"{h:02d}:{m_:02d}:{s:02d},{ms:03d}"
 
     out = []
-    for i, (s, e, txt) in enumerate(entries, 1):
+    for i, (s, dur, txt, label) in enumerate(entries, 1):
         out.append(str(i))
-        out.append(f"{_hhmmss(s)} --> {_hhmmss(e)}")
-        out.append(txt)
+        out.append(f"{_hhmmss(s)} --> {_hhmmss(s + dur)}")
+        out.append(f"【{label}】{txt}")
         out.append("")
     return "\n".join(out)
