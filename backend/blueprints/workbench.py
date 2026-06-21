@@ -265,9 +265,9 @@ def export_fcpxml(pid):
             z.writestr(f"{safe}.fcpxml", res["xml"])
             z.writestr(f"{safe}.srt", srt)
         resp = Response(buf.getvalue(), mimetype="application/zip")
+        # Content-Disposition 的文件名用 percent-encode（quote）确保 ASCII，避免中文触发
+        # latin-1 编码错误。不再用自定义 X- 头放项目名（HTTP 头不支持非 ASCII）。
         resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(safe)}.zip"
-        resp.headers["X-Export-Name"] = safe
-        resp.headers["X-Export-Warnings"] = str(len(res.get("warnings", [])))
         return resp
     except Exception as e:
         return jsonify({"error": str(e)}), 500
