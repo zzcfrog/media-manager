@@ -252,7 +252,21 @@ def export_fcpxml(pid):
     name = (data.get("name") or "").strip()
     try:
         res = build_fcpxml(pid, name)
-        res["srt"] = build_srt(pid)
-        return jsonify(res)
+        srt = build_srt(pid)
+        # 打包成单个 zip（fcpxml + srt），避免浏览器拦截「一次操作多个下载」丢文件。
+        import io
+        import zipfile
+        from flask import Response
+        from urllib.parse import quote
+        safe = res["name"]
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+            z.writestr(f"{safe}.fcpxml", res["xml"])
+            z.writestr(f"{safe}.srt", srt)
+        resp = Response(buf.getvalue(), mimetype="application/zip")
+        resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(safe)}.zip"
+        resp.headers["X-Export-Name"] = safe
+        resp.headers["X-Export-Warnings"] = str(len(res.get("warnings", [])))
+        return resp
     except Exception as e:
         return jsonify({"error": str(e)}), 500

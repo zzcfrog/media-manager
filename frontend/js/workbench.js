@@ -2309,17 +2309,27 @@ const WorkbenchPage = {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name: (name || "").trim() }),
           });
-          const data = await res.json();
-          if (!res.ok || !data.ok) throw new Error(data.error || "export failed");
-          const safe = (data.name || "project").replace(/[\\/:*?"<>|]/g, "_");
-          this._downloadBlob(`${safe}.fcpxml`, data.xml, "application/xml");
-          if (data.srt) {
-            setTimeout(() => this._downloadBlob(`${safe}.srt`, data.srt, "text/plain;charset=utf-8"), 350);
+          if (!res.ok) {
+            const j = await res.json().catch(() => ({}));
+            throw new Error(j.error || "export failed");
           }
-          const warns = data.warnings && data.warnings.length;
+          // 单个 zip（fcpxml + srt），避免浏览器拦截多文件下载丢 .srt
+          const blob = await res.blob();
+          let fname = "project.zip";
+          const cd = res.headers.get("Content-Disposition") || "";
+          const m = cd.match(/filename\*=UTF-8''([^;]+)/i) || cd.match(/filename="?([^";]+)"?/i);
+          if (m) { try { fname = decodeURIComponent(m[1]); } catch (e) { fname = m[1]; } }
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url; a.download = fname;
+          document.body.appendChild(a); a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(url), 2000);
+          const warns = parseInt(res.headers.get("X-Export-Warnings") || "0", 10);
+          const projName = res.headers.get("X-Export-Name") || (name || "").trim() || "project";
           Quasar.Notify.create({
             type: "positive", position: "top", timeout: 5000,
-            message: t("wb.export_fcpxml_done", { name: data.name })
+            message: t("wb.export_fcpxml_done", { name: projName })
               + (warns ? t("wb.export_fcpxml_warn", { n: warns }) : ""),
           });
         } catch (e) {
@@ -2329,15 +2339,6 @@ const WorkbenchPage = {
           });
         }
       });
-    },
-    _downloadBlob(filename, text, mime) {
-      const blob = new Blob([text], { type: mime });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = filename;
-      document.body.appendChild(a); a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
     },
     openMediaPicker() {
       this.$root.pickerSelected = [];
