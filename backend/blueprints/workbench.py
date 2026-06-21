@@ -237,10 +237,11 @@ def update_project_media(pid):
 # ── Export to FCPXML (剪映/达芬奇/Final Cut 通用) ────────────
 
 
-@bp.route("/<int:pid>/export-fcpxml", methods=["GET"])
+@bp.route("/<int:pid>/export-fcpxml", methods=["GET", "POST"])
 def export_fcpxml(pid):
-    """Export the project as a ZIP (FCPXML + companion SRT) — GET 以便前端用原生导航下载。
+    """Export the project as a ZIP (FCPXML + companion SRT)。
 
+    同时接受 GET（前端用 window.location 原生导航下载，最稳）和 POST。
     剪映专业版「导入工程」、DaVinci Resolve、Final Cut Pro 均可直接导入该 .fcpxml；
     .srt 为全部文字（主旨/叙事/旁白/字幕），各编辑器「导入字幕」用。
     """
@@ -248,7 +249,8 @@ def export_fcpxml(pid):
     proj = db.execute("SELECT id FROM projects WHERE id = ?", (pid,)).fetchone()
     if not proj:
         return jsonify({"error": "Not found"}), 404
-    name = (request.args.get("name") or "").strip()
+    j = request.get_json(silent=True) or {}
+    name = (request.args.get("name") or request.form.get("name") or j.get("name") or "").strip()
     try:
         res = build_fcpxml(pid, name)
         srt = build_srt(pid)
