@@ -87,18 +87,22 @@ app.on("ready", () => {
     shell.showItemInFolder(filePath);
   });
 
-  // 原生存盘对话框 + Node fs 写文件（renderer 的 showSaveFilePicker 在某些版本写出 0 字节）。
-  // data: ArrayBuffer/Uint8Array；suggestedName: 默认文件名。
-  ipcMain.handle("save-export", async (event, data, suggestedName, filterExt) => {
+  // 原生存盘对话框（先弹，不依赖后端），返回用户选的路径或 null（取消）。
+  ipcMain.handle("pick-save-path", async (event, suggestedName, filterExt) => {
     const ext = (filterExt || "zip").replace(/^\./, "");
     const result = await dialog.showSaveDialog(win, {
       title: "保存到",
       defaultPath: suggestedName || `export.${ext}`,
       filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
     });
-    if (result.canceled || !result.filePath) return { canceled: true };
-    fs.writeFileSync(result.filePath, Buffer.from(data));
-    return { canceled: false, path: result.filePath };
+    return result.canceled || !result.filePath ? null : result.filePath;
+  });
+
+  // Node fs 写文件（renderer 的 showSaveFilePicker 在某些版本写出 0 字节，故走主进程）。
+  // data: ArrayBuffer/Uint8Array。
+  ipcMain.handle("write-file", (event, filePath, data) => {
+    fs.writeFileSync(filePath, Buffer.from(data));
+    return true;
   });
 
   startPython();

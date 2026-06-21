@@ -5,7 +5,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   selectFiles: () => ipcRenderer.invoke("select-files"),
   selectDirectory: () => ipcRenderer.invoke("select-directory"),
   openInFinder: (path) => ipcRenderer.invoke("open-in-finder", path),
-  saveExport: (data, suggestedName, filterExt) => ipcRenderer.invoke("save-export", data, suggestedName, filterExt),
+  pickSavePath: (suggestedName, filterExt) => ipcRenderer.invoke("pick-save-path", suggestedName, filterExt),
+  writeFile: (filePath, data) => ipcRenderer.invoke("write-file", filePath, data),
   getPathForFile: (file) => {
     try { return webUtils.getPathForFile(file); } catch { return null; }
   },

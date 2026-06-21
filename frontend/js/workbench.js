@@ -2306,19 +2306,22 @@ const WorkbenchPage = {
         const safe = (name || "").trim() || "project";
         const url = `/api/workbench/${this.project.id}/export-fcpxml?name=${encodeURIComponent(safe)}`;
         try {
-          // 1. 先取数据（ArrayBuffer），再交给写入层
+          // 1. 先弹保存框（Electron IPC 主进程 dialog，与后端无关）→ 拿到保存路径
+          const ea = window.electronAPI;
+          let savePath = null;
+          if (ea && typeof ea.pickSavePath === "function") {
+            savePath = await ea.pickSavePath(`${safe}.zip`, "zip");
+            if (!savePath) return;  // 用户取消
+          }
+          // 2. 取数据
           Quasar.Notify.create({ type: "info", position: "top", timeout: 2500, message: t("wb.export_fcpxml_exporting") });
           const res = await fetch(url);
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const buf = new Uint8Array(await res.arrayBuffer());
           if (!buf.length) throw new Error("导出内容为空");
-          // 2. 写文件：优先 Electron IPC（主进程 dialog.showSaveDialog + Node fs，最稳），
-          //    其次 showSaveFilePicker，最后 blob 下载（普通浏览器）。
-          const ea = window.electronAPI;
-          if (ea && typeof ea.saveExport === "function") {
-            const r = await ea.saveExport(buf, `${safe}.zip`, "zip");
-            if (r && r.canceled) return;  // 用户取消
-            if (!r || !r.path) throw new Error("保存失败");
+          // 3. 写文件：Electron 走主进程 Node fs；否则回退 showSaveFilePicker / blob 下载
+          if (savePath && ea && typeof ea.writeFile === "function") {
+            await ea.writeFile(savePath, buf);
             Quasar.Notify.create({ type: "positive", position: "top", timeout: 4000,
               message: t("wb.export_fcpxml_done", { name: safe }) });
             return;
