@@ -2323,17 +2323,19 @@ const WorkbenchPage = {
           Quasar.Notify.create({ type: "info", position: "top", timeout: 2500, message: t("wb.export_fcpxml_exporting") });
           const res = await fetch(url);
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const blob = await res.blob();
+          const buf = new Uint8Array(await res.arrayBuffer());
+          if (!buf.length) throw new Error("导出内容为空");
           // 3. 写到用户选的位置；无 showSaveFilePicker 则回退 blob 下载（普通浏览器）
           if (handle) {
+            // Electron 某些版本 writable.write(blob) 会写 0 字节，用 Uint8Array 更稳。
             const w = await handle.createWritable();
-            await w.write(blob);
+            await w.write(buf);
             await w.close();
             Quasar.Notify.create({ type: "positive", position: "top", timeout: 4000,
               message: t("wb.export_fcpxml_done", { name: safe }) });
           } else {
             const a = document.createElement("a");
-            a.href = URL.createObjectURL(blob);
+            a.href = URL.createObjectURL(new Blob([buf], { type: "application/zip" }));
             a.download = `${safe}.zip`;
             document.body.appendChild(a); a.click(); a.remove();
             setTimeout(() => URL.revokeObjectURL(a.href), 3000);
