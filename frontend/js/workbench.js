@@ -9,9 +9,9 @@ const WorkbenchPage = {
       <span v-if="project" style="font-size:15px;font-weight:500">{{ project.name }}</span>
       <span v-if="project && project.description" style="font-size:12px;color:var(--text3);margin-left:8px">{{ project.description }}</span>
       <q-btn v-if="project" flat dense no-caps icon="file_download"
-             :label="t('wb.export_jianying')" size="sm" color="grey-7"
-             style="margin-left:8px;font-size:12px" @click="exportJianying">
-        <q-tooltip :delay="500">{{ t('wb.export_jianying_tip') }}</q-tooltip>
+             :label="t('wb.export_fcpxml')" size="sm" color="grey-7"
+             style="margin-left:8px;font-size:12px" @click="exportProject">
+        <q-tooltip :delay="500">{{ t('wb.export_fcpxml_tip') }}</q-tooltip>
       </q-btn>
     </div>
     <div style="display:flex;align-items:center;gap:4px">
@@ -2293,37 +2293,51 @@ const WorkbenchPage = {
         location.hash = "#/gallery";
       });
     },
-    exportJianying() {
+    exportProject() {
       if (!this.project) return;
       Quasar.Dialog.create({
-        title: t("wb.export_jianying"),
-        message: t("wb.export_jianying_prompt"),
+        title: t("wb.export_fcpxml"),
+        message: t("wb.export_fcpxml_prompt"),
         prompt: { model: this.project.name, type: "text", outlined: true, dense: true },
         cancel: true,
         persistent: false,
-        ok: { label: t("wb.export_jianying"), color: "accent", unelevated: true },
+        ok: { label: t("wb.export_fcpxml"), color: "accent", unelevated: true },
       }).onOk(async (name) => {
         try {
-          const res = await fetch(`/api/workbench/${this.project.id}/export-jianying`, {
+          const res = await fetch(`/api/workbench/${this.project.id}/export-fcpxml`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ name: (name || "").trim() }),
           });
           const data = await res.json();
           if (!res.ok || !data.ok) throw new Error(data.error || "export failed");
+          const safe = (data.name || "project").replace(/[\\/:*?"<>|]/g, "_");
+          this._downloadBlob(`${safe}.fcpxml`, data.xml, "application/xml");
+          if (data.srt) {
+            setTimeout(() => this._downloadBlob(`${safe}.srt`, data.srt, "text/plain;charset=utf-8"), 350);
+          }
           const warns = data.warnings && data.warnings.length;
           Quasar.Notify.create({
-            type: "positive", position: "top", timeout: 4000,
-            message: t("wb.export_jianying_done", { name: data.name })
-              + (warns ? t("wb.export_jianying_warn", { n: warns }) : ""),
+            type: "positive", position: "top", timeout: 5000,
+            message: t("wb.export_fcpxml_done", { name: data.name })
+              + (warns ? t("wb.export_fcpxml_warn", { n: warns }) : ""),
           });
         } catch (e) {
           Quasar.Notify.create({
-            message: t("wb.export_jianying_fail") + (e.message ? ": " + e.message : ""),
+            message: t("wb.export_fcpxml_fail") + (e.message ? ": " + e.message : ""),
             color: "negative", position: "top", timeout: 6000,
           });
         }
       });
+    },
+    _downloadBlob(filename, text, mime) {
+      const blob = new Blob([text], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
     },
     openMediaPicker() {
       this.$root.pickerSelected = [];

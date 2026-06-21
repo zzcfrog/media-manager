@@ -1,5 +1,21 @@
 # TODO
 
+## 已完成：导出改为 FCPXML + SRT 开放格式（剪映加密不可行）（2026-06-21）
+
+原「导出到剪映」生成剪映原生草稿，实测在剪映 6.0+/10.x（用户 10.8.7）上**打开报「草稿已损坏」**：剪映从 6.0 起对 `draft_info.json`/`draft_content.json` 加密（`crypto_key_store.dat`，scheme `jianying_draft_encrypt_v2`），cipher 只在剪映二进制内，pyJianYingDraft 只能生成明文、且仅兼容 ≤5.9。[jy-draftc](https://github.com/wenshui330/jy-draftc) 能回加密但 Windows 专属 + 调 `videoeditor.dll`，Mac 无对应方案。逆向 cipher 成功率低且随版本失效，放弃。
+
+**改走开放格式**（剪映/达芬奇/Final Cut 都认）：把按钮「导出到剪映」改为「**导出工程**」，产出两个文件——
+- **`.fcpxml`**（FCPXML 1.10）：分镜视频片段展开为一条 sequence/spine 上的 `<asset-clip>`，`offset=时间线位置`、`start=metadata.srcStart`（绝对媒体入点）、`duration=src 区间长`；resources 里 `<format>`（画布跟随首个分镜 ffprobe 尺寸，如 3840×2160）+ 去重后的 `<asset>`（file:// 源素材）。剪映「导入工程」、Resolve、FCP 直接导入。
+- **`.srt`**：字幕 + 旁白文字（旁白前缀「旁白」），HH:mm:ss,ms 时间码。剪映/Resolve/FCP「导入字幕」。
+
+改动：
+- **新建 [backend/fcpxml_export.py](backend/fcpxml_export.py)**：`build_fcpxml(pid,name)`（asset-clip 时间线）+ `build_srt(pid)`（字幕/旁白）。时间用微秒有理数 `N/1000000s`。
+- [backend/blueprints/workbench.py](backend/blueprints/workbench.py)：`POST /api/workbench/<pid>/export-fcpxml` 返回 `{ok,name,xml(fcpxml),srt,warnings}`。
+- [frontend/js/workbench.js](frontend/js/workbench.js)：按钮「导出工程」+ `exportProject()`（Quasar.Dialog 填名 → POST → Blob 下载 `<name>.fcpxml` + `<name>.srt`，via `_downloadBlob`）。
+- **删除** [backend/jianying_export.py](backend/jianying_export.py) + `pyjianyingdraft` 依赖（requirements.txt）+ `wb.export_jianying*` i18n，换 `wb.export_fcpxml*`。
+
+验证：Flask test client 工程62 → fcpxml well-formed（1.10）、画布 3840×2160、112 asset/170 clip、首 clip `start=3.5s duration=6.5s offset=0` 正确；srt 180 条。**待用户在剪映 10.8.7「导入工程」实测**（clips 是核心，先确认导入；字幕/旁白文字随后视导入效果再决定是否也做成 FCPXML title）。
+
 ## 已完成：导出工程到剪映草稿（2026-06-20）
 
 工作台顶栏工程名右侧新增「导出到剪映」按钮：点击弹窗填草稿名 → 后端用 [pyJianYingDraft](https://github.com/GuanYixuan/pyJianYingDraft)（`pip install pyjianyingdraft`，已加 `requirements.txt`）生成剪映草稿，写入剪映草稿目录，打开剪映即可见。

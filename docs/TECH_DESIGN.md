@@ -93,7 +93,7 @@ video_analyzer/
 | `analysis` | `/api/analysis` | AI 分析 + 批量分析 + 分段编辑 + 进度查询 |
 | `tags` | `/api/tags` | 标签管理（后端保留，前端已移除） |
 | `settings` | `/api/settings` | 全局设置 CRUD |
-| `workbench` | `/api/workbench` | 创作工作台：工程 CRUD、segment 查询、多轨时间线管理、导出剪映草稿（`POST /<pid>/export-jianying`，由 [jianying_export.py](../backend/jianying_export.py) 生成） |
+| `workbench` | `/api/workbench` | 创作工作台：工程 CRUD、segment 查询、多轨时间线管理、导出 FCPXML+SRT（`POST /<pid>/export-fcpxml`，由 [fcpxml_export.py](../backend/fcpxml_export.py) 生成） |
 
 ### 3.3 数据库
 
@@ -518,7 +518,7 @@ confirmPicker()
 
 ### 5.9 导出到剪映
 
-顶栏（`.wb-toolbar`）工程名右侧「导出到剪映」按钮 → `Quasar.Dialog` prompt 填草稿名（默认工程名）→ `POST /api/workbench/<pid>/export-jianying` → 后端 [jianying_export.py](../backend/jianying_export.py) `build_draft(pid,name,drafts_dir)` 用 pyJianYingDraft 生成剪映草稿（`DraftFolder.create_draft(canvas_w,canvas_h,...) → add_track(video)/add_track(text:subtitle)/add_track(text:narration)` → 每分镜 `VideoSegment(VideoMaterial(path), target, source_timerange)`、字幕/旁白 `TextSegment` → `save()`）。**画布比例跟随首个有效分镜素材**的 width/height（预扫首个可读 VideoMaterial 取尺寸，缺则回退 1920×1080），避免竖屏/4K 素材出黑边。写入 `resolve_drafts_dir()`（settings `jianying_drafts_dir` > env `JIANYING_DRAFTS_DIR` > macOS 默认 `~/Movies/JianyingPro/User Data/Projects/com.lveditor.draft/`）。**源点映射**：`metadata.srcStart/srcEnd` = 绝对媒体时间戳、`track.time_start` = 时间线累加位置，秒→微秒；source 时长钳到 `material.duration`。素材经 `VideoMaterial` 自动登记进 `materials`（剪映素材库可见）；缺 file_path 的分镜跳过 + 计 warnings 返回。运行环境需 MediaInfo 库（pyJianYingDraft 经 pymediainfo 读素材时长/尺寸；macOS `brew install mediainfo`）。
+顶栏（`.wb-toolbar`）工程名右侧「导出工程」按钮 → `Quasar.Dialog` 填工程名 → `POST /api/workbench/<pid>/export-fcpxml` → 浏览器 Blob 下载 `<name>.fcpxml` + `<name>.srt` 两个文件。**为什么不用剪映原生草稿**：剪映 6.0+ 对草稿加密（`crypto_key_store.dat`，scheme `jianying_draft_encrypt_v2`），cipher 只在剪映二进制内，pyJianYingDraft 只能生成明文、仅兼容 ≤5.9；用户 10.8.7 打开明文草稿报「已损坏」。故改走开放格式 FCPXML——剪映「导入工程」、DaVinci Resolve、Final Cut Pro 都能直接导入。后端 [fcpxml_export.py](../backend/fcpxml_export.py) `build_fcpxml(pid,name)`：FCPXML 1.10，resources 里 `<format>`（画布跟随首个分镜 ffprobe 尺寸，如 3840×2160）+ 去重的 `<asset>`（file:// 源素材）；sequence/spine 上每分镜一个 `<asset-clip offset=时间线位置 start=src入点 duration=时长>`。时间用微秒有理数 `N/1000000s`。**源点映射**：`metadata.srcStart` = 绝对媒体入点（与 segment.time_start 同坐标系）→ `start`，`track.time_start` → `offset`，`srcEnd-srcStart` → `duration`。`build_srt(pid)` 把字幕/旁白文字导成 SRT（旁白前缀「旁白」）。缺 file_path 的分镜跳过 + warnings。
 
 ## 6. 外部依赖
 
@@ -540,7 +540,6 @@ rawpy>=0.20.0       # RAW 格式解码（NEF/DNG/CR2/ARW 等）
 onnxruntime>=1.17.0 # ResNet50 ONNX 推理（图片特征提取）
 scikit-learn>=1.3.0 # PCA 降维（可选）
 hdbscan>=0.8.0      # HDBSCAN 聚类（图片相似检测）
-pyjianyingdraft>=0.2.6  # 生成剪映（JianYing/CapCut）草稿；经 pymediainfo 读素材，需系统装 MediaInfo 库
 ```
 
 运行时额外依赖（非 requirements.txt）：`jieba`、`rawpy`、`pillow-heif`。

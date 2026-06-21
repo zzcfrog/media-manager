@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from ..db import get_db
 from ..emotion_labels import aggregate_emotions
-from ..jianying_export import build_draft, resolve_drafts_dir
+from ..fcpxml_export import build_fcpxml, build_srt
 
 bp = Blueprint("workbench", __name__)
 
@@ -234,23 +234,25 @@ def update_project_media(pid):
     return jsonify({"ok": True})
 
 
-# ── Export to JianYing (剪映草稿) ─────────────────────────────
+# ── Export to FCPXML (剪映/达芬奇/Final Cut 通用) ────────────
 
 
-@bp.route("/<int:pid>/export-jianying", methods=["POST"])
-def export_jianying(pid):
-    """Export the project as a JianYing draft into the JianYing drafts folder."""
-    import os
+@bp.route("/<int:pid>/export-fcpxml", methods=["POST"])
+def export_fcpxml(pid):
+    """Export the project as FCPXML (+ companion SRT).
 
+    剪映专业版「导入工程」、DaVinci Resolve、Final Cut Pro 均可直接导入该 .fcpxml；
+    .srt 为字幕/旁白，各编辑器「导入字幕」用。
+    """
     db = get_db()
     proj = db.execute("SELECT id FROM projects WHERE id = ?", (pid,)).fetchone()
     if not proj:
         return jsonify({"error": "Not found"}), 404
     data = request.get_json(silent=True) or {}
     name = (data.get("name") or "").strip()
-    drafts_dir = resolve_drafts_dir(db)
     try:
-        os.makedirs(drafts_dir, exist_ok=True)
-        return jsonify(build_draft(pid, name, drafts_dir))
+        res = build_fcpxml(pid, name)
+        res["srt"] = build_srt(pid)
+        return jsonify(res)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
