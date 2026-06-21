@@ -2302,42 +2302,14 @@ const WorkbenchPage = {
         cancel: true,
         persistent: false,
         ok: { label: t("wb.export_fcpxml"), color: "accent", unelevated: true },
-      }).onOk(async (name) => {
-        try {
-          const res = await fetch(`/api/workbench/${this.project.id}/export-fcpxml`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: (name || "").trim() }),
-          });
-          if (!res.ok) {
-            const j = await res.json().catch(() => ({}));
-            throw new Error(j.error || "export failed");
-          }
-          // 单个 zip（fcpxml + srt），避免浏览器拦截多文件下载丢 .srt
-          const blob = await res.blob();
-          let fname = "project.zip";
-          const cd = res.headers.get("Content-Disposition") || "";
-          const m = cd.match(/filename\*=UTF-8''([^;]+)/i) || cd.match(/filename="?([^";]+)"?/i);
-          if (m) { try { fname = decodeURIComponent(m[1]); } catch (e) { fname = m[1]; } }
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url; a.download = fname;
-          document.body.appendChild(a); a.click();
-          document.body.removeChild(a);
-          setTimeout(() => URL.revokeObjectURL(url), 2000);
-          const warns = parseInt(res.headers.get("X-Export-Warnings") || "0", 10);
-          const projName = res.headers.get("X-Export-Name") || (name || "").trim() || "project";
-          Quasar.Notify.create({
-            type: "positive", position: "top", timeout: 5000,
-            message: t("wb.export_fcpxml_done", { name: projName })
-              + (warns ? t("wb.export_fcpxml_warn", { n: warns }) : ""),
-          });
-        } catch (e) {
-          Quasar.Notify.create({
-            message: t("wb.export_fcpxml_fail") + (e.message ? ": " + e.message : ""),
-            color: "negative", position: "top", timeout: 6000,
-          });
-        }
+      }).onOk((name) => {
+        // 用原生导航触发下载（最稳：不受异步用户激活/弹窗拦截影响），zip 落到下载目录。
+        const n = encodeURIComponent((name || "").trim());
+        Quasar.Notify.create({
+          type: "info", position: "top", timeout: 2500,
+          message: t("wb.export_fcpxml_exporting"),
+        });
+        window.location.href = `/api/workbench/${this.project.id}/export-fcpxml?name=${n}`;
       });
     },
     openMediaPicker() {
