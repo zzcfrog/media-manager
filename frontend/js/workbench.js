@@ -2306,40 +2306,40 @@ const WorkbenchPage = {
         const safe = (name || "").trim() || "project";
         const url = `/api/workbench/${this.project.id}/export-fcpxml?name=${encodeURIComponent(safe)}`;
         try {
-          // 1. 先弹原生存盘对话框（趁 onOk 的用户激活还在）；Electron/Chromium 支持。
-          let handle = null;
-          if (window.showSaveFilePicker) {
-            try {
-              handle = await window.showSaveFilePicker({
-                suggestedName: `${safe}.zip`,
-                types: [{ description: "ZIP", accept: { "application/zip": [".zip"] } }],
-              });
-            } catch (e) {
-              if (e && e.name === "AbortError") return;  // 用户取消
-              handle = null;  // 其它异常 → 走回退
-            }
-          }
-          // 2. 取数据
+          // 1. 先取数据（ArrayBuffer），再交给写入层
           Quasar.Notify.create({ type: "info", position: "top", timeout: 2500, message: t("wb.export_fcpxml_exporting") });
           const res = await fetch(url);
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const buf = new Uint8Array(await res.arrayBuffer());
           if (!buf.length) throw new Error("导出内容为空");
-          // 3. 写到用户选的位置；无 showSaveFilePicker 则回退 blob 下载（普通浏览器）
-          if (handle) {
-            // Electron 某些版本 writable.write(blob) 会写 0 字节，用 Uint8Array 更稳。
+          // 2. 写文件：优先 Electron IPC（主进程 dialog.showSaveDialog + Node fs，最稳），
+          //    其次 showSaveFilePicker，最后 blob 下载（普通浏览器）。
+          const ea = window.electronAPI;
+          if (ea && typeof ea.saveExport === "function") {
+            const r = await ea.saveExport(buf, `${safe}.zip`, "zip");
+            if (r && r.canceled) return;  // 用户取消
+            if (!r || !r.path) throw new Error("保存失败");
+            Quasar.Notify.create({ type: "positive", position: "top", timeout: 4000,
+              message: t("wb.export_fcpxml_done", { name: safe }) });
+            return;
+          }
+          if (window.showSaveFilePicker) {
+            const handle = await window.showSaveFilePicker({
+              suggestedName: `${safe}.zip`,
+              types: [{ description: "ZIP", accept: { "application/zip": [".zip"] } }],
+            });
             const w = await handle.createWritable();
             await w.write(buf);
             await w.close();
             Quasar.Notify.create({ type: "positive", position: "top", timeout: 4000,
               message: t("wb.export_fcpxml_done", { name: safe }) });
-          } else {
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(new Blob([buf], { type: "application/zip" }));
-            a.download = `${safe}.zip`;
-            document.body.appendChild(a); a.click(); a.remove();
-            setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+            return;
           }
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(new Blob([buf], { type: "application/zip" }));
+          a.download = `${safe}.zip`;
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(() => URL.revokeObjectURL(a.href), 3000);
         } catch (e) {
           Quasar.Notify.create({
             message: t("wb.export_fcpxml_fail") + (e && e.message ? ": " + e.message : ""),

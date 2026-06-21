@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, nativeImage } = require("electron")
 const { spawn } = require("child_process");
 const path = require("path");
 const http = require("http");
+const fs = require("fs");
 
 const ICON = path.join(__dirname, "dock-icon.png");
 
@@ -84,6 +85,20 @@ app.on("ready", () => {
   ipcMain.handle("open-in-finder", async (event, filePath) => {
     const { shell } = require("electron");
     shell.showItemInFolder(filePath);
+  });
+
+  // 原生存盘对话框 + Node fs 写文件（renderer 的 showSaveFilePicker 在某些版本写出 0 字节）。
+  // data: ArrayBuffer/Uint8Array；suggestedName: 默认文件名。
+  ipcMain.handle("save-export", async (event, data, suggestedName, filterExt) => {
+    const ext = (filterExt || "zip").replace(/^\./, "");
+    const result = await dialog.showSaveDialog(win, {
+      title: "保存到",
+      defaultPath: suggestedName || `export.${ext}`,
+      filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
+    });
+    if (result.canceled || !result.filePath) return { canceled: true };
+    fs.writeFileSync(result.filePath, Buffer.from(data));
+    return { canceled: false, path: result.filePath };
   });
 
   startPython();
