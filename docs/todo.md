@@ -1,5 +1,15 @@
 # TODO
 
+## 已完成：素材库右键「用拍摄时间覆盖文件时间」（批量）（2026-06-21）
+
+素材库右键菜单新增「用拍摄时间覆盖文件时间」，把选中文件（支持多选批量）的**创建时间 + 修改时间**改为各自的 EXIF 拍摄时间，弹框确认**不可逆**。
+
+- **后端 [backend/blueprints/library.py](backend/blueprints/library.py)**：`POST /api/library/set-file-date-from-exif {ids}` —— 逐文件用 exiftool `-FileCreateDate=<dt> -FileModifyDate=<dt>` 写入，`<dt>` 取自 DB `date_taken`（导入时已带 CreateDate 回退）。**时区**：date_taken 是相机本地时间，exiftool 按本机时区写入文件时间戳，Finder 即显示拍摄本地日期（不做 UTC 换算，避免错位）。无 date_taken / 文件缺失的跳过；同步更新 DB `file_mtime`（mtime 已变，避免下次扫描误判）。返回 `{updated, skipped, errors}`。
+- **前端 [frontend/js/gallery.js](frontend/js/gallery.js)**：右键菜单加项（AI 分析之后，独立分组），单选/多选标签；`confirmSetFileDate()` 用 `Quasar.Dialog.create` 弹确认框（红色按钮，文案写明改创建+修改时间、不可逆、无拍摄时间的跳过）→ `API.setFileDateFromExif(selArr)` → notify 结果。
+- [frontend/js/api.js](frontend/js/api.js) 加 `setFileDateFromExif`；i18n 加 `g.ctx_set_file_date*` / `g.confirm_set_file_date*` / `g.set_file_date_done/fail` 中英。
+
+验证：exiftool 在 macOS 实测能写 birth time（FileCreateDate）；端点端到端测试（临时拷贝+临时 DB 行）——birth time 从拷贝时间正确改为拍摄时间，已清理，未碰真实素材。
+
 ## 已完成：导出改为 FCPXML + SRT 开放格式（剪映加密不可行）（2026-06-21）
 
 原「导出到剪映」生成剪映原生草稿，实测在剪映 6.0+/10.x（用户 10.8.7）上**打开报「草稿已损坏」**：剪映从 6.0 起对 `draft_info.json`/`draft_content.json` 加密（`crypto_key_store.dat`，scheme `jianying_draft_encrypt_v2`），cipher 只在剪映二进制内，pyJianYingDraft 只能生成明文、且仅兼容 ≤5.9。[jy-draftc](https://github.com/wenshui330/jy-draftc) 能回加密但 Windows 专属 + 调 `videoeditor.dll`，Mac 无对应方案。逆向 cipher 成功率低且随版本失效，放弃。

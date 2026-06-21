@@ -39,6 +39,9 @@ const API = {
   batchUpdate(data) {
     return this._fetch(`/api/library/batch`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
   },
+  setFileDateFromExif(ids) {
+    return this._fetch(`/api/library/set-file-date-from-exif`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) });
+  },
   batchGet(ids) {
     return this._fetch(`/api/library/batch-get`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) });
   },

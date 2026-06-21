@@ -863,6 +863,64 @@ def batch_write_xmp():
     return jsonify({"ok": True, "count": count})
 
 
+@bp.route("/set-file-date-from-exif", methods=["POST"])
+def set_file_date_from_exif():
+    """用拍摄时间（DB date_taken，已含 CreateDate 回退）覆盖文件的创建时间和修改时间。
+
+    时区：date_taken 是相机本地时间，exiftool `-FileCreateDate=` 按本机时区写入，
+    Finder 即显示为拍摄本地日期（不做 UTC 换算，避免日期错位）。无 date_taken 或
+    文件缺失的跳过。exiftool 不在则 500。该操作直接改文件系统时间戳，不可逆。
+    """
+    import shutil
+    import subprocess
+
+    db = get_db()
+    data = request.get_json(silent=True) or {}
+    ids = data.get("ids") or []
+    if not ids:
+        return jsonify({"error": "No ids"}), 400
+    if not shutil.which("exiftool"):
+        return jsonify({"error": "exiftool not found"}), 500
+
+    placeholders = ",".join("?" * len(ids))
+    rows = db.execute(
+        f"SELECT id, file_path, date_taken FROM media WHERE id IN ({placeholders})", ids
+    ).fetchall()
+
+    updated = 0
+    skipped = 0
+    errors = 0
+    for r in rows:
+        path = r["file_path"]
+        dt = (r["date_taken"] or "").strip()
+        if not path or not os.path.exists(path) or not dt:
+            skipped += 1
+            continue
+        # ISO '2024-08-17 15:40:39' → exiftool '2024:08:17 15:40:39'
+        exif_dt = dt.replace("-", ":", 2)
+        cmd = [
+            "exiftool", "-overwrite_original", "-q", "-q",
+            f"-FileCreateDate={exif_dt}", f"-FileModifyDate={exif_dt}", path,
+        ]
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            if proc.returncode == 0:
+                updated += 1
+                # 文件 mtime 已被改成拍摄时间，同步 DB file_mtime 避免下次扫描误判变更
+                try:
+                    db.execute("UPDATE media SET file_mtime = ? WHERE id = ?", (os.path.getmtime(path), r["id"]))
+                except OSError:
+                    pass
+            else:
+                errors += 1
+        except Exception:
+            errors += 1
+
+    db.commit()
+    logger.info("set-file-date-from-exif: ids={} updated={} skipped={} errors={}", len(ids), updated, skipped, errors)
+    return jsonify({"ok": True, "updated": updated, "skipped": skipped, "errors": errors})
+
+
 @bp.route("/<int:media_id>", methods=["PATCH"])
 def update_media(media_id):
     db = get_db()

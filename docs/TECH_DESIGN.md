@@ -242,6 +242,8 @@ import_single_file() × 5 并发（ThreadPoolExecutor）
 ```
 
 **批量导入端点**：`POST /api/library/import-batch`（SSE 流，前端单次请求，后端 5 线程并发处理，实时推送 ok/fail/skip 事件）
+
+**用拍摄时间覆盖文件时间**：`POST /api/library/set-file-date-from-exif {ids}`——逐文件用 exiftool `-FileCreateDate=<dt> -FileModifyDate=<dt>` 把文件创建/修改时间改为 DB `date_taken`（导入时已带 CreateDate 回退）。时区：date_taken 是相机本地时间，exiftool 按本机时区写入，Finder 显示拍摄本地日期（不做 UTC 换算）。无 date_taken / 文件缺失跳过；同步更新 `file_mtime`。返回 `{updated, skipped, errors}`。素材库右键菜单入口，支持多选批量，前端 `Quasar.Dialog` 二次确认（不可逆）。
     ├── _import_one() — 检查重复（已存在则跳过，不删旧缩略图）
     ├── _probe() / _probe_image() — ffprobe + exiftool 元数据
     │   ├── 视频额外检测：DJI 文件名 _D 后缀推断 D-Log M

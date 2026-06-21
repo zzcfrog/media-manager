@@ -404,6 +404,11 @@ const GalleryPage = {
           <q-item-section>{{ selArr.length > 1 ? t('g.ctx_analyze_n', {n: selArr.length}) : t('g.ctx_analyze') }}</q-item-section>
         </q-item>
         <q-separator style="background:var(--border)"></q-separator>
+        <q-item clickable @click="ctxMenu.show = false; confirmSetFileDate()" style="padding-left:8px;padding-right:12px">
+          <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="schedule" size="14px" color="grey-6"></q-icon></q-item-section>
+          <q-item-section>{{ selArr.length > 1 ? t('g.ctx_set_file_date_n', {n: selArr.length}) : t('g.ctx_set_file_date') }}</q-item-section>
+        </q-item>
+        <q-separator style="background:var(--border)"></q-separator>
         <q-item clickable @click="ctxMenu.show = false; deleteCtx()" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="delete_outline" size="14px" color="negative"></q-icon></q-item-section>
           <q-item-section style="color:var(--negative)">{{ selArr.length > 1 ? t('g.ctx_remove_n', {n: selArr.length}) : t('g.ctx_remove') }}</q-item-section>
@@ -1205,6 +1210,29 @@ const GalleryPage = {
         const m = this.items.find(i => i.id === id);
         this.confirmDelete = { show: true, id, name: m ? m.file_name : "" };
       }
+    },
+    confirmSetFileDate() {
+      const n = this.selArr.length;
+      Quasar.Dialog.create({
+        title: this.t("g.confirm_set_file_date"),
+        message: this.t("g.confirm_set_file_date_msg", { n }),
+        cancel: true,
+        persistent: false,
+        ok: { label: this.t("g.confirm_set_file_date"), color: "negative", unelevated: true },
+      }).onOk(async () => {
+        try {
+          const res = await API.setFileDateFromExif([...this.selArr]);
+          Quasar.Notify.create({
+            type: "positive", position: "top", timeout: 4000,
+            message: this.t("g.set_file_date_done", { updated: res.data.updated, skipped: res.data.skipped }),
+          });
+        } catch (e) {
+          Quasar.Notify.create({
+            message: this.t("g.set_file_date_fail", { msg: e.message || e }),
+            color: "negative", position: "top", timeout: 3000,
+          });
+        }
+      });
     },
     async openBatchAnalysisDialog() {
       this.ctxMenu.show = false;
