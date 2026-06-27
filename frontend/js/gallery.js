@@ -1252,9 +1252,12 @@ const GalleryPage = {
       }).onOk(async () => {
         try {
           const res = await API.setFileDateFromExif([...this.selArr]);
+          const errs = res.errors || 0;
           Quasar.Notify.create({
-            type: "positive", position: "top", timeout: 4000,
-            message: this.t("g.set_file_date_done", { updated: res.updated, skipped: res.skipped }),
+            type: errs > 0 && !(res.updated > 0) ? "negative" : (errs > 0 ? "warning" : "positive"),
+            position: "top", timeout: errs > 0 ? 6000 : 4000,
+            message: this.t("g.set_file_date_done", { updated: res.updated, skipped: res.skipped, errors: errs })
+              + (errs > 0 ? "  ⚠ " + this.t("g.file_op_errors_hint") : ""),
           });
         } catch (e) {
           Quasar.Notify.create({
@@ -1273,9 +1276,15 @@ const GalleryPage = {
       this.adjustTime.show = false;
       try {
         const res = await API.shiftShootingTime([...this.selArr], hours);
+        const errs = res.errors || 0;
         Quasar.Notify.create({
-          type: "positive", position: "top", timeout: 4000,
-          message: this.t("g.adjust_time_done", { hours: (hours > 0 ? "+" : "") + hours, updated: res.updated, skipped: res.skipped }),
+          type: errs > 0 && !(res.updated > 0) ? "negative" : (errs > 0 ? "warning" : "positive"),
+          position: "top", timeout: errs > 0 ? 6000 : 4000,
+          message: this.t("g.adjust_time_done", {
+            hours: (hours > 0 ? "+" : "") + hours,
+            updated: res.updated, skipped: res.skipped, errors: errs,
+          })
+          + (errs > 0 ? "  ⚠ " + this.t("g.file_op_errors_hint") : ""),
         });
         this.load && this.load();
       } catch (e) {
