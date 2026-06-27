@@ -921,6 +921,95 @@ def set_file_date_from_exif():
     return jsonify({"ok": True, "updated": updated, "skipped": skipped, "errors": errors})
 
 
+@bp.route("/shift-shooting-time", methods=["POST"])
+def shift_shooting_time():
+    """把文件拍摄时间元数据整体偏移 N 小时（-24..+24，用于校正相机时间/时区偏差）。
+
+    exiftool 对 DateTimeOriginal / CreateDate / TrackCreateDate / MediaCreateDate 统一
+    +=N:00:00（或 -=）。同时把 DB date_taken 按相同小时数偏移并保留原格式。直接改文件
+    元数据，需前端二次确认。返回 {updated, skipped, errors, hours}。
+    """
+    import shutil
+    import subprocess
+
+    db = get_db()
+    data = request.get_json(silent=True) or {}
+    ids = data.get("ids") or []
+    try:
+        hours = int(data.get("hours", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "invalid hours"}), 400
+    if not ids:
+        return jsonify({"error": "No ids"}), 400
+    if not -24 <= hours <= 24:
+        return jsonify({"error": "hours out of range (-24..24)"}), 400
+    if hours == 0:
+        return jsonify({"ok": True, "updated": 0, "skipped": len(ids), "errors": 0, "hours": 0})
+    if not shutil.which("exiftool"):
+        return jsonify({"error": "exiftool not found"}), 500
+
+    placeholders = ",".join("?" * len(ids))
+    rows = db.execute(
+        f"SELECT id, file_path, date_taken FROM media WHERE id IN ({placeholders})", ids
+    ).fetchall()
+
+    sign = "+=" if hours > 0 else "-="
+    h = abs(hours)
+    tags = ["DateTimeOriginal", "CreateDate", "TrackCreateDate", "MediaCreateDate"]
+    updated = 0
+    skipped = 0
+    errors = 0
+    for r in rows:
+        path = r["file_path"]
+        if not path or not os.path.exists(path):
+            skipped += 1
+            continue
+        cmd = ["exiftool", "-overwrite_original", "-q", "-q"] + [
+            f"-{t}{sign}{h}:00:00" for t in tags
+        ] + [path]
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            if proc.returncode == 0:
+                updated += 1
+                new_dt = _shift_date_taken(r["date_taken"], hours)
+                if new_dt:
+                    db.execute(
+                        "UPDATE media SET date_taken = ?, updated_at = datetime('now') WHERE id = ?",
+                        (new_dt, r["id"]),
+                    )
+            else:
+                errors += 1
+        except Exception:
+            errors += 1
+
+    db.commit()
+    logger.info(
+        "shift-shooting-time: ids={} hours={} updated={} skipped={} errors={}",
+        len(ids), hours, updated, skipped, errors,
+    )
+    return jsonify({"ok": True, "updated": updated, "skipped": skipped, "errors": errors, "hours": hours})
+
+
+def _shift_date_taken(dt, hours):
+    """date_taken 偏移 N 小时，保留原格式（ISO-Z=UTC / 纯文本=本地）。失败返回 None。"""
+    import datetime as _dt
+
+    if not dt:
+        return None
+    s = dt.strip()
+    try:
+        if "T" in s and s.endswith("Z"):
+            base = _dt.datetime.fromisoformat(s.replace("Z", "+00:00"))
+            return (base + _dt.timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%S.000000Z")
+        if "T" in s:
+            base = _dt.datetime.fromisoformat(s)
+            return (base + _dt.timedelta(hours=hours)).isoformat()
+        base = _dt.datetime.fromisoformat(s)
+        return (base + _dt.timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S")
+    except (ValueError, TypeError):
+        return None
+
+
 @bp.route("/<int:media_id>", methods=["PATCH"])
 def update_media(media_id):
     db = get_db()

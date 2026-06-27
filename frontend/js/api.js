@@ -42,6 +42,9 @@ const API = {
   setFileDateFromExif(ids) {
     return this._fetch(`/api/library/set-file-date-from-exif`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) });
   },
+  shiftShootingTime(ids, hours) {
+    return this._fetch(`/api/library/shift-shooting-time`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids, hours }) });
+  },
   batchGet(ids) {
     return this._fetch(`/api/library/batch-get`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) });
   },

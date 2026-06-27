@@ -408,6 +408,10 @@ const GalleryPage = {
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="schedule" size="14px" color="grey-6"></q-icon></q-item-section>
           <q-item-section>{{ selArr.length > 1 ? t('g.ctx_set_file_date_n', {n: selArr.length}) : t('g.ctx_set_file_date') }}</q-item-section>
         </q-item>
+        <q-item clickable @click="openAdjustTime()" style="padding-left:8px;padding-right:12px">
+          <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="time_to_leave" size="14px" color="grey-6"></q-icon></q-item-section>
+          <q-item-section>{{ selArr.length > 1 ? t('g.ctx_adjust_time_n', {n: selArr.length}) : t('g.ctx_adjust_time') }}</q-item-section>
+        </q-item>
         <q-separator style="background:var(--border)"></q-separator>
         <q-item clickable @click="ctxMenu.show = false; deleteCtx()" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="delete_outline" size="14px" color="negative"></q-icon></q-item-section>
@@ -447,6 +451,31 @@ const GalleryPage = {
         <q-card-actions align="right">
           <q-btn flat :label="t('g.cancel')" @click="confirmBatch.show=false"></q-btn>
           <q-btn color="red" :label="t('g.confirm_remove')" @click="doBatchDelete"></q-btn>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+    <!-- 拍摄时间时区调整 -->
+    <q-dialog v-model="adjustTime.show">
+      <q-card style="min-width:380px" class="dialog-card">
+        <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" v-close-popup></q-btn>
+        <q-card-section>
+          <div class="text-h6">{{ t('g.adjust_time_title') }}</div>
+        </q-card-section>
+        <q-card-section>
+          <p class="text-body2">{{ t('g.adjust_time_msg', {n: selArr.length}) }}</p>
+          <div style="display:flex;align-items:center;gap:12px;margin:8px 4px 4px">
+            <span style="font-size:12px;color:var(--text3)">-24h</span>
+            <q-slider v-model="adjustTime.hours" :min="-24" :max="24" :step="1" label :label-value="adjustTime.hours + 'h'" color="primary" style="flex:1"></q-slider>
+            <span style="font-size:12px;color:var(--text3)">+24h</span>
+          </div>
+          <p class="text-caption" :style="{color: adjustTime.hours > 0 ? 'var(--accent)' : (adjustTime.hours < 0 ? 'var(--accent)' : 'var(--text3)')}">
+            {{ adjustTime.hours > 0 ? t('g.adjust_time_later', {n: adjustTime.hours}) : (adjustTime.hours < 0 ? t('g.adjust_time_earlier', {n: -adjustTime.hours}) : t('g.adjust_time_zero')) }}
+          </p>
+          <p class="text-caption text-orange-8" style="margin-top:8px">⚠ {{ t('g.adjust_time_warn') }}</p>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat :label="t('g.cancel')" @click="adjustTime.show=false"></q-btn>
+          <q-btn color="primary" :label="t('g.adjust_time_apply')" :disable="adjustTime.hours === 0" @click="doAdjustTime"></q-btn>
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -646,6 +675,7 @@ const GalleryPage = {
       ctxMenu: { show: false, item: null, x: 0, y: 0 },
       confirmDelete: { show: false, id: null, name: "" },
       confirmBatch: { show: false },
+      adjustTime: { show: false, hours: 0 },
       showBatchAnalysisDialog: false,
       batchAnalysisInfo: { videos: 0, images: 0, analyzedCount: 0, videoModel: '', imageModel: '', existingAction: 'reanalyze' },
       similarDlg: { show: false, source: null, loading: false, similarType: 'near', near: [], similar: [], cluster: [] },
@@ -1233,6 +1263,27 @@ const GalleryPage = {
           });
         }
       });
+    },
+    openAdjustTime() {
+      this.adjustTime.hours = 0;
+      this.adjustTime.show = true;
+    },
+    async doAdjustTime() {
+      const hours = this.adjustTime.hours;
+      this.adjustTime.show = false;
+      try {
+        const res = await API.shiftShootingTime([...this.selArr], hours);
+        Quasar.Notify.create({
+          type: "positive", position: "top", timeout: 4000,
+          message: this.t("g.adjust_time_done", { hours: (hours > 0 ? "+" : "") + hours, updated: res.updated, skipped: res.skipped }),
+        });
+        this.load && this.load();
+      } catch (e) {
+        Quasar.Notify.create({
+          message: this.t("g.adjust_time_fail", { msg: e.message || e }),
+          color: "negative", position: "top", timeout: 3000,
+        });
+      }
     },
     async openBatchAnalysisDialog() {
       this.ctxMenu.show = false;

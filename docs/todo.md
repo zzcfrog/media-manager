@@ -1,5 +1,15 @@
 # TODO
 
+## 已完成：素材库右键「拍摄时间时区调整」（批量）（2026-06-27）
+
+素材库右键菜单新增「拍摄时间时区调整」，把选中文件（多选批量）的拍摄时间元数据整体偏移 ±24 小时内的整数小时，用于校正相机时间/时区偏差。弹窗有滑杆 + 不可逆提示。
+
+- **后端 [backend/blueprints/library.py](backend/blueprints/library.py)**：`POST /api/library/shift-shooting-time {ids,hours}` —— 每文件 exiftool 对 `DateTimeOriginal/CreateDate/TrackCreateDate/MediaCreateDate` 统一 `+=N:00:00`（或 `-=`），`hours` 限 `-24..+24`、0 直接返回。同步 DB `date_taken`（`_shift_date_taken` 按相同小时数偏移，保留 ISO-Z/纯文本两种原格式）。返回 `{updated, skipped, errors, hours}`。
+- **前端 [frontend/js/gallery.js](frontend/js/gallery.js)**：右键菜单项（「覆盖文件时间」下面）+ `<q-dialog>` 滑杆（-24..+24，步进 1，实时显示「向后 N h 变晚 / 向前 N h 变早」）+ ⚠ 不可逆提示。`openAdjustTime/doAdjustTime` → `API.shiftShootingTime(selArr,hours)` → notify + `this.load()` 刷新。
+- [frontend/js/api.js](frontend/js/api.js) 加 `shiftShootingTime`；i18n 加 `g.ctx_adjust_time*` / `g.adjust_time_*` 中英。
+
+验证：exiftool shift 语法实测（视频 QuickTime 三标签 + 照片 EXIF 都正确偏移）；端点端到端测试（临时拷贝）——文件 CreateDate + DB date_taken 均正确 +8h，格式保留，已清理，未碰真实素材。
+
 ## 已完成：素材库右键「用拍摄时间覆盖文件时间」（批量）（2026-06-21）
 
 素材库右键菜单新增「用拍摄时间覆盖文件时间」，把选中文件（支持多选批量）的**创建时间 + 修改时间**改为各自的 EXIF 拍摄时间，弹框确认**不可逆**。
