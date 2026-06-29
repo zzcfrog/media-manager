@@ -1,5 +1,22 @@
 # TODO
 
+## 已完成：批量改文件时间 改 SSE 流式 + 50/批（治慢/超时）（2026-06-30）
+
+「用拍摄时间覆盖文件时间」「拍摄时间时区调整」批量时很慢甚至超时。根因：①每个文件起一个 exiftool 子进程（N 次启动开销）；②shift 改 QuickTime 元数据需重写整个 MP4，大文件 + 慢 exFAT 盘单文件就慢；③串行单请求，总时间叠加超时。
+
+改为 **措施1（50/批合并 exiftool）+ 措施2（SSE 流式进度）**：
+
+- **后端 [backend/blueprints/library.py](backend/blueprints/library.py)**：两个端点都改成 `text/event-stream`。
+  - `_EXIFTOOL_CHUNK=50`、`_run_exiftool_chunk()`（一次 exiftool 跑一批，按 stderr `Error: ... - <path>` 找失败文件）、`_sse()`。
+  - **set-file-date**：每批 50 文件用 exiftool `-execute` 链（各文件不同 date_taken → `-FileCreateDate=dt -FileModifyDate=dt file -execute …`），一个进程跑完一批。
+  - **shift**：同一偏移量 → `exiftool <tag 偏移> file1…file50`，一个进程跑一批。
+  - 每批后 yield `progress` 事件（done/total/updated/errors/skipped）+ 末尾 `done`。失败文件不入 DB 更新。
+- **前端 [frontend/js/gallery.js](frontend/js/gallery.js)**：`_streamFileOp(url,body,label)` 通用 SSE 消费（`getReader`+`TextDecoder`，按 `\n\n` 切，解析 `data:` 事件）→ 驱动 `<q-dialog>` 进度框（`q-linear-progress` + 「done/total，已更新 N，失败 M」）。`doAdjustTime` / `confirmSetFileDate` 改用它。[api.js](frontend/js/api.js) 两个方法改返回 raw `fetch` Response（不再 `_fetch` 的 json）。i18n 加 `g.*_progress` / `g.file_op_fail`。
+
+效果：覆盖文件时间（只改文件系统时间戳、不重写文件）合并批后**快很多**（治本）；时区调整省启动 + SSE 不再整体超时、有进度可见（大文件重写 I/O 仍固有，但不再"卡死"）。
+
+验证：临时拷贝 3 文件实测两端点 SSE 流正常，shift CreateDate 正确 +5h、set-file-date `-execute` 链成功，已清理。
+
 ## 已完成：素材库右键「拍摄时间时区调整」（批量）（2026-06-27）
 
 素材库右键菜单新增「拍摄时间时区调整」，把选中文件（多选批量）的拍摄时间元数据整体偏移 ±24 小时内的整数小时，用于校正相机时间/时区偏差。弹窗有滑杆 + 不可逆提示。

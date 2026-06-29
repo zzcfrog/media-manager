@@ -479,6 +479,20 @@ const GalleryPage = {
         </q-card-actions>
       </q-card>
     </q-dialog>
+    <!-- 文件时间操作 进度 -->
+    <q-dialog v-model="fileOpProgress.show" persistent>
+      <q-card style="min-width:360px" class="dialog-card">
+        <q-card-section>
+          <div class="text-h6">{{ fileOpProgress.label }}</div>
+          <p class="text-body2" style="margin:8px 0 4px">
+            {{ fileOpProgress.done }} / {{ fileOpProgress.total }}
+            <span class="text-caption text-grey-6">（已更新 {{ fileOpProgress.updated }}，失败 {{ fileOpProgress.errors }}）</span>
+          </p>
+          <q-linear-progress :value="fileOpProgress.total ? fileOpProgress.done / fileOpProgress.total : 0"
+                             color="primary" track-color="grey-3" class="q-mt-sm" style="height:8px;border-radius:4px"></q-linear-progress>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
     <!-- Batch AI Analysis confirm -->
     <q-dialog v-model="showBatchAnalysisDialog" class="batch-analysis-dialog">
       <q-card style="min-width:400px" class="dialog-card">
@@ -676,6 +690,7 @@ const GalleryPage = {
       confirmDelete: { show: false, id: null, name: "" },
       confirmBatch: { show: false },
       adjustTime: { show: false, hours: 0 },
+      fileOpProgress: { show: false, done: 0, total: 0, updated: 0, errors: 0, label: "" },
       showBatchAnalysisDialog: false,
       batchAnalysisInfo: { videos: 0, images: 0, analyzedCount: 0, videoModel: '', imageModel: '', existingAction: 'reanalyze' },
       similarDlg: { show: false, source: null, loading: false, similarType: 'near', near: [], similar: [], cluster: [] },
@@ -1250,21 +1265,18 @@ const GalleryPage = {
         persistent: false,
         ok: { label: this.t("g.confirm_set_file_date"), color: "negative", unelevated: true },
       }).onOk(async () => {
-        try {
-          const res = await API.setFileDateFromExif([...this.selArr]);
-          const errs = res.errors || 0;
-          Quasar.Notify.create({
-            type: errs > 0 && !(res.updated > 0) ? "negative" : (errs > 0 ? "warning" : "positive"),
-            position: "top", timeout: errs > 0 ? 6000 : 4000,
-            message: this.t("g.set_file_date_done", { updated: res.updated, skipped: res.skipped, errors: errs })
-              + (errs > 0 ? "  ⚠ " + this.t("g.file_op_errors_hint") : ""),
-          });
-        } catch (e) {
-          Quasar.Notify.create({
-            message: this.t("g.set_file_date_fail", { msg: e.message || e }),
-            color: "negative", position: "top", timeout: 3000,
-          });
-        }
+        const res = await this._streamFileOp(
+          "/api/library/set-file-date-from-exif", { ids: [...this.selArr] }, "g.set_file_date_progress"
+        );
+        if (!res) return;
+        const errs = res.errors || 0;
+        Quasar.Notify.create({
+          type: errs > 0 && !(res.updated > 0) ? "negative" : (errs > 0 ? "warning" : "positive"),
+          position: "top", timeout: errs > 0 ? 6000 : 4000,
+          message: this.t("g.set_file_date_done", { updated: res.updated, skipped: res.skipped, errors: errs })
+            + (errs > 0 ? "  ⚠ " + this.t("g.file_op_errors_hint") : ""),
+        });
+        this.load && this.load();
       });
     },
     openAdjustTime() {
@@ -1274,25 +1286,71 @@ const GalleryPage = {
     async doAdjustTime() {
       const hours = this.adjustTime.hours;
       this.adjustTime.show = false;
+      const res = await this._streamFileOp(
+        "/api/library/shift-shooting-time", { ids: [...this.selArr], hours }, "g.adjust_time_progress"
+      );
+      if (!res) return;
+      const errs = res.errors || 0;
+      Quasar.Notify.create({
+        type: errs > 0 && !(res.updated > 0) ? "negative" : (errs > 0 ? "warning" : "positive"),
+        position: "top", timeout: errs > 0 ? 6000 : 4000,
+        message: this.t("g.adjust_time_done", {
+          hours: (hours > 0 ? "+" : "") + hours,
+          updated: res.updated, skipped: res.skipped, errors: errs,
+        })
+        + (errs > 0 ? "  ⚠ " + this.t("g.file_op_errors_hint") : ""),
+      });
+      this.load && this.load();
+    },
+    // 通用：SSE 流式跑文件时间操作，弹进度框。返回最终 done 事件（或 null=失败/取消）。
+    async _streamFileOp(url, body, labelKey) {
+      this.fileOpProgress = {
+        show: true, done: 0, total: body.ids ? body.ids.length : 0,
+        updated: 0, errors: 0, label: this.t(labelKey),
+      };
+      let finalEv = null;
       try {
-        const res = await API.shiftShootingTime([...this.selArr], hours);
-        const errs = res.errors || 0;
-        Quasar.Notify.create({
-          type: errs > 0 && !(res.updated > 0) ? "negative" : (errs > 0 ? "warning" : "positive"),
-          position: "top", timeout: errs > 0 ? 6000 : 4000,
-          message: this.t("g.adjust_time_done", {
-            hours: (hours > 0 ? "+" : "") + hours,
-            updated: res.updated, skipped: res.skipped, errors: errs,
-          })
-          + (errs > 0 ? "  ⚠ " + this.t("g.file_op_errors_hint") : ""),
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
         });
-        this.load && this.load();
+        if (!resp.ok) {
+          const j = await resp.json().catch(() => ({}));
+          throw new Error(j.error || ("HTTP " + resp.status));
+        }
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop();
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const ev = JSON.parse(line.slice(6));
+            if (ev.type === "progress") {
+              this.fileOpProgress.done = ev.done;
+              this.fileOpProgress.total = ev.total;
+              this.fileOpProgress.updated = ev.updated;
+              this.fileOpProgress.errors = ev.errors;
+            } else if (ev.type === "done") {
+              finalEv = ev;
+            }
+          }
+        }
       } catch (e) {
+        this.fileOpProgress.show = false;
         Quasar.Notify.create({
-          message: this.t("g.adjust_time_fail", { msg: e.message || e }),
-          color: "negative", position: "top", timeout: 3000,
+          message: this.t("g.file_op_fail", { msg: e.message || e }),
+          color: "negative", position: "top", timeout: 4000,
         });
+        return null;
       }
+      this.fileOpProgress.show = false;
+      return finalEv;
     },
     async openBatchAnalysisDialog() {
       this.ctxMenu.show = false;

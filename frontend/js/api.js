@@ -40,10 +40,10 @@ const API = {
     return this._fetch(`/api/library/batch`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
   },
   setFileDateFromExif(ids) {
-    return this._fetch(`/api/library/set-file-date-from-exif`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) });
+    return fetch(`/api/library/set-file-date-from-exif`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) });
   },
   shiftShootingTime(ids, hours) {
-    return this._fetch(`/api/library/shift-shooting-time`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids, hours }) });
+    return fetch(`/api/library/shift-shooting-time`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids, hours }) });
   },
   batchGet(ids) {
     return this._fetch(`/api/library/batch-get`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) });

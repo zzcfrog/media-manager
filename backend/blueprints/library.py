@@ -863,18 +863,43 @@ def batch_write_xmp():
     return jsonify({"ok": True, "count": count})
 
 
+_EXIFTOOL_CHUNK = 50  # 每批 exiftool 处理的文件数（措施1：合并子进程，省 N 次启动）
+
+
+def _run_exiftool_chunk(argv, chunk_paths, timeout):
+    """跑一次 exiftool（一批），按 stderr `Error: ... - <path>` 找出失败文件。
+
+    返回 failed_paths 集合。整批超时则视为全部失败。
+    """
+    import subprocess
+    try:
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return set(chunk_paths)
+    failed = set()
+    for line in (proc.stderr or "").splitlines():
+        s = line.strip()
+        if s.startswith("Error:"):
+            for p in chunk_paths:
+                if p and p in s:
+                    failed.add(p)
+    return failed
+
+
+def _sse(event):
+    return f"data: {json.dumps(event)}\n\n"
+
+
 @bp.route("/set-file-date-from-exif", methods=["POST"])
 def set_file_date_from_exif():
-    """用拍摄时间（DB date_taken，已含 CreateDate 回退）覆盖文件的创建时间和修改时间。
+    """用拍摄时间（DB date_taken）覆盖文件创建/修改时间。SSE 流式 + 50/批 exiftool。
 
-    时区：date_taken 是相机本地时间，exiftool `-FileCreateDate=` 按本机时区写入，
-    Finder 即显示为拍摄本地日期（不做 UTC 换算，避免日期错位）。无 date_taken 或
-    文件缺失的跳过。exiftool 不在则 500。该操作直接改文件系统时间戳，不可逆。
+    date_taken 是相机本地时间，exiftool `-FileCreateDate=` 按本机时区写入（Finder 显示拍摄本地日期）。
+    每批 50 文件一次 exiftool（-execute 链，各文件不同日期），省 N 次启动。stderr 解析失败文件。
     """
     import shutil
-    import subprocess
+    from flask import stream_with_context, Response
 
-    db = get_db()
     data = request.get_json(silent=True) or {}
     ids = data.get("ids") or []
     if not ids:
@@ -883,56 +908,58 @@ def set_file_date_from_exif():
         return jsonify({"error": "exiftool not found"}), 500
 
     placeholders = ",".join("?" * len(ids))
-    rows = db.execute(
+    all_rows = get_db().execute(
         f"SELECT id, file_path, date_taken FROM media WHERE id IN ({placeholders})", ids
     ).fetchall()
 
-    updated = 0
-    skipped = 0
-    errors = 0
-    for r in rows:
-        path = r["file_path"]
-        dt = (r["date_taken"] or "").strip()
-        if not path or not os.path.exists(path) or not dt:
-            skipped += 1
-            continue
-        # ISO '2024-08-17 15:40:39' → exiftool '2024:08:17 15:40:39'
-        exif_dt = dt.replace("-", ":", 2)
-        cmd = [
-            "exiftool", "-overwrite_original", "-q", "-q",
-            f"-FileCreateDate={exif_dt}", f"-FileModifyDate={exif_dt}", path,
-        ]
-        try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            if proc.returncode == 0:
-                updated += 1
-                # 文件 mtime 已被改成拍摄时间，同步 DB file_mtime 避免下次扫描误判变更
-                try:
-                    db.execute("UPDATE media SET file_mtime = ? WHERE id = ?", (os.path.getmtime(path), r["id"]))
-                except OSError:
-                    pass
+    def generate():
+        db = get_db()
+        valid = []
+        skipped = 0
+        for r in all_rows:
+            dt = (r["date_taken"] or "").strip()
+            if r["file_path"] and os.path.exists(r["file_path"]) and dt:
+                valid.append(r)
             else:
-                errors += 1
-        except Exception:
-            errors += 1
+                skipped += 1
+        total = len(valid)
+        updated = errors = done = 0
+        for i in range(0, total, _EXIFTOOL_CHUNK):
+            chunk = valid[i:i + _EXIFTOOL_CHUNK]
+            paths = [r["file_path"] for r in chunk]
+            argv = ["exiftool", "-overwrite_original"]
+            for r in chunk:
+                edt = (r["date_taken"] or "").replace("-", ":", 2)
+                argv += [f"-FileCreateDate={edt}", f"-FileModifyDate={edt}", r["file_path"], "-execute"]
+            failed = _run_exiftool_chunk(argv, paths, timeout=max(120, 5 * len(chunk)))
+            for r in chunk:
+                done += 1
+                if r["file_path"] in failed:
+                    errors += 1
+                else:
+                    updated += 1
+                    try:
+                        db.execute("UPDATE media SET file_mtime = ? WHERE id = ?", (os.path.getmtime(r["file_path"]), r["id"]))
+                    except OSError:
+                        pass
+            db.commit()
+            yield _sse({"type": "progress", "done": done, "total": total, "updated": updated, "errors": errors, "skipped": skipped})
+        logger.info("set-file-date-from-exif: ids={} updated={} skipped={} errors={}", len(ids), updated, skipped, errors)
+        yield _sse({"type": "done", "updated": updated, "skipped": skipped, "errors": errors})
 
-    db.commit()
-    logger.info("set-file-date-from-exif: ids={} updated={} skipped={} errors={}", len(ids), updated, skipped, errors)
-    return jsonify({"ok": True, "updated": updated, "skipped": skipped, "errors": errors})
+    return Response(stream_with_context(generate()), mimetype="text/event-stream")
 
 
 @bp.route("/shift-shooting-time", methods=["POST"])
 def shift_shooting_time():
-    """把文件拍摄时间元数据整体偏移 N 小时（-24..+24，用于校正相机时间/时区偏差）。
+    """把文件拍摄时间元数据整体偏移 N 小时（-24..+24）。SSE 流式 + 50/批 exiftool。
 
-    exiftool 对 DateTimeOriginal / CreateDate / TrackCreateDate / MediaCreateDate 统一
-    +=N:00:00（或 -=）。同时把 DB date_taken 按相同小时数偏移并保留原格式。直接改文件
-    元数据，需前端二次确认。返回 {updated, skipped, errors, hours}。
+    同一偏移量，一批 50 文件一次 exiftool（所有文件同 args），省 N 次启动。stderr 解析失败文件。
+    同步 DB date_taken（_shift_date_taken 保留 ISO-Z/纯文本格式）。
     """
     import shutil
-    import subprocess
+    from flask import stream_with_context, Response
 
-    db = get_db()
     data = request.get_json(silent=True) or {}
     ids = data.get("ids") or []
     try:
@@ -949,45 +976,44 @@ def shift_shooting_time():
         return jsonify({"error": "exiftool not found"}), 500
 
     placeholders = ",".join("?" * len(ids))
-    rows = db.execute(
+    all_rows = get_db().execute(
         f"SELECT id, file_path, date_taken FROM media WHERE id IN ({placeholders})", ids
     ).fetchall()
-
     sign = "+=" if hours > 0 else "-="
     h = abs(hours)
-    tags = ["DateTimeOriginal", "CreateDate", "TrackCreateDate", "MediaCreateDate"]
-    updated = 0
-    skipped = 0
-    errors = 0
-    for r in rows:
-        path = r["file_path"]
-        if not path or not os.path.exists(path):
-            skipped += 1
-            continue
-        cmd = ["exiftool", "-overwrite_original", "-q", "-q"] + [
-            f"-{t}{sign}{h}:00:00" for t in tags
-        ] + [path]
-        try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            if proc.returncode == 0:
-                updated += 1
-                new_dt = _shift_date_taken(r["date_taken"], hours)
-                if new_dt:
-                    db.execute(
-                        "UPDATE media SET date_taken = ?, updated_at = datetime('now') WHERE id = ?",
-                        (new_dt, r["id"]),
-                    )
-            else:
-                errors += 1
-        except Exception:
-            errors += 1
+    tag_args = [f"-{t}{sign}{h}:00:00" for t in ["DateTimeOriginal", "CreateDate", "TrackCreateDate", "MediaCreateDate"]]
 
-    db.commit()
-    logger.info(
-        "shift-shooting-time: ids={} hours={} updated={} skipped={} errors={}",
-        len(ids), hours, updated, skipped, errors,
-    )
-    return jsonify({"ok": True, "updated": updated, "skipped": skipped, "errors": errors, "hours": hours})
+    def generate():
+        db = get_db()
+        valid = []
+        skipped = 0
+        for r in all_rows:
+            if r["file_path"] and os.path.exists(r["file_path"]):
+                valid.append(r)
+            else:
+                skipped += 1
+        total = len(valid)
+        updated = errors = done = 0
+        for i in range(0, total, _EXIFTOOL_CHUNK):
+            chunk = valid[i:i + _EXIFTOOL_CHUNK]
+            paths = [r["file_path"] for r in chunk]
+            argv = ["exiftool", "-overwrite_original"] + tag_args + paths
+            failed = _run_exiftool_chunk(argv, paths, timeout=max(180, 30 * len(chunk)))
+            for r in chunk:
+                done += 1
+                if r["file_path"] in failed:
+                    errors += 1
+                else:
+                    updated += 1
+                    new_dt = _shift_date_taken(r["date_taken"], hours)
+                    if new_dt:
+                        db.execute("UPDATE media SET date_taken = ?, updated_at = datetime('now') WHERE id = ?", (new_dt, r["id"]))
+            db.commit()
+            yield _sse({"type": "progress", "done": done, "total": total, "updated": updated, "errors": errors, "skipped": skipped})
+        logger.info("shift-shooting-time: ids={} hours={} updated={} skipped={} errors={}", len(ids), hours, updated, skipped, errors)
+        yield _sse({"type": "done", "updated": updated, "skipped": skipped, "errors": errors, "hours": hours})
+
+    return Response(stream_with_context(generate()), mimetype="text/event-stream")
 
 
 def _shift_date_taken(dt, hours):
