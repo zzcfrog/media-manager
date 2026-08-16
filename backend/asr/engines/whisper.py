@@ -82,6 +82,9 @@ class WhisperEngine(AsrEngine):
         except Exception as e:
             logger.warning("Whisper 预加载失败（{}）—— 首次使用 ASR 时会重试", e)
 
+    def is_ready(self):
+        return _model_loaded
+
     def transcribe(self, audio_path: str | Path, on_progress=None, model_name: str | None = None) -> list[AsrSegment]:
         if on_progress and not _model_loaded:
             on_progress("loading")

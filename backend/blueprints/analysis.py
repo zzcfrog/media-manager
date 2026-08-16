@@ -9,8 +9,9 @@ from pathlib import Path
 from ..db import get_db, get_setting
 from ..compressor import compress_video, compress_image
 from ..config import HEIF_EXTS, ANALYSIS_API_CONCURRENCY, ANALYSIS_THREAD_POOL_SIZE
-from ..analyzer import analyze_video, analyze_image, CODING_BASE_URL
+from ..analyzer import analyze_video, analyze_image, analyze_video_frames, CODING_BASE_URL
 from ..asr import get_engine as get_asr_engine, preload_all, reload_engine
+from .. import local_vlm
 from ..emotion_labels import dominant_mood, aggregate_emotions
 
 bp = Blueprint("analysis", __name__)
@@ -61,7 +62,14 @@ def get_progress():
         if p.get("step") == "analyzing":
             item["substep"] = p.get("substep", "uploading")
             item["chars"] = p.get("chars", 0)
+            if p.get("window"):
+                item["window"] = p["window"]
         result.append(item)
+    # 启动期 ASR 模型预加载也并入进度条（系统任务）
+    from ..asr import preload_state
+    if preload_state["state"] == "loading":
+        result.append({"id": "__preload__", "step": "asr_loading", "media_type": "system",
+                       "file_name": f"{preload_state['engine']} {preload_state['model']}".strip()})
     return jsonify(result)
 
 
@@ -126,6 +134,7 @@ def start_batch_analysis():
         progress = {"step": "queued", "substep": "uploading", "chars": 0}
 
         if media["media_type"] == "video":
+            vengine = get_setting(db, "video_engine", "cloud")
             api_key = get_setting(db, "video_api_key", "")
             model = get_setting(db, "model", "glm-4.6v")
             resolution = get_setting(db, "resolution", "480")
@@ -133,8 +142,13 @@ def start_batch_analysis():
             hw_accel = get_setting(db, "hw_accel", "false") == "true"
             use_multimodal = get_setting(db, "use_multimodal", "true") == "true"
             asr_engine_name = get_setting(db, "asr_engine", "whisper")
+            local_cfg = None
+            if vengine == "local":
+                local_cfg = _local_video_cfg(db)
+                use_multimodal = False  # 本地引擎帧无音频，强制独立 whisper ASR
             _analysis_pool.submit(_process_video, media_id, file_path, api_key, model,
-                        resolution, fps, hw_accel, use_multimodal, asr_engine_name, app, progress)
+                        resolution, fps, hw_accel, use_multimodal, asr_engine_name,
+                        app, progress, vengine, local_cfg)
         elif media["media_type"] == "image":
             image_api_key = get_setting(db, "image_api_key", "")
             image_model = get_setting(db, "image_model", "glm-4.6v")
@@ -158,7 +172,8 @@ def _sse(event_dict):
 # ---------------------------------------------------------------------------
 
 def _process_video(media_id, file_path, api_key, model, resolution, fps, hw_accel,
-                   use_multimodal, asr_engine_name, app, progress):
+                   use_multimodal, asr_engine_name, app, progress,
+                   engine="cloud", local_cfg=None):
     """Full video pipeline in a thread: compress → VLM (semaphore) → ASR → save."""
     _active_progress[media_id] = progress
     progress["media_type"] = "video"
@@ -185,6 +200,13 @@ def _process_video(media_id, file_path, api_key, model, resolution, fps, hw_acce
             }
             progress["compress_time"] = compress_time
 
+            # --- 本地引擎：确保 llama-server 就绪（幂等；首次/切换模型 4~40s） ---
+            base_url = CODING_BASE_URL
+            if engine == "local":
+                progress["step"] = "engine_starting"
+                base_url = local_vlm.ensure(local_cfg["model_id"])["base_url"]
+                progress["step"] = "queued"
+
             # --- VLM Analyze (bounded by API concurrency) ---
             _api_semaphore.acquire()
             try:
@@ -197,15 +219,26 @@ def _process_video(media_id, file_path, api_key, model, resolution, fps, hw_acce
                         progress["substep"] = "receiving"
                         progress["chars"] = chars
 
-                segments, analyze_time, usage = analyze_video(
-                    str(compressed_path), api_key, model=model,
-                    base_url=CODING_BASE_URL, multimodal=use_multimodal,
-                    on_progress=on_analyze_progress,
-                )
+                if engine == "local":
+                    def on_window(cur, total):
+                        progress["substep"] = "receiving"
+                        progress["window"] = f"{cur}/{total}"
+                    segments, analyze_time, usage = analyze_video_frames(
+                        str(compressed_path), "local", model=local_cfg["model_id"],
+                        base_url=base_url, fps=local_cfg["fps"],
+                        max_frames=local_cfg["max_frames"],
+                        on_progress=on_analyze_progress, on_window=on_window,
+                    )
+                else:
+                    segments, analyze_time, usage = analyze_video(
+                        str(compressed_path), api_key, model=model,
+                        base_url=CODING_BASE_URL, multimodal=use_multimodal,
+                        on_progress=on_analyze_progress,
+                    )
             finally:
                 _api_semaphore.release()
 
-            # --- ASR (parallel OK) ---
+            # --- ASR (parallel OK)；本地模式帧无音频，上游已强制 use_multimodal=False ---
             if not use_multimodal:
                 asr_engine = get_asr_engine(asr_engine_name) if asr_engine_name else None
                 if asr_engine:
@@ -213,12 +246,13 @@ def _process_video(media_id, file_path, api_key, model, resolution, fps, hw_acce
                         asr_model_name = get_setting(get_db(), "asr_model", "large-v3")
                         asr_segments = asr_engine.transcribe(str(compressed_path), model_name=asr_model_name)
                         if asr_segments:
-                            _merge_asr(segments, asr_segments)
+                            _merge_asr(segments, _stitch_asr_sentences(asr_segments))
                     except Exception as e:
                         logger.error("ASR failed: {}", e)
 
             # --- Save ---
-            save_segments(media_id, segments, model=model)
+            _stitch_cross_segments(segments)
+            save_segments(media_id, segments, model=(local_cfg["model_id"] if engine == "local" else model))
             progress["step"] = "done"
             logger.info("Video analysis thread done: media_id={} segments={}", media_id, len(segments))
             progress["result"] = {"segments": segments, "analyze_time": analyze_time, "usage": usage}
@@ -241,7 +275,7 @@ def _process_video(media_id, file_path, api_key, model, resolution, fps, hw_acce
 
 
 def _process_image(media_id, file_path, image_api_key, model, image_resolution,
-                   app, progress):
+                   app, progress, engine="cloud", local_model_id="qwen3-vl-8b"):
     """Full image pipeline in a thread: compress → VLM (semaphore) → save."""
     _active_progress[media_id] = progress
     progress["media_type"] = "image"
@@ -262,6 +296,15 @@ def _process_image(media_id, file_path, image_api_key, model, image_resolution,
                     "message": f"压缩完成: {size_kb:.0f}KB, 耗时 {compress_time:.1f}s",
                 }
 
+            # 本地引擎：确保 llama-server 已就绪（幂等；首次启动/切换模型需 4~40s）
+            if engine == "local":
+                progress["step"] = "engine_starting"
+                st = local_vlm.ensure(local_model_id)
+                base_url, model_name, key = st["base_url"], local_model_id, "local"
+                progress["step"] = "queued"
+            else:
+                base_url, model_name, key = CODING_BASE_URL, model, image_api_key
+
             # VLM Analyze (bounded by API concurrency)
             _api_semaphore.acquire()
             try:
@@ -275,14 +318,14 @@ def _process_image(media_id, file_path, image_api_key, model, image_resolution,
                         progress["chars"] = chars
 
                 result, analyze_time, usage = analyze_image(
-                    analyze_path, image_api_key,
-                    model=model, base_url=CODING_BASE_URL, on_progress=on_progress,
+                    analyze_path, key,
+                    model=model_name, base_url=base_url, on_progress=on_progress,
                 )
             finally:
                 _api_semaphore.release()
 
             segments = [result]
-            save_segments(media_id, segments, model=model)
+            save_segments(media_id, segments, model=model_name)
             progress["step"] = "done"
             logger.info("Image analysis thread done: media_id={}", media_id)
             progress["result"] = {"analyze_time": analyze_time, "usage": usage}
@@ -311,9 +354,11 @@ def _process_image(media_id, file_path, image_api_key, model, image_resolution,
 
 def _start_image_analysis(media_id, media, app):
     db = get_db()
+    engine = get_setting(db, "image_engine", "cloud")
     model = get_setting(db, "image_model", "glm-4.6v")
     image_api_key = get_setting(db, "image_api_key", "")
-    if not image_api_key:
+    local_model_id = get_setting(db, "local_model", "qwen3-vl-8b")
+    if engine != "local" and not image_api_key:
         return jsonify({"error": "图片 API Key 未设置，请在设置中配置"}), 400
     image_resolution = get_setting(db, "image_resolution", "1920")
     file_path = media["file_path"]
@@ -324,13 +369,17 @@ def _start_image_analysis(media_id, media, app):
     def generate():
         progress = {"step": "queued", "substep": "uploading", "chars": 0}
         _analysis_pool.submit(_process_image, media_id, file_path, image_api_key, model,
-                    image_resolution, app, progress)
+                    image_resolution, app, progress, engine, local_model_id)
+        display_model = local_model_id if engine == "local" else model
 
         emitted = {"compress_start": False, "compressed": False, "analyze_start": False}
         while progress["step"] not in ("done", "error"):
             step = progress["step"]
             if step == "queued":
                 yield _sse({'type': 'progress', 'step': 'queued', 'message': '排队等待中...'})
+            elif step == "engine_starting":
+                yield _sse({'type': 'progress', 'step': 'engine_starting',
+                            'message': f'启动本地引擎（{local_model_id}）...'})
             elif step == "compressing":
                 if not emitted["compress_start"]:
                     emitted["compress_start"] = True
@@ -345,7 +394,7 @@ def _start_image_analysis(media_id, media, app):
                 if not emitted["analyze_start"]:
                     emitted["analyze_start"] = True
                     yield _sse({'type': 'progress', 'step': 'analyzing',
-                                'message': f'调用 {model} 分析中...'})
+                                'message': f'调用 {display_model} 分析中...'})
                 yield _sse({'type': 'progress', 'step': 'analyzing',
                             'substep': progress.get('substep', 'uploading'),
                             'chars': progress.get('chars', 0)})
@@ -362,16 +411,30 @@ def _start_image_analysis(media_id, media, app):
     return Response(generate(), mimetype="text/event-stream")
 
 
+def _local_video_cfg(db):
+    """本地视频引擎配置（供单条/批量两个入口复用）。"""
+    return {
+        "model_id": get_setting(db, "local_model", "qwen3-vl-8b"),
+        "fps": float(get_setting(db, "local_frames_fps", "1") or 1),
+        "max_frames": int(get_setting(db, "local_frames_max", "32") or 32),
+    }
+
+
 def _start_video_analysis(media_id, media, app):
     db = get_db()
+    engine = get_setting(db, "video_engine", "cloud")
     model = get_setting(db, "model", "glm-4.6v")
     resolution = get_setting(db, "resolution", "480")
     fps = get_setting(db, "fps", "30")
     use_multimodal = get_setting(db, "use_multimodal", "true") == "true"
     asr_engine_name = get_setting(db, "asr_engine", "whisper")
     api_key = get_setting(db, "video_api_key", "")
-    if not api_key:
-        return jsonify({"error": "API Key 未设置，请在设置中配置"}), 400
+    local_cfg = _local_video_cfg(db) if engine == "local" else None
+    if engine != "local":
+        if not api_key:
+            return jsonify({"error": "API Key 未设置，请在设置中配置"}), 400
+    else:
+        use_multimodal = False  # 本地引擎帧无音频，强制独立 whisper ASR
     hw_accel = get_setting(db, "hw_accel", "false") == "true"
     file_path = media["file_path"]
 
@@ -379,13 +442,17 @@ def _start_video_analysis(media_id, media, app):
         progress = {"step": "queued", "compress_pct": 0, "substep": "uploading", "chars": 0}
         _analysis_pool.submit(_process_video, media_id, file_path, api_key, model,
                     resolution, fps, hw_accel, use_multimodal, asr_engine_name,
-                    app, progress)
+                    app, progress, engine, local_cfg)
+        display_model = local_cfg["model_id"] if engine == "local" else model
 
         emitted = {"compress_start": False, "compressed": False, "analyze_start": False}
         while progress["step"] not in ("done", "error"):
             step = progress["step"]
             if step == "queued":
                 yield _sse({'type': 'progress', 'step': 'queued', 'message': '排队等待中...'})
+            elif step == "engine_starting":
+                yield _sse({'type': 'progress', 'step': 'engine_starting',
+                            'message': f'启动本地引擎（{local_cfg["model_id"]}）...'})
             elif step == "compressing":
                 if not emitted["compress_start"]:
                     emitted["compress_start"] = True
@@ -401,11 +468,12 @@ def _start_video_analysis(media_id, media, app):
                         yield _sse({'type': 'progress', 'step': 'compressed', **ci})
                 if not emitted["analyze_start"]:
                     emitted["analyze_start"] = True
-                    msg = f'AI 综合分析中（{model}）...' if use_multimodal else f'调用 {model} 分析中...'
+                    msg = f'AI 综合分析中（{display_model}）...' if use_multimodal else f'调用 {display_model} 分析中...'
                     yield _sse({'type': 'progress', 'step': 'analyzing', 'message': msg})
                 yield _sse({'type': 'progress', 'step': 'analyzing',
                             'substep': progress.get('substep', 'uploading'),
-                            'chars': progress.get('chars', 0)})
+                            'chars': progress.get('chars', 0),
+                            **({'window': progress['window']} if progress.get('window') else {})})
             time.sleep(0.3)
 
         if progress["step"] == "done":
@@ -428,6 +496,53 @@ def _parse_time(ts: str) -> float:
     if len(parts) == 2:
         return float(parts[0]) * 60 + float(parts[1])
     return float(ts)
+
+
+_TERMINALS = set("。！？!?….")
+
+
+def _ends_sentence(text: str) -> bool:
+    """句末是否有终止标点（句号/问号/叹号/省略号，中英）。无标点或逗号分号算未说完。"""
+    t = (text or "").rstrip()
+    return bool(t) and t[-1] in _TERMINALS
+
+
+def _joiner_for(next_text: str) -> str:
+    """拼接用间隔符：下一个片段是 CJK/全角开头不加空格，拉丁字母加空格。"""
+    return "" if next_text and ord(next_text[0]) >= 0x2E80 else " "
+
+
+def _stitch_asr_sentences(asr_segments, max_gap: float = 1.2):
+    """Whisper 常在句中停顿处把一句话切成多段——把「前段无终止标点 + 间隔小」的相邻段
+    拼回整句再分配分镜，避免一句话被拆到两个分镜。"""
+    out = []
+    for seg in asr_segments:
+        prev = out[-1] if out else None
+        if prev is not None and not _ends_sentence(prev.text):
+            try:
+                gap = _parse_time(seg.time_start) - _parse_time(prev.time_end)
+            except (ValueError, IndexError):
+                gap = max_gap + 1
+            if gap < max_gap:
+                prev.text += _joiner_for(seg.text) + seg.text
+                prev.time_end = seg.time_end
+                continue
+        out.append(seg)
+    return out
+
+
+def _stitch_cross_segments(vlm_segments):
+    """句子跨分镜边界被切成两半（多模态模式按镜头转写，或缝合后仍跨镜）——
+    前一分镜的 asr 未说完时，把后一分镜的 asr 拼回去。best-effort：
+    后一分镜若含自己的完整句也会被一并带过去。"""
+    for a, b in zip(vlm_segments, vlm_segments[1:]):
+        if not a.get("asr") or not b.get("asr") or _ends_sentence(a["asr"]):
+            continue
+        a["asr"] += _joiner_for(b["asr"]) + b["asr"]
+        b["asr"] = ""
+    for seg in vlm_segments:
+        if not seg.get("asr"):
+            seg.pop("asr", None)
 
 
 def _merge_asr(vlm_segments, asr_segments):

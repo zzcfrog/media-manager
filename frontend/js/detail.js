@@ -1001,6 +1001,12 @@ const DetailPage = {
                 task.percent = 0;
                 if (isAlive()) self.analysisProgress = t('d.queued');
               }
+              if (evt.step === "engine_starting") {
+                task.step = "engine_starting";
+                task.stageLabel = t('d.engine_starting');
+                task.percent = 5;
+                if (isAlive()) self.analysisProgress = evt.message || t('d.engine_starting');
+              }
               if (evt.step === "compressing") {
                 task.step = "compressing";
                 task.stageLabel = t('d.compressing');
@@ -1027,6 +1033,11 @@ const DetailPage = {
                 task.step = "analyzing";
                 task.stageLabel = t('d.analyzing');
                 task.percent = 40 + (isImage ? 30 : 20);
+                const wm = /^(\d+)\/(\d+)$/.exec(evt.window || '');
+                if (wm) {
+                  task.stageLabel = t('d.analyzing') + ' · ' + evt.window;
+                  task.percent = 60 + (parseInt(wm[1]) / parseInt(wm[2])) * 9;
+                }
                 if (isAlive()) {
                   if (!isImage) {
                     const fmtSize = (b) => {

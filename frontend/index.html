@@ -29,8 +29,9 @@
                 <span class="text-caption text-grey-6">{{ t('g.bg_tasks') }}</span>
                 <q-btn v-if="bgTasks.some(t=>t.status!=='running')" flat dense size="xs" color="grey-6" :label="t('g.bg_clear')" @click="clearBgTasks"></q-btn>
               </div>
-              <div v-for="task in bgTasks.filter(t => t.id !== '__placeholder__')" :key="task.id" class="bg-task-item" @click="bgTaskGo(task.id)">
-                <img :src="'/media/thumbnail/'+task.id" class="bg-task-thumb" />
+              <div v-for="task in bgTasks.filter(t => t.id !== '__placeholder__')" :key="task.id" class="bg-task-item" @click="task.id !== '__preload__' && bgTaskGo(task.id)">
+                <img v-if="task.id !== '__preload__'" :src="'/media/thumbnail/'+task.id" class="bg-task-thumb" />
+                <div v-else class="bg-task-thumb" style="display:flex;align-items:center;justify-content:center"><q-icon name="graphic_eq" size="18px" color="grey-5"></q-icon></div>
                 <div style="flex:1;min-width:0">
                   <div class="bg-task-name">{{ task.fileName }}</div>
                   <div class="bg-task-stage">{{ task.stageLabel }}</div>
@@ -275,7 +276,7 @@
         <q-tab :name="'general'" :label="t('s.tab_general')" style="font-size:12px"></q-tab>
         <q-tab :name="'image'" :label="t('s.tab_image')" style="font-size:12px"></q-tab>
         <q-tab :name="'video'" :label="t('s.tab_video')" style="font-size:12px"></q-tab>
-        <q-tab v-if="!settingsForm.useMultimodal" :name="'audio'" :label="t('s.tab_audio')" style="font-size:12px"></q-tab>
+        <q-tab v-if="!settingsForm.useMultimodal || settingsForm.videoEngine === 'local'" :name="'audio'" :label="t('s.tab_audio')" style="font-size:12px"></q-tab>
       </q-tabs>
       <q-separator style="background:var(--border)"></q-separator>
       <q-tab-panels v-model="settingsTab" animated style="min-height:200px">
@@ -292,26 +293,53 @@
         </q-tab-panel>
         <!-- Image tab -->
         <q-tab-panel :name="'image'" style="display:flex;flex-direction:column;gap:12px">
+          <div class="row items-center q-gutter-md">
+            <div class="text-caption text-grey-5">{{ t('s.engine') }}</div>
+            <q-radio v-model="settingsForm.imageEngine" val="cloud" :label="t('s.engine_cloud')" dense></q-radio>
+            <q-radio v-model="settingsForm.imageEngine" val="local" :label="t('s.engine_local')" dense></q-radio>
+          </div>
           <q-select v-model="settingsForm.imageResolution" :options="computedImgResOptions" :label="t('s.compress_size')" dense filled emit-value map-options></q-select>
-          <q-select v-model="settingsForm.imageModel" :options="computedImgModelOptions" :label="t('s.ai_model')" dense filled emit-value map-options></q-select>
-          <q-input v-model="settingsForm.imageApiKey" :type="showImgKey ? 'text' : 'password'" :label="t('s.api_key')" dense filled>
-            <template v-slot:append>
-              <q-icon :name="showImgKey ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="showImgKey = !showImgKey"></q-icon>
-            </template>
-            <template v-slot:hint>
-              <span class="text-grey-6" style="font-size:11px">{{ t('s.img_api_hint') }}</span>
-            </template>
-          </q-input>
+          <template v-if="settingsForm.imageEngine !== 'local'">
+            <q-select v-model="settingsForm.imageModel" :options="computedImgModelOptions" :label="t('s.ai_model')" dense filled emit-value map-options></q-select>
+            <q-input v-model="settingsForm.imageApiKey" :type="showImgKey ? 'text' : 'password'" :label="t('s.api_key')" dense filled>
+              <template v-slot:append>
+                <q-icon :name="showImgKey ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="showImgKey = !showImgKey"></q-icon>
+              </template>
+              <template v-slot:hint>
+                <span class="text-grey-6" style="font-size:11px">{{ t('s.img_api_hint') }}</span>
+              </template>
+            </q-input>
+          </template>
+          <template v-else>
+            <q-select v-model="settingsForm.localModel" :options="computedLocalModelOptions" :label="t('s.local_model')" dense filled emit-value map-options></q-select>
+            <div style="font-size:11px;color:var(--text3);padding:0 4px">{{ localModels.length ? t('s.local_engine_hint') : t('s.local_no_models') }}</div>
+          </template>
         </q-tab-panel>
         <!-- Video tab -->
         <q-tab-panel :name="'video'" style="display:flex;flex-direction:column;gap:12px">
+          <div class="row items-center q-gutter-md">
+            <div class="text-caption text-grey-5">{{ t('s.engine') }}</div>
+            <q-radio v-model="settingsForm.videoEngine" val="cloud" :label="t('s.engine_cloud')" dense></q-radio>
+            <q-radio v-model="settingsForm.videoEngine" val="local" :label="t('s.engine_local')" dense></q-radio>
+          </div>
           <div class="row q-col-gutter-sm">
             <q-select v-model="settingsForm.resolution" :options="computedResOptions" :label="t('s.compress_res')" dense filled emit-value map-options class="col"></q-select>
             <q-select v-model="settingsForm.fps" :options="computedFpsOptions" :label="t('s.fps')" dense filled emit-value map-options class="col"></q-select>
           </div>
           <div style="font-size:11px;color:var(--text3);padding:0 4px">{{ t('s.estimated_bitrate', {rate: estimatedBitrate}) }}</div>
           <q-toggle v-if="hwEncoderAvailable" v-model="settingsForm.hwAccel" :label="t('s.hw_accel')"></q-toggle>
-          <q-select v-model="settingsForm.model" :options="computedModelOptions" :label="t('s.ai_model')" dense filled emit-value map-options></q-select>
+          <template v-if="settingsForm.videoEngine !== 'local'">
+            <q-select v-model="settingsForm.model" :options="computedModelOptions" :label="t('s.ai_model')" dense filled emit-value map-options></q-select>
+            <q-toggle v-model="settingsForm.useMultimodal" :label="t('s.multimodal')"></q-toggle>
+          </template>
+          <template v-else>
+            <q-select v-model="settingsForm.localModel" :options="computedLocalModelOptions" :label="t('s.local_model')" dense filled emit-value map-options></q-select>
+            <div class="row q-col-gutter-sm">
+              <q-select v-model="settingsForm.localFps" :options="computedLocalFpsOptions" :label="t('s.local_fps')" dense filled emit-value map-options class="col"></q-select>
+              <q-select v-model="settingsForm.localMaxFrames" :options="computedLocalMaxOptions" :label="t('s.local_frames_max')" dense filled emit-value map-options class="col"></q-select>
+            </div>
+            <div style="font-size:11px;color:var(--text3);padding:0 4px">{{ t('s.local_video_hint') }}</div>
+          </template>
           <q-select v-model="settingsForm.creativeModel" :options="computedCreativeModelOptions" :label="t('s.creative_model')" dense filled emit-value map-options></q-select>
           <q-input v-model="settingsForm.videoApiKey" :type="showVideoKey ? 'text' : 'password'" :label="t('s.api_key')" dense filled>
             <template v-slot:append>
@@ -321,7 +349,6 @@
               <span class="text-grey-6" style="font-size:11px">{{ t('s.video_api_hint') }}</span>
             </template>
           </q-input>
-          <q-toggle v-model="settingsForm.useMultimodal" :label="t('s.multimodal')"></q-toggle>
         </q-tab-panel>
         <!-- Audio tab -->
         <q-tab-panel :name="'audio'" style="display:flex;flex-direction:column;gap:12px">
@@ -578,7 +605,8 @@ const app = Vue.createApp({
       showImport: false,
       showSettings: false,
       showShortcuts: false,
-      settingsForm: { resolution: "480", fps: "30", model: "glm-4.6v", useMultimodal: true, asrEngine: "whisper", asrModel: "large-v3", videoApiKey: "", asrApiKey: "", imageResolution: "1920", imageApiKey: "", imageModel: "glm-4.6v", hwAccel: false, language: "zh", creativeModel: "glm-5-turbo" },
+      settingsForm: { resolution: "480", fps: "30", model: "glm-4.6v", useMultimodal: true, asrEngine: "whisper", asrModel: "large-v3", videoApiKey: "", asrApiKey: "", imageResolution: "1920", imageApiKey: "", imageModel: "glm-4.6v", imageEngine: "cloud", videoEngine: "cloud", localModel: "qwen3-vl-8b", localFps: "1", localMaxFrames: "32", hwAccel: false, language: "zh", creativeModel: "glm-5-turbo" },
+      localModels: [],
       settingsTab: "general",
       hwEncoderAvailable: false,
       showVideoKey: false,
@@ -669,11 +697,22 @@ const app = Vue.createApp({
           if (p.step === "compressing") {
             task.percent = (p.compress_pct || 0) * 0.4;
             task.stageLabel = t('g.bg_compressing');
+          } else if (p.step === "engine_starting") {
+            task.stageLabel = t('g.bg_engine_starting');
+          } else if (p.step === "asr_loading") {
+            // 系统任务：启动期 ASR 模型预加载（无真实百分比，按耗时缓慢爬升）
+            task.percent = Math.min(95, (Date.now() - (task.startTime || Date.now())) / 1200);
+            task.stageLabel = t('g.bg_model_loading');
           } else if (p.step === "analyzing") {
             const isImage = task.mediaType === "image" || p.media_type === "image";
             task.percent = isImage ? 70 : 60;
-            task.stageLabel = t('g.bg_ai_analyzing');
+            task.stageLabel = t('g.bg_ai_analyzing') + (p.window ? ' ' + p.window : '');
           }
+          changed = true;
+        } else if (task.id === '__preload__') {
+          // 预加载任务从 /progress 消失 = 后端已加载完成（或失败）
+          task.status = "done"; task.percent = 100;
+          task.stageLabel = t('g.bg_done');
           changed = true;
         } else {
           // No active thread for this task → check DB for terminal state
@@ -826,6 +865,23 @@ const app = Vue.createApp({
     },
     computedImgModelOptions() {
       return this.computedModelOptions;
+    },
+    computedLocalModelOptions() {
+      return this.localModels
+        .filter(m => m.installed)
+        .map(m => ({ label: `${m.label} · ${m.quant} · ${m.size_gb}GB`, value: m.id }));
+    },
+    computedLocalFpsOptions() {
+      return [
+        { label: t('s.local_fps_05'), value: "0.5" },
+        { label: t('s.local_fps_1'), value: "1" },
+        { label: t('s.local_fps_2'), value: "2" },
+        { label: t('s.local_fps_5'), value: "5" },
+        { label: t('s.local_fps_10'), value: "10" },
+      ];
+    },
+    computedLocalMaxOptions() {
+      return [16, 32, 48, 64, 96, 128].map(n => ({ label: String(n), value: String(n) }));
     },
     shortcutGeneral() {
       return [
@@ -1237,6 +1293,20 @@ const app = Vue.createApp({
         this.settingsForm.imageResolution = s.image_resolution || "1920";
         this.settingsForm.imageApiKey = s.image_api_key || "";
         this.settingsForm.imageModel = s.image_model || "glm-4.6v";
+        this.settingsForm.imageEngine = s.image_engine || "cloud";
+        this.settingsForm.videoEngine = s.video_engine || "cloud";
+        this.settingsForm.localModel = s.local_model || "qwen3-vl-8b";
+        this.settingsForm.localFps = s.local_frames_fps || "1";
+        this.settingsForm.localMaxFrames = s.local_frames_max || "32";
+        try {
+          const models = await API.getLocalVlmModels();
+          this.localModels = Array.isArray(models) ? models : [];
+          if (this.settingsForm.imageEngine === "local" &&
+              !this.localModels.some(m => m.id === this.settingsForm.localModel && m.installed)) {
+            const firstInstalled = this.localModels.find(m => m.installed);
+            if (firstInstalled) this.settingsForm.localModel = firstInstalled.id;
+          }
+        } catch { this.localModels = []; }
         this.settingsForm.creativeModel = s.creative_model || "glm-5-turbo";
         this.settingsForm.hwAccel = s.hw_accel === "true";
         this.settingsForm.language = s.language || "zh";
@@ -1260,6 +1330,11 @@ const app = Vue.createApp({
           image_resolution: this.settingsForm.imageResolution,
           image_api_key: this.settingsForm.imageApiKey,
           image_model: this.settingsForm.imageModel,
+          image_engine: this.settingsForm.imageEngine,
+          video_engine: this.settingsForm.videoEngine,
+          local_model: this.settingsForm.localModel,
+          local_frames_fps: this.settingsForm.localFps,
+          local_frames_max: this.settingsForm.localMaxFrames,
           hw_accel: String(this.settingsForm.hwAccel),
           language: this.settingsForm.language,
           creative_model: this.settingsForm.creativeModel,

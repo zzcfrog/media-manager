@@ -12,6 +12,7 @@ node_modules/
 dist/
 electron/dist/
 backend/models/
+electron/resources/bin/
 docs/todo.md
 test-results/
 playwright-report/

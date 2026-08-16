@@ -115,6 +115,9 @@ scanPaths(paths) {
   saveSettings(data) {
     return this._fetch(`/api/settings/`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
   },
+  getLocalVlmModels() {
+    return this._fetch(`/api/local-vlm/models`);
+  },
   clearAnalysis(mediaId) {
     return this._fetch(`/api/analysis/${mediaId}`, { method: "DELETE" });
   },

@@ -1,5 +1,67 @@
 # TODO
 
+## 已完成：修复 ASR 一句话被拆进两个分镜——两级句子缝合（2026-08-16）
+
+**问题**：一句话没说完经常被拆成两个分片。根因不在 `_merge_asr`（它本就整句分配、不切文本），在上游：①whisper 在句中停顿处（换气/VAD）把一句话切成多段，两半各自按「重叠最大」落到不同分镜；②多模态模式下 GLM 按镜头转写，句子跨镜头时各写各的。
+
+**修复（[blueprints/analysis.py](../backend/blueprints/analysis.py)，两级缝合，双模式受益）**：
+- **分镜分配前** `_stitch_asr_sentences()`：whisper 相邻段「前段无终止标点（。！？!?…）+ 间隔 <1.2s」→ 拼回整句（CJK 无缝/拉丁加空格）再进 `_merge_asr`。真停顿（句间隔大）不拼。
+- **存库前** `_stitch_cross_segments(segments)`（双模式通用）：相邻分镜 A 的 asr 未说完 → B 的 asr 拼回 A，B 清空删键。best-effort：B 若含自己的完整句会被一并带走（多模态模式无句级时间戳，无法再细分；whisper 路径已被前一级保护）。
+
+验证：真实代码跑 6 个合成用例全过——句中拼回整句 / 真停顿不拼 / 整句归一个分镜 / 跨分镜拼回 / 完整句不误拼 / 英文空格。
+
+## 进行中：本地视觉分析引擎（云端/本地双引擎）——Step1/2 完成，下一步视频抽帧（2026-08-16）
+
+产品双路线定案：分析引擎可配**云端（智谱，质量档）**或**本地（Qwen3-VL via llama-server，免费·隐私·离线·够用）**。
+
+- **新建 [PRD_LOCAL_VLM.md](PRD_LOCAL_VLM.md)**：九节完整 PRD——双引擎设置、本地模型管理（应用内下载/断点续传/hf-mirror 镜像默认/目录可选）、llama-server 生命周期（按需启动/端口顺延/空闲退出）、视频抽帧适配（本地栈不收 video_url → ffmpeg 抽帧多图 + 时间戳）、数据模型（settings 新增 `video_engine`/`image_engine`/`local_model` 等 7 个 key）、实现步骤与验证清单。
+- **模型下载中**（~24GB，走 7897 代理——HF 直连实测不通）：Qwen3-VL-8B Q4_K_M (4.68GB) + 30B-A3B Q4_K_M (17.28GB) + 各自 mmproj-F16（视觉投影器，必带）。
+- **llama-server 已就位**：[electron/resources/bin/darwin-arm64/llama-b10451/](electron/resources/bin/)（26MB，验证 `--version` 可跑；MIT 协议可随产品分发；目录已加 .gitignore）。
+- 关键技术事实（选型依据）：①本地栈（llama.cpp/Ollama）不接受 base64 视频，视频必须抽帧多图；②mmproj 与主模型必须成对加载，选 F16 不量化（小文件、视觉敏感、非速度瓶颈）；③本地模式音频强制 faster-whisper；④`llama-cpp-python` 进程内方案对 Qwen3-VL 视觉支持滞后（issue #2080），不可用；⑤analyzer.py 的 `base_url` 参数化使本地模式近零改动。
+- **下载完成 + 核对**：四文件体积与 HF API 精确一致（4.68/1.08/17.28/1.01 GB）。注意 huggingface_hub 0.22 的 `--local-dir` 落的是指向 `~/.cache/huggingface` 的**软链接**——产品实现下载管理时需 `local_dir_use_symlinks=False`（否则删目录不释放缓存空间）。
+- **冒烟测试通过**（llama-server b10451，OpenAI 兼容接口，真实素材缩略图）：
+
+| | 8B Q4_K_M | 30B-A3B Q4_K_M |
+|---|---|---|
+| 模型加载（热缓存） | 3.8s | ~3s（冷启动 17GB 磁盘读会更久） |
+| 单图中文打标签 | 2.6s · 49 tok/s | 2.0s · **68 tok/s** |
+| 多图（3帧，视频抽帧机制） | ✅ 0.7s | ✅ 0.8s，描述更具体 |
+
+  - 意外发现：**30B 生成比 8B 快**（MoE 仅 3B 激活 vs 8B dense 全激活），代价是 17GB 常驻内存——「速度档 8B / 质量档 30B」的定位要改为「内存档 8B / 质量且更快档 30B」。
+  - 质量对比（同一图）：30B 描述明显更细腻（服装/背包/帽子细节、主体更全），多帧场景切换描述具体（「峡谷徒步→草原经幡塔」vs 8B 只答「场景切换」）。
+  - 30B 输出用 ```json 围栏包裹——现有 `_parse_response`（[analyzer.py](../backend/analyzer.py)）已处理，无碍。
+  - llama-server 启动告警 `--image-min-tokens 1024`（grounding 任务精度相关）——打标签场景暂不处理，若实测精度差再加。
+- **✅ Step1 完成：引擎管理**（[backend/local_vlm.py](../backend/local_vlm.py) + [blueprints/local_vlm.py](../backend/blueprints/local_vlm.py)）：模块级单例 spawn llama-server（主模型+mmproj、绝对路径、独立进程组 killpg 回收、atexit 清理、端口 8080 顺延至 8099、健康检查绕代理），路由 `/api/local-vlm/{status,models,start,stop}`。test_client 六项验证全过：初始态 / 占 8080 顺延 8081 / 真启动 4.1s / 幂等 / 停止 / 无残留进程。
+- **✅ Step2 完成：图片本地链路全通**（PRD §7.2）：
+  - 后端 [blueprints/analysis.py](../backend/blueprints/analysis.py)：`_start_image_analysis` 读 `image_engine`/`local_model`（本地时免 API Key）；`_process_image` 本地分支 `local_vlm.ensure()`（SSE 新增 `engine_starting` 档）后以 `base_url=127.0.0.1:<port>/v1` 调 `analyze_image`；记录的 analysis_model = 本地模型 id。
+  - 前端：设置页图片 tab 顶部「分析引擎」单选（云端智谱/本地 Qwen3-VL），本地时 API Key/云端模型折叠、显示本地模型下拉（仅列已下载，来自 `/api/local-vlm/models`）；api.js `getLocalVlmModels()`；i18n 中英 9 键；detail.js 与画廊批量进度条均处理 `engine_starting`。
+  - **E2E 实测**（真实照片 _DSC9547.JPG，8256×5504 → 800px）：本地 8B 全链 **11.3s**（压缩 0.7s + 引擎启动 1.5s + 分析 8.6s），22/28 字段非空（visual/色彩/主体/景别/情绪带权重/arousal-valence 全有），与云端产物同构，落库可查。
+- **⚠ 重大坑（已修）：httpx 读 macOS 系统代理劫持本地回环**——环境变量为空也会从 **scutil 系统代理**（用户常开 Clash「系统代理」）拿到 7897，把 `127.0.0.1:8080` 的请求发给代理 → 本地分析挂死 5 分钟+；且系统代理的本地例外列表 httpx 不识别。修复：[analyzer.py](../backend/analyzer.py) 新增 `_openai_client()`，本地 base_url 用 `httpx.Client(trust_env=False, timeout=600)`（自定义 http_client 时须显式给 timeout，httpx 默认仅 5s 会掐死长生成）。死代理环境变量复验通过（11.0s 完成）。与「GUI PATH 问题」同类产品教训：**一切本地回环调用必须显式绕代理**（local_vlm.py 健康检查的 `ProxyHandler({})` 先前已做，本次补齐 SDK 调用侧；faster-whisper 走 HF 下载不受影响）。
+- **✅ Step3 完成：视频本地链路全通**（PRD §7.3）：
+  - 后端 [analyzer.py](../backend/analyzer.py) 新增 `extract_video_frames()`（ffmpeg 按窗抽帧，窗时长 = 帧数上限÷fps，内存恒定不随视频时长增长）+ `analyze_video_frames()`（每帧标注**绝对时间戳**、分窗请求、跨窗拼接；保留「模型输出窗内相对时间 → 平移回绝对」兜底）。[blueprints/analysis.py](../backend/blueprints/analysis.py) 两个入口（单条 SSE + 批量）均支持 `video_engine=local`，本地**强制 use_multimodal=False**（帧无音频，ASR 走 whisper 分支照常合并）；SSE/`/progress` 新增 `window`（如 `2/10`）进度。
+  - 前端：视频 tab 引擎单选 + 本地模式（模型/抽帧帧率 0.5–10 预设/单窗帧数上限 16–128）；本地模式下音频 tab 保持可见（whisper 型号可配）；detail/画廊进度显示窗口进度。
+  - **E2E 实测**（DSC_9506.MOV 31s，fps=2 → 2 窗 × 29-32 帧）：压缩 7.3s + 引擎 1.5s + 抽帧 0.2s + VLM 48.5s（约 24s/窗）+ whisper 冷加载 78s + 转写 → 共 170.6s；**4 分镜时间戳跨窗连续且绝对**（0-15/16-21/21-25/25-30），whisper 语音正确合入对应分镜（「景山上拍的故宫全景」→ 全景分镜），usage 跨窗累计。
+  - **实测 token 校准**：240p 源每帧约 190 token、480p 约 400 → `local_frames_max` 默认 **32**（PRD 已更新；480p 下 64 帧 ≈ 2.6 万 token 逼近 32K 上下文不安全）。
+- **✅ 启动模型加载进度并入顶部进度条**：[asr/\_\_init\_.py](../backend/asr/__init__.py) 新增 `preload_state`（loading/done/error）+ 引擎 `is_ready()` 校验（whisper 实现见 [engines/whisper.py](../backend/asr/engines/whisper.py)）；`/api/analysis/progress` 加载中时附带 `__preload__` 系统任务（file_name = "whisper large-v3"）；前端顶部进度条把它渲染成任务条目（graphic_eq 图标替代缩略图、耗时爬升百分比、完成后自动消除、刷新页面可恢复）。设置里切换 ASR 模型触发的重载暂不入条（仅启动时），如需再加。
+- **下一步 Step4**：模型下载管理（hf-mirror 镜像、断点续传、SSE 进度、删除、`local_dir_use_symlinks=False`）+ 设置页模型卡片 UI。
+
+## 待办：产品化打包——后端自包含（Python/ffmpeg/exiftool 不再依赖用户环境）（2026-08-16）
+
+当前 Electron「产品」实际依赖开发机环境，拿给普通用户跑不起来。逐项：
+
+- **Python 后端**：[electron/main.js](electron/main.js) `startPython()` 直接 spawn 系统 `python3`，要求用户自装 Python 3.12 + pip 依赖。需用 PyInstaller（或同类）把 Flask 后端打包成自包含二进制随安装包分发，main.js 改 spawn 该二进制。
+- **ffmpeg**：后端全部裸命令 `ffmpeg` 走 PATH（[compressor.py](backend/compressor.py)、[blueprints/serve.py](backend/blueprints/serve.py) 多处）。需打包静态 ffmpeg（macOS evermeet 构建 ~80MB / Windows gyan.dev），改按资源目录绝对路径调用。
+- **exiftool**：同上（[blueprints/serve.py](backend/blueprints/serve.py)、[blueprints/library.py](backend/blueprints/library.py) 多处）。exiftool 是 Perl 程序，macOS 有官方独立打包版（单文件可执行），Windows 用 exiftool.exe。
+- **⚠ 实锤：GUI 启动 PATH 问题（影响 ffmpeg/exiftool 所有裸命令调用）**：macOS 应用从 Finder/桌面启动时 PATH 只有 `/usr/bin:/bin:/usr/sbin:/sbin`，不含 `/opt/homebrew/bin`——现在从终端启动能用只是继承了 shell 的 PATH；打包成产品后 `shutil.which("ffmpeg"/"exiftool")` 全部找不到，压缩/缩略图/元数据/XMP 功能全挂。修复方向：开发模式启动时补 PATH；产品模式改用资源目录内二进制的绝对路径（配合上两条）。
+- **requirements.txt 缺 loguru（✅ 已修 2026-08-16）**：backend 15 处 `from loguru import logger` 但依赖未声明——新机器装完依赖启动即 ImportError（本机 conda 环境碰巧有才没炸）。已补 `loguru>=0.7`。
+- **端口写死 6622**（[main.js](electron/main.js) `const PORT = 6622`；[run.py](run.py) 本身支持 `PORT` env）：占用/多开即启动失败，产品需动态端口 + 冲突处理。
+- **模型文件管理**：whisper 模型运行时自动下载到 `~/.cache/huggingface`（faster-whisper 默认）；将来本地 VLM 模型（Qwen3-VL GGUF，约 24GB）更大。产品应统一「模型目录可配置」（视频用户常有大外置盘），默认放应用数据目录。
+- **分发合规**：macOS 需 Developer ID 签名 + 公证（否则用户打开报「已损坏」）；考虑 electron-updater 自动更新。llama.cpp（MIT）与 Qwen 权重（Apache 2.0）均允许随产品分发。
+- **国内下载源**：HF 直连不通，模型下载默认走 hf-mirror.com 镜像或允许配置（whisper 与未来 VLM 模型同）。
+- **PyInstaller 已知坑**：faster-whisper/ctranslate2、rawpy、onnxruntime 都有 hidden imports / 数据文件问题，需逐个验证。
+
+关联：计划中的「本地 VLM 引擎」（llama-server sidecar，spawn 模式与 Python 后端相同）与此同属产品化课题——Electron 伴生进程（Flask、llama-server）+ 资源内自带二进制，打包时一并解决。
+
 ## 已完成：批量改文件时间 改 SSE 流式 + 50/批（治慢/超时）（2026-06-30）
 
 「用拍摄时间覆盖文件时间」「拍摄时间时区调整」批量时很慢甚至超时。根因：①每个文件起一个 exiftool 子进程（N 次启动开销）；②shift 改 QuickTime 元数据需重写整个 MP4，大文件 + 慢 exFAT 盘单文件就慢；③串行单请求，总时间叠加超时。

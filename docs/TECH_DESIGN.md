@@ -31,7 +31,8 @@ video_analyzer/
 │   ├── config.py              # 路径、文件扩展名、分析并发配置
 │   ├── logger.py              # loguru 日志配置（文件输出 + 按天轮转）
 │   ├── db.py                  # SQLite schema、迁移、连接管理
-│   ├── analyzer.py            # VLM API 调用（视频/图片分析）
+│   ├── analyzer.py            # VLM API 调用（视频/图片分析；`_openai_client()` 本地 base_url 绕代理）
+│   ├── local_vlm.py           # 本地视觉引擎管理（llama-server 子进程单例：spawn/健康检查/端口顺延/回收）
 │   ├── compressor.py          # ffmpeg 视频压缩（真实进度 + 硬件加速） + temp 清理
 │   ├── video_prompt.txt       # 视频分析提示词
 │   ├── img_prompt.txt         # 图片分析提示词
@@ -45,7 +46,8 @@ video_analyzer/
 │   │   ├── library.py         # 媒体库 CRUD、搜索、导入
 │   │   ├── analysis.py        # AI 分析（SSE 流式）
 │   │   ├── tags.py            # 标签管理
-│   │   └── settings.py        # 全局设置 CRUD
+│   │   ├── settings.py        # 全局设置 CRUD
+│   │   └── local_vlm.py       # 本地视觉引擎路由（status/models/start/stop）
 │   └── services/
 │       ├── importer.py        # 文件扫描、元数据提取、缩略图生成
 │       ├── embedding.py       # ResNet50 ONNX 特征提取（图片相似检测）
@@ -94,6 +96,7 @@ video_analyzer/
 | `tags` | `/api/tags` | 标签管理（后端保留，前端已移除） |
 | `settings` | `/api/settings` | 全局设置 CRUD |
 | `workbench` | `/api/workbench` | 创作工作台：工程 CRUD、segment 查询、多轨时间线管理、导出 FCPXML+SRT（`POST /<pid>/export-fcpxml`，由 [fcpxml_export.py](../backend/fcpxml_export.py) 生成） |
+| `local_vlm` | `/api/local-vlm` | 本地视觉引擎管理：`GET status`/`GET models`/`POST start`/`POST stop`（llama-server 子进程生命周期） |
 
 ### 3.3 数据库
 
@@ -299,14 +302,25 @@ compress_video() — ffmpeg 压缩（线程运行，SSE 推送真实百分比）
     ↓ VLM 完成 → SSE analyze_done（立即标记）
     ↓ ASR 完成 → SSE asr_progress（加载模型 → 语音识别）
     ↓
-_merge_asr() — 最佳匹配：每段 ASR 只匹配重叠时间最长的 VLM 分段
+_stitch_asr_sentences() — 句子缝合：whisper 常在句中停顿处切断，把「前段无终止标点 + 间隔 <1.2s」的相邻段拼回整句
+    ↓
+_merge_asr() — 最佳匹配：每段 ASR 只匹配重叠时间最长的 VLM 分段（整句归属，不切文本）
+    ↓
+_stitch_cross_segments() — 跨分镜缝合：前一分镜 asr 未说完（无终止标点）时把后一分镜 asr 拼回（多模态模式按镜头转写的兜底）
     ↓
 save_segments() → _fix_segment_overlaps()（修正重叠时间戳）→ _refresh_fts() → call_on_close()
 ```
 
 进度通过 **SSE（Server-Sent Events）** 实时推送到前端：
-- `progress` 事件包含 `step`（compressing/compressed/analyzing/analyze_done/asr_start/asr_progress）和可选的 `percent`/`substep`/`chars`/`size_bytes` 字段
+- `progress` 事件包含 `step`（compressing/compressed/analyzing/analyze_done/asr_start/asr_progress/engine_starting）和可选的 `percent`/`substep`/`chars`/`size_bytes` 字段
 - `done`（完成）、`error`（失败）
+
+**双引擎（云端/本地）**：`image_engine`/`video_engine`（settings 表，默认 cloud）决定分析走向（详见 [PRD_LOCAL_VLM.md](PRD_LOCAL_VLM.md)）。
+
+- **图片链路（已实现）**：`_start_image_analysis` 读 `image_engine`，本地时免 API Key；`_process_image` 调 `local_vlm.ensure(local_model)`（SSE 推 `engine_starting`，幂等——已运行同模型直接复用，切换模型自动重启引擎）后以 `base_url=http://127.0.0.1:<port>/v1` 调 `analyze_image`，OpenAI 兼容接口零适配。
+- **视频链路（已实现）**：本地栈无视频解码器，`analyze_video_frames()`（analyzer.py）走 **ffmpeg 分窗抽帧多图**——`extract_video_frames()` 每窗 ≤ `local_frames_max` 帧（窗时长 = 帧数上限 ÷ `local_frames_fps`，内存与视频时长无关），prompt 中每帧标注绝对时间戳 `[HH:MM:SS]`（模型可输出跨窗连续的绝对时间；保留相对时间平移兜底），分窗请求后拼接 segments。本地模式两个入口（单条 SSE + 批量）均强制 `use_multimodal=False` → ASR 走 whisper 分支照常 `_merge_asr` 合入。实测每帧约 190 token（240p 源）/ 400（480p），`local_frames_max` 默认 32。
+- **启动模型预加载进度**：`asr/__init__.py` 维护 `preload_state`（loading/done/error，`is_ready()` 校验），`/api/analysis/progress` 在加载中附带 `__preload__` 系统任务；前端顶部进度条渲染为任务条目（无缩略图、耗时爬升百分比），页面刷新可恢复。
+- **⚠ 本地回环必须绕代理**：httpx（OpenAI SDK 底层）的 `trust_env=True` 会读 **macOS 系统代理**（scutil 层，环境变量为空也读；Clash「系统代理」常开），把 `127.0.0.1` 请求发给代理导致挂死；系统代理的本地例外列表 httpx 不识别。analyzer.py `_openai_client()` 对本地 base_url 用 `httpx.Client(trust_env=False, timeout=600)`（自定义 http_client 必须显式给 timeout，httpx 默认 5s）；local_vlm.py 健康检查用 `ProxyHandler({})` 同理。
 
 ### 4.3 ASR 插件架构
 
