@@ -2,6 +2,10 @@ import os
 import sys
 from pathlib import Path
 
+# HF 直连不通，模型下载默认走镜像。必须在 huggingface_hub 首次导入前设置
+# （其 ENDPOINT 常量在导入时固化）。
+os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
+
 # Paths and file-extension constants used across the backend.
 BASE_DIR = Path(__file__).parent.parent
 

@@ -2844,7 +2844,7 @@ const WorkbenchPage = {
             let evt;
             try { evt = JSON.parse(trimmed.slice(6)); } catch { continue; }
             if (evt.type === "progress") {
-              const labels = { queued: t('g.queued') || '排队中', compressing: t('g.compressing') || '压缩中', analyzing: t('g.analyzing') || '分析中' };
+              const labels = { queued: t('g.queued') || '排队中', compressing: t('g.compressing') || '压缩中', analyzing: t('g.analyzing') || '分析中', engine_starting: t('d.engine_starting') || '启动本地引擎', extracting: t('g.bg_extracting') || '抽帧中', asr_start: t('g.bg_transcribing') || '转写中', asr_progress: t('g.bg_transcribing') || '转写中', merging: t('g.bg_merging') || '合并保存中' };
               task.stageLabel = labels[evt.step] || labels.analyzing;
               if (evt.percent != null) task.percent = evt.percent;
               root.bgTasks = [...root.bgTasks];

@@ -118,6 +118,15 @@ scanPaths(paths) {
   getLocalVlmModels() {
     return this._fetch(`/api/local-vlm/models`);
   },
+  localVlmDownloadStatus() {
+    return this._fetch(`/api/local-vlm/download`);
+  },
+  startLocalVlmDownload(modelId) {
+    return this._fetch(`/api/local-vlm/download`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model_id: modelId }) });
+  },
+  deleteLocalVlmModel(modelId) {
+    return this._fetch(`/api/local-vlm/delete`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model_id: modelId }) });
+  },
   clearAnalysis(mediaId) {
     return this._fetch(`/api/analysis/${mediaId}`, { method: "DELETE" });
   },
@@ -139,6 +148,9 @@ scanPaths(paths) {
   },
   thumbUrl(id) { return `/media/thumbnail/${id}`; },
   videoUrl(id) { return `/media/video/${id}`; },
+  mediaExists(id) {
+    return this._fetch(`/api/media/${id}/exists`);
+  },
   imageUrl(id) { return `/media/image/${id}`; },
 
   // -- Workbench --

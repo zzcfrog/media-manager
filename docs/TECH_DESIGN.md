@@ -84,7 +84,7 @@ video_analyzer/
 
 ### 3.1 应用启动
 
-`run.py` → `create_app()` → loguru 日志初始化 → 初始化目录 → 清理 temp_video → 初始化数据库（schema + 迁移 + checkpoint + VACUUM）→ 注册蓝图 → 预加载本地 ASR 模型（仅本地引擎）。
+`run.py` → `create_app()` → loguru 日志初始化 → 初始化目录 → 清理 temp_video → 初始化数据库（schema + 迁移 + checkpoint + VACUUM）→ 注册蓝图 → 按需预加载本地 ASR 模型（仅 `video_engine=local` 或 `use_multimodal=false` 时加载；云端+多模态跳过，首次使用时懒加载）。
 
 ### 3.2 蓝图路由
 
@@ -293,7 +293,7 @@ POST /api/analysis/<id>
     ↓
 读取 settings（model, resolution, fps, use_multimodal, asr_engine, hw_accel）
     ↓
-compress_video() — ffmpeg 压缩（线程运行，SSE 推送真实百分比）
+compress_video() — ffmpeg 压缩（线程运行，SSE 推送真实百分比；本地引擎模式跳过此步，抽帧直接吃原片）
     ↓
 ┌─────────────────────────┬──────────────────────────────┐
 │  analyze_video()        │  _run_asr()                   │
@@ -312,14 +312,15 @@ save_segments() → _fix_segment_overlaps()（修正重叠时间戳）→ _refre
 ```
 
 进度通过 **SSE（Server-Sent Events）** 实时推送到前端：
-- `progress` 事件包含 `step`（compressing/compressed/analyzing/analyze_done/asr_start/asr_progress/engine_starting）和可选的 `percent`/`substep`/`chars`/`size_bytes` 字段
-- `done`（完成）、`error`（失败）
+- `progress` 事件包含 `step` 和可选字段。**云端视频**：`compressing`(percent) → `compressed`(尺寸/码率) → `analyzing`(substep/chars) → `asr_start` → `asr_progress`(substep: loading/transcribing) → `merging`；**本地视频**：`queued`(engine) → `engine_starting`(message 带已耗时秒数) → `engine_ready`(elapsed=加载耗时) → `extracting`(percent=窗进度, window=i/N) → `extract_done`(windows/frames) → `analyzing`(window=i/N, substep/chars) → `asr_start` → `asr_progress` → `merging`
+- 一次性事件（engine_ready/extract_done）由 worker 在完成瞬间写入 `engine_time`/`extract_info` 标志、生成器轮询时补发——不依赖 step 转迁检测，快速阶段（如合并 <1s）不会被 0.3s 轮询间隔漏掉；合并过快时前端在 done 事件收尾兜底
+- `done`（完成，含 usage/segments_count）、`error`（失败）
 
 **双引擎（云端/本地）**：`image_engine`/`video_engine`（settings 表，默认 cloud）决定分析走向（详见 [PRD_LOCAL_VLM.md](PRD_LOCAL_VLM.md)）。
 
 - **图片链路（已实现）**：`_start_image_analysis` 读 `image_engine`，本地时免 API Key；`_process_image` 调 `local_vlm.ensure(local_model)`（SSE 推 `engine_starting`，幂等——已运行同模型直接复用，切换模型自动重启引擎）后以 `base_url=http://127.0.0.1:<port>/v1` 调 `analyze_image`，OpenAI 兼容接口零适配。
-- **视频链路（已实现）**：本地栈无视频解码器，`analyze_video_frames()`（analyzer.py）走 **ffmpeg 分窗抽帧多图**——`extract_video_frames()` 每窗 ≤ `local_frames_max` 帧（窗时长 = 帧数上限 ÷ `local_frames_fps`，内存与视频时长无关），prompt 中每帧标注绝对时间戳 `[HH:MM:SS]`（模型可输出跨窗连续的绝对时间；保留相对时间平移兜底），分窗请求后拼接 segments。本地模式两个入口（单条 SSE + 批量）均强制 `use_multimodal=False` → ASR 走 whisper 分支照常 `_merge_asr` 合入。实测每帧约 190 token（240p 源）/ 400（480p），`local_frames_max` 默认 32。
-- **启动模型预加载进度**：`asr/__init__.py` 维护 `preload_state`（loading/done/error，`is_ready()` 校验），`/api/analysis/progress` 在加载中附带 `__preload__` 系统任务；前端顶部进度条渲染为任务条目（无缩略图、耗时爬升百分比），页面刷新可恢复。
+- **视频链路（已实现）**：本地栈无视频解码器，`analyze_video_frames()`（analyzer.py）走 **ffmpeg 分窗抽帧多图**——`extract_video_frames()` **直接吃原片**（本地模式跳过 compress_video，无 temp 中间产物），抽帧 filter 一步 `fps=N,scale=W:H`（短边 = `local_frames_res` 240/480/720；ffprobe 探宽高算精确 scale，16:9 横片与压缩语义一致），macOS 附 `-hwaccel videotoolbox`（4K 10bit HEVC 软解极重且抢推理核，实测硬解 CPU 省 30×）。每窗 ≤ `local_frames_max` 帧（窗时长 = 帧数上限 ÷ `local_frames_fps`，内存与视频时长无关），prompt 中每帧标注绝对时间戳 `[HH:MM:SS]`（模型可输出跨窗连续的绝对时间；保留相对时间平移兜底），分窗请求后拼接 segments。本地模式两个入口（单条 SSE + 批量）均强制 `use_multimodal=False` → ASR 走 whisper 分支**直接转写原片音轨**后 `_merge_asr` 合入。实测每帧约 190 token（240p）/ 400（480p），`local_frames_max` 默认 32。进度事件（`/progress` 与 SSE queued）携带 `engine` 字段（queued 另带 `asr_mode`），detail 页本地视频时间线为 **5 步：本地引擎启动（engine_starting 带已耗时，首次 4~40s）→ 抽帧（extracting 逐窗 percent，extract_done 报「N 窗 · M 帧」）→ 视觉分析（analyzing window=i/N + 接收字符数）→ 语音转写（asr loading/transcribing）→ 合并保存（merging）**；whisper 的 `transcribe(on_progress)` 接入 ASR 子步骤上报（此前从未上报，转写期间 UI 误显示「分析中」——云端独立 ASR 同步受益）。**Omni 音视频同析（`local_asr_mode=merged`，仅 qwen3-omni-30b-a3b）**：`extract_video_frames(with_audio=True)` 每窗另抽 16k 单声道 PCM（`-f s16le pipe:1`，wave 模块自建头——管道流式 `-f wav` 的头部长度是占位值不可用），`analyze_video_frames` 在帧前插入 `input_audio`（OpenAI 格式，base64 wav），模型直接听原声；`_process_video` 跳过独立 whisper，时间线变 4 步（引擎→抽帧→视听分析→合并）；模型清单新增 qwen3.6-35b-a3b（unsloth UD-Q4_K_M 22.1GB，纯视觉）与 qwen3-omni-30b-a3b（ggml-org Q4_K_M 18.6GB，audio+vision，MODELS 带 `audio: true`），`installed_models()` 输出 `audio` 字段，设置下拉列出全部模型（未下载禁选并标注）。
+- **启动模型预加载进度**：`asr/__init__.py` 维护 `preload_state`（loading/done/error，`is_ready()` 校验），`/api/analysis/progress` 在加载中附带 `__preload__` 系统任务；前端顶部进度条渲染为任务条目（无缩略图、耗时爬升百分比），页面刷新可恢复。预加载按需触发：仅 `video_engine=local`（帧无音频强制 whisper）或 `use_multimodal=false`（独立 ASR）时启动加载，云端+多模态跳过（省 ~3GB 内存，whisper 首次使用时懒加载）；本地视觉模型（llama-server）不在启动加载，首次本地分析时 `ensure()` 按需启动。
 - **⚠ 本地回环必须绕代理**：httpx（OpenAI SDK 底层）的 `trust_env=True` 会读 **macOS 系统代理**（scutil 层，环境变量为空也读；Clash「系统代理」常开），把 `127.0.0.1` 请求发给代理导致挂死；系统代理的本地例外列表 httpx 不识别。analyzer.py `_openai_client()` 对本地 base_url 用 `httpx.Client(trust_env=False, timeout=600)`（自定义 http_client 必须显式给 timeout，httpx 默认 5s）；local_vlm.py 健康检查用 `ProxyHandler({})` 同理。
 
 ### 4.3 ASR 插件架构

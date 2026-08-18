@@ -1368,8 +1368,8 @@ const GalleryPage = {
         videos: videos.length,
         images: images.length,
         analyzedCount: analyzed.length,
-        videoModel: modelLabels[s.model] || s.model,
-        imageModel: modelLabels[s.image_model] || s.image_model,
+        videoModel: s.video_engine === 'local' ? (s.local_model || 'qwen3-vl-8b') : (modelLabels[s.model] || s.model),
+        imageModel: s.image_engine === 'local' ? (s.local_model || 'qwen3-vl-8b') : (modelLabels[s.image_model] || s.image_model),
         existingAction: analyzed.length > 0 ? 'skip' : 'reanalyze',
       };
       this.showBatchAnalysisDialog = true;

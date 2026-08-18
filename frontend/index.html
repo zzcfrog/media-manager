@@ -267,7 +267,7 @@
 
   <!-- Settings modal -->
   <q-dialog v-model="showSettings" @show="loadSettings">
-    <q-card style="min-width:440px" class="dialog-card">
+    <q-card style="width:480px" class="dialog-card">
       <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" v-close-popup></q-btn>
       <q-card-section>
         <div class="text-h6">{{ t('s.title') }}</div>
@@ -276,14 +276,20 @@
         <q-tab :name="'general'" :label="t('s.tab_general')" style="font-size:12px"></q-tab>
         <q-tab :name="'image'" :label="t('s.tab_image')" style="font-size:12px"></q-tab>
         <q-tab :name="'video'" :label="t('s.tab_video')" style="font-size:12px"></q-tab>
-        <q-tab v-if="!settingsForm.useMultimodal || settingsForm.videoEngine === 'local'" :name="'audio'" :label="t('s.tab_audio')" style="font-size:12px"></q-tab>
+        <q-tab :name="'creative'" :label="t('s.tab_creative')" style="font-size:12px"></q-tab>
       </q-tabs>
       <q-separator style="background:var(--border)"></q-separator>
-      <q-tab-panels v-model="settingsTab" animated style="min-height:200px">
+      <q-tab-panels v-model="settingsTab" animated style="height:560px;overflow-y:auto">
         <!-- General tab -->
-        <q-tab-panel :name="'general'" style="display:flex;flex-direction:column;gap:16px">
-          <q-select v-model="settingsForm.language" :options="settingLangOptions" :label="t('s.language')" dense filled emit-value map-options @update:model-value="onLanguageChange"></q-select>
-          <q-select v-model="themeMode" :options="settingThemeOptions" :label="t('s.theme')" dense filled emit-value map-options @update:model-value="applyTheme"></q-select>
+        <q-tab-panel :name="'general'" class="settings-panel">
+          <div>
+            <div class="settings-label">{{ t('s.language') }}</div>
+            <q-select v-model="settingsForm.language" :options="settingLangOptions" dense filled emit-value map-options @update:model-value="onLanguageChange"></q-select>
+          </div>
+          <div>
+            <div class="settings-label">{{ t('s.theme') }}</div>
+            <q-select v-model="themeMode" :options="settingThemeOptions" dense filled emit-value map-options @update:model-value="applyTheme"></q-select>
+          </div>
           <div>
             <div class="text-caption text-grey-5 q-mb-sm">{{ t('s.accent') }}</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -292,76 +298,191 @@
           </div>
         </q-tab-panel>
         <!-- Image tab -->
-        <q-tab-panel :name="'image'" style="display:flex;flex-direction:column;gap:12px">
-          <div class="row items-center q-gutter-md">
-            <div class="text-caption text-grey-5">{{ t('s.engine') }}</div>
-            <q-radio v-model="settingsForm.imageEngine" val="cloud" :label="t('s.engine_cloud')" dense></q-radio>
-            <q-radio v-model="settingsForm.imageEngine" val="local" :label="t('s.engine_local')" dense></q-radio>
-          </div>
-          <q-select v-model="settingsForm.imageResolution" :options="computedImgResOptions" :label="t('s.compress_size')" dense filled emit-value map-options></q-select>
+        <q-tab-panel :name="'image'" class="settings-panel">
+          <q-btn-toggle v-model="settingsForm.imageEngine" class="engine-toggle" no-caps unelevated dense
+            :options="[{ label: t('s.engine_cloud'), value: 'cloud' }, { label: t('s.engine_local'), value: 'local' }]"></q-btn-toggle>
           <template v-if="settingsForm.imageEngine !== 'local'">
-            <q-select v-model="settingsForm.imageModel" :options="computedImgModelOptions" :label="t('s.ai_model')" dense filled emit-value map-options></q-select>
-            <q-input v-model="settingsForm.imageApiKey" :type="showImgKey ? 'text' : 'password'" :label="t('s.api_key')" dense filled>
-              <template v-slot:append>
-                <q-icon :name="showImgKey ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="showImgKey = !showImgKey"></q-icon>
-              </template>
-              <template v-slot:hint>
-                <span class="text-grey-6" style="font-size:11px">{{ t('s.img_api_hint') }}</span>
-              </template>
-            </q-input>
+            <div>
+              <div class="settings-label">{{ t('s.ai_model') }}</div>
+              <q-select v-model="settingsForm.imageModel" :options="computedImgModelOptions" dense filled emit-value map-options></q-select>
+            </div>
+            <div>
+              <div class="settings-label">{{ t('s.api_key') }}</div>
+              <q-input v-model="settingsForm.imageApiKey" :type="showImgKey ? 'text' : 'password'" dense filled>
+                <template v-slot:append>
+                  <q-icon :name="showImgKey ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="showImgKey = !showImgKey"></q-icon>
+                </template>
+              </q-input>
+            </div>
+            <div class="settings-hint"><span class="material-icons">info</span><span>{{ t('s.img_api_hint') }}</span></div>
           </template>
           <template v-else>
-            <q-select v-model="settingsForm.localModel" :options="computedLocalModelOptions" :label="t('s.local_model')" dense filled emit-value map-options></q-select>
-            <div style="font-size:11px;color:var(--text3);padding:0 4px">{{ localModels.length ? t('s.local_engine_hint') : t('s.local_no_models') }}</div>
+            <div>
+              <div class="settings-label">{{ t('s.local_model') }}</div>
+              <q-select v-model="settingsForm.localModel" :options="computedLocalModelOptions" dense filled emit-value map-options ref="imageLocalModelSelect">
+              <template v-slot:option="scope">
+                <q-item :clickable="!scope.opt.disable" style="padding-top:8px;padding-bottom:8px" @click="!scope.opt.disable && scope.toggleOption(scope.opt)">
+                  <q-item-section>
+                    <q-item-label style="font-size:13px">{{ scope.opt.name }}</q-item-label>
+                    <q-item-label v-if="vlmDownload.state === 'downloading' && vlmDownload.model_id === scope.opt.value" caption style="font-size:11px">
+                      <q-linear-progress :value="vlmDownload.total_bytes ? vlmDownload.done_bytes / vlmDownload.total_bytes : 0" size="4px" rounded color="primary" style="margin:3px 0"></q-linear-progress>
+                      {{ Math.floor(vlmDownload.done_bytes / (vlmDownload.total_bytes || 1) * 100) }}% · {{ fmtBytes(vlmDownload.speed_bps) }}/s
+                    </q-item-label>
+                    <q-item-label v-else caption style="font-size:11px">
+                      {{ scope.opt.quant }} · {{ scope.opt.size_gb }}GB<template v-if="!scope.opt.installed"> · {{ t('s.model_need_ram', {gb: scope.opt.min_ram_gb}) }}</template>
+                    </q-item-label>
+                  </q-item-section>
+                  <q-item-section v-if="scope.opt.installed" side>
+                    <q-btn flat round dense icon="delete_outline" size="sm" color="grey-6" @click.stop="onModelDeleteClick(scope.opt, 'imageLocalModelSelect')"></q-btn>
+                  </q-item-section>
+                  <q-item-section v-else side>
+                    <q-btn v-if="vlmDownload.state === 'downloading' && vlmDownload.model_id !== scope.opt.value" flat round dense icon="download_for_offline" size="sm" color="grey-4" disable></q-btn>
+                    <q-btn v-else-if="vlmDownload.state !== 'downloading'" flat round dense icon="download_for_offline" size="sm" color="primary" @click.stop="onModelDownloadClick(scope.opt, 'imageLocalModelSelect')"></q-btn>
+                  </q-item-section>
+                </q-item>
+              </template>
+            </q-select>
+            </div>
+            <div v-if="vlmDownload.state === 'downloading'" class="settings-hint">
+              <span class="material-icons">downloading</span>
+              <span style="flex:1">
+                <q-linear-progress :value="vlmDownload.total_bytes ? vlmDownload.done_bytes / vlmDownload.total_bytes : 0" size="6px" rounded color="primary" style="margin-bottom:4px"></q-linear-progress>
+                {{ t('s.model_dl_running') }} · {{ Math.floor(vlmDownload.done_bytes / (vlmDownload.total_bytes || 1) * 100) }}% · {{ fmtBytes(vlmDownload.speed_bps) }}/s
+              </span>
+            </div>
+            <div v-if="vlmDownload.state === 'error'" class="settings-hint" style="color:var(--negative)"><span class="material-icons">error_outline</span><span>{{ t('s.model_dl_failed') }}: {{ vlmDownload.error }}</span></div>
+            <div class="settings-hint"><span class="material-icons">info</span><span>{{ localModels.length ? t('s.local_engine_hint') : t('s.local_no_models') }}</span></div>
           </template>
+          <div>
+            <div class="settings-label">{{ t('s.compress_size') }}</div>
+            <q-select v-model="settingsForm.imageResolution" :options="computedImgResOptions" dense filled emit-value map-options></q-select>
+          </div>
         </q-tab-panel>
         <!-- Video tab -->
-        <q-tab-panel :name="'video'" style="display:flex;flex-direction:column;gap:12px">
-          <div class="row items-center q-gutter-md">
-            <div class="text-caption text-grey-5">{{ t('s.engine') }}</div>
-            <q-radio v-model="settingsForm.videoEngine" val="cloud" :label="t('s.engine_cloud')" dense></q-radio>
-            <q-radio v-model="settingsForm.videoEngine" val="local" :label="t('s.engine_local')" dense></q-radio>
-          </div>
-          <div class="row q-col-gutter-sm">
-            <q-select v-model="settingsForm.resolution" :options="computedResOptions" :label="t('s.compress_res')" dense filled emit-value map-options class="col"></q-select>
-            <q-select v-model="settingsForm.fps" :options="computedFpsOptions" :label="t('s.fps')" dense filled emit-value map-options class="col"></q-select>
-          </div>
-          <div style="font-size:11px;color:var(--text3);padding:0 4px">{{ t('s.estimated_bitrate', {rate: estimatedBitrate}) }}</div>
-          <q-toggle v-if="hwEncoderAvailable" v-model="settingsForm.hwAccel" :label="t('s.hw_accel')"></q-toggle>
+        <q-tab-panel :name="'video'" class="settings-panel">
+          <q-btn-toggle v-model="settingsForm.videoEngine" class="engine-toggle" no-caps unelevated dense
+            :options="[{ label: t('s.engine_cloud'), value: 'cloud' }, { label: t('s.engine_local'), value: 'local' }]"></q-btn-toggle>
           <template v-if="settingsForm.videoEngine !== 'local'">
-            <q-select v-model="settingsForm.model" :options="computedModelOptions" :label="t('s.ai_model')" dense filled emit-value map-options></q-select>
-            <q-toggle v-model="settingsForm.useMultimodal" :label="t('s.multimodal')"></q-toggle>
+            <div>
+              <div class="settings-label">{{ t('s.ai_model') }}</div>
+              <q-select v-model="settingsForm.model" :options="computedModelOptions" dense filled emit-value map-options></q-select>
+            </div>
+            <div>
+              <div class="settings-label">{{ t('s.api_key') }}</div>
+              <q-input v-model="settingsForm.videoApiKey" :type="showVideoKey ? 'text' : 'password'" dense filled>
+                <template v-slot:append>
+                  <q-icon :name="showVideoKey ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="showVideoKey = !showVideoKey"></q-icon>
+                </template>
+              </q-input>
+            </div>
+            <q-toggle v-model="settingsForm.useMultimodal" :label="t('s.multimodal')" dense></q-toggle>
+            <div class="row q-col-gutter-sm">
+              <div class="col">
+                <div class="settings-label">{{ t('s.compress_res') }}</div>
+                <q-select v-model="settingsForm.resolution" :options="computedResOptions" dense filled emit-value map-options></q-select>
+              </div>
+              <div class="col">
+                <div class="settings-label">{{ t('s.fps') }}</div>
+                <q-select v-model="settingsForm.fps" :options="computedFpsOptions" dense filled emit-value map-options></q-select>
+              </div>
+            </div>
+            <q-toggle v-if="hwEncoderAvailable" v-model="settingsForm.hwAccel" :label="t('s.hw_accel')" dense></q-toggle>
+            <div class="settings-hint"><span class="material-icons">info</span><span>{{ t('s.video_api_hint') }} · {{ t('s.estimated_bitrate', {rate: estimatedBitrate}) }}</span></div>
           </template>
           <template v-else>
-            <q-select v-model="settingsForm.localModel" :options="computedLocalModelOptions" :label="t('s.local_model')" dense filled emit-value map-options></q-select>
-            <div class="row q-col-gutter-sm">
-              <q-select v-model="settingsForm.localFps" :options="computedLocalFpsOptions" :label="t('s.local_fps')" dense filled emit-value map-options class="col"></q-select>
-              <q-select v-model="settingsForm.localMaxFrames" :options="computedLocalMaxOptions" :label="t('s.local_frames_max')" dense filled emit-value map-options class="col"></q-select>
+            <div>
+              <div class="settings-label">{{ t('s.local_model') }}</div>
+              <q-select v-model="settingsForm.localModel" :options="computedLocalModelOptions" dense filled emit-value map-options ref="videoLocalModelSelect">
+              <template v-slot:option="scope">
+                <q-item :clickable="!scope.opt.disable" style="padding-top:8px;padding-bottom:8px" @click="!scope.opt.disable && scope.toggleOption(scope.opt)">
+                  <q-item-section>
+                    <q-item-label style="font-size:13px">{{ scope.opt.name }}</q-item-label>
+                    <q-item-label v-if="vlmDownload.state === 'downloading' && vlmDownload.model_id === scope.opt.value" caption style="font-size:11px">
+                      <q-linear-progress :value="vlmDownload.total_bytes ? vlmDownload.done_bytes / vlmDownload.total_bytes : 0" size="4px" rounded color="primary" style="margin:3px 0"></q-linear-progress>
+                      {{ Math.floor(vlmDownload.done_bytes / (vlmDownload.total_bytes || 1) * 100) }}% · {{ fmtBytes(vlmDownload.speed_bps) }}/s
+                    </q-item-label>
+                    <q-item-label v-else caption style="font-size:11px">
+                      {{ scope.opt.quant }} · {{ scope.opt.size_gb }}GB<template v-if="!scope.opt.installed"> · {{ t('s.model_need_ram', {gb: scope.opt.min_ram_gb}) }}</template>
+                    </q-item-label>
+                  </q-item-section>
+                  <q-item-section v-if="scope.opt.audio" side style="flex-direction:row;align-items:center;gap:6px;flex-wrap:nowrap">
+                    <div @click.stop>
+                      <q-toggle v-model="settingsForm.localAsrMode" true-value="merged" false-value="separate" :label="t('s.local_asr_merged')" dense size="xs" color="primary"></q-toggle>
+                      <q-icon name="help_outline" size="14px" color="grey-6" style="cursor:help;vertical-align:middle;margin-left:2px">
+                        <q-tooltip max-width="280px">{{ t('s.local_asr_mode_hint') }}</q-tooltip>
+                      </q-icon>
+                    </div>
+                  </q-item-section>
+                  <q-item-section v-if="scope.opt.installed" side>
+                    <q-btn flat round dense icon="delete_outline" size="sm" color="grey-6" @click.stop="onModelDeleteClick(scope.opt, 'videoLocalModelSelect')"></q-btn>
+                  </q-item-section>
+                  <q-item-section v-else side>
+                    <q-btn v-if="vlmDownload.state === 'downloading' && vlmDownload.model_id !== scope.opt.value" flat round dense icon="download_for_offline" size="sm" color="grey-4" disable></q-btn>
+                    <q-btn v-else-if="vlmDownload.state !== 'downloading'" flat round dense icon="download_for_offline" size="sm" color="primary" @click.stop="onModelDownloadClick(scope.opt, 'videoLocalModelSelect')"></q-btn>
+                  </q-item-section>
+                </q-item>
+              </template>
+            </q-select>
             </div>
-            <div style="font-size:11px;color:var(--text3);padding:0 4px">{{ t('s.local_video_hint') }}</div>
+            <div class="settings-section">{{ t('s.section_frame_params') }}</div>
+            <div class="row q-col-gutter-sm">
+              <div class="col">
+                <div class="settings-label">{{ t('s.local_fps') }}</div>
+                <q-select v-model="settingsForm.localFps" :options="computedLocalFpsOptions" dense filled emit-value map-options></q-select>
+              </div>
+              <div class="col">
+                <div class="settings-label">{{ t('s.local_frames_max') }}</div>
+                <q-select v-model="settingsForm.localMaxFrames" :options="computedLocalMaxOptions" dense filled emit-value map-options></q-select>
+              </div>
+            </div>
+            <div>
+              <div class="settings-label">{{ t('s.local_frame_res') }}</div>
+              <q-select v-model="settingsForm.localRes" :options="computedLocalResOptions" dense filled emit-value map-options></q-select>
+            </div>
+            <div v-if="vlmDownload.state === 'downloading'" class="settings-hint">
+              <span class="material-icons">downloading</span>
+              <span style="flex:1">
+                <q-linear-progress :value="vlmDownload.total_bytes ? vlmDownload.done_bytes / vlmDownload.total_bytes : 0" size="6px" rounded color="primary" style="margin-bottom:4px"></q-linear-progress>
+                {{ t('s.model_dl_running') }} · {{ Math.floor(vlmDownload.done_bytes / (vlmDownload.total_bytes || 1) * 100) }}% · {{ fmtBytes(vlmDownload.speed_bps) }}/s
+              </span>
+            </div>
+            <div v-if="vlmDownload.state === 'error'" class="settings-hint" style="color:var(--negative)"><span class="material-icons">error_outline</span><span>{{ t('s.model_dl_failed') }}: {{ vlmDownload.error }}</span></div>
+            <div class="settings-hint"><span class="material-icons">info</span><span>{{ t('s.local_video_hint') }}</span></div>
           </template>
-          <q-select v-model="settingsForm.creativeModel" :options="computedCreativeModelOptions" :label="t('s.creative_model')" dense filled emit-value map-options></q-select>
-          <q-input v-model="settingsForm.videoApiKey" :type="showVideoKey ? 'text' : 'password'" :label="t('s.api_key')" dense filled>
-            <template v-slot:append>
-              <q-icon :name="showVideoKey ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="showVideoKey = !showVideoKey"></q-icon>
-            </template>
-            <template v-slot:hint>
-              <span class="text-grey-6" style="font-size:11px">{{ t('s.video_api_hint') }}</span>
-            </template>
-          </q-input>
+          <div class="settings-section">{{ t('s.asr_section') }}</div>
+          <div v-if="settingsForm.useMultimodal && settingsForm.videoEngine !== 'local'" class="settings-hint"><span class="material-icons">info</span><span>{{ t('s.asr_inactive_hint') }}</span></div>
+          <q-btn-toggle v-model="settingsForm.asrMode" class="engine-toggle" no-caps unelevated dense
+            :options="[{ label: t('s.engine_cloud_short'), value: 'cloud' }, { label: t('s.engine_local_whisper'), value: 'local' }]"></q-btn-toggle>
+          <template v-if="settingsForm.asrMode !== 'cloud'">
+            <div>
+              <div class="settings-label">{{ t('s.asr_model') }}</div>
+              <q-select v-model="settingsForm.asrModel" :options="computedAsrModelOptions"
+                dense filled emit-value map-options
+                :disable="settingsForm.videoEngine === 'local' && localModelAudio && settingsForm.localAsrMode === 'merged'"></q-select>
+            </div>
+          </template>
+          <template v-else>
+            <div class="settings-hint"><span class="material-icons">hourglass_empty</span><span>{{ t('s.asr_cloud_hint') }}</span></div>
+          </template>
+          <div v-if="settingsForm.videoEngine === 'local' && localModelAudio && settingsForm.localAsrMode === 'merged'" class="settings-hint">
+            <span class="material-icons">link</span><span>{{ t('s.asr_local_merged_hint') }}</span>
+          </div>
         </q-tab-panel>
-        <!-- Audio tab -->
-        <q-tab-panel :name="'audio'" style="display:flex;flex-direction:column;gap:12px">
-          <q-select v-model="settingsForm.asrEngine" :options="computedAsrOptions" :label="t('s.asr_engine')" dense filled emit-value map-options></q-select>
-          <q-select v-if="settingsForm.asrEngine === 'whisper'" v-model="settingsForm.asrModel" :options="computedAsrModelOptions" :label="t('s.asr_model')" dense filled emit-value map-options></q-select>
-          <q-input v-if="settingsForm.asrEngine !== 'whisper'" v-model="settingsForm.asrApiKey" :type="showAsrKey ? 'text' : 'password'" :label="t('s.asr_api_key')" dense filled>
-            <template v-slot:append>
-              <q-icon :name="showAsrKey ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="showAsrKey = !showAsrKey"></q-icon>
-            </template>
-            <template v-slot:hint>
-              <span class="text-grey-6" style="font-size:11px">{{ t('s.asr_api_hint') }}</span>
-            </template>
-          </q-input>
+        <!-- Creative tab -->
+        <q-tab-panel :name="'creative'" class="settings-panel">
+          <div>
+            <div class="settings-label">{{ t('s.creative_model') }}</div>
+            <q-select v-model="settingsForm.creativeModel" :options="computedCreativeModelOptions" dense filled emit-value map-options></q-select>
+          </div>
+          <div>
+            <div class="settings-label">{{ t('s.api_key') }}</div>
+            <q-input v-model="settingsForm.videoApiKey" :type="showVideoKey ? 'text' : 'password'" dense filled>
+              <template v-slot:append>
+                <q-icon :name="showVideoKey ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="showVideoKey = !showVideoKey"></q-icon>
+              </template>
+            </q-input>
+          </div>
+          <div class="settings-hint"><span class="material-icons">info</span><span>{{ t('s.creative_tab_hint') }}</span></div>
         </q-tab-panel>
       </q-tab-panels>
       <q-card-actions align="right">
@@ -605,12 +726,12 @@ const app = Vue.createApp({
       showImport: false,
       showSettings: false,
       showShortcuts: false,
-      settingsForm: { resolution: "480", fps: "30", model: "glm-4.6v", useMultimodal: true, asrEngine: "whisper", asrModel: "large-v3", videoApiKey: "", asrApiKey: "", imageResolution: "1920", imageApiKey: "", imageModel: "glm-4.6v", imageEngine: "cloud", videoEngine: "cloud", localModel: "qwen3-vl-8b", localFps: "1", localMaxFrames: "32", hwAccel: false, language: "zh", creativeModel: "glm-5-turbo" },
+      settingsForm: { resolution: "480", fps: "30", model: "glm-4.6v", useMultimodal: true, asrEngine: "whisper", asrMode: "local", asrModel: "large-v3", videoApiKey: "", asrApiKey: "", imageResolution: "1920", imageApiKey: "", imageModel: "glm-4.6v", imageEngine: "cloud", videoEngine: "cloud", localModel: "qwen3-vl-8b", localFps: "1", localMaxFrames: "32", localRes: "480", localAsrMode: "separate", hwAccel: false, language: "zh", creativeModel: "glm-5-turbo" },
       localModels: [],
+      vlmDownload: { state: "idle", model_id: null, total_bytes: 0, done_bytes: 0, speed_bps: 0, error: null },
       settingsTab: "general",
       hwEncoderAvailable: false,
       showVideoKey: false,
-      showAsrKey: false,
       showImgKey: false,
 
       importStep: "select",
@@ -679,6 +800,19 @@ const app = Vue.createApp({
         this.bgTasks = [...this.bgTasks];
       }
     }).catch(() => {});
+    // Poll local VLM model download progress (settings dialog open or download running)
+    this._vlmDlTimer = setInterval(async () => {
+      if (this.vlmDownload.state !== "downloading" && !this.showSettings) return;
+      try {
+        const st = await API.localVlmDownloadStatus();
+        const prev = this.vlmDownload.state;
+        this.vlmDownload = st;
+        if (prev === "downloading" && st.state === "done") {
+          await this.refreshLocalModels();
+          Quasar.Notify.create({ message: t('s.model_dl_done'), position: "top", timeout: 3000, color: "positive" });
+        }
+      } catch {}
+    }, 1500);
     // Poll running bgTasks against DB (SSE may have disconnected)
     this._bgPollTimer = setInterval(async () => {
       const running = this.bgTasks.filter(t => t.status === "running");
@@ -694,11 +828,21 @@ const app = Vue.createApp({
         const p = progressMap[task.id];
         if (p) {
           task.step = p.step;
+          if (p.engine) task.engine = p.engine;
           if (p.step === "compressing") {
             task.percent = (p.compress_pct || 0) * 0.4;
             task.stageLabel = t('g.bg_compressing');
           } else if (p.step === "engine_starting") {
             task.stageLabel = t('g.bg_engine_starting');
+          } else if (p.step === "extracting") {
+            task.percent = 5 + (p.extract_pct || 0) * 0.1;
+            task.stageLabel = t('g.bg_extracting') + (p.window ? ' ' + p.window : '');
+          } else if (p.step === "asr_start" || p.step === "asr_progress") {
+            task.percent = 80;
+            task.stageLabel = t('g.bg_transcribing');
+          } else if (p.step === "merging") {
+            task.percent = 95;
+            task.stageLabel = t('g.bg_merging');
           } else if (p.step === "asr_loading") {
             // 系统任务：启动期 ASR 模型预加载（无真实百分比，按耗时缓慢爬升）
             task.percent = Math.min(95, (Date.now() - (task.startTime || Date.now())) / 1200);
@@ -840,12 +984,6 @@ const app = Vue.createApp({
         { label: "GLM-4.6", value: "glm-4.6" },
       ];
     },
-    computedAsrOptions() {
-      return [
-        { label: t('s.asr_whisper'), value: "whisper" },
-        { label: t('s.asr_zhipu'), value: "zhipu-asr" },
-      ];
-    },
     computedAsrModelOptions() {
       return [
         { label: t('s.asr_model_tiny'), value: "tiny" },
@@ -868,8 +1006,21 @@ const app = Vue.createApp({
     },
     computedLocalModelOptions() {
       return this.localModels
-        .filter(m => m.installed)
-        .map(m => ({ label: `${m.label} · ${m.quant} · ${m.size_gb}GB`, value: m.id }));
+        .map(m => ({
+          label: `${m.label} · ${m.quant} · ${m.size_gb}GB`,
+          value: m.id,
+          disable: !m.installed,
+          installed: m.installed,
+          audio: !!m.audio,
+          name: m.label,
+          quant: m.quant,
+          size_gb: m.size_gb,
+          min_ram_gb: m.min_ram_gb,
+        }));
+    },
+    localModelAudio() {
+      const m = this.localModels.find(x => x.id === this.settingsForm.localModel);
+      return !!(m && m.audio);
     },
     computedLocalFpsOptions() {
       return [
@@ -882,6 +1033,13 @@ const app = Vue.createApp({
     },
     computedLocalMaxOptions() {
       return [16, 32, 48, 64, 96, 128].map(n => ({ label: String(n), value: String(n) }));
+    },
+    computedLocalResOptions() {
+      return [
+        { label: t('s.local_res_240'), value: "240" },
+        { label: t('s.local_res_480'), value: "480" },
+        { label: t('s.local_res_720'), value: "720" },
+      ];
     },
     shortcutGeneral() {
       return [
@@ -1287,6 +1445,7 @@ const app = Vue.createApp({
         this.settingsForm.model = s.model || "glm-4.6v";
         this.settingsForm.useMultimodal = s.use_multimodal !== "false";
         this.settingsForm.asrEngine = s.asr_engine || "whisper";
+        this.settingsForm.asrMode = s.asr_engine_mode || "local";
         this.settingsForm.asrModel = s.asr_model || "large-v3";
         this.settingsForm.videoApiKey = s.video_api_key || "";
         this.settingsForm.asrApiKey = s.asr_api_key || "";
@@ -1298,14 +1457,10 @@ const app = Vue.createApp({
         this.settingsForm.localModel = s.local_model || "qwen3-vl-8b";
         this.settingsForm.localFps = s.local_frames_fps || "1";
         this.settingsForm.localMaxFrames = s.local_frames_max || "32";
+        this.settingsForm.localRes = s.local_frames_res || "480";
+        this.settingsForm.localAsrMode = s.local_asr_mode === "merged" ? "merged" : "separate";
         try {
-          const models = await API.getLocalVlmModels();
-          this.localModels = Array.isArray(models) ? models : [];
-          if (this.settingsForm.imageEngine === "local" &&
-              !this.localModels.some(m => m.id === this.settingsForm.localModel && m.installed)) {
-            const firstInstalled = this.localModels.find(m => m.installed);
-            if (firstInstalled) this.settingsForm.localModel = firstInstalled.id;
-          }
+          await this.refreshLocalModels();
         } catch { this.localModels = []; }
         this.settingsForm.creativeModel = s.creative_model || "glm-5-turbo";
         this.settingsForm.hwAccel = s.hw_accel === "true";
@@ -1314,6 +1469,62 @@ const app = Vue.createApp({
         this._prevAsrModel = this.settingsForm.asrModel;
         i18nState.locale = this.settingsForm.language;
       } catch (e) { console.error(e); }
+    },
+    async refreshLocalModels() {
+      const models = await API.getLocalVlmModels();
+      this.localModels = Array.isArray(models) ? models : [];
+      // 当前选中的本地模型不可用（未下载/被删）时回落到首个已下载模型
+      if (!this.localModels.some(m => m.id === this.settingsForm.localModel && m.installed)) {
+        const firstInstalled = this.localModels.find(m => m.installed);
+        if (firstInstalled) this.settingsForm.localModel = firstInstalled.id;
+      }
+    },
+    fmtBytes(b) {
+      if (!b || b <= 0) return "0 KB";
+      if (b >= 1073741824) return (b / 1073741824).toFixed(2) + " GB";
+      if (b >= 1048576) return (b / 1048576).toFixed(1) + " MB";
+      return (b / 1024).toFixed(0) + " KB";
+    },
+    onModelDownloadClick(opt, refName) {
+      const sel = this.$refs[refName];
+      if (sel && sel.hide) sel.hide();
+      this.confirmModelDownload({ id: opt.value, label: opt.name, size_gb: opt.size_gb });
+    },
+    onModelDeleteClick(opt, refName) {
+      const sel = this.$refs[refName];
+      if (sel && sel.hide) sel.hide();
+      this.confirmModelDelete({ id: opt.value, label: opt.name, size_gb: opt.size_gb });
+    },
+    confirmModelDownload(m) {
+      Quasar.Dialog.create({
+        title: t('s.model_dl_confirm_title', {name: m.label, size: m.size_gb}),
+        message: t('s.model_dl_confirm_body'),
+        ok: { label: t('s.download_start'), color: "primary" },
+        cancel: { label: t('d.cancel'), flat: true },
+      }).onOk(async () => {
+        try {
+          const res = await API.startLocalVlmDownload(m.id);
+          this.vlmDownload = { ...this.vlmDownload, ...res, done_bytes: 0, speed_bps: 0 };
+        } catch (e) {
+          Quasar.Notify.create({ message: e.message || String(e), position: "top", color: "negative", timeout: 3000 });
+        }
+      });
+    },
+    confirmModelDelete(m) {
+      Quasar.Dialog.create({
+        title: t('s.model_del_confirm_title', {name: m.label, size: m.size_gb}),
+        message: t('s.model_del_confirm_body'),
+        ok: { label: t('s.delete_btn'), color: "negative" },
+        cancel: { label: t('d.cancel'), flat: true },
+      }).onOk(async () => {
+        try {
+          await API.deleteLocalVlmModel(m.id);
+          await this.refreshLocalModels();
+          Quasar.Notify.create({ message: t('s.model_del_done'), position: "top", timeout: 2000 });
+        } catch (e) {
+          Quasar.Notify.create({ message: e.message || String(e), position: "top", color: "negative", timeout: 3000 });
+        }
+      });
     },
     async saveSettings() {
       try {
@@ -1324,6 +1535,7 @@ const app = Vue.createApp({
           model: this.settingsForm.model,
           use_multimodal: String(this.settingsForm.useMultimodal),
           asr_engine: this.settingsForm.asrEngine,
+          asr_engine_mode: this.settingsForm.asrMode,
           asr_model: this.settingsForm.asrModel,
           video_api_key: this.settingsForm.videoApiKey,
           asr_api_key: this.settingsForm.asrApiKey,
@@ -1335,6 +1547,8 @@ const app = Vue.createApp({
           local_model: this.settingsForm.localModel,
           local_frames_fps: this.settingsForm.localFps,
           local_frames_max: this.settingsForm.localMaxFrames,
+          local_frames_res: this.settingsForm.localRes,
+          local_asr_mode: this.settingsForm.localAsrMode,
           hw_accel: String(this.settingsForm.hwAccel),
           language: this.settingsForm.language,
           creative_model: this.settingsForm.creativeModel,

@@ -37,13 +37,17 @@ def create_app() -> Flask:
     app.register_blueprint(creative_bp, url_prefix="/api/creative")
     app.register_blueprint(local_vlm_bp, url_prefix="/api/local-vlm")
 
-    # Preload local ASR model in background (only for local engines like whisper)
+    # Preload local ASR model in background — only when it will actually be used:
+    # local video engine (frames carry no audio → whisper forced) or separate-ASR mode.
+    # Cloud + multimodal skips it (saves ~3GB RAM); whisper lazy-loads on first use if settings change.
     with app.app_context():
         from .asr import preload_all, available_engines
         from .db import get_db
         db = get_db()
         asr_engine_name = get_setting(db, "asr_engine", "whisper")
-        if asr_engine_name in available_engines():
+        needs_asr = get_setting(db, "video_engine", "cloud") == "local" or \
+            get_setting(db, "use_multimodal", "true") != "true"
+        if needs_asr and asr_engine_name in available_engines():
             asr_model_name = get_setting(db, "asr_model", "large-v3")
             preload_all(asr_engine_name, asr_model_name)
 

@@ -31,3 +31,28 @@ def start_engine():
 @bp.route("/stop", methods=["POST"])
 def stop_engine():
     return jsonify(local_vlm.stop())
+
+
+@bp.route("/download", methods=["POST"])
+def start_download():
+    data = request.get_json(silent=True) or {}
+    try:
+        return jsonify(local_vlm.start_download(data.get("model_id", "")))
+    except Exception as e:
+        logger.error("model download start failed: {}", e)
+        return jsonify({"error": str(e)}), 400
+
+
+@bp.route("/download")
+def download_status():
+    return jsonify(local_vlm.download_status())
+
+
+@bp.route("/delete", methods=["POST"])
+def delete_model():
+    data = request.get_json(silent=True) or {}
+    try:
+        return jsonify(local_vlm.delete_model(data.get("model_id", "")))
+    except Exception as e:
+        logger.error("model delete failed: {}", e)
+        return jsonify({"error": str(e)}), 400

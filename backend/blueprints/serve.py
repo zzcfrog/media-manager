@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 
 from loguru import logger
-from flask import Blueprint, Response, send_file, send_from_directory, current_app, request
+from flask import Blueprint, Response, send_file, send_from_directory, current_app, request, jsonify
 
 from ..db import get_db
 from ..config import THUMB_DIR, IMAGE_EXTS
@@ -36,6 +36,13 @@ def _media_or_404(media_id):
     return row
 
 
+@bp.route("/api/media/<int:media_id>/exists")
+def media_exists(media_id):
+    """轻量文件存在性检查（播放出错时区分「文件不存在」与「格式不支持」）。"""
+    row = _media_or_404(media_id)
+    return jsonify({"exists": Path(row["file_path"]).exists()})
+
+
 @bp.route("/media/video/<int:media_id>")
 def serve_video(media_id):
     row = _media_or_404(media_id)
@@ -45,7 +52,6 @@ def serve_video(media_id):
         abort(404)
 
     ext = path.suffix.lower()
-
     # Browser-native formats: serve directly with range support
     if ext in _BROWSER_NATIVE_EXTS:
         mime = MIME_MAP.get(ext, "video/mp4")

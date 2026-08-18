@@ -54,11 +54,21 @@ def get_progress():
     db = get_db()
     for mid, p in dict(_active_progress).items():
         item = {"id": mid, "step": p.get("step", ""), "media_type": p.get("media_type", "")}
+        if p.get("engine"):
+            item["engine"] = p["engine"]
+        if p.get("asr_mode"):
+            item["asr_mode"] = p["asr_mode"]
         media = db.execute("SELECT file_name FROM media WHERE id = ?", (mid,)).fetchone()
         if media:
             item["file_name"] = media["file_name"]
         if p.get("step") == "compressing":
             item["compress_pct"] = p.get("compress_pct", 0)
+        if p.get("step") == "extracting":
+            item["extract_pct"] = p.get("extract_pct", 0)
+            if p.get("window"):
+                item["window"] = p["window"]
+        if p.get("step") in ("asr_start", "asr_progress"):
+            item["asr_substep"] = p.get("asr_substep", "transcribing")
         if p.get("step") == "analyzing":
             item["substep"] = p.get("substep", "uploading")
             item["chars"] = p.get("chars", 0)
@@ -135,6 +145,7 @@ def start_batch_analysis():
 
         if media["media_type"] == "video":
             vengine = get_setting(db, "video_engine", "cloud")
+            progress["engine"] = vengine
             api_key = get_setting(db, "video_api_key", "")
             model = get_setting(db, "model", "glm-4.6v")
             resolution = get_setting(db, "resolution", "480")
@@ -182,35 +193,43 @@ def _process_video(media_id, file_path, api_key, model, resolution, fps, hw_acce
     compressed_path = None
     try:
         with app.app_context():
-            # --- Compress (parallel OK) ---
-            progress["step"] = "compressing"
+            # --- Compress (仅云端需要控制上传体积；本地抽帧时直接 scale，无需中间产物) ---
+            source_path = file_path
+            if engine != "local":
+                progress["step"] = "compressing"
 
-            def on_compress(pct):
-                progress["compress_pct"] = pct
+                def on_compress(pct):
+                    progress["compress_pct"] = pct
 
-            compressed_path, compress_time, cw, ch, cfps = compress_video(
-                file_path, resolution=resolution, fps=fps,
-                on_progress=on_compress, hw_accel=hw_accel,
-            )
-            size_mb = compressed_path.stat().st_size / (1024 * 1024)
-            size_bytes = compressed_path.stat().st_size
-            progress["compressed_info"] = {
-                "message": f"压缩完成: {size_mb:.1f}MB, 耗时 {compress_time:.1f}s",
-                "width": cw, "height": ch, "fps": cfps, "size_bytes": size_bytes,
-            }
-            progress["compress_time"] = compress_time
+                compressed_path, compress_time, cw, ch, cfps = compress_video(
+                    file_path, resolution=resolution, fps=fps,
+                    on_progress=on_compress, hw_accel=hw_accel,
+                )
+                size_mb = compressed_path.stat().st_size / (1024 * 1024)
+                size_bytes = compressed_path.stat().st_size
+                progress["compressed_info"] = {
+                    "message": f"压缩完成: {size_mb:.1f}MB, 耗时 {compress_time:.1f}s",
+                    "width": cw, "height": ch, "fps": cfps, "size_bytes": size_bytes,
+                }
+                progress["compress_time"] = compress_time
+                source_path = str(compressed_path)
 
             # --- 本地引擎：确保 llama-server 就绪（幂等；首次/切换模型 4~40s） ---
             base_url = CODING_BASE_URL
             if engine == "local":
                 progress["step"] = "engine_starting"
+                progress["engine_t0"] = time.time()
                 base_url = local_vlm.ensure(local_cfg["model_id"])["base_url"]
-                progress["step"] = "queued"
+                progress["engine_time"] = round(time.time() - progress["engine_t0"], 1)
+                # 抽帧在 analyze_video_frames 内部随即开始（ffprobe 后逐窗回调 on_extract）
+                progress["step"] = "extracting"
 
             # --- VLM Analyze (bounded by API concurrency) ---
             _api_semaphore.acquire()
             try:
-                progress["step"] = "analyzing"
+                # 本地：analyzing 由 on_extract_done 切入（抽帧完成后才进入视觉分析）
+                if engine != "local":
+                    progress["step"] = "analyzing"
 
                 def on_analyze_progress(status, chars=0):
                     if status == "first_token":
@@ -220,37 +239,63 @@ def _process_video(media_id, file_path, api_key, model, resolution, fps, hw_acce
                         progress["chars"] = chars
 
                 if engine == "local":
+                    # Omni 系 + 设置选「音视频一起」：抽帧同时附音轨，模型直接听原声
+                    merged_audio = bool(local_cfg.get("audio")) and local_cfg.get("asr_mode") == "merged"
+                    progress["asr_mode"] = "merged" if merged_audio else "separate"
+
+                    def on_extract(cur, total):
+                        progress["step"] = "extracting"
+                        progress["extract_pct"] = round(cur / total * 100, 1) if total else 0
+                        progress["window"] = f"{cur}/{total}"
+
+                    def on_extract_done(nw, nf):
+                        progress["extract_info"] = {"windows": nw, "frames": nf}
+                        progress["step"] = "analyzing"
+
                     def on_window(cur, total):
                         progress["substep"] = "receiving"
                         progress["window"] = f"{cur}/{total}"
                     segments, analyze_time, usage = analyze_video_frames(
-                        str(compressed_path), "local", model=local_cfg["model_id"],
+                        source_path, "local", model=local_cfg["model_id"],
                         base_url=base_url, fps=local_cfg["fps"],
                         max_frames=local_cfg["max_frames"],
+                        frame_res=local_cfg["res"],
                         on_progress=on_analyze_progress, on_window=on_window,
+                        on_extract=on_extract, on_extract_done=on_extract_done,
+                        with_audio=merged_audio,
                     )
                 else:
                     segments, analyze_time, usage = analyze_video(
-                        str(compressed_path), api_key, model=model,
+                        source_path, api_key, model=model,
                         base_url=CODING_BASE_URL, multimodal=use_multimodal,
                         on_progress=on_analyze_progress,
                     )
             finally:
                 _api_semaphore.release()
 
-            # --- ASR (parallel OK)；本地模式帧无音频，上游已强制 use_multimodal=False ---
-            if not use_multimodal:
+            # --- ASR (parallel OK)；本地模式帧无音频，上游已强制 use_multimodal=False。
+            #     本地直接吃原片音轨（未再编码，音质更好）。
+            #     Omni「音视频一起」模式下音轨已随帧送入模型，跳过独立转写 ---
+            if not use_multimodal and progress.get("asr_mode") != "merged":
                 asr_engine = get_asr_engine(asr_engine_name) if asr_engine_name else None
                 if asr_engine:
                     try:
+                        progress["step"] = "asr_start"
+
+                        def on_asr(sub):
+                            progress["step"] = "asr_progress"
+                            progress["asr_substep"] = sub
+
                         asr_model_name = get_setting(get_db(), "asr_model", "large-v3")
-                        asr_segments = asr_engine.transcribe(str(compressed_path), model_name=asr_model_name)
+                        asr_segments = asr_engine.transcribe(source_path, model_name=asr_model_name,
+                                                             on_progress=on_asr)
                         if asr_segments:
                             _merge_asr(segments, _stitch_asr_sentences(asr_segments))
                     except Exception as e:
                         logger.error("ASR failed: {}", e)
 
-            # --- Save ---
+            # --- Merge & Save（跨窗拼接 + 落库 + FTS 刷新，通常 <1s） ---
+            progress["step"] = "merging"
             _stitch_cross_segments(segments)
             save_segments(media_id, segments, model=(local_cfg["model_id"] if engine == "local" else model))
             progress["step"] = "done"
@@ -413,10 +458,16 @@ def _start_image_analysis(media_id, media, app):
 
 def _local_video_cfg(db):
     """本地视频引擎配置（供单条/批量两个入口复用）。"""
+    model_id = get_setting(db, "local_model", "qwen3-vl-8b")
+    supports_audio = bool(local_vlm.MODELS.get(model_id, {}).get("audio"))
     return {
-        "model_id": get_setting(db, "local_model", "qwen3-vl-8b"),
+        "model_id": model_id,
         "fps": float(get_setting(db, "local_frames_fps", "1") or 1),
         "max_frames": int(get_setting(db, "local_frames_max", "32") or 32),
+        "res": int(get_setting(db, "local_frames_res", "480") or 480),
+        # Omni 系可选「音视频一起分析」（模型直接听原声，跳过 whisper）
+        "audio": supports_audio,
+        "asr_mode": get_setting(db, "local_asr_mode", "separate"),
     }
 
 
@@ -439,20 +490,47 @@ def _start_video_analysis(media_id, media, app):
     file_path = media["file_path"]
 
     def generate():
-        progress = {"step": "queued", "compress_pct": 0, "substep": "uploading", "chars": 0}
+        progress = {"step": "queued", "compress_pct": 0,
+                    "substep": "receiving" if engine == "local" else "uploading",
+                    "chars": 0, "engine": engine}
         _analysis_pool.submit(_process_video, media_id, file_path, api_key, model,
                     resolution, fps, hw_accel, use_multimodal, asr_engine_name,
                     app, progress, engine, local_cfg)
         display_model = local_cfg["model_id"] if engine == "local" else model
 
-        emitted = {"compress_start": False, "compressed": False, "analyze_start": False}
+        emitted = {"compress_start": False, "compressed": False, "analyze_start": False,
+                   "engine_ready": False, "extract_done": False}
         while progress["step"] not in ("done", "error"):
             step = progress["step"]
+            # 本地流程一次性事件：由 worker 写入的标志驱动（engine_time/extract_info 在
+            # 各自完成瞬间写入），不受当前 step 影响——引擎就绪/抽帧完成即时上报，
+            # 且快速阶段不会因落在两次轮询之间被漏掉
+            if engine == "local" and not emitted["engine_ready"] and "engine_time" in progress \
+                    and step != "engine_starting":
+                emitted["engine_ready"] = True
+                yield _sse({'type': 'progress', 'step': 'engine_ready',
+                            'elapsed': progress["engine_time"]})
+            if engine == "local" and not emitted["extract_done"] and progress.get("extract_info") \
+                    and step not in ("queued", "engine_starting", "extracting"):
+                emitted["extract_done"] = True
+                yield _sse({'type': 'progress', 'step': 'extract_done',
+                            **progress["extract_info"]})
             if step == "queued":
-                yield _sse({'type': 'progress', 'step': 'queued', 'message': '排队等待中...'})
+                q = {'type': 'progress', 'step': 'queued', 'message': '排队等待中...',
+                     'engine': engine}
+                if engine == "local":
+                    q['asr_mode'] = 'merged' if (local_cfg.get("audio") and
+                                                 local_cfg.get("asr_mode") == "merged") else 'separate'
+                yield _sse(q)
             elif step == "engine_starting":
+                # 带已耗时秒数（真实加载 % 无法从 llama-server 获取，耗时是诚实的进度信号）
+                el = time.time() - progress.get("engine_t0", time.time())
                 yield _sse({'type': 'progress', 'step': 'engine_starting',
-                            'message': f'启动本地引擎（{local_cfg["model_id"]}）...'})
+                            'message': f'启动本地引擎（{local_cfg["model_id"]}）... {el:.0f}s'})
+            elif step == "extracting":
+                yield _sse({'type': 'progress', 'step': 'extracting',
+                            'percent': progress.get('extract_pct', 0),
+                            'window': progress.get('window', '')})
             elif step == "compressing":
                 if not emitted["compress_start"]:
                     emitted["compress_start"] = True
@@ -474,6 +552,11 @@ def _start_video_analysis(media_id, media, app):
                             'substep': progress.get('substep', 'uploading'),
                             'chars': progress.get('chars', 0),
                             **({'window': progress['window']} if progress.get('window') else {})})
+            elif step in ("asr_start", "asr_progress"):
+                yield _sse({'type': 'progress', 'step': step,
+                            'substep': progress.get('asr_substep', 'transcribing')})
+            elif step == "merging":
+                yield _sse({'type': 'progress', 'step': 'merging', 'message': '合并分段并保存...'})
             time.sleep(0.3)
 
         if progress["step"] == "done":

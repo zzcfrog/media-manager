@@ -43,7 +43,76 @@
   - **E2E 实测**（DSC_9506.MOV 31s，fps=2 → 2 窗 × 29-32 帧）：压缩 7.3s + 引擎 1.5s + 抽帧 0.2s + VLM 48.5s（约 24s/窗）+ whisper 冷加载 78s + 转写 → 共 170.6s；**4 分镜时间戳跨窗连续且绝对**（0-15/16-21/21-25/25-30），whisper 语音正确合入对应分镜（「景山上拍的故宫全景」→ 全景分镜），usage 跨窗累计。
   - **实测 token 校准**：240p 源每帧约 190 token、480p 约 400 → `local_frames_max` 默认 **32**（PRD 已更新；480p 下 64 帧 ≈ 2.6 万 token 逼近 32K 上下文不安全）。
 - **✅ 启动模型加载进度并入顶部进度条**：[asr/\_\_init\_.py](../backend/asr/__init__.py) 新增 `preload_state`（loading/done/error）+ 引擎 `is_ready()` 校验（whisper 实现见 [engines/whisper.py](../backend/asr/engines/whisper.py)）；`/api/analysis/progress` 加载中时附带 `__preload__` 系统任务（file_name = "whisper large-v3"）；前端顶部进度条把它渲染成任务条目（graphic_eq 图标替代缩略图、耗时爬升百分比、完成后自动消除、刷新页面可恢复）。设置里切换 ASR 模型触发的重载暂不入条（仅启动时），如需再加。
-- **下一步 Step4**：模型下载管理（hf-mirror 镜像、断点续传、SSE 进度、删除、`local_dir_use_symlinks=False`）+ 设置页模型卡片 UI。
+- **✅ 启动 ASR 预加载改按需**（此前无论云端/本地一律启动加载 whisper ~3GB）：[\_\_init\_.py](../backend/__init__.py) 仅当 `video_engine=local`（帧无音频强制 whisper）或 `use_multimodal=false`（独立 ASR 模式）才启动预加载；云端+多模态跳过（语音由 GLM 顺手转写，whisper 用不上），首次需要时懒加载。视觉本地模型（llama-server）本就不在启动加载（按需 `ensure()`，PRD 设计）。已验证三分支：cloud+mm=跳过 / local=加载 / cloud+独立 ASR=加载（用户当前配置）。
+- **✅ 本地视频去掉压缩中间步骤**（用户提出：抽帧时可同步降分辨率，压缩是为云端上传设计的）：
+  - 后端 [analysis.py](../backend/blueprints/analysis.py) `_process_video` 本地分支跳过 `compress_video`（无 temp 产物），帧与 whisper 都直接吃**原片**（ASR 音质更好）；[analyzer.py](../backend/analyzer.py) `extract_video_frames` 新增 `frame_res`——ffprobe 探宽高后 `fps=N,scale=W:H` 一步降采样+降分辨率（短边对齐 p 值，16:9 横片 852×480 与压缩语义一致）；macOS 附 `-hwaccel videotoolbox`（4K60 10bit HEVC 软解极重且与 llama-server 抢核，实测 16s 窗墙钟 7.3→4.4s、CPU 55s→1.8s ≈ 30×）。新设置 `local_frames_res`（240/480/720，默认 480，720 ≈ 900 token/帧 线性推算）。
+  - 前端：视频 tab 选本地时压缩区块（压缩分辨率/帧率/预估码率/硬件加速）整体隐藏，本地区块新增「帧分辨率」三档（带 token 提示）；进度事件（`/progress` + SSE queued）新增 `engine` 字段，detail 页本地视频阶段列表去掉「压缩/编码」两步（= AI 分析 + 语音转写）；i18n 中英 6 键。
+  - **E2E 实测**（DSC_9506.MOV 4K60 10bit HEVC，fps=2/res=480）：无压缩步骤 ✓，抽帧 9.1s（软解 17.9s），VLM 102.6s，3 分镜时间戳连续（0-15/16-22/22-30），whisper 原片音轨正确合入第 1/3 分镜。注：whisper 对个别词的转写与压缩音源略有差异（景山→九山、镜头→枕头，样本 1 次待观察）。
+  - 顺手确认：退出时 faster_whisper 的 tqdm 监视线程 atexit 报 "cannot join thread" 为第三方无害告警，非本仓代码。
+- **✅ 设置页 tab 更名 + 构思独立成页**（用户提议）：tab「图片/视频/音频」→「图片分析/视频分析/语音分析」；「构思生成模型」从视频分析页抽出，新 tab「剪辑构思」（含提示：创作构思始终用云端模型，API Key 在视频分析页配置）。纯前端改动（[index.html](../frontend/index.html) + i18n 中英各 3 改 2 增），无逻辑变化。
+- **✅ 设置弹窗三处 UI 修复**（用户反馈，已在运行实例验证）：① tab 面板改**固定高度 440px + 滚动**（原来 min-height 随内容变化，切 tab 弹窗尺寸跳变——实测五个 tab 均稳定 605px）；② 云端模式字段顺序统一为 **AI 模型 → API Key**（视频页多模态/压缩参数沉底，图片页压缩尺寸沉底，API Key 在本地模式尾部保留供剪辑构思用）；③ 剪辑构思页补 **API Key 输入框**（与视频分析共用同一 Key，v-model 相同）+ 提示文案更新。
+- **✅ 设置弹窗第二轮修复**（用户反馈，已在运行实例验证）：
+  - **弹窗宽度钉死 440px**（原 min-width 会随内容撑宽——视频页本地模式的下拉选中项文案长，切引擎时弹窗突然变宽；实测本地/云端切换宽度恒 440）。
+  - **视频本地模式移除 API Key**（上一轮为剪辑构思保留在尾部，用户明确不要；Key 只在云端块和剪辑构思 tab 出现）。
+  - **语音分析 tab 引擎 radio 化**：本地（默认，Whisper 型号下拉）/ 云端（占位提示「即将支持」，无字段）。新设置键 `asr_engine_mode`（local/cloud）；原 `asr_engine` 恒为 whisper 不动（云端 ASR 引擎后端本就不存在——UI 里那个 zhipu-asr 选项是死选项，本次连 asrEngine 下拉/ASR Key 输入一起移除，未来云端引擎实现时接线）。清理孤儿：computedAsrOptions、showAsrKey、i18n 5 键。
+- **✅ 设置弹窗第三轮修复**（用户反馈，已在运行实例验证）：
+  - **弹窗加宽 440→480px**。
+  - **tab 左右移动根治**：语音分析 tab 原为条件渲染（云端多模态时隐藏），切引擎/多模态开关时 tab 增删 + justify 重排导致整排横移；改为 5 个 tab 常驻渲染，实测本地↔云端↔关多模态三种状态下 5 个 tab 的 x 坐标完全不变。
+  - **代价处理**：云端+多模态时语音设置不生效（Whisper 不参与），语音 tab 顶部补提示「当前为云端多模态模式，音频由视频模型直接分析，此处设置不会生效」（实测开启多模态后提示出现）。
+- **✅ 修复：重新分析走本地引擎但 UI 显示云端流程**（用户反馈：本地设置下点「重新分析」，右侧仍是压缩/编码/上传流程 + token 消耗，以为没触发本地模型）：
+  - **核实**：后端实际走了本地——DB 里该次分析 `analysis_model=qwen3-vl-8b`、状态 done（后端 `_start_video_analysis` 一直按 `video_engine` 设置分流，本地跳过压缩）。问题纯在 detail 页 UI 两处只看多模态开关、从不读引擎设置（批量入口改过，detail 漏了）。
+  - **确认弹窗**（detail.js `openAnalysisConfirm`）：本地引擎显示本地模型名 + 抽帧参数行（`{fps}fps · {res}p · ≤{max} 帧/窗`）+ 音频恒「独立 ASR (Whisper)」+ 提示改「本地引擎离线运行，不消耗云端 API 费用」；云端保持原样。已 Playwright 实测。
+  - **阶段列表**（detail.js `doAnalysis`）：按引擎构建，本地视频 = 分析 + 转写 两步（与 `created()` 恢复逻辑一致）；bgTask 预置 `engine` 字段。
+  - **完成弹窗 token**：为 llama-server 返回的真实本地消耗（非云端计费），流程标识正确后保留展示。
+  - **附带**：gallery 批量确认弹窗模型名按引擎显示（本地 → local_model）；后端本地模式 SSE `substep` 初始值 `uploading→receiving`（不再闪「上传中」）。
+- **✅ 本地分析进度明细化（SSE 事件链重构，用户反馈：进度不准、不够细、缺引擎加载进度）**：
+  - **真相**：whisper 的 `transcribe(on_progress)` 从未接线——转写的 10~30s 里 UI 一直显示「分析中」；抽帧/合并无任何事件；engine_starting 只发一条无耗时。
+  - **后端**：`extract_video_frames(on_extract)` 逐窗回调（percent=i/N）；`analyze_video_frames` 新增 `on_extract_done(窗数,总帧数)`；`_process_video` 记录 `engine_t0/engine_time`、ASR 步骤（asr_start/asr_progress + loading/transcribing 子步骤）、合并步骤（merging）；SSE 生成器新增 engine_starting 带已耗时秒数、engine_ready(elapsed)、extracting(percent/window)、extract_done(windows/frames)、asr_*/merging 事件；一次性事件由 worker 标志驱动（不依赖 step 转迁检测，快速阶段不漏）。`/progress` 端点补 extracting/asr 字段。
+  - **前端**：detail 页本地时间线 2 步 → **5 步（本地引擎启动→抽帧→视觉分析→语音转写→合并保存）**，各档独立进度条/子步骤/耗时；done 收尾兜底标记漏事件的快速阶段；全局任务栏（index.html 轮询）与 workbench SSE 标签同步新步骤。
+  - **验证**：假引擎协议级 E2E（monkeypatch ensure/analyze_frames/ASR），事件序 = queued→engine_starting(带耗时)→engine_ready(0.8s)→extracting(0→50% 1/2)→extract_done→analyzing(1/2,2/2+receiving)→asr_progress(loading→transcribing)→merging→done ✓；i18n 键/handler/stepMap 与后端步骤交叉核查 ✓（补漏 d.local_engine_stage）。云端独立 ASR 同步获得转写阶段显示。
+- **✅ 新增两个本地模型 + Omni 音视频同析模式**（用户需求：加 Qwen3.6-35B-A3B 与 Qwen3-Omni-30B-A3B；Omni 支持 ASR，可选音视频一起或独立 whisper）：
+  - **模型注册**（local_vlm.py MODELS，文件名/体积为 hf-mirror API 实测）：`qwen3.6-35b-a3b`（unsloth/Qwen3.6-35B-A3B-GGUF，UD-Q4_K_M 22.13GB + mmproj-F16 0.90GB，纯视觉）、`qwen3-omni-30b-a3b`（ggml-org/Qwen3-Omni-30B-A3B-Instruct-GGUF，Q4_K_M 18.56GB + mmproj-Q8_0 1.33GB，**audio+vision**，`audio:true` 标记随 /api/local-vlm/models 输出）。运行时前提已核：llama.cpp libmtmd 官方支持 Qwen3-Omni audio 输入（`input_audio`，语音输出 talker 未集成但我们只需输入）；本项目 llama-server 为 2026-08-16 master 构建（b10451），支持齐全。
+  - **同析管线**：`extract_video_frames(with_audio=True)` 每窗抽 16k 单声道 PCM（`-f s16le pipe:1`；**不能用 `-f wav pipe:1`——管道不可 seek，头部时长是占位值**，实测解析出 13 万秒；改由 wave 模块自建头）→ `analyze_video_frames` 帧前插 `input_audio`（base64 wav）→ `_process_video` 检测 `local_asr_mode=merged` 时跳过 whisper。真实 9126 抽取实测：8/8 窗对齐、4.0s/窗、166KB b64/窗。
+  - **设置**：新键 `local_asr_mode`（separate 默认/merged）；视频本地模板选 Omni 时显示「语音分析：音视频一起 / 独立 Whisper」radio + hint；语音分析 tab 在本地同析下显示「不生效」提示；模型下拉改列全部 4 个模型、未下载禁选标注「未下载」（下载管理 Step4 前需手动放置 `backend/models/vlm/<id>/`）。
+  - **进度/确认**：queued SSE 与 /progress 带 `asr_mode`；同析时间线 4 步（引擎→抽帧→**视听分析**→合并，无转写档），独立模式 5 步不变；确认弹窗音频行显示「音视频一起（Omni）」。
+  - **验证**：fake 协议 E2E——merged：queued(merged)→done、with_audio=True、whisper 未跑、无 asr 事件 ✓；separate 回归：queued(separate)、with_audio=False、whisper 跑 ✓；settings 测试前后保存/恢复。
+- **✅ 应用内模型下载管理（Step4，用户需求：为什么新模型未下载 → 支持应用内下载）**：
+  - **后端**（local_vlm.py + blueprints/local_vlm.py）：`POST /api/local-vlm/download`（单任务，未知/已下载 400）后台线程 `hf_hub_download` 两个文件（main+mmproj）→ 完成后软链 `backend/models/vlm/<id>/`；`GET /download` 轮询状态（done_bytes = 已完成文件字节 + `blobs/*.incomplete` 实时字节；速度按相邻轮询差值；精确总量从 hf-mirror API 拉取失败回退估算）；`POST /delete` 删模型目录 + HF 缓存仓库目录（引擎运行该模型/下载中拒删）。`HF_ENDPOINT=hf-mirror.com` 在 config.py 顶部 setdefault（须在 huggingface_hub 首次导入前）。下载前磁盘空间检查（<1.05× 拒下）。断点续传由 hf_hub_download 原生支持。
+  - **前端**：设置「视频分析→本地」底部模型管理列表（4 行：已装=删除按钮，未装=下载按钮+内存需求标注，下载中=进度条+%+速度）；1.5s 轮询（弹窗关闭/刷新不中断后台下载，完成时刷新清单+通知）；图片 tab 指引文案。下载/删除均二次确认。
+  - **验证**：fake hf_hub_download 全流程（downloading→done、双软链有效、delete 清两处目录、运行中/下载中拒删、unknown/installed 400）✓；live UI 实测管理列表渲染 4 行 2 删 2 下（发现用户 Flask 带自动重载，后端新码已生效）。
+  - **说明**：进度用轮询 GET 而非 PRD 原计划的 SSE——20GB 级下载 30min+，弹窗必然关闭、页面可能刷新，轮询天然可恢复；PRD 已更新。
+- **✅ 模型下载/删除按钮移入下拉菜单**（用户反馈：不要放在下方独立管理列表）：q-select 自定义 `v-slot:option`——每选项右侧按钮（已装=删除、未装=下载），未装选项副标题「需内存 N GB+ · 未下载」；点击按钮 `@click.stop` 防选中 + `hide()` 收起菜单后弹二次确认；下载中选项行内进度条+%+速度（其它未装按钮置灰），下拉收起时选框下方保留一条汇总进度条（仅下载中可见）；视频/图片两 tab 下拉行为一致；删除原独立管理列表与「见视频分析页」指引，清理孤儿 i18n（s.model_manage/model_manage_in_video/not_installed）。已 Playwright 实测：4 选项渲染（2 删 2 下）、点下载→菜单收起→确认框（22.13GB 提示）→取消后状态 idle。
+- **✅ 语音分析引擎 radio 顺序对齐**（用户反馈）：原实现「本地在前、云端在后」与图片/视频 tab 的「云端在前」不一致（UE_DESIGN 文档本来就写的「云端 / 本地」，代码没跟上）；已对调为云端在前。默认值仍为本地（云端引擎尚未实现，默认云端会落到死占位提示）。
+- **✅ 设置页视觉重构**（用户反馈：tab 内容文字多显乱、审美差）：
+  - **引擎选择改通栏分段控件**（q-btn-toggle 两段 50/50，选中段主色底 + 圆角描边容器），图片/视频/语音三 tab 同构，语音用「云端 | 本地（Whisper）」短标签（原来误用视觉引擎名）。
+  - **小节标题**（12px 加粗 + 左 3px 强调色竖条，与快捷键弹窗同款 idiom）：视频本地的「抽帧参数」、Omni 的「语音分析」（该组同时从 radio 改为分段控件）。
+  - **提示统一收进灰底圆角提示框**（surface2 + 11px text3 + 图标 info/hourglass/downloading/error_outline，与分析确认弹窗同款 idiom）：API Key 说明、预估码率、本地引擎说明、Omni 模式说明、云端占位、下载进度/错误——每模式至多一条置于块底，替代原先散落的多行 11px 小字。
+  - 间距 12→14px；清理孤儿键（s.engine）；输入框内嵌 hint 移除并入提示框。Playwright 截图视觉核验（本地/云端两态）：分段选中态、色条小节、提示框、无错位重叠 ✓。
+  - **提示框去灰底**（用户反馈：灰底与 filled 下拉/输入控件同色，误像可点击）：改为无底色旁注——左侧 2px 灰细竖线 + 11px muted 字 + 图标（实测 computed style：提示 transparent vs 输入控件 rgba(255,255,255,0.07)，视觉核验确认不再混淆）。
+- **✅ 修复：模型下载进度永远 0%**（用户反馈）：
+  - **根因**：hf_hub_download（0.22.2）的数据流**无读超时**——hf-mirror CDN/代理链路会静默掐断长连接，`read()` 永久阻塞（faulthandler 栈坐实：卡在 `http_get` SSL read）；进度分子又取自 `blobs/*.incomplete`，连接死了文件不再增长 → 永远 0% 且不报错。实测同一 URL 直连 14MB/s、走代理 23MB/s——是**间歇性**掐连接，不是全断。
+  - **修复**：弃用 hf_hub_download，自研 `_download_file`：`requests` 流式 + `timeout=(10,60)`（连接/读）+ **失败自动重试 ≤10 次（指数退避）** + **Range 断点续传**（`<file>.part` 直落模型目录，206 续传/200 重写/416 视为完成）+ 完成校验文件大小后 rename；进度改为直接量 `.part` 文件（不再扫 HF cache）。新下载不再经 HF cache/软链，直接写 `backend/models/vlm/<id>/`（删除逻辑向后兼容老的 cache+软链结构）。
+  - **验证**：假 session 四场景（全新/600B 断点续传/连掉重试×2/大小不符清 part 报错）✓；真网络拉 ggml-org README 330B ✓。**需重启后端生效**（run.py 无 auto-reload；旧进程里卡死的下载线程只有重启能清）。
+- **✅ 下载提速：8 连接分片下载**（用户反馈：速度只有几百 KB）：
+  - **测速定位**：源就是 `hf-mirror.com`（HF 官方直连与走用户代理均 ConnectTimeout，镜像唯一可用）；主 GGUF 单连接实测直连 0.87MB/s / 走代理 3.45MB/s（mmproj 昨日可达 14~23MB/s）——镜像 CDN 按文件/时段限速，单连接无解。
+  - **实现**：`_download_segmented`——≥128MB 且已知大小的文件分 8 段并发（各线程独立 Session + 闭合区间 Range + pwrite 预分配的 `.part`），64MB 块级断点（`<part>.json` sidecar 记每段连续前缀，块内中断重下该块）；兼容旧单线程 `.part`（无 sidecar 时把顺序前缀映射为各段进度，已下字节不浪费）；块字节数不符即重试（防服务器忽略 Range 写脏数据）；小文件仍走单连接。进度显示不变（仍量 `.part`）。
+  - **验证**：fake 源三场景（分片布局内容一致 / 段级断点 / 旧前缀迁移）✓；真网络——主 GGUF 闭合区间返回精确 206+Content-Range（1000000-1000099 恰 100B）、闭合与开区间同位置 4096B 字节级一致 ✓；非 LFS 文件（README）忽略闭合区间返回全量——分片仅用于 ≥128MB 的 LFS 文件，天然规避。
+- **✅ 「音视频一起分析」改为能力驱动 + 开关移入模型下拉**（用户反馈三点：①文案不应绑定 Omni——未来自定义模型支持音频输入也适用；②开关放下拉里图标左侧 + 问号提示；③语音 tab 联动禁用 + 指引）：
+  - **能力驱动**：前端统一按 `localModels[].audio` 判定（选中模型能力 computed `localModelAudio`；下拉选项带 audio 标志）；detail.js 的确认弹窗/阶段表改为查 `/api/local-vlm/models` 的 audio 而非硬编码模型 id。文案全部通用化（去「Omni」字样；d.merged_asr → 「音视频一起」）。
+  - **开关进下拉**：支持音频的模型选项行内、图标按钮左侧——小号 q-toggle「音视频一起分析」+ help_outline 问号（tooltip = 原 hint 说明）；`@click.stop` 防误选模型；移除面板里的「语音分析」小节与分段控件，清孤儿键（s.local_asr_separate/local_asr_mode_label）。
+  - **语音 tab 联动**：开启时（本地引擎 + 所选模型支持音频 + merged）Whisper 模型下拉 `disable`，底部提示「当前已开启音视频一起分析，语音由视频模型直接处理；如需在此独立配置语音分析，请先在视频分析的模型下拉中关闭该选项」。
+  - **验证**（Playwright）：下拉 4 行中仅 Omni 行有开关+问号（左于 delete 图标）；开关点击菜单不关、开启后语音 tab 下拉 q-field--disabled + aria-disabled + input disabled 三重坐实、指引出现；测试全程未点保存（DB 仍 local_model=qwen3-vl-8b/separate）。
+- **✅ 语音分析并回视频分析 tab（子模块）**（用户反馈：语音本就是分析视频里的音频内容，不该独立成 tab）：删除语音 tab（设置页变 4 tab：通用/图片分析/视频分析/剪辑构思，仍全部常驻不移动）；语音配置整体移入视频面板底部小节「语音分析」（小节标题 + 云端|本地（Whisper）分段控件 + Whisper 型号下拉 + 条件提示/占位/禁用联动原样保留，云端本地两种视频引擎通用）；清孤儿键 s.tab_audio。已实测：tab 列表 = 4 个，视频面板小节 [抽帧参数, 语音分析]、分段控件 ×2（引擎+ASR）、下拉含 ASR 模型。
+- **✅ 修复：开「音视频一起分析」后设置弹窗组件被遮挡**（用户反馈）：根因不是高度——面板是 flex 列布局，内容超高时**子项被 flex-shrink 压缩变形**（scrollHeight 恒 440 根本不触发滚动），select 被压扁看起来像被遮挡。修复：面板改 `.settings-panel` 类 + **子项 `flex-shrink:0`**（恢复滚动语义）；同时面板高度 440→560（视频页并入语音模块后内容确实变长；弹窗总高 725px < 屏高 897px）。实测：视频本地+同析完整内容 560 一屏装下无需滚动、select 高度健康（40/48px 无压缩）、四个 tab 高度恒定 560 无跳变。
+- **✅ 引擎切换改轻量药丸**（用户反馈：通栏分段控件太突兀太大不好看）：`engine-toggle` 从通栏 spread（448×48、选中实心 primary 大色块）改为**内容自适应胶囊**（实测 245×31、999px 圆角、描边容器）；选中态改**半透明强调色底（accent-dim）+ 强调色字**（Quasar 默认 toggle-color 会给实心 primary，需 `!important` 覆盖），未选中灰字、hover 提亮；图片/视频/语音三处引擎切换同构。AI 视觉核验：比例协调不突兀、层级清晰、无布局问题。
+- **✅ 模型下拉选项改两行结构**（用户反馈：标题和选项挤在一行不美观）：主行只放**模型名 + 右侧开关/问号/图标**（腾出横向空间），量化·体积·内存标注降为副标题行；行内边距放宽（上下 8px，行高 49px）；已下载行副标题 `Q4_K_M · 18.56GB`、未下载行附加「需内存 N GB+ · 未下载」，下载中行显示进度条；选中态在选框里的展示仍是紧凑单行（label 不变）。options 补漏 quant 字段；开关与图标间距按 AI 核验建议 2→6px。视频/图片两处下拉同构。
+- **✅ 设置字段标签外置**（用户反馈：所有下拉的标题缩在控件内显得紧凑、值没有水平对齐感）：全部 q-select/q-input 去掉 Quasar filled 的**盒内浮动标签**（`:label`），改为 `.settings-label`（11px 灰字）置于控件上方、控件内只显示值——覆盖通用/图片/视频（云端+本地+抽帧两列）/语音/剪辑构思全部字段；两列行（压缩分辨率+帧率、抽帧帧率+帧数上限）改为每列独立包裹（标签+控件）；API Key 输入框同步处理。实测：面板内浮动内嵌标签数 = 0，全部 filled 控件高度统一 40px（值基线水平对齐），AI 视觉核验「层级分明、对齐良好」。
+- **✅ 播放错误细分：文件不存在 vs 格式不支持**（用户反馈：素材都在外置盘，盘未挂载时仍提示「格式不支持」）：
+  - **根因**：浏览器对加载失败（含 404/磁盘缺失）统一抛 MediaError code=4「不支持」，前端按 code 映射无法区分。
+  - **修复**：新轻量端点 `GET /api/media/<id>/exists`（DB 行 + `Path.exists()`，不动转码管线——HEAD 播放 URL 会拉起 ffmpeg 所以不能直接探）；`onVideoError` 先查存在性——不存在 → 「文件不存在（可能已被移动、删除，或所在磁盘未挂载）」；存在 → 按错误码细分（格式不支持/解码失败/网络错误等）；接口异常回退原行为。
+  - **验证**：端点三态（真实文件 true / 缺失 false——恰逢用户外置盘未挂载，9126 即真实案例 / 无记录 404）✓。需重启后端生效。
+- **预留（用户提议，未实现）**：音乐分析 tab——识别乐器、表达的情绪、描绘的画面，作为设置页独立 tab 后续加入。
+- **下一步 Step4**：模型下载管理（hf-mirror 镜像、断点续传、SSE 进度、删除、`local_dir_use_symlinks=False`）+ 设置页模型卡片 UI。**注（2026-08-17 实测）**：whisper large-v3 加载 78~82s 的根因是 CTranslate2 在本机 CPU 后端不支持 fp16 计算 → `compute_type=auto` 落到 int8 → 每次启动现场把 fp16 权重逐矩阵量化成 int8（纯 CPU、不随 cpu_threads 扩展；磁盘读 2.9GB 仅 0.24s 非瓶颈；llama-server 5.76GB 仅 3.5~11s 是因为 GGUF mmap 免转换）。**解法**：下载后一次性本地转换为 int8 格式缓存（CT2 转换器），之后加载秒级——并入 Step4 实现。
 
 ## 待办：产品化打包——后端自包含（Python/ffmpeg/exiftool 不再依赖用户环境）（2026-08-16）
 

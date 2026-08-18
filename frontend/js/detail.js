@@ -277,9 +277,13 @@ const DetailPage = {
         </q-card-section>
         <q-card-section>
           <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
-            <div v-if="media?.media_type==='video'" class="row items-center">
+            <div v-if="media?.media_type==='video' && confirmInfo.engine !== 'local'" class="row items-center">
               <span class="text-grey-6" style="width:80px">{{ t('d.compress') }}</span>
               <span>{{ confirmInfo.resolution }} / {{ confirmInfo.fps }}fps / {{ confirmInfo.bitrate }}</span>
+            </div>
+            <div v-if="media?.media_type==='video' && confirmInfo.engine === 'local'" class="row items-center">
+              <span class="text-grey-6" style="width:80px">{{ t('d.frame_extract') }}</span>
+              <span>{{ t('d.local_frame_params', {fps: confirmInfo.localFps, res: confirmInfo.localRes, max: confirmInfo.localMaxFrames}) }}</span>
             </div>
             <div class="row items-center">
               <span class="text-grey-6" style="width:80px">{{ t('d.model') }}</span>
@@ -287,12 +291,18 @@ const DetailPage = {
             </div>
             <div v-if="media?.media_type==='video'" class="row items-center">
               <span class="text-grey-6" style="width:80px">{{ t('d.audio') }}</span>
-              <span>{{ confirmInfo.useMultimodal ? t('d.multimodal') : t('d.independent_asr', {engine: confirmInfo.asrEngine}) }}</span>
+              <span v-if="confirmInfo.useMultimodal">{{ t('d.multimodal') }}</span>
+              <span v-else-if="confirmInfo.mergedAsr">{{ t('d.merged_asr') }}</span>
+              <span v-else>{{ t('d.independent_asr', {engine: confirmInfo.asrEngine}) }}</span>
             </div>
           </div>
-          <div style="margin-top:16px;padding:8px 12px;border-radius:6px;background:var(--surface2);font-size:12px;color:var(--text3)">
+          <div v-if="confirmInfo.engine !== 'local'" style="margin-top:16px;padding:8px 12px;border-radius:6px;background:var(--surface2);font-size:12px;color:var(--text3)">
             <q-icon name="info" size="14px" style="margin-right:4px"></q-icon>
             {{ t('d.ai_cost_warning') }}
+          </div>
+          <div v-else style="margin-top:16px;padding:8px 12px;border-radius:6px;background:var(--surface2);font-size:12px;color:var(--text3)">
+            <q-icon name="info" size="14px" style="margin-right:4px"></q-icon>
+            {{ t('d.local_cost_note') }}
           </div>
         </q-card-section>
         <q-card-actions align="right">
@@ -408,9 +418,23 @@ const DetailPage = {
       this.analyzing = true;
       this.analysis = { status: "processing", segments: [] };
       const isImage = this.media.media_type === "image";
+      // 本地视频：抽帧直接吃原片，无压缩/编码两步；Omni「音视频一起」时无独立转写档
+      this._videoStageKind = (!isImage && bgTask.engine === "local") ? "local" : "cloud";
+      this._localMerged = this._videoStageKind === "local" && bgTask.asrMode === "merged";
       this.analysisStages = isImage ? [
         { key: "analyze", label: t('d.img_analysis'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.analyzing'), doneText: t('d.analysis_done_short') },
+      ] : this._videoStageKind === "local" ? (this._localMerged ? [
+        { key: "engine", label: t('d.local_engine_stage'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.engine_starting'), doneText: t('d.engine_ready') },
+        { key: "extract", label: t('d.frame_extract'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.extracting'), doneText: t('d.extract_done_short') },
+        { key: "analyze", label: t('d.av_analysis'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.analyzing'), doneText: t('d.analysis_done_short') },
+        { key: "merge", label: t('d.merge_save'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.merging'), doneText: t('d.saved') },
       ] : [
+        { key: "engine", label: t('d.local_engine_stage'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.engine_starting'), doneText: t('d.engine_ready') },
+        { key: "extract", label: t('d.frame_extract'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.extracting'), doneText: t('d.extract_done_short') },
+        { key: "analyze", label: t('d.visual_analysis'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.analyzing'), doneText: t('d.analysis_done_short') },
+        { key: "asr", label: t('d.asr'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.transcribing'), doneText: t('d.transcribe_done') },
+        { key: "merge", label: t('d.merge_save'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.merging'), doneText: t('d.saved') },
+      ]) : [
         { key: "compress", label: t('d.video_compress'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.compressing'), doneText: t('d.compress_done') },
         { key: "encode", label: t('d.video_encode'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.encoding'), doneText: t('d.encode_done') },
         { key: "analyze", label: t('d.ai_model_analysis'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.analyzing'), doneText: t('d.analysis_done_short') },
@@ -479,9 +503,13 @@ const DetailPage = {
       const step = task.step || "";
       const stages = this.analysisStages;
       const isImage = stages.length === 1 && stages[0].key === "analyze";
-      // Map SSE step names to stage index (images only have stage 0)
+      // Map SSE step names to stage index (images only have stage 0; local video has no compress/encode)
       const stepMap = isImage
         ? { queued: -1, compressing: -1, compressed: -1, analyzing: 0, analyze_done: 0 }
+        : this._videoStageKind === "local"
+        ? (this._localMerged
+           ? { queued: -1, engine_starting: 0, engine_ready: 0, extracting: 1, extract_done: 1, analyzing: 2, analyze_done: 2, merging: 3 }
+           : { queued: -1, engine_starting: 0, engine_ready: 0, extracting: 1, extract_done: 1, analyzing: 2, analyze_done: 2, asr_start: 3, asr_progress: 3, merging: 4 })
         : { queued: -1, compressing: 0, compressed: 1, analyzing: 2, analyze_done: 2, asr_start: 3, asr_progress: 3 };
       const currentIdx = stepMap[step] ?? -1;
       for (let i = 0; i < stages.length; i++) {
@@ -729,20 +757,42 @@ const DetailPage = {
       try {
         const s = await API.getSettings();
         const modelLabels = { "glm-4v-plus": "智谱 GLM-4V-Plus", "glm-4.6v": "智谱 GLM-4.6V", "glm-4.6v-flash": "智谱 GLM-4.6V-Flash", "glm-4.6v-flashx": "智谱 GLM-4.6V-FlashX", "glm-4.5v": "智谱 GLM-4.5V" };
-        this.confirmInfo.resolution = s.resolution === "320" ? "320P" : s.resolution === "240" ? "240P" : "480P";
-        this.confirmInfo.fps = s.fps || "30";
-        const resPixels = { "240": 426 * 240, "320": 640 * 360, "480": 854 * 480 };
-        const rPx = resPixels[s.resolution] || 854 * 480;
-        const rFps = parseInt(s.fps) || 30;
-        const bps = 2_000_000 * (rPx / (854 * 480)) * (rFps / 30);
-        this.confirmInfo.bitrate = bps >= 1_000_000 ? (bps / 1_000_000).toFixed(2) + " Mbps" : (bps / 1_000).toFixed(0) + " Kbps";
-        this.confirmInfo.modelLabel = this.media?.media_type === "image"
-          ? (modelLabels[s.image_model] || s.image_model)
-          : (modelLabels[s.model] || s.model);
-        this.confirmInfo.useMultimodal = s.use_multimodal !== "false";
+        const engine = (this.media?.media_type === "image" ? s.image_engine : s.video_engine) || "cloud";
+        this.confirmInfo.engine = engine;
+        if (engine === "local") {
+          // 本地引擎：显示本地模型与抽帧参数；音频方式 = 音视频一起（需模型支持音频输入）或 Whisper 独立转写
+          this.confirmInfo.modelLabel = s.local_model || "qwen3-vl-8b";
+          this.confirmInfo.useMultimodal = false;
+          const audioCap = await this._localModelAudio(s.local_model);
+          this.confirmInfo.mergedAsr = audioCap && s.local_asr_mode === "merged";
+          this.confirmInfo.localFps = s.local_frames_fps || "1";
+          this.confirmInfo.localMaxFrames = s.local_frames_max || "32";
+          this.confirmInfo.localRes = s.local_frames_res || "480";
+        } else {
+          this.confirmInfo.mergedAsr = false;
+          this.confirmInfo.resolution = s.resolution === "320" ? "320P" : s.resolution === "240" ? "240P" : "480P";
+          this.confirmInfo.fps = s.fps || "30";
+          const resPixels = { "240": 426 * 240, "320": 640 * 360, "480": 854 * 480 };
+          const rPx = resPixels[s.resolution] || 854 * 480;
+          const rFps = parseInt(s.fps) || 30;
+          const bps = 2_000_000 * (rPx / (854 * 480)) * (rFps / 30);
+          this.confirmInfo.bitrate = bps >= 1_000_000 ? (bps / 1_000_000).toFixed(2) + " Mbps" : (bps / 1_000).toFixed(0) + " Kbps";
+          this.confirmInfo.modelLabel = this.media?.media_type === "image"
+            ? (modelLabels[s.image_model] || s.image_model)
+            : (modelLabels[s.model] || s.model);
+          this.confirmInfo.useMultimodal = s.use_multimodal !== "false";
+        }
         this.confirmInfo.asrEngine = (s.asr_engine || "whisper") === "whisper" ? "Whisper" : s.asr_engine;
       } catch (e) { console.error(e); }
       this.showAnalysisDialog = true;
+    },
+    async _localModelAudio(modelId) {
+      // 模型是否支持音频输入（音视频一起分析）——按能力而非硬编码模型 id
+      try {
+        const models = await API.getLocalVlmModels();
+        const m = (Array.isArray(models) ? models : []).find(x => x.id === modelId);
+        return !!(m && m.audio);
+      } catch { return false; }
     },
     dimRowCam(seg) { return this.camFields.some(f => seg[f.key]); },
     dimRowScene(seg) { return this.sceneFields.some(f => seg[f.key]); },
@@ -935,9 +985,14 @@ const DetailPage = {
       }
     },
     async doAnalysis() {
+      let engine = "cloud";
+      let localMerged = false;
       try {
         const s = await API.getSettings();
-        this.confirmInfo.useMultimodal = s.use_multimodal !== "false";
+        engine = (this.media?.media_type === "image" ? s.image_engine : s.video_engine) || "cloud";
+        // 本地引擎帧无音频 → 默认独立 ASR；模型支持音频输入时可「音视频一起」（与后端一致）
+        localMerged = engine === "local" && await this._localModelAudio(s.local_model) && s.local_asr_mode === "merged";
+        this.confirmInfo.useMultimodal = engine === "local" ? false : s.use_multimodal !== "false";
       } catch (e) {}
       this.analyzing = true;
       this._analyzeSubstep = false;
@@ -945,9 +1000,23 @@ const DetailPage = {
       this.analysis = { status: "processing", segments: [] };
       const isImage = this.media?.media_type === "image";
       const useMultimodal = this.confirmInfo.useMultimodal;
+      // 本地视频：抽帧直接吃原片，无压缩/编码两步；Omni 同析时无独立转写档（与 created() 一致）
+      this._videoStageKind = (!isImage && engine === "local") ? "local" : "cloud";
+      this._localMerged = this._videoStageKind === "local" && localMerged;
       this.analysisStages = isImage ? [
         { key: "analyze", label: t('d.img_analysis'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.analyzing'), doneText: t('d.analysis_done_short') },
-      ] : useMultimodal ? [
+      ] : this._videoStageKind === "local" ? (this._localMerged ? [
+        { key: "engine", label: t('d.local_engine_stage'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.engine_starting'), doneText: t('d.engine_ready') },
+        { key: "extract", label: t('d.frame_extract'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.extracting'), doneText: t('d.extract_done_short') },
+        { key: "analyze", label: t('d.av_analysis'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.analyzing'), doneText: t('d.analysis_done_short') },
+        { key: "merge", label: t('d.merge_save'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.merging'), doneText: t('d.saved') },
+      ] : [
+        { key: "engine", label: t('d.local_engine_stage'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.engine_starting'), doneText: t('d.engine_ready') },
+        { key: "extract", label: t('d.frame_extract'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.extracting'), doneText: t('d.extract_done_short') },
+        { key: "analyze", label: t('d.visual_analysis'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.analyzing'), doneText: t('d.analysis_done_short') },
+        { key: "asr", label: t('d.asr'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.transcribing'), doneText: t('d.transcribe_done') },
+        { key: "merge", label: t('d.merge_save'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.merging'), doneText: t('d.saved') },
+      ]) : useMultimodal ? [
         { key: "compress", label: t('d.video_compress'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.compressing'), doneText: t('d.compress_done') },
         { key: "encode", label: t('d.video_encode'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.encoding'), doneText: t('d.encode_done') },
         { key: "analyze", label: t('d.ai_comprehensive'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.analyzing'), doneText: t('d.analysis_done_short') },
@@ -962,7 +1031,7 @@ const DetailPage = {
       const root = this.$root;
       const oldIdx = root.bgTasks.findIndex(t => t.id === this.media.id);
       if (oldIdx >= 0) root.bgTasks.splice(oldIdx, 1);
-      const task = { id: this.media.id, fileName: this.media.file_name, mediaType: this.media.media_type, status: "running", percent: 0, stageLabel: t('d.preparing'), startTime: Date.now() };
+      const task = { id: this.media.id, fileName: this.media.file_name, mediaType: this.media.media_type, status: "running", percent: 0, stageLabel: t('d.preparing'), startTime: Date.now(), engine };
       root.bgTasks.push(task);
       // Capture DetailPage reference for optional local updates
       const self = this;
@@ -995,17 +1064,41 @@ const DetailPage = {
             let evt;
             try { evt = JSON.parse(jsonStr); } catch { continue; }
             if (evt.type === "progress") {
+              if (evt.engine) task.engine = evt.engine;
               if (evt.step === "queued") {
                 task.step = "queued";
                 task.stageLabel = t('d.queued');
                 task.percent = 0;
+                if (evt.asr_mode) task.asrMode = evt.asr_mode;
                 if (isAlive()) self.analysisProgress = t('d.queued');
               }
               if (evt.step === "engine_starting") {
                 task.step = "engine_starting";
                 task.stageLabel = t('d.engine_starting');
                 task.percent = 5;
-                if (isAlive()) self.analysisProgress = evt.message || t('d.engine_starting');
+                task.engine = "local";
+                if (isAlive()) {
+                  self.analysisProgress = evt.message || t('d.engine_starting');
+                  self._updateStage("engine", "active");
+                }
+              }
+              if (evt.step === "engine_ready") {
+                task.step = "extracting";
+                if (isAlive()) self._updateStage("engine", "done", evt.elapsed != null ? evt.elapsed.toFixed(1) + 's' : "");
+              }
+              if (evt.step === "extracting") {
+                task.step = "extracting";
+                task.stageLabel = t('d.extracting') + (evt.window ? ' · ' + evt.window : '');
+                task.percent = 5 + (evt.percent || 0) * 0.1;
+                if (isAlive()) {
+                  self.analysisProgress = task.stageLabel;
+                  self._updateStage("extract", "active");
+                  if (evt.percent != null) self._setStageProgress("extract", evt.percent);
+                }
+              }
+              if (evt.step === "extract_done") {
+                if (isAlive()) self._updateStage("extract", "done",
+                  (evt.windows && evt.frames) ? t('d.extract_info_txt', {w: evt.windows, f: evt.frames}) : "");
               }
               if (evt.step === "compressing") {
                 task.step = "compressing";
@@ -1035,8 +1128,11 @@ const DetailPage = {
                 task.percent = 40 + (isImage ? 30 : 20);
                 const wm = /^(\d+)\/(\d+)$/.exec(evt.window || '');
                 if (wm) {
+                  const wpct = parseInt(wm[1]) / parseInt(wm[2]);
                   task.stageLabel = t('d.analyzing') + ' · ' + evt.window;
-                  task.percent = 60 + (parseInt(wm[1]) / parseInt(wm[2])) * 9;
+                  // 本地 5 步流程：视觉分析占 15~70%；云端压缩流程：60~69%
+                  task.percent = self._videoStageKind === "local" ? 15 + wpct * 55 : 60 + wpct * 9;
+                  if (isAlive() && self._videoStageKind === "local") self._setStageProgress("analyze", wpct * 100);
                 }
                 if (isAlive()) {
                   if (!isImage) {
@@ -1077,6 +1173,15 @@ const DetailPage = {
                   self._setAsrSubstep(evt.substep, evt.message || asrLabels[evt.substep] || "");
                 }
               }
+              if (evt.step === "merging") {
+                task.step = "merging";
+                task.stageLabel = t('d.merging');
+                task.percent = 95;
+                if (isAlive()) {
+                  self.analysisProgress = t('d.merging');
+                  self._updateStage("merge", "active");
+                }
+              }
             } else if (evt.type === "done") {
               task.step = "done";
               task.status = "done";
@@ -1088,6 +1193,11 @@ const DetailPage = {
                 self._stopAnalyzeTips();
                 self._analyzeSubstep = false;
                 self._updateStage("analyze", "done");
+                // 收尾兜底：本地流程的快速阶段（合并 <1s）可能未轮询到显式事件
+                for (const k of ["engine", "extract", "merge"]) {
+                  const st = self.analysisStages.find(s => s.key === k);
+                  if (st && st.status !== "done") self._updateStage(k, "done");
+                }
                 const asrStage = self.analysisStages.find(s => s.key === "asr");
                 if (asrStage) {
                   if (asrStage.status === "active") {
@@ -1242,12 +1352,20 @@ const DetailPage = {
     onVideoPlay() { this.detailPlaying = true; this.startWaveformAnim(); this.startScopes(); },
     onVideoPause() { this.detailPlaying = false; this.stopWaveformAnim(); this.stopScopes(); this.drawWaveform(); this.drawScopesOnce(); },
     onVideoSeeked() { this.initScopes(); this.drawWaveform(); this.drawScopesOnce(); this.updateActiveSeg(); },
-    onVideoError() {
+    async onVideoError() {
       const player = this.$refs.player;
+      const codes = { 1: t('d.err_aborted'), 2: t('d.err_network'), 3: t('d.err_decode'), 4: t('d.err_format') };
       let msg = t('d.video_load_fail');
-      if (player?.error) {
-        const codes = { 1: t('d.err_aborted'), 2: t('d.err_network'), 3: t('d.err_decode'), 4: t('d.err_format') };
-        msg = codes[player.error.code] || msg;
+      // 浏览器对 404/外置盘缺失也只报 code=4「不支持」——先查文件存在性再定性
+      try {
+        const res = await API.mediaExists(this.media.id);
+        if (res && res.exists === false) {
+          msg = t('d.err_not_found');
+        } else if (player?.error) {
+          msg = codes[player.error.code] || msg;
+        }
+      } catch {
+        if (player?.error) msg = codes[player.error.code] || msg;
       }
       Quasar.Notify.create({ message: msg, position: "top", color: "negative", timeout: 4000 });
     },
