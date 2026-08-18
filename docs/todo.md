@@ -97,6 +97,26 @@
   - **测速定位**：源就是 `hf-mirror.com`（HF 官方直连与走用户代理均 ConnectTimeout，镜像唯一可用）；主 GGUF 单连接实测直连 0.87MB/s / 走代理 3.45MB/s（mmproj 昨日可达 14~23MB/s）——镜像 CDN 按文件/时段限速，单连接无解。
   - **实现**：`_download_segmented`——≥128MB 且已知大小的文件分 8 段并发（各线程独立 Session + 闭合区间 Range + pwrite 预分配的 `.part`），64MB 块级断点（`<part>.json` sidecar 记每段连续前缀，块内中断重下该块）；兼容旧单线程 `.part`（无 sidecar 时把顺序前缀映射为各段进度，已下字节不浪费）；块字节数不符即重试（防服务器忽略 Range 写脏数据）；小文件仍走单连接。进度显示不变（仍量 `.part`）。
   - **验证**：fake 源三场景（分片布局内容一致 / 段级断点 / 旧前缀迁移）✓；真网络——主 GGUF 闭合区间返回精确 206+Content-Range（1000000-1000099 恰 100B）、闭合与开区间同位置 4096B 字节级一致 ✓；非 LFS 文件（README）忽略闭合区间返回全量——分片仅用于 ≥128MB 的 LFS 文件，天然规避。
+- **✅ 音乐分析全链路（第三媒体类型 media_type='audio'，P1 已实施完成，2026-08-18）**：PRD 定稿见 [PRD_MUSIC.md](PRD_MUSIC.md)；设置页新增「音乐分析」tab（引擎药丸本地默认/云端占位、Omni 系模型下拉含下载删除、分段时长 15/30/60s）。
+  - **数据层**：media 表重建迁移（CHECK 加 'audio' + music_title/artist/album/summary 四列；sqlite_master 检测幂等 + FK OFF 包裹 + 显式列名 INSERT…SELECT + 索引重建 + 迁移前整库备份）；新表 music_segment（mood/genre/instrument/theme_json + arousal/valence REAL + vocals/vocals_language/watermark/watermark_text/seq）；_DEFAULTS 加 music_engine/music_model/music_segment_sec；AUDIO_EXTS + ENCRYPTED_AUDIO_EXTS（ncm 跳过提示）+ AUDIO_LIKE_VIDEO_EXTS。
+  - **导入**：_probe_audio（ffprobe ID3 title/artist/album + exiftool 兜底）；.mp4/.m4v 按 ffprobe 流判定（_probe 塞 _has_video/_has_audio 布尔，零新增子进程）；波形缩略图 showwavespic（-ac 1 -ar 8000 降采样、超长曲 -t 1800 截断）；删除链路补 music_segment；list_media 解析 music_summary。
+  - **serve**：/media/audio/<id>——原生集(mp3/m4a/wav/flac/ogg/oga/aac/**.mp4纯音轨**) send_file(conditional=True) 支持 Range 拖动；仅 wma/aiff 走 AAC ADTS 流式转码（_stream_ffmpeg 与视频转码共用）；MIME_MAP 补 9 个音频。
+  - **引擎层**：music_prompt.txt（10 字段 + {music_taxonomy} 词表注入 + 权重/枚举/水印严格约束）；analyzer 新增 load_music_prompt/_render_music_taxonomy/music_taxonomy_labels/extract_audio_segment（复用视频同析 PCM→wave→base64 通路）/analyze_music（逐段惰性抽取+流式）/sanitize（词表白名单+权重归一100+数值clamp+时间后端强制）；**local_vlm 新增 acquire_engine/release_engine 占用协议**（Condition+计数，防视频 8B/音乐 Omni 互相杀 llama-server，视频/图片/音乐三链路已全部接入 try/finally）。
+  - **分析入口**：单条/批量 audio 分支；_process_music（acquire→ffprobe→N=ceil(dur/seg)→逐段 analyzing(window i/N)→merging→done）；_refine_watermark 两步复核（任一段 Present→曲级标；水印段 vocals=念白→多数表决复核）；_aggregate_music（权重=段时长：标签加权 top5 归一、双轴加权均值、vocals 多数）；save_music_segments（DELETE+INSERT+media.music_summary+_refresh_fts(extra_tags)）；get_analysis audio 分支；/music-taxonomy 路由（前端 en→zh 映射单一事实源）。
+  - **前端**：gallery 筛选第四档 music_note + 8 处卡片 typeIcon 三态 + mood chip（music_summary.mood[0] zh 映射 + 权重%）+ 水印角标（branding_watermark 琥珀色）+ 批量弹窗三计数三模型行；detail 第三分支（曲目/音频/文件元信息栏 + 隐藏 audio 元素 + arousal/valence 双线曲线 canvas 点击 seek + 大波形按所属段 arousal 着色蓝→红 + 精简控制条含分段色块 tooltip + 侧栏全曲汇总权重 chips/水印警示/分段列表可点击 seek）；音乐 3 步进度时间线 + stepMap；波形函数改 waveformPlayer() 抽象（视频/音乐共用）；设置 tab + i18n zh/en 约 40 键。
+  - **E2E（真模型）**：ANBR- Land（169s/6 段/44s/15K token）→ Epic60/Cinematic81/Strings47/Trailer60 + **水印 6/6 段命中逐字转写** + vocals 正确排除水印=Instrumental；Beyond 海阔天空（241s/8 段/67s）→ **Male/Cantonese 精确命中** + 悲壮/中国风扩展值真实启用 + 钢琴主导。
+  - **水印幻觉修复**：Beyond 首跑尾段误报 Present 且"转写"逐字复述了 prompt 示例里的 Artlist 例句——**prompt 示例即幻觉种子**；修复=字段说明收紧（仅清晰听到的广告语音才算，欢呼/念白/和声不是）+ 示例值改中性占位。重跑：Beyond 9/9 段 None（0 误报）+ ANBR 仍 100% 检出（且转写含 "Artlist IO" 大小写变体=真实转写证据）。
+  - **UI 验证（独立 6699 测试实例 + Playwright）**：筛选音乐档 3 卡音符角标/水印角标 1/mood chip 中文/波形缩略图全载；详情页播放 0→1.77s、AV 曲线点击 seek 31.3s、ANBR 水印警示、侧栏 9 段中文 chips；设置 5 tab、Omni 模型选中、段长药丸。
+  - **待用户操作**：重启应用后生效（media 表自动迁移，已自动备份 .db.bak-music）。
+- **✅ 修复：media 表重建迁移丢列事故**（用户实测导入报 `no such column: file_mtime`）：
+  - **根因**：重建用 `_SCHEMA` 的 media 定义建 media_new，但 **`_MIGRATIONS` 的 18 个历史 ALTER 列（file_mtime/file_hash/phash/embedding/has_xmp/picture_control/camera_make/lens_model/video_profile/bit_rate/audio_*/color_*/pix_fmt）不在 `_SCHEMA` 里**；交集拷贝 `old ∩ new` 把这些列全部静默丢弃——行数不变（8876=8876）但列没了，首个触碰 file_mtime 的 SELECT 即报错。首次迁移验证只断言了行数/CHECK/新表，**没断言历史列完整性**——测试盲区。
+  - **修复**（db.py）：建 media_new 后，遍历 `PRAGMA table_info(media)`，把老表有而新表没有的列**逐个 ALTER 补进 media_new（带类型与 DEFAULT）再全量拷贝**——对任意历史列通用，不再依赖枚举。
+  - **数据恢复**：迁移前的自动备份 `data/media.db.bak-music` 完好（行数一致、迁移后导入全失败无新增行）；已停机恢复备份 → 重启后由修复版迁移重跑。
+  - **修复版验证**（备份副本）：42 列 = 旧 38 + music 4 无缺失；file_mtime(8438)/file_hash(439)/embedding(7568)/segments(4322)/FTS(8875) **逐项数据一致**；integrity ok；二次启动幂等。
+- **✅ 音乐分析改为整曲模式**（用户决定：音乐是整首歌的基调，不需要分段——分段/逐段进度/分段时长设置全部移除）：
+  - analyze_music 整曲单次请求（头文字「这是一首完整的音乐作品」），返回单段 dict（time 0~时长）；**超长截断保护 MUSIC_MAX_ANALYSIS_SEC=1500**（音频 token≈15/s，25min+prompt 守住 32k 上下文，日志提示截断）；_process_music 去逐段循环；设置键 music_segment_sec、设置 tab 分段时长药丸、确认弹窗分段行、i18n 分段键全部移除。
+  - **详情页单段降级**：AV 双线曲线仅 segments.length>1 显示；整曲模式改显「唤醒/效价双轴数值大字」；侧栏汇总/分段列表照常（music_segment 仍写 1 行整曲记录）。
+  - **E2E（真模型）**：ANBR 169s 整曲 16s 完成（分段模式 44s）→ Epic70/Orchestra40 + 水印检出逐字转写；Beyond 241s 整曲 15s（原 67s）→ **Male/Cantonese 保持精确命中** + 悲壮 30% + 钢琴30/鼓25/电吉他25——**整曲模式更快（~4 倍）、质量不降**（一次听全曲，基调判断更 holistic）。
 - **✅ 「音视频一起分析」改为能力驱动 + 开关移入模型下拉**（用户反馈三点：①文案不应绑定 Omni——未来自定义模型支持音频输入也适用；②开关放下拉里图标左侧 + 问号提示；③语音 tab 联动禁用 + 指引）：
   - **能力驱动**：前端统一按 `localModels[].audio` 判定（选中模型能力 computed `localModelAudio`；下拉选项带 audio 标志）；detail.js 的确认弹窗/阶段表改为查 `/api/local-vlm/models` 的 audio 而非硬编码模型 id。文案全部通用化（去「Omni」字样；d.merged_asr → 「音视频一起」）。
   - **开关进下拉**：支持音频的模型选项行内、图标按钮左侧——小号 q-toggle「音视频一起分析」+ help_outline 问号（tooltip = 原 hint 说明）；`@click.stop` 防误选模型；移除面板里的「语音分析」小节与分段控件，清孤儿键（s.local_asr_separate/local_asr_mode_label）。

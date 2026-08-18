@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS media (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     file_path       TEXT NOT NULL UNIQUE,
     file_name       TEXT NOT NULL,
-    media_type      TEXT NOT NULL CHECK(media_type IN ('video', 'image')),
+    media_type      TEXT NOT NULL CHECK(media_type IN ('video', 'image', 'audio')),
     file_size       INTEGER,
     duration        REAL,
     width           INTEGER,
@@ -37,7 +37,11 @@ CREATE TABLE IF NOT EXISTS media (
     favorite        INTEGER DEFAULT 0,
     notes           TEXT DEFAULT '',
     imported_at     TEXT DEFAULT (datetime('now')),
-    updated_at      TEXT DEFAULT (datetime('now'))
+    updated_at      TEXT DEFAULT (datetime('now')),
+    music_title     TEXT,
+    music_artist    TEXT,
+    music_album     TEXT,
+    music_summary   TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_media_type ON media(media_type);
@@ -87,6 +91,26 @@ CREATE TABLE IF NOT EXISTS media_segment (
 CREATE INDEX IF NOT EXISTS idx_segment_media ON media_segment(media_id);
 CREATE INDEX IF NOT EXISTS idx_segment_shot ON media_segment(shot_type);
 CREATE INDEX IF NOT EXISTS idx_segment_mood ON media_segment(mood);
+
+CREATE TABLE IF NOT EXISTS music_segment (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    media_id        INTEGER NOT NULL REFERENCES media(id) ON DELETE CASCADE,
+    time_start      TEXT NOT NULL,
+    time_end        TEXT NOT NULL,
+    mood_json       TEXT DEFAULT '[]',
+    genre_json      TEXT DEFAULT '[]',
+    instrument_json TEXT DEFAULT '[]',
+    theme_json      TEXT DEFAULT '[]',
+    arousal         REAL,
+    valence         REAL,
+    vocals          TEXT DEFAULT '',
+    vocals_language TEXT DEFAULT '',
+    watermark       TEXT DEFAULT 'None',
+    watermark_text  TEXT DEFAULT '',
+    seq             INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_music_segment_media ON music_segment(media_id);
 CREATE INDEX IF NOT EXISTS idx_segment_scene ON media_segment(scene_type);
 
 CREATE VIRTUAL TABLE IF NOT EXISTS media_fts USING fts5(
@@ -225,6 +249,53 @@ def _migrate(db):
             db.execute("DROP TABLE dup_exclusions")
             db.execute("ALTER TABLE dup_exclusions_new RENAME TO dup_exclusions")
 
+    # media 表重建：media_type CHECK 加 'audio' + music 四列。
+    # SQLite 无法 ALTER CHECK，需建新表拷数据；dup_exclusions 重建（上方）的同款模式。
+    row = db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='media'").fetchone()
+    if row and "'audio'" not in row[0]:
+        import re
+        import shutil
+        from pathlib import Path
+        # 迁移前整库备份（WAL 先 checkpoint 确保主文件完整）
+        db.commit()
+        db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        db.commit()
+        try:
+            src = Path(current_app.config["DATABASE"])
+            shutil.copy(src, src.with_suffix(".db.bak-music"))
+        except Exception as e:
+            logger.warning("media rebuild backup failed (continuing): {}", e)
+        db.execute("PRAGMA foreign_keys=OFF")  # 否则 DROP media 级联清空子表
+        m = re.search(r"(CREATE TABLE IF NOT EXISTS media \(.*?\n\))", _SCHEMA, re.S)
+        db.execute("DROP TABLE IF EXISTS media_new")
+        db.execute(m.group(1).replace("CREATE TABLE IF NOT EXISTS media", "CREATE TABLE media_new"))
+        old_info = db.execute("PRAGMA table_info(media)").fetchall()
+        new_cols = {r[1] for r in db.execute("PRAGMA table_info(media_new)").fetchall()}
+        # 关键：_MIGRATIONS 历史 ALTER 列（file_mtime/audio_*/embedding 等）不在 _SCHEMA 里，
+        # 必须先逐个补进 media_new，否则交集拷贝会静默丢列丢数据（2026-08-18 事故）
+        for r in old_info:
+            if r[1] == "id" or r[1] in new_cols:
+                continue
+            ddl = f'ALTER TABLE media_new ADD COLUMN "{r[1]}" {r[2] or "TEXT"}'
+            if r[4] is not None:
+                ddl += f" DEFAULT {r[4]}"
+            db.execute(ddl)
+            new_cols.add(r[1])
+        keep = [r[1] for r in old_info if r[1] != "id"]
+        cols_sql = ", ".join(f'"{c}"' for c in keep)
+        db.execute(f"INSERT INTO media_new (id, {cols_sql}) SELECT id, {cols_sql} FROM media")
+        db.execute("DROP TABLE media")
+        db.execute("ALTER TABLE media_new RENAME TO media")
+        for idx_sql in (
+            "CREATE INDEX IF NOT EXISTS idx_media_type ON media(media_type)",
+            "CREATE INDEX IF NOT EXISTS idx_media_rating ON media(rating)",
+            "CREATE INDEX IF NOT EXISTS idx_media_imported ON media(imported_at)",
+        ):
+            db.execute(idx_sql)
+        db.execute("PRAGMA foreign_keys=ON")
+        db.commit()
+        logger.info("media table rebuilt: media_type CHECK + music columns (backup: .db.bak-music)")
+
     # dialogue → asr: rename column + rebuild FTS
     seg_cols = {r[1] for r in db.execute("PRAGMA table_info(media_segment)").fetchall()}
     if "dialogue" in seg_cols and "asr" not in seg_cols:
@@ -326,6 +397,8 @@ _DEFAULTS = {
     "hw_accel": "false",
     "language": "zh",
     "asr_model": "large-v3",
+    "music_engine": "local",
+    "music_model": "qwen3-omni-30b-a3b",
 }
 
 

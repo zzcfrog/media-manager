@@ -148,6 +148,10 @@ scanPaths(paths) {
   },
   thumbUrl(id) { return `/media/thumbnail/${id}`; },
   videoUrl(id) { return `/media/video/${id}`; },
+  audioUrl(id) { return `/media/audio/${id}`; },
+  getMusicTaxonomy() {
+    return this._fetch(`/api/analysis/music-taxonomy`);
+  },
   mediaExists(id) {
     return this._fetch(`/api/media/${id}/exists`);
   },

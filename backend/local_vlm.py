@@ -205,6 +205,37 @@ def stop() -> dict:
     return status()
 
 
+# ── 引擎占用协议：单实例 llama-server，切模型 = 杀进程重启 ──────────────
+# 不同模型互斥（防视频 8B 分析中途被音乐 Omni 重启），同模型多任务共享。
+_engine_cond = threading.Condition()
+_engine_users = 0
+_engine_model: str | None = None
+
+
+def acquire_engine(model_id: str) -> dict:
+    """占用式获取引擎：等待无占用或占用模型相同 → 计数 +1 → ensure。
+    分析线程必须 try/finally 配对 release_engine()。"""
+    global _engine_users, _engine_model
+    with _engine_cond:
+        _engine_cond.wait_for(lambda: _engine_users == 0 or _engine_model == model_id)
+        _engine_users += 1
+        _engine_model = model_id
+    try:
+        return ensure(model_id)
+    except Exception:
+        release_engine()
+        raise
+
+
+def release_engine() -> None:
+    global _engine_users, _engine_model
+    with _engine_cond:
+        _engine_users = max(0, _engine_users - 1)
+        if _engine_users == 0:
+            _engine_model = None
+        _engine_cond.notify_all()
+
+
 # ── 模型下载管理（hf-mirror 镜像 + 自研断点续传下载器）────────────────
 # 不用 huggingface_hub.hf_hub_download：0.22.2 的数据流无读超时，镜像 CDN/代理
 # 静默掐断长连接后 read() 永久阻塞（表现为进度永远 0% 且不报错）。

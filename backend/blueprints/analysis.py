@@ -9,7 +9,8 @@ from pathlib import Path
 from ..db import get_db, get_setting
 from ..compressor import compress_video, compress_image
 from ..config import HEIF_EXTS, ANALYSIS_API_CONCURRENCY, ANALYSIS_THREAD_POOL_SIZE
-from ..analyzer import analyze_video, analyze_image, analyze_video_frames, CODING_BASE_URL
+from ..analyzer import (analyze_video, analyze_image, analyze_video_frames, CODING_BASE_URL,
+                        analyze_music, probe_audio_duration, music_taxonomy_labels)
 from ..asr import get_engine as get_asr_engine, preload_all, reload_engine
 from .. import local_vlm
 from ..emotion_labels import dominant_mood, aggregate_emotions
@@ -35,9 +36,27 @@ def _cleanup_temp(path):
 @bp.route("/<int:media_id>")
 def get_analysis(media_id):
     db = get_db()
-    row = db.execute("SELECT analysis_model, analysis_date, analysis_status FROM media WHERE id = ?", (media_id,)).fetchone()
+    row = db.execute("SELECT analysis_model, analysis_date, analysis_status, media_type, music_summary FROM media WHERE id = ?", (media_id,)).fetchone()
     if not row:
         return jsonify({"error": "Not found"}), 404
+
+    if row["media_type"] == "audio":
+        seg_rows = db.execute(
+            "SELECT * FROM music_segment WHERE media_id = ? ORDER BY seq, id", (media_id,)).fetchall()
+        summary = None
+        if row["music_summary"]:
+            try:
+                summary = json.loads(row["music_summary"])
+            except Exception:
+                summary = None
+        return jsonify({
+            "status": row["analysis_status"],
+            "model": row["analysis_model"],
+            "date": row["analysis_date"],
+            "segments": [_music_seg_to_dict(r) for r in seg_rows],
+            "summary": summary,
+        })
+
     seg_rows = db.execute(f"SELECT {_SEGMENT_COLS} FROM media_segment WHERE media_id = ? ORDER BY seq, id", (media_id,)).fetchall()
     segments = [_segment_to_dict(r) for r in seg_rows]
     return jsonify({
@@ -46,6 +65,13 @@ def get_analysis(media_id):
         "date": row["analysis_date"],
         "segments": segments,
     })
+
+
+@bp.route("/music-taxonomy")
+def music_taxonomy():
+    """音乐受控词表（前端 en→zh 映射的单一事实源）。"""
+    from ..analyzer import MUSIC_TAXONOMY_FILE
+    return jsonify(json.loads(MUSIC_TAXONOMY_FILE.read_text(encoding="utf-8")))
 
 
 @bp.route("/progress")
@@ -90,8 +116,9 @@ def delete_analysis(media_id):
     if not media:
         return jsonify({"error": "Not found"}), 404
     db.execute("DELETE FROM media_segment WHERE media_id = ?", (media_id,))
+    db.execute("DELETE FROM music_segment WHERE media_id = ?", (media_id,))
     db.execute("DELETE FROM media_fts WHERE media_id = ?", (media_id,))
-    db.execute("UPDATE media SET analysis_status = 'none', analysis_model = NULL, analysis_date = NULL WHERE id = ?", (media_id,))
+    db.execute("UPDATE media SET analysis_status = 'none', analysis_model = NULL, analysis_date = NULL, music_summary = NULL WHERE id = ?", (media_id,))
     db.commit()
     return jsonify({"ok": True})
 
@@ -110,6 +137,8 @@ def start_analysis(media_id):
         return _start_video_analysis(media_id, media, app)
     elif media["media_type"] == "image":
         return _start_image_analysis(media_id, media, app)
+    elif media["media_type"] == "audio":
+        return _start_music_analysis(media_id, media, app)
     else:
         return jsonify({"error": "Unsupported media type"}), 400
 
@@ -166,6 +195,11 @@ def start_batch_analysis():
             image_resolution = get_setting(db, "image_resolution", "1920")
             _analysis_pool.submit(_process_image, media_id, file_path, image_api_key, image_model,
                         image_resolution, app, progress)
+        elif media["media_type"] == "audio":
+            m_cfg = _music_cfg(db)
+            progress["engine"] = m_cfg["engine"]
+            _analysis_pool.submit(_process_music, media_id, file_path,
+                        app, progress, m_cfg["engine"], m_cfg["model_id"])
 
         submitted.append(media_id)
 
@@ -191,6 +225,7 @@ def _process_video(media_id, file_path, api_key, model, resolution, fps, hw_acce
     progress["step"] = "queued"
     logger.info("Video analysis thread started: media_id={} file={}", media_id, Path(file_path).name)
     compressed_path = None
+    engine_acquired = False
     try:
         with app.app_context():
             # --- Compress (仅云端需要控制上传体积；本地抽帧时直接 scale，无需中间产物) ---
@@ -219,7 +254,8 @@ def _process_video(media_id, file_path, api_key, model, resolution, fps, hw_acce
             if engine == "local":
                 progress["step"] = "engine_starting"
                 progress["engine_t0"] = time.time()
-                base_url = local_vlm.ensure(local_cfg["model_id"])["base_url"]
+                base_url = local_vlm.acquire_engine(local_cfg["model_id"])["base_url"]
+                engine_acquired = True
                 progress["engine_time"] = round(time.time() - progress["engine_t0"], 1)
                 # 抽帧在 analyze_video_frames 内部随即开始（ffprobe 后逐窗回调 on_extract）
                 progress["step"] = "extracting"
@@ -315,6 +351,8 @@ def _process_video(media_id, file_path, api_key, model, resolution, fps, hw_acce
     finally:
         if compressed_path:
             _cleanup_temp(str(compressed_path))
+        if engine_acquired:
+            local_vlm.release_engine()
         _active_progress.pop(media_id, None)
         logger.info("Video analysis thread exited: media_id={}", media_id)
 
@@ -328,6 +366,7 @@ def _process_image(media_id, file_path, image_api_key, model, image_resolution,
     logger.info("Image analysis thread started: media_id={} file={}", media_id, Path(file_path).name)
     analyze_path = file_path
     compressed = False
+    engine_acquired = False
     try:
         with app.app_context():
             needs_compress = image_resolution != "original" or Path(file_path).suffix.lower() in HEIF_EXTS
@@ -344,7 +383,8 @@ def _process_image(media_id, file_path, image_api_key, model, image_resolution,
             # 本地引擎：确保 llama-server 已就绪（幂等；首次启动/切换模型需 4~40s）
             if engine == "local":
                 progress["step"] = "engine_starting"
-                st = local_vlm.ensure(local_model_id)
+                st = local_vlm.acquire_engine(local_model_id)
+                engine_acquired = True
                 base_url, model_name, key = st["base_url"], local_model_id, "local"
                 progress["step"] = "queued"
             else:
@@ -388,8 +428,274 @@ def _process_image(media_id, file_path, image_api_key, model, image_resolution,
     finally:
         if compressed:
             _cleanup_temp(analyze_path)
+        if engine_acquired:
+            local_vlm.release_engine()
         _active_progress.pop(media_id, None)
         logger.info("Image analysis thread exited: media_id={}", media_id)
+
+
+# ---------------------------------------------------------------------------
+# 音乐分析：分段 Omni → 两步水印 → 加权聚合 → music_segment + music_summary
+# ---------------------------------------------------------------------------
+
+def _music_cfg(db):
+    model_id = get_setting(db, "music_model", "qwen3-omni-30b-a3b")
+    if model_id not in local_vlm.MODELS or not local_vlm.MODELS[model_id].get("audio"):
+        model_id = next((mid for mid, m in local_vlm.MODELS.items() if m.get("audio")),
+                        "qwen3-omni-30b-a3b")
+    return {
+        "engine": get_setting(db, "music_engine", "local"),
+        "model_id": model_id,
+    }
+
+
+def _music_seg_duration(seg) -> float:
+    try:
+        return max(0.0, _parse_time(seg["time_end"]) - _parse_time(seg["time_start"]))
+    except Exception:
+        return 0.0
+
+
+def _refine_watermark(segs: list[dict]) -> None:
+    """两步水印复核（就地修改）：任一段 Present → 曲级标水印；
+    水印段的 vocals=念白（≈广告语音误判）→ 按非水印段多数表决复核 + 语言清空。"""
+    wm = [s for s in segs if s.get("watermark") == "Present"]
+    if not wm:
+        return
+    others = [s for s in segs if s.get("watermark") != "Present" and s.get("vocals")]
+    votes: dict[str, float] = {}
+    for s in others:
+        votes[s["vocals"]] = votes.get(s["vocals"], 0.0) + _music_seg_duration(s)
+    majority = max(votes, key=votes.get) if votes else "Instrumental"
+    for s in wm:
+        if not s.get("vocals") or s.get("vocals") == "Spoken Word":
+            s["vocals"] = majority
+            s["vocals_language"] = ""
+
+
+def _aggregate_music(segs: list[dict]) -> dict:
+    """全曲汇总（权重=段时长；后端计算，不额外请求模型）。"""
+    if not segs:
+        return {}
+    total = sum(_music_seg_duration(s) for s in segs) or 1.0
+    summary: dict = {"segments": len(segs)}
+
+    for dim in ("mood", "genre", "instrument", "theme"):
+        acc: dict[str, float] = {}
+        for s in segs:
+            w = _music_seg_duration(s)
+            for it in s.get(dim, []):
+                acc[it["label"]] = acc.get(it["label"], 0.0) + w * it.get("weight", 0)
+        top = sorted(acc.items(), key=lambda kv: -kv[1])[:5]
+        tsum = sum(v for _, v in top) or 1.0
+        summary[dim] = [{"label": k, "weight": round(v / tsum * 100)} for k, v in top]
+
+    def _wavg(key, default):
+        num = den = 0.0
+        for s in segs:
+            if s.get(key) is None:
+                continue
+            w = _music_seg_duration(s)
+            num += w * s[key]
+            den += w
+        return round(num / den, 2) if den else default
+    summary["arousal"] = _wavg("arousal", 0.5)
+    summary["valence"] = _wavg("valence", 0.0)
+
+    voc_votes: dict[str, float] = {}
+    lang_votes: dict[str, float] = {}
+    for s in segs:
+        if s.get("watermark") == "Present" and s.get("vocals") == "Spoken Word":
+            continue  # 水印误判已由 _refine_watermark 处理；此处防御
+        w = _music_seg_duration(s)
+        if s.get("vocals"):
+            voc_votes[s["vocals"]] = voc_votes.get(s["vocals"], 0.0) + w
+        if s.get("vocals") in ("Male", "Female", "Choir") and s.get("vocals_language"):
+            lang_votes[s["vocals_language"]] = lang_votes.get(s["vocals_language"], 0.0) + w
+    summary["vocals"] = max(voc_votes, key=voc_votes.get) if voc_votes else "Instrumental"
+    summary["vocals_language"] = max(lang_votes, key=lang_votes.get) if lang_votes else ""
+
+    wm_segs = [s for s in segs if s.get("watermark") == "Present"]
+    summary["watermark"] = "Present" if wm_segs else "None"
+    summary["watermark_text"] = " / ".join(dict.fromkeys(
+        s["watermark_text"] for s in wm_segs if s.get("watermark_text"))) if wm_segs else ""
+    return summary
+
+
+def _music_fts_tags(segs: list[dict]) -> str:
+    """音乐标签文本（FTS tags 列）：mood/genre/instrument/theme 的 label + vocals/语言。"""
+    words: list[str] = []
+    for s in segs:
+        for dim in ("mood", "genre", "instrument", "theme"):
+            words += [it["label"] for it in s.get(dim, [])]
+        if s.get("vocals"):
+            words.append(s["vocals"])
+        if s.get("vocals_language"):
+            words.append(s["vocals_language"])
+    return " ".join(dict.fromkeys(w for w in words if w))
+
+
+def save_music_segments(media_id: int, segs: list[dict], model: str, summary: dict) -> None:
+    db = get_db()
+    db.execute("DELETE FROM music_segment WHERE media_id = ?", (media_id,))
+    for i, s in enumerate(segs):
+        db.execute(
+            "INSERT INTO music_segment (media_id, time_start, time_end, mood_json, genre_json, "
+            "instrument_json, theme_json, arousal, valence, vocals, vocals_language, watermark, watermark_text, seq) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (media_id, s["time_start"], s["time_end"],
+             json.dumps(s.get("mood", []), ensure_ascii=False),
+             json.dumps(s.get("genre", []), ensure_ascii=False),
+             json.dumps(s.get("instrument", []), ensure_ascii=False),
+             json.dumps(s.get("theme", []), ensure_ascii=False),
+             s.get("arousal"), s.get("valence"),
+             s.get("vocals", ""), s.get("vocals_language", ""),
+             s.get("watermark", "None"), s.get("watermark_text", ""), i),
+        )
+    db.execute(
+        "UPDATE media SET analysis_status = 'done', analysis_model = ?, analysis_date = datetime('now'), "
+        "music_summary = ?, updated_at = datetime('now') WHERE id = ?",
+        (model, json.dumps(summary, ensure_ascii=False), media_id),
+    )
+    _refresh_fts(db, media_id, segs, extra_tags=_music_fts_tags(segs))
+    db.commit()
+    logger.info("music segments saved: media_id={} segments={} model={}", media_id, len(segs), model)
+
+
+def _music_seg_to_dict(row) -> dict:
+    def _arr(v):
+        try:
+            out = json.loads(v) if v else []
+            return out if isinstance(out, list) else []
+        except Exception:
+            return []
+    return {
+        "time_start": row["time_start"], "time_end": row["time_end"],
+        "mood": _arr(row["mood_json"]), "genre": _arr(row["genre_json"]),
+        "instrument": _arr(row["instrument_json"]), "theme": _arr(row["theme_json"]),
+        "arousal": row["arousal"], "valence": row["valence"],
+        "vocals": row["vocals"] or "", "vocals_language": row["vocals_language"] or "",
+        "watermark": row["watermark"] or "None", "watermark_text": row["watermark_text"] or "",
+        "seq": row["seq"],
+    }
+
+
+def _process_music(media_id, file_path, app, progress, engine="local",
+                   model_id="qwen3-omni-30b-a3b"):
+    """音乐分析线程：acquire 引擎 → 整曲单次分析 → 水印复核 → 聚合 → 落库。"""
+    _active_progress[media_id] = progress
+    progress["media_type"] = "audio"
+    progress["step"] = "queued"
+    logger.info("Music analysis thread started: media_id={} file={}", media_id, Path(file_path).name)
+    engine_acquired = False
+    try:
+        with app.app_context():
+            if engine != "local":
+                raise RuntimeError("云端音乐分析引擎尚未支持，请在设置中选择本地引擎")
+            if not local_vlm.MODELS.get(model_id, {}).get("audio"):
+                raise RuntimeError(f"模型 {model_id} 不支持音频输入，请选择 Omni 系模型")
+
+            progress["step"] = "engine_starting"
+            progress["engine_t0"] = time.time()
+            base_url = local_vlm.acquire_engine(model_id)["base_url"]
+            engine_acquired = True
+            progress["engine_time"] = round(time.time() - progress["engine_t0"], 1)
+
+            _api_semaphore.acquire()
+            try:
+                progress["step"] = "analyzing"
+                progress["substep"] = "receiving"
+
+                def on_analyze_progress(status, chars=0):
+                    if status == "receiving":
+                        progress["chars"] = chars
+
+                # 整曲单次分析（2026-08-18 用户决定取消分段——音乐是整首的基调）
+                segs, analyze_time, usage = analyze_music(
+                    file_path, "local", model=model_id, base_url=base_url,
+                    on_progress=on_analyze_progress)
+            finally:
+                _api_semaphore.release()
+
+            if not segs:
+                raise RuntimeError("音乐分析失败：模型未返回有效结果")
+
+            progress["step"] = "merging"
+            _refine_watermark(segs)
+            summary = _aggregate_music(segs)
+            save_music_segments(media_id, segs, model=model_id, summary=summary)
+            progress["step"] = "done"
+            progress["result"] = {"analyze_time": analyze_time, "usage": usage,
+                                  "segments_count": len(segs)}
+            logger.info("Music analysis thread done: media_id={} segments={}", media_id, len(segs))
+    except Exception as e:
+        logger.error("Music processing failed: media_id={} file={} error={}", media_id, Path(file_path).name, e)
+        try:
+            with app.app_context():
+                db = get_db()
+                db.execute("UPDATE media SET analysis_status = 'error' WHERE id = ?", (media_id,))
+                db.commit()
+        except Exception:
+            pass
+        progress["step"] = "error"
+        progress["error"] = str(e)
+    finally:
+        if engine_acquired:
+            local_vlm.release_engine()
+        _active_progress.pop(media_id, None)
+        logger.info("Music analysis thread exited: media_id={}", media_id)
+
+
+def _start_music_analysis(media_id, media, app):
+    db = get_db()
+    cfg = _music_cfg(db)
+    db.execute("UPDATE media SET analysis_status = 'processing' WHERE id = ?", (media_id,))
+    db.commit()
+    file_path = media["file_path"]
+
+    def generate():
+        progress = {"step": "queued", "substep": "receiving", "chars": 0,
+                    "engine": cfg["engine"], "media_type": "audio"}
+        _analysis_pool.submit(_process_music, media_id, file_path, app, progress,
+                              cfg["engine"], cfg["model_id"])
+
+        emitted = {"engine_ready": False, "analyze_start": False}
+        while progress["step"] not in ("done", "error"):
+            step = progress["step"]
+            if step == "queued":
+                yield _sse({'type': 'progress', 'step': 'queued', 'message': '排队等待中...',
+                            'engine': cfg["engine"]})
+            elif step == "engine_starting":
+                el = time.time() - progress.get("engine_t0", time.time())
+                yield _sse({'type': 'progress', 'step': 'engine_starting',
+                            'message': f'启动本地引擎（{cfg["model_id"]}）... {el:.0f}s'})
+            elif step == "analyzing":
+                if not emitted["engine_ready"] and "engine_time" in progress:
+                    emitted["engine_ready"] = True
+                    yield _sse({'type': 'progress', 'step': 'engine_ready',
+                                'elapsed': progress["engine_time"]})
+                if not emitted["analyze_start"]:
+                    emitted["analyze_start"] = True
+                    yield _sse({'type': 'progress', 'step': 'analyzing',
+                                'message': f'调用 {cfg["model_id"]} 分析中...'})
+                yield _sse({'type': 'progress', 'step': 'analyzing',
+                            'substep': progress.get('substep', 'receiving'),
+                            'chars': progress.get('chars', 0),
+                            **({'window': progress['window']} if progress.get('window') else {})})
+            elif step == "merging":
+                yield _sse({'type': 'progress', 'step': 'merging', 'message': '聚合分段并保存...'})
+            time.sleep(0.3)
+
+        if progress["step"] == "done":
+            r = progress.get("result", {})
+            yield _sse({'type': 'done', 'message': '分析完成',
+                        'analyze_time': round(r.get('analyze_time', 0), 1),
+                        'tokens': r.get('usage'),
+                        'segments_count': r.get('segments_count', 0)})
+        else:
+            yield _sse({'type': 'error', 'message': progress.get('error', 'Unknown error')})
+
+    return Response(generate(), mimetype="text/event-stream")
 
 
 # ---------------------------------------------------------------------------
@@ -754,7 +1060,7 @@ def save_segments(media_id, segments, model=""):
     db.commit()
 
 
-def _refresh_fts(db, media_id, segments):
+def _refresh_fts(db, media_id, segments, extra_tags: str = ""):
     from .library import _segment
     visual, asr, subtitle = [], [], []
     subjects, colors = set(), set()
@@ -775,7 +1081,8 @@ def _refresh_fts(db, media_id, segments):
         "SELECT t.name FROM tags t JOIN media_tags mt ON t.id = mt.tag_id WHERE mt.media_id = ?",
         (media_id,),
     ).fetchall()
-    tags_str = " ".join(r["name"] for r in tag_rows)
+    # extra_tags：音乐分析的受控标签文本（拼入 tags 列，可检索）
+    tags_str = " ".join(list(r["name"] for r in tag_rows) + ([extra_tags] if extra_tags else []))
 
     db.execute("DELETE FROM media_fts WHERE media_id = ?", (media_id,))
     db.execute(

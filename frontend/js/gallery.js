@@ -19,6 +19,11 @@ const GalleryPage = {
                @click="filters.media_type='video'; load()">
           <q-tooltip :delay="1000">{{ t('g.videos') }}</q-tooltip>
         </q-btn>
+        <q-btn unelevated dense size="sm" icon="music_note"
+               :style="filters.media_type==='audio'?'background:var(--accent) !important;color:#fff !important':''"
+               @click="filters.media_type='audio'; load()">
+          <q-tooltip :delay="1000">{{ t('g.music') }}</q-tooltip>
+        </q-btn>
       </q-btn-group>
       <div style="display:flex;gap:2px">
         <q-btn flat round dense size="sm" @click="cycleFavFilter(); showFilterToast(); load()"
@@ -101,10 +106,11 @@ const GalleryPage = {
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
               <div class="thumb-wrap">
                 <img class="thumb" :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
-                <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
+                <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
                 <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
                 <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
                 <span v-if="m.analysis_status==='done'" class="ai-badge"><q-icon name="auto_awesome" size="10px" color="white"></q-icon></span>
+                <span v-if="m.media_type==='audio' && m.music_summary && m.music_summary.watermark==='Present'" class="wm-badge"><q-icon name="branding_watermark" size="11px" color="amber-4"><q-tooltip :delay="500">{{ t('g.watermark_badge') }}</q-tooltip></q-icon></span>
                 <span v-if="m.has_xmp && m.media_type==='image'" class="xmp-badge" style="color:white;font-size:7px;font-weight:700">XMP</span>
               </div>
               <div v-if="m.rating" class="rating">{{ '★'.repeat(m.rating) }}</div>
@@ -114,6 +120,7 @@ const GalleryPage = {
                   <span v-if="m.width">{{ m.width }}x{{ m.height }}</span>
                   <span v-if="m.camera_model">{{ m.camera_model }}</span>
                   <span class="spacer"></span>
+                  <span v-if="m.media_type==='audio' && m.music_summary && m.music_summary.mood && m.music_summary.mood.length" class="mood-chip">{{ musicMoodZh(m) }} {{ m.music_summary.mood[0].weight }}%</span>
                   <span v-if="m.duration" class="dur-inline">{{ fmtDur(m.duration) }}</span>
                 </div>
               </div>
@@ -135,10 +142,11 @@ const GalleryPage = {
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
           <div class="thumb-wrap">
             <img class="thumb" :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
-            <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
+            <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
             <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
             <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
             <span v-if="m.analysis_status==='done'" class="ai-badge"><q-icon name="auto_awesome" size="10px" color="white"></q-icon></span>
+                <span v-if="m.media_type==='audio' && m.music_summary && m.music_summary.watermark==='Present'" class="wm-badge"><q-icon name="branding_watermark" size="11px" color="amber-4"><q-tooltip :delay="500">{{ t('g.watermark_badge') }}</q-tooltip></q-icon></span>
             <span v-if="m.has_xmp && m.media_type==='image'" class="xmp-badge" style="color:white;font-size:7px;font-weight:700">XMP</span>
           </div>
           <div v-if="m.rating" class="rating">{{ '★'.repeat(m.rating) }}</div>
@@ -148,6 +156,7 @@ const GalleryPage = {
               <span v-if="m.width">{{ m.width }}x{{ m.height }}</span>
               <span v-if="m.camera_model">{{ m.camera_model }}</span>
               <span class="spacer"></span>
+              <span v-if="m.media_type==='audio' && m.music_summary && m.music_summary.mood && m.music_summary.mood.length" class="mood-chip">{{ musicMoodZh(m) }} {{ m.music_summary.mood[0].weight }}%</span>
               <span v-if="m.duration" class="dur-inline">{{ fmtDur(m.duration) }}</span>
             </div>
           </div>
@@ -171,10 +180,11 @@ const GalleryPage = {
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
               <div class="masonry-img">
                 <img :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
-                <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
+                <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
                 <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
                 <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
                 <span v-if="m.analysis_status==='done'" class="ai-badge"><q-icon name="auto_awesome" size="10px" color="white"></q-icon></span>
+                <span v-if="m.media_type==='audio' && m.music_summary && m.music_summary.watermark==='Present'" class="wm-badge"><q-icon name="branding_watermark" size="11px" color="amber-4"><q-tooltip :delay="500">{{ t('g.watermark_badge') }}</q-tooltip></q-icon></span>
                 <span v-if="m.has_xmp && m.media_type==='image'" class="xmp-badge" style="color:white;font-size:7px;font-weight:700">XMP</span>
               </div>
               <div v-if="m.rating" class="rating">{{ '★'.repeat(m.rating) }}</div>
@@ -200,10 +210,11 @@ const GalleryPage = {
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
           <div class="masonry-img">
             <img :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
-            <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
+            <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
             <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
             <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
             <span v-if="m.analysis_status==='done'" class="ai-badge"><q-icon name="auto_awesome" size="10px" color="white"></q-icon></span>
+                <span v-if="m.media_type==='audio' && m.music_summary && m.music_summary.watermark==='Present'" class="wm-badge"><q-icon name="branding_watermark" size="11px" color="amber-4"><q-tooltip :delay="500">{{ t('g.watermark_badge') }}</q-tooltip></q-icon></span>
             <span v-if="m.has_xmp && m.media_type==='image'" class="xmp-badge" style="color:white;font-size:7px;font-weight:700">XMP</span>
           </div>
           <div v-if="m.rating" class="rating">{{ '★'.repeat(m.rating) }}</div>
@@ -230,10 +241,11 @@ const GalleryPage = {
                 <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
                 <img :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
-                <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
+                <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
                 <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
                 <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
                 <span v-if="m.analysis_status==='done'" class="ai-badge"><q-icon name="auto_awesome" size="10px" color="white"></q-icon></span>
+                <span v-if="m.media_type==='audio' && m.music_summary && m.music_summary.watermark==='Present'" class="wm-badge"><q-icon name="branding_watermark" size="11px" color="amber-4"><q-tooltip :delay="500">{{ t('g.watermark_badge') }}</q-tooltip></q-icon></span>
                 <span v-if="m.has_xmp && m.media_type==='image'" class="xmp-badge" style="color:white;font-size:7px;font-weight:700">XMP</span>
                 <div v-if="m.rating" class="rating">{{ '★'.repeat(m.rating) }}</div>
                 <div class="justified-info">
@@ -258,10 +270,11 @@ const GalleryPage = {
             <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
             <img :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
-            <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
+            <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
             <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
             <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
             <span v-if="m.analysis_status==='done'" class="ai-badge"><q-icon name="auto_awesome" size="10px" color="white"></q-icon></span>
+                <span v-if="m.media_type==='audio' && m.music_summary && m.music_summary.watermark==='Present'" class="wm-badge"><q-icon name="branding_watermark" size="11px" color="amber-4"><q-tooltip :delay="500">{{ t('g.watermark_badge') }}</q-tooltip></q-icon></span>
             <span v-if="m.has_xmp && m.media_type==='image'" class="xmp-badge" style="color:white;font-size:7px;font-weight:700">XMP</span>
             <div v-if="m.rating" class="rating">{{ '★'.repeat(m.rating) }}</div>
             <div class="justified-info">
@@ -286,7 +299,7 @@ const GalleryPage = {
                  @contextmenu.prevent="showCtx($event, m)">
               <div class="row-thumb-wrap">
                 <img class="row-thumb" :src="API.thumbUrl(m.id)" loading="lazy" @error="$event.target.src='/static/img/no-thumb.svg'">
-                <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
+                <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
               </div>
               <div class="row-name" :title="m.file_name">{{ m.file_name }}</div>
               <span class="row-col">{{ m.width ? m.width+'x'+m.height : '-' }}</span>
@@ -327,7 +340,7 @@ const GalleryPage = {
              @contextmenu.prevent="showCtx($event, m)">
           <div class="row-thumb-wrap">
             <img class="row-thumb" :src="API.thumbUrl(m.id)" loading="lazy" @error="$event.target.src='/static/img/no-thumb.svg'">
-            <span class="type-badge"><q-icon :name="m.media_type==='video' ? 'play_arrow' : 'image'" size="12px" color="white"></q-icon></span>
+            <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
           </div>
           <div class="row-name" :title="m.file_name">{{ m.file_name }}</div>
           <span class="row-col">{{ m.width ? m.width+'x'+m.height : '-' }}</span>
@@ -395,7 +408,7 @@ const GalleryPage = {
           <q-item-section>{{ t('g.ctx_reveal') }}</q-item-section>
         </q-item>
         <q-separator style="background:var(--border)"></q-separator>
-        <q-item v-if="selArr.length === 1 && ctxMenu.item && ctxMenu.item.media_type !== 'video'" clickable @click="ctxMenu.show = false; findSimilar()" style="padding-left:8px;padding-right:12px">
+        <q-item v-if="selArr.length === 1 && ctxMenu.item && ctxMenu.item.media_type === 'image'" clickable @click="ctxMenu.show = false; findSimilar()" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="content_copy" size="14px" color="grey-6"></q-icon></q-item-section>
           <q-item-section>{{ t('g.ctx_find_similar') }}</q-item-section>
         </q-item>
@@ -504,7 +517,7 @@ const GalleryPage = {
           <!-- Stats -->
           <div style="display:flex;gap:16px;margin-bottom:16px">
             <div style="flex:1;text-align:center;padding:12px 8px;border-radius:8px;background:var(--surface2)">
-              <div style="font-size:20px;font-weight:700;color:var(--accent)">{{ batchAnalysisInfo.videos + batchAnalysisInfo.images }}</div>
+              <div style="font-size:20px;font-weight:700;color:var(--accent)">{{ batchAnalysisInfo.videos + batchAnalysisInfo.images + (batchAnalysisInfo.audios || 0) }}</div>
               <div style="font-size:11px;color:var(--text3);margin-top:2px">{{ t('g.batch_total', {n: ''}) }}</div>
             </div>
             <div style="flex:1;text-align:center;padding:12px 8px;border-radius:8px;background:var(--surface2)">
@@ -515,11 +528,16 @@ const GalleryPage = {
               <div style="font-size:20px;font-weight:700;color:var(--accent)">{{ batchAnalysisInfo.images }}</div>
               <div style="font-size:11px;color:var(--text3);margin-top:2px">{{ t('g.batch_images', {n: ''}) }}</div>
             </div>
+            <div v-if="batchAnalysisInfo.audios > 0" style="flex:1;text-align:center;padding:12px 8px;border-radius:8px;background:var(--surface2)">
+              <div style="font-size:20px;font-weight:700;color:var(--accent)">{{ batchAnalysisInfo.audios }}</div>
+              <div style="font-size:11px;color:var(--text3);margin-top:2px">{{ t('g.batch_audios', {n: ''}) }}</div>
+            </div>
           </div>
           <!-- Models -->
           <div style="font-size:13px;display:flex;flex-direction:column;gap:6px">
             <div v-if="batchAnalysisInfo.videos > 0" style="display:flex;justify-content:space-between"><span style="color:var(--text3)">{{ t('g.batch_video_model') }}</span><span>{{ batchAnalysisInfo.videoModel }}</span></div>
             <div v-if="batchAnalysisInfo.images > 0" style="display:flex;justify-content:space-between"><span style="color:var(--text3)">{{ t('g.batch_image_model') }}</span><span>{{ batchAnalysisInfo.imageModel }}</span></div>
+            <div v-if="batchAnalysisInfo.audios > 0" style="display:flex;justify-content:space-between"><span style="color:var(--text3)">{{ t('g.batch_music_model') }}</span><span>{{ batchAnalysisInfo.musicModel }}</span></div>
           </div>
           <!-- Already analyzed -->
           <div v-if="batchAnalysisInfo.analyzedCount > 0" style="margin-top:14px;padding:10px 14px;border-radius:8px;background:var(--surface2)">
@@ -768,7 +786,10 @@ const GalleryPage = {
         tags.push({ icon: 'folder', label: folder });
       }
       if (this.filters.media_type !== "all") {
-        tags.push({ icon: this.filters.media_type === 'image' ? 'image' : 'smart_display', label: this.t(this.filters.media_type === 'image' ? 'g.images' : 'g.videos') });
+        const icons = { image: 'image', video: 'smart_display', audio: 'music_note' };
+        const labels = { image: 'g.images', video: 'g.videos', audio: 'g.music' };
+        const mt = this.filters.media_type;
+        tags.push({ icon: icons[mt] || 'smart_display', label: this.t(labels[mt] || 'g.videos') });
       }
       if (this.filters.rating) tags.push({ stars: '★'.repeat(this.filters.rating) });
       if (this.filters.color_label) tags.push({ dot: this.filters.color_label });
@@ -894,6 +915,13 @@ const GalleryPage = {
   },
   // -- Methods: data loading, selection, keyboard, context menu, formatting --
   methods: {
+    typeIcon(m) {
+      return m.media_type === 'video' ? 'play_arrow' : m.media_type === 'audio' ? 'music_note' : 'image';
+    },
+    musicMoodZh(m) {
+      const en = m.music_summary?.mood?.[0]?.label || '';
+      return this.$root.musicTaxZh?.[en] || en;
+    },
     t,
     API,
     // Build query params from current filters (shared by load, loadMore, selectAll)
@@ -1012,7 +1040,7 @@ const GalleryPage = {
     },
     showFilterToast() {
       const parts = [];
-      const typeMap = {image: this.t('g.filter_image'), video: this.t('g.filter_video')};
+      const typeMap = {image: this.t('g.filter_image'), video: this.t('g.filter_video'), audio: this.t('g.filter_music')};
       if (this.filters.media_type !== "all") parts.push(typeMap[this.filters.media_type]);
       if (this.filters.rating) parts.push(this.t('g.filter_rating', {n: this.filters.rating}));
       if (this.filters.color_label) {
@@ -1363,13 +1391,16 @@ const GalleryPage = {
       const selected = this.items.filter(m => this.selArr.includes(m.id));
       const videos = selected.filter(m => m.media_type === 'video');
       const images = selected.filter(m => m.media_type === 'image');
+      const audios = selected.filter(m => m.media_type === 'audio');
       const analyzed = selected.filter(m => m.analysis_status === 'done');
       this.batchAnalysisInfo = {
         videos: videos.length,
         images: images.length,
+        audios: audios.length,
         analyzedCount: analyzed.length,
         videoModel: s.video_engine === 'local' ? (s.local_model || 'qwen3-vl-8b') : (modelLabels[s.model] || s.model),
         imageModel: s.image_engine === 'local' ? (s.local_model || 'qwen3-vl-8b') : (modelLabels[s.image_model] || s.image_model),
+        musicModel: s.music_model || 'qwen3-omni-30b-a3b',
         existingAction: analyzed.length > 0 ? 'skip' : 'reanalyze',
       };
       this.showBatchAnalysisDialog = true;

@@ -102,6 +102,12 @@ def list_media():
     for r in rows:
         d = dict(r)
         d.pop("embedding", None)
+        # 音乐曲级汇总（卡片 mood chip / 水印角标用），后端解析一次
+        if d.get("media_type") == "audio" and d.get("music_summary"):
+            try:
+                d["music_summary"] = json.loads(d["music_summary"])
+            except Exception:
+                d["music_summary"] = None
         data.append(d)
 
     return jsonify({
@@ -330,11 +336,11 @@ def reveal_file(media_id):
 
 @bp.route("/scan", methods=["POST"])
 def scan_paths():
-    from ..services.importer import scan_only
+    from ..services.importer import scan_only, collect_encrypted
     data = request.get_json()
     paths = data.get("paths", [])
     result, skipped = scan_only(paths)
-    return jsonify({"data": result, "skipped": skipped})
+    return jsonify({"data": result, "skipped": skipped, "encrypted": collect_encrypted(paths)})
 
 
 @bp.route("/backfill-embeddings", methods=["POST"])
@@ -1090,7 +1096,7 @@ def delete_folder():
 def sync_folder():
     """Scan a folder: import new files, update changed files, remove deleted files. SSE stream."""
     from flask import stream_with_context
-    from ..services.importer import _import_one, _collect_files, _delete_media_records, VIDEO_EXTS, IMAGE_EXTS
+    from ..services.importer import _import_one, _collect_files, _delete_media_records, VIDEO_EXTS, IMAGE_EXTS, AUDIO_EXTS
     from pathlib import Path
     import json as _json
 
@@ -1103,7 +1109,7 @@ def sync_folder():
     # Scan disk files outside generator (no DB needed)
     disk_files = set()
     for f in _collect_files([path]):
-        if f.suffix.lower() in (VIDEO_EXTS | IMAGE_EXTS):
+        if f.suffix.lower() in (VIDEO_EXTS | IMAGE_EXTS | AUDIO_EXTS):
             disk_files.add(str(f))
     work = sorted(disk_files)
 
@@ -1187,6 +1193,7 @@ def batch_update():
                     thumb.unlink()
         db.execute(f"DELETE FROM media_tags WHERE media_id IN ({placeholders})", ids)
         db.execute(f"DELETE FROM media_segment WHERE media_id IN ({placeholders})", ids)
+        db.execute(f"DELETE FROM music_segment WHERE media_id IN ({placeholders})", ids)
         db.execute(f"DELETE FROM media_fts WHERE media_id IN ({placeholders})", ids)
         for mid in ids:
             db.execute("DELETE FROM dup_exclusions WHERE media_id_a = ? OR media_id_b = ?", (mid, mid))

@@ -66,6 +66,13 @@ IMAGE_EXTS = {
 HEIF_EXTS = {".heic", ".heif", ".hif", ".avif"}
 RAW_EXTS = IMAGE_EXTS - {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".tif", ".gif"} - HEIF_EXTS
 
+# ── Audio (music) media type ──────────────────────────────────
+AUDIO_EXTS = {".mp3", ".wav", ".m4a", ".flac", ".ogg", ".oga", ".aac", ".wma", ".aiff", ".aif"}
+# 平台加密音频（网易云/QQ 音乐等），无法解码——跳过并在导入汇总中提示
+ENCRYPTED_AUDIO_EXTS = {".ncm", ".qmcflac", ".qmcmp3", ".mflac", ".mgg", ".vpr", ".kwflac"}
+# 视频容器但可能是纯音频轨（如「xxx_音频.mp4」）：导入时 ffprobe 按流判定归属
+AUDIO_LIKE_VIDEO_EXTS = {".mp4", ".m4v"}
+
 # ── Analysis concurrency ──────────────────────────────────────
 # Max concurrent VLM (visual-language model) API calls during batch analysis.
 # Increase only if your model API supports parallel requests without rate-limiting.

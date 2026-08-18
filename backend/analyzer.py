@@ -20,6 +20,8 @@ from .emotion_labels import render_label_table
 
 PROMPT_FILE = Path(__file__).parent / "prompts" / "video_prompt.txt"
 IMG_PROMPT_FILE = Path(__file__).parent / "prompts" / "img_prompt.txt"
+MUSIC_PROMPT_FILE = Path(__file__).parent / "prompts" / "music_prompt.txt"
+MUSIC_TAXONOMY_FILE = Path(__file__).parent / "prompts" / "music_taxonomy.json"
 
 
 def _openai_client(api_key: str, base_url: str) -> OpenAI:
@@ -37,6 +39,37 @@ def load_prompt() -> str:
 
 def load_img_prompt() -> str:
     return IMG_PROMPT_FILE.read_text(encoding="utf-8").replace("{emotion_labels}", render_label_table())
+
+
+def _render_music_taxonomy() -> str:
+    """渲染 music_taxonomy.json 为 prompt 受控词表块（单一事实源在 JSON，与
+    emotion_labels.render_label_table 同构）。"""
+    tax = json.loads(MUSIC_TAXONOMY_FILE.read_text(encoding="utf-8"))
+    lines = ["受控词表（label 输出英文规范值，括号内为中文含义，仅供理解）："]
+
+    def _vals(dim):
+        return " | ".join(f'{x["en"]}({x["zh"]})' for x in tax[dim])
+
+    lines.append(f'mood（情绪）: {_vals("mood")}')
+    lines.append(f'genre（曲风）: {_vals("genre")}')
+    lines.append(f'instrument（乐器）: {_vals("instrument")}')
+    lines.append(f'video_theme（适用画面）: {_vals("video_theme")}')
+    lines.append(f'vocals（人声，单选）: {_vals("vocals")}')
+    lines.append("vocals_language（歌词语言，单选，无歌词时留空）: "
+                 + " | ".join(x["en"] for x in tax["vocals_language"]))
+    lines.append("watermark（水印，单选）: None(无) | Present(有)")
+    return "\n".join(lines)
+
+
+def load_music_prompt() -> str:
+    return (MUSIC_PROMPT_FILE.read_text(encoding="utf-8")
+            .replace("{music_taxonomy}", _render_music_taxonomy()))
+
+
+def music_taxonomy_labels(dim: str) -> set[str]:
+    """词表某维度的合法英文值集合（sanitize 白名单用）。"""
+    tax = json.loads(MUSIC_TAXONOMY_FILE.read_text(encoding="utf-8"))
+    return {x["en"] for x in tax.get(dim, [])}
 
 
 def encode_image_base64(image_path: str | Path) -> str:
@@ -334,6 +367,176 @@ def analyze_video_frames(video_path: str | Path, api_key: str, model: str = "qwe
     logger.info("Local video analysis done: {:.1f}s, {} segments, {} windows, file={}",
                 elapsed, len(all_segments), len(windows), Path(video_path).name)
     return all_segments, elapsed, (usage_sum if has_usage else None)
+
+
+# ── 音乐分析（分段音频 → Omni input_audio → 受控标签 + 双轴 + 水印）──────
+
+MUSIC_MAX_ANALYSIS_SEC = 1500   # 整曲上限 25 分钟（音频 token≈15/s + prompt，守住 32k 上下文）
+
+
+def probe_audio_duration(audio_path: str | Path) -> float:
+    r = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+         "-of", "csv=p=0", str(audio_path)],
+        capture_output=True, text=True)
+    try:
+        return float(r.stdout.strip())
+    except ValueError:
+        raise RuntimeError(f"无法读取音频时长: {r.stderr[:200]}")
+
+
+def extract_audio_segment(audio_path: str | Path, start: float, dur: float) -> str:
+    """单段 16k 单声道 PCM → wave 自建头 → base64（复用视频同析的音频通路；
+    不用 `-f wav pipe:1`——管道不可 seek，头部时长是占位值）。"""
+    r = subprocess.run(
+        ["ffmpeg", "-hide_banner", "-loglevel", "error",
+         "-ss", f"{start:.3f}", "-i", str(audio_path),
+         "-t", f"{dur:.3f}", "-vn", "-ac", "1", "-ar", "16000",
+         "-f", "s16le", "pipe:1"],
+        capture_output=True)
+    if not r.stdout:
+        raise RuntimeError(f"音频段抽取失败: {Path(audio_path).name} @ {start:.1f}s")
+    buf = io.BytesIO()
+    w = wave.open(buf, "wb")
+    w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000)
+    w.writeframes(r.stdout)
+    w.close()
+    return base64.b64encode(buf.getvalue()).decode()
+
+
+def analyze_music(audio_path: str | Path, api_key: str, model: str = "qwen3-omni-30b-a3b",
+                  base_url: str = CODING_BASE_URL,
+                  on_progress=None) -> tuple[list[dict], float, dict | None]:
+    """整曲分析（2026-08-18 按用户决定取消分段）：一次性把全曲送 Omni，
+    返回单段 dict（time 强制 0~时长）。音频 token ≈ 15/s，超长曲截断保护上下文。"""
+    client = _openai_client(api_key, base_url)
+    prompt = load_music_prompt()
+    duration = probe_audio_duration(audio_path)
+    dur = min(duration, MUSIC_MAX_ANALYSIS_SEC)
+    if dur < duration:
+        logger.warning("audio too long, truncated to {}s: {}", int(dur), Path(audio_path).name)
+    t0 = time.time()
+    logger.info("Music analysis: model={} duration={:.0f}s file={}",
+                model, duration, Path(audio_path).name)
+
+    b64 = extract_audio_segment(audio_path, 0, dur)
+    content = [
+        {"type": "text", "text":
+            f"这是一首完整的音乐作品（时长 {int(duration)} 秒{'' if dur >= duration else f'，仅提供前 {int(dur)} 秒'}），请分析整首曲目："},
+        {"type": "input_audio", "input_audio": {"data": b64, "format": "wav"}},
+        {"type": "text", "text": prompt},
+    ]
+
+    full_content = ""
+    usage = None
+    first_token = True
+    stream = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": content}],
+        stream=True,
+        stream_options={"include_usage": True},
+    )
+    for chunk in stream:
+        if chunk.usage:
+            usage = chunk.usage
+        if not chunk.choices:
+            continue
+        delta = chunk.choices[0].delta
+        if delta.content:
+            if first_token:
+                if on_progress:
+                    on_progress("first_token")
+                first_token = False
+            full_content += delta.content
+            if on_progress:
+                on_progress("receiving", chars=len(full_content))
+
+    seg = sanitize_music_segment(parse_music_segment(full_content), 0, duration)
+    elapsed = time.time() - t0
+    u = {"prompt": usage.prompt_tokens, "completion": usage.completion_tokens,
+         "total": usage.total_tokens} if usage else None
+    logger.info("Music analysis done: {:.1f}s, seg={} file={}",
+                elapsed, seg is not None, Path(audio_path).name)
+    return ([seg] if seg else []), elapsed, u
+
+
+def parse_music_segment(content: str) -> dict | None:
+    """剥 ``` 围栏 → 解析单个 JSON 对象；失败返回 None（该段跳过聚合）。"""
+    content = (content or "").strip()
+    if content.startswith("```"):
+        lines = content.split("\n")
+        lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        content = "\n".join(lines)
+    try:
+        obj = json.loads(content)
+        return obj if isinstance(obj, dict) else None
+    except json.JSONDecodeError:
+        logger.warning("Music segment parse failed: {}", (content or "")[:120])
+        return None
+
+
+def sanitize_music_segment(obj: dict | None, start: float, end: float) -> dict | None:
+    """词表白名单 + 权重归一 100 + 数值 clamp + 时间强制。"""
+    if obj is None:
+        return None
+    tag_dims = ("mood", "genre", "instrument", "theme")
+    key_map = {"theme": "video_theme"}
+    out = {"time_start": _fmt_ts(start), "time_end": _fmt_ts(end)}
+    for dim in tag_dims:
+        raw = obj.get(key_map.get(dim, dim)) or []
+        if not isinstance(raw, list):
+            raw = []
+        allowed = music_taxonomy_labels(key_map.get(dim, dim))
+        items, acc = [], 0.0
+        for it in raw:
+            if not isinstance(it, dict):
+                continue
+            label = str(it.get("label", "")).strip()
+            if label not in allowed:
+                continue
+            try:
+                w = float(it.get("weight", 0))
+            except (TypeError, ValueError):
+                continue
+            if w <= 0:
+                continue
+            items.append([label, w])
+            acc += w
+        if not items:                       # 全被过滤：该维度留空而不是丢段
+            out[dim] = []
+            continue
+        norm = [{ "label": l, "weight": round(w / acc * 100) } for l, w in items]
+        # 修整：归一后合计应=100（round 误差补到第一项）
+        diff = 100 - sum(x["weight"] for x in norm)
+        if norm and diff:
+            norm[0]["weight"] = max(1, norm[0]["weight"] + diff)
+        out[dim] = norm
+
+    def _num(key, lo, hi, default):
+        try:
+            v = float(obj.get(key, default))
+        except (TypeError, ValueError):
+            v = default
+        return max(lo, min(hi, v))
+
+    out["arousal"] = _num("arousal", 0.0, 1.0, 0.5)
+    out["valence"] = _num("valence", -1.0, 1.0, 0.0)
+
+    voc_allowed = music_taxonomy_labels("vocals") | {""}
+    lang_allowed = music_taxonomy_labels("vocals_language") | {""}
+    voc = str(obj.get("vocals", "") or "").strip()
+    out["vocals"] = voc if voc in voc_allowed else ""
+    lang = str(obj.get("vocals_language", "") or "").strip()
+    out["vocals_language"] = lang if lang in lang_allowed else ""
+    # 无歌词形态强制语言为空
+    if out["vocals"] in ("Instrumental", "Wordless Vocals", ""):
+        out["vocals_language"] = ""
+    wm = str(obj.get("watermark", "") or "").strip()
+    out["watermark"] = "Present" if wm == "Present" else "None"
+    out["watermark_text"] = str(obj.get("watermark_text", "") or "")[:300] if out["watermark"] == "Present" else ""
+    return out
 
 
 def _parse_response(content: str) -> list[dict]:

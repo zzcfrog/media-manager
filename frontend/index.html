@@ -276,6 +276,7 @@
         <q-tab :name="'general'" :label="t('s.tab_general')" style="font-size:12px"></q-tab>
         <q-tab :name="'image'" :label="t('s.tab_image')" style="font-size:12px"></q-tab>
         <q-tab :name="'video'" :label="t('s.tab_video')" style="font-size:12px"></q-tab>
+        <q-tab :name="'music'" :label="t('s.tab_music')" style="font-size:12px"></q-tab>
         <q-tab :name="'creative'" :label="t('s.tab_creative')" style="font-size:12px"></q-tab>
       </q-tabs>
       <q-separator style="background:var(--border)"></q-separator>
@@ -468,6 +469,54 @@
             <span class="material-icons">link</span><span>{{ t('s.asr_local_merged_hint') }}</span>
           </div>
         </q-tab-panel>
+        <!-- Music tab -->
+        <q-tab-panel :name="'music'" class="settings-panel">
+          <q-btn-toggle v-model="settingsForm.musicEngine" class="engine-toggle" no-caps unelevated dense
+            :options="[{ label: t('s.engine_local_short'), value: 'local' }, { label: t('s.engine_cloud_short'), value: 'cloud', disable: true }]"></q-btn-toggle>
+          <div v-if="settingsForm.musicEngine === 'cloud'" class="settings-hint">
+            <span class="material-icons">hourglass_empty</span><span>{{ t('s.music_cloud_hint') }}</span>
+          </div>
+          <template v-else>
+            <div>
+              <div class="settings-label">{{ t('s.local_model') }}</div>
+              <q-select v-model="settingsForm.musicModel" :options="computedMusicModelOptions" dense filled emit-value map-options>
+                <template v-slot:option="scope">
+                  <q-item :clickable="!scope.opt.disable" style="padding-top:8px;padding-bottom:8px" @click="!scope.opt.disable && scope.toggleOption(scope.opt)">
+                    <q-item-section>
+                      <q-item-label style="font-size:13px">{{ scope.opt.name }}</q-item-label>
+                      <q-item-label v-if="vlmDownload.state === 'downloading' && vlmDownload.model_id === scope.opt.value" caption style="font-size:11px">
+                        <q-linear-progress :value="vlmDownload.total_bytes ? vlmDownload.done_bytes / vlmDownload.total_bytes : 0" size="4px" rounded color="primary" style="margin:3px 0"></q-linear-progress>
+                        {{ Math.floor(vlmDownload.done_bytes / (vlmDownload.total_bytes || 1) * 100) }}% · {{ fmtBytes(vlmDownload.speed_bps) }}/s
+                      </q-item-label>
+                      <q-item-label v-else caption style="font-size:11px">
+                        {{ scope.opt.quant }} · {{ scope.opt.size_gb }}GB<template v-if="!scope.opt.installed"> · {{ t('s.model_need_ram', {gb: scope.opt.min_ram_gb}) }}</template>
+                      </q-item-label>
+                    </q-item-section>
+                    <q-item-section v-if="scope.opt.installed" side>
+                      <q-btn flat round dense icon="delete_outline" size="sm" color="grey-6" @click.stop="onModelDeleteClick(scope.opt, 'musicModelSelect')"></q-btn>
+                    </q-item-section>
+                    <q-item-section v-else side>
+                      <q-btn v-if="vlmDownload.state === 'downloading' && vlmDownload.model_id !== scope.opt.value" flat round dense icon="download_for_offline" size="sm" color="grey-4" disable></q-btn>
+                      <q-btn v-else-if="vlmDownload.state !== 'downloading'" flat round dense icon="download_for_offline" size="sm" color="primary" @click.stop="onModelDownloadClick(scope.opt, 'musicModelSelect')"></q-btn>
+                    </q-item-section>
+                  </q-item>
+                </template>
+              </q-select>
+            </div>
+            <div v-if="vlmDownload.state === 'downloading'" class="settings-hint">
+              <span class="material-icons">downloading</span>
+              <span style="flex:1">
+                <q-linear-progress :value="vlmDownload.total_bytes ? vlmDownload.done_bytes / vlmDownload.total_bytes : 0" size="6px" rounded color="primary" style="margin-bottom:4px"></q-linear-progress>
+                {{ t('s.model_dl_running') }} · {{ Math.floor(vlmDownload.done_bytes / (vlmDownload.total_bytes || 1) * 100) }}% · {{ fmtBytes(vlmDownload.speed_bps) }}/s
+              </span>
+            </div>
+            <div v-if="vlmDownload.state === 'error'" class="settings-hint" style="color:var(--negative)"><span class="material-icons">error_outline</span><span>{{ t('s.model_dl_failed') }}: {{ vlmDownload.error }}</span></div>
+            <div class="settings-hint">
+              <span class="material-icons">info</span>
+              <span>{{ t('s.music_engine_hint_whole') }}</span>
+            </div>
+          </template>
+        </q-tab-panel>
         <!-- Creative tab -->
         <q-tab-panel :name="'creative'" class="settings-panel">
           <div>
@@ -588,7 +637,7 @@
               <div class="import-preview-thumb">
                 <img v-if="item.thumbnail_path" :src="API.thumbUrl(item.id)">
                 <div v-else class="import-preview-placeholder">
-                  <q-icon :name="item.media_type === 'video' ? 'movie' : 'image'" size="24px" color="grey-6"></q-icon>
+                  <q-icon :name="item.media_type === 'video' ? 'movie' : item.media_type === 'audio' ? 'music_note' : 'image'" size="24px" color="grey-6"></q-icon>
                 </div>
               </div>
               <div class="import-preview-name">{{ item.file_name }}</div>
@@ -640,7 +689,7 @@
               <div class="import-preview-thumb">
                 <img v-if="item.thumbnail_path" :src="API.thumbUrl(item.id)">
                 <div v-else class="import-preview-placeholder">
-                  <q-icon :name="item.media_type === 'video' ? 'movie' : 'image'" size="24px" color="grey-6"></q-icon>
+                  <q-icon :name="item.media_type === 'video' ? 'movie' : item.media_type === 'audio' ? 'music_note' : 'image'" size="24px" color="grey-6"></q-icon>
                 </div>
               </div>
               <div class="import-preview-name">{{ item.file_name }}</div>
@@ -726,8 +775,9 @@ const app = Vue.createApp({
       showImport: false,
       showSettings: false,
       showShortcuts: false,
-      settingsForm: { resolution: "480", fps: "30", model: "glm-4.6v", useMultimodal: true, asrEngine: "whisper", asrMode: "local", asrModel: "large-v3", videoApiKey: "", asrApiKey: "", imageResolution: "1920", imageApiKey: "", imageModel: "glm-4.6v", imageEngine: "cloud", videoEngine: "cloud", localModel: "qwen3-vl-8b", localFps: "1", localMaxFrames: "32", localRes: "480", localAsrMode: "separate", hwAccel: false, language: "zh", creativeModel: "glm-5-turbo" },
+      settingsForm: { resolution: "480", fps: "30", model: "glm-4.6v", useMultimodal: true, asrEngine: "whisper", asrMode: "local", asrModel: "large-v3", videoApiKey: "", asrApiKey: "", imageResolution: "1920", imageApiKey: "", imageModel: "glm-4.6v", imageEngine: "cloud", videoEngine: "cloud", localModel: "qwen3-vl-8b", localFps: "1", localMaxFrames: "32", localRes: "480", localAsrMode: "separate", musicEngine: "local", musicModel: "qwen3-omni-30b-a3b", hwAccel: false, language: "zh", creativeModel: "glm-5-turbo" },
       localModels: [],
+      musicTaxZh: null,   // 音乐词表 en→zh 映射（卡片 chip/详情页共用，来自 /api/analysis/music-taxonomy）
       vlmDownload: { state: "idle", model_id: null, total_bytes: 0, done_bytes: 0, speed_bps: 0, error: null },
       settingsTab: "general",
       hwEncoderAvailable: false,
@@ -787,6 +837,13 @@ const app = Vue.createApp({
     document.addEventListener("click", this._closeFolderCtx);
     this.resolveRoute();
     // Restore bgTasks from backend (survives page refresh)
+    API.getMusicTaxonomy().then(tax => {
+      const zh = {};
+      for (const dim of ["mood", "genre", "instrument", "video_theme", "vocals", "vocals_language"]) {
+        for (const x of (tax[dim] || [])) zh[x.en] = x.zh;
+      }
+      this.musicTaxZh = zh;
+    }).catch(() => {});
     API.getProgress().then(tasks => {
       if (tasks.length) {
         for (const task of tasks) {
@@ -849,8 +906,9 @@ const app = Vue.createApp({
             task.stageLabel = t('g.bg_model_loading');
           } else if (p.step === "analyzing") {
             const isImage = task.mediaType === "image" || p.media_type === "image";
-            task.percent = isImage ? 70 : 60;
-            task.stageLabel = t('g.bg_ai_analyzing') + (p.window ? ' ' + p.window : '');
+            const isAudio = task.mediaType === "audio" || p.media_type === "audio";
+            task.percent = isImage ? 70 : isAudio ? 50 : 60;
+            task.stageLabel = (isAudio ? t('g.bg_music_analyzing') : t('g.bg_ai_analyzing')) + (p.window ? ' ' + p.window : '');
           }
           changed = true;
         } else if (task.id === '__preload__') {
@@ -1021,6 +1079,20 @@ const app = Vue.createApp({
     localModelAudio() {
       const m = this.localModels.find(x => x.id === this.settingsForm.localModel);
       return !!(m && m.audio);
+    },
+    computedMusicModelOptions() {
+      return this.localModels
+        .filter(m => m.audio)
+        .map(m => ({
+          label: `${m.label} · ${m.quant} · ${m.size_gb}GB`,
+          value: m.id,
+          disable: !m.installed,
+          installed: m.installed,
+          name: m.label,
+          quant: m.quant,
+          size_gb: m.size_gb,
+          min_ram_gb: m.min_ram_gb,
+        }));
     },
     computedLocalFpsOptions() {
       return [
@@ -1459,6 +1531,8 @@ const app = Vue.createApp({
         this.settingsForm.localMaxFrames = s.local_frames_max || "32";
         this.settingsForm.localRes = s.local_frames_res || "480";
         this.settingsForm.localAsrMode = s.local_asr_mode === "merged" ? "merged" : "separate";
+        this.settingsForm.musicEngine = s.music_engine === "cloud" ? "cloud" : "local";
+        this.settingsForm.musicModel = s.music_model || "qwen3-omni-30b-a3b";
         try {
           await this.refreshLocalModels();
         } catch { this.localModels = []; }
@@ -1477,6 +1551,11 @@ const app = Vue.createApp({
       if (!this.localModels.some(m => m.id === this.settingsForm.localModel && m.installed)) {
         const firstInstalled = this.localModels.find(m => m.installed);
         if (firstInstalled) this.settingsForm.localModel = firstInstalled.id;
+      }
+      // 音乐模型回落：必须支持音频输入（Omni 系）
+      if (!this.localModels.some(m => m.id === this.settingsForm.musicModel && m.installed && m.audio)) {
+        const firstAudio = this.localModels.find(m => m.installed && m.audio);
+        if (firstAudio) this.settingsForm.musicModel = firstAudio.id;
       }
     },
     fmtBytes(b) {
@@ -1549,6 +1628,8 @@ const app = Vue.createApp({
           local_frames_max: this.settingsForm.localMaxFrames,
           local_frames_res: this.settingsForm.localRes,
           local_asr_mode: this.settingsForm.localAsrMode,
+          music_engine: this.settingsForm.musicEngine,
+          music_model: this.settingsForm.musicModel,
           hw_accel: String(this.settingsForm.hwAccel),
           language: this.settingsForm.language,
           creative_model: this.settingsForm.creativeModel,

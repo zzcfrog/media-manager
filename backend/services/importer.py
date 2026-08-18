@@ -7,7 +7,8 @@ from pathlib import Path
 
 from loguru import logger
 
-from ..config import VIDEO_EXTS, IMAGE_EXTS, RAW_EXTS, THUMB_DIR
+from ..config import (VIDEO_EXTS, IMAGE_EXTS, RAW_EXTS, THUMB_DIR,
+                      AUDIO_EXTS, ENCRYPTED_AUDIO_EXTS, AUDIO_LIKE_VIDEO_EXTS)
 from ..db import get_db
 
 # Timeout for external tool calls (ffprobe/ffmpeg/exiftool)
@@ -27,6 +28,7 @@ def _delete_media_records(db, ids: list[int], thumb_paths: list[str | None] = No
                 thumb.unlink()
         db.execute("DELETE FROM media_tags WHERE media_id = ?", (mid,))
         db.execute("DELETE FROM media_segment WHERE media_id = ?", (mid,))
+        db.execute("DELETE FROM music_segment WHERE media_id = ?", (mid,))
         db.execute("DELETE FROM media_fts WHERE media_id = ?", (mid,))
         db.execute("DELETE FROM dup_exclusions WHERE media_id_a = ? OR media_id_b = ?", (mid, mid))
         db.execute("DELETE FROM media WHERE id = ?", (mid,))
@@ -38,13 +40,33 @@ def _collect_files(paths: list[str]) -> list[Path]:
         path = Path(p)
         if path.is_file() and path.name.startswith("._"):
             continue
-        if path.is_file() and path.suffix.lower() in (VIDEO_EXTS | IMAGE_EXTS):
+        if path.is_file() and path.suffix.lower() in (VIDEO_EXTS | IMAGE_EXTS | AUDIO_EXTS):
             files.append(path)
         elif path.is_dir():
             for f in path.rglob("*"):
-                if f.is_file() and not f.name.startswith("._") and f.suffix.lower() in (VIDEO_EXTS | IMAGE_EXTS):
+                if f.is_file() and not f.name.startswith("._") and f.suffix.lower() in (VIDEO_EXTS | IMAGE_EXTS | AUDIO_EXTS):
                     files.append(f)
     return files
+
+
+def collect_encrypted(paths: list[str]) -> list[dict]:
+    """收集加密音频文件（ncm 等），供导入汇总提示「N 个加密格式已跳过」。"""
+    out = []
+    for p in paths:
+        path = Path(p)
+        cand = [path] if path.is_file() else (path.rglob("*") if path.is_dir() else [])
+        for f in cand:
+            if f.is_file() and not f.name.startswith("._") and f.suffix.lower() in ENCRYPTED_AUDIO_EXTS:
+                out.append({"file_name": f.name, "file_path": str(f)})
+    return out
+
+
+def _scan_media_type(ext: str) -> str:
+    if ext in VIDEO_EXTS:
+        return "video"
+    if ext in AUDIO_EXTS:
+        return "audio"
+    return "image"
 
 
 def scan_only(paths: list[str]) -> list[dict]:
@@ -57,11 +79,11 @@ def scan_only(paths: list[str]) -> list[dict]:
         if existing:
             skipped.append({"file_name": f.name, "file_path": str(f), "media_id": existing["id"]})
             continue
-        ext = f.suffix.lower()
+        # 注意：AUDIO_LIKE_VIDEO_EXTS（.mp4/.m4v）此处预标 video，_import_one 时按流判定修正
         results.append({
             "file_path": str(f),
             "file_name": f.name,
-            "media_type": "video" if ext in VIDEO_EXTS else "image",
+            "media_type": _scan_media_type(f.suffix.lower()),
             "file_size": f.stat().st_size,
         })
     return results, skipped
@@ -71,7 +93,7 @@ def import_single_file(file_path: str) -> dict | None:
     filepath = Path(file_path)
     if not filepath.exists() or filepath.name.startswith("._"):
         return None
-    if filepath.suffix.lower() not in (VIDEO_EXTS | IMAGE_EXTS):
+    if filepath.suffix.lower() not in (VIDEO_EXTS | IMAGE_EXTS | AUDIO_EXTS):
         return None
     db = get_db()
     try:
@@ -83,7 +105,6 @@ def import_single_file(file_path: str) -> dict | None:
 
 def _import_one(db, filepath: Path, force_update: bool = False) -> dict | None:
     ext = filepath.suffix.lower()
-    media_type = "video" if ext in VIDEO_EXTS else "image"
 
     stat = filepath.stat()
     existing = db.execute(
@@ -100,7 +121,28 @@ def _import_one(db, filepath: Path, force_update: bool = False) -> dict | None:
         # File changed — clean up old record and re-import
         _delete_media_records(db, [existing["id"]], [existing["thumbnail_path"]])
 
-    meta = _probe(filepath, media_type) if media_type == "video" else _probe_image(filepath)
+    if ext in AUDIO_EXTS:
+        media_type, meta = "audio", _probe_audio(filepath)
+    elif ext in AUDIO_LIKE_VIDEO_EXTS:
+        # .mp4/.m4v 可能是纯音频轨（如「xxx_音频.mp4」）：按流判定归属，probe 不新增子进程
+        meta = _probe(filepath, "video")
+        has_video = meta.pop("_has_video", True)
+        has_audio = meta.pop("_has_audio", False)
+        if not has_video and has_audio:
+            media_type = "audio"
+            au_meta = _probe_audio(filepath)
+            meta.update({k: au_meta[k] for k in ("audio_codec", "audio_sample_rate",
+                                                 "audio_channels", "duration", "bit_rate",
+                                                 "music_title", "music_artist", "music_album")})
+        else:
+            media_type = "video"
+    elif ext in VIDEO_EXTS:
+        media_type = "video"
+        meta = _probe(filepath, media_type)
+    else:
+        media_type = "image"
+        meta = _probe_image(filepath)
+
     thumb = _generate_thumbnail(filepath, media_type)
     if thumb:
         meta["thumbnail_path"] = thumb
@@ -119,8 +161,8 @@ def _import_one(db, filepath: Path, force_update: bool = False) -> dict | None:
         "INSERT INTO media (file_path, file_name, media_type, file_size, file_mtime, duration, width, height, fps, "
         "video_codec, video_profile, bit_rate, audio_codec, audio_sample_rate, audio_channels, "
         "color_space, color_range, pix_fmt, camera_make, camera_model, lens_model, date_taken, thumbnail_path, "
-        "has_xmp, picture_control, embedding) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "has_xmp, picture_control, embedding, music_title, music_artist, music_album) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             str(filepath), filepath.name, media_type,
             stat.st_size, stat.st_mtime,
@@ -131,6 +173,7 @@ def _import_one(db, filepath: Path, force_update: bool = False) -> dict | None:
             meta.get("pix_fmt"), meta.get("camera_make"), meta.get("camera_model"),
             meta.get("lens_model"), meta.get("date_taken"), meta.get("thumbnail_path"),
             xmp_exists, meta.get("picture_control"), embedding,
+            meta.get("music_title"), meta.get("music_artist"), meta.get("music_album"),
         ),
     )
     media_id = cur.lastrowid
@@ -170,6 +213,9 @@ def _probe(filepath: Path, media_type: str) -> dict:
         "color_range": vs.get("color_range"),
         "pix_fmt": vs.get("pix_fmt"),
         "duration": float(fmt["duration"]) if fmt.get("duration") else None,
+        # 流判定布尔（.mp4/.m4v 纯音轨归 audio），_import_one 消费后 pop
+        "_has_video": bool(vs),
+        "_has_audio": bool(au),
         "camera_model": tags.get("com.apple.quicktime.model") or tags.get("model"),
         "camera_make": None,
         "lens_model": None,
@@ -275,6 +321,58 @@ def _exif_probe(filepath: Path, meta: dict):
         _apply_exif_tags(tags, meta)
 
 
+def _probe_audio(filepath: Path) -> dict:
+    """音频元数据：ffprobe（流参数 + format.tags 的 ID3 title/artist/album），exiftool 兜底。"""
+    meta = {
+        "duration": None, "bit_rate": None,
+        "audio_codec": None, "audio_sample_rate": None, "audio_channels": None,
+        "music_title": None, "music_artist": None, "music_album": None,
+        "date_taken": _normalize_date(datetime.fromtimestamp(filepath.stat().st_mtime).isoformat()),
+    }
+    try:
+        cmd = ["ffprobe", "-v", "quiet", "-print_format", "json",
+               "-show_format", "-show_streams", str(filepath)]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=PROBE_TIMEOUT)
+        info = json.loads(result.stdout)
+        au = next((s for s in info.get("streams", []) if s.get("codec_type") == "audio"), {})
+        fmt = info.get("format", {})
+        ftags = fmt.get("tags", {}) or {}
+        meta.update({
+            "duration": float(fmt["duration"]) if fmt.get("duration") else None,
+            "bit_rate": int(fmt["bit_rate"]) if fmt.get("bit_rate") else None,
+            "audio_codec": au.get("codec_name"),
+            "audio_sample_rate": int(au["sample_rate"]) if au.get("sample_rate") else None,
+            "audio_channels": au.get("channels"),
+        })
+        # ID3（大小写键名因容器而异：title/Title/TITLE）
+        def _tag(*keys):
+            for k in keys:
+                for kk, vv in ftags.items():
+                    if kk.lower() == k and vv:
+                        return str(vv).strip()
+            return None
+        meta["music_title"] = _tag("title")
+        meta["music_artist"] = _tag("artist", "album_artist")
+        meta["music_album"] = _tag("album")
+    except Exception as e:
+        logger.warning("audio probe failed {}: {}", filepath.name, e)
+
+    # ID3 缺失时 exiftool 兜底（_run_exiftool 固定字段不含 ID3，单独探测）
+    if not meta.get("music_title") and shutil.which("exiftool"):
+        try:
+            cmd = ["exiftool", "-json", "-Title", "-Artist", "-Album", str(filepath)]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=EXIFTOOL_TIMEOUT)
+            data = json.loads(result.stdout)
+            if data and isinstance(data, list):
+                tags = data[0]
+                meta["music_title"] = meta.get("music_title") or (str(tags["Title"]).strip() if tags.get("Title") else None)
+                meta["music_artist"] = meta.get("music_artist") or (str(tags["Artist"]).strip() if tags.get("Artist") else None)
+                meta["music_album"] = meta.get("music_album") or (str(tags["Album"]).strip() if tags.get("Album") else None)
+        except Exception:
+            pass
+    return meta
+
+
 def _probe_image(filepath: Path) -> dict:
     """Extract all image metadata via exiftool only."""
     meta = {
@@ -347,6 +445,22 @@ def _generate_thumbnail(filepath: Path, media_type: str) -> str | None:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT)
             if result.returncode == 0 and thumb_path.exists():
                 return thumb_name
+    elif media_type == "audio":
+        # 波形缩略图：8k 单声道降采样（解码耗时约降一个量级），超长曲截断 30 分钟
+        if shutil.which("ffmpeg"):
+            try:
+                cmd = [
+                    "ffmpeg", "-i", str(filepath), "-t", "1800",
+                    "-ac", "1", "-ar", "8000",
+                    "-filter_complex", "showwavespic=s=640x240:colors=#6c8cff",
+                    "-frames:v", "1", "-y", str(thumb_path),
+                ]
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT)
+                if result.returncode == 0 and thumb_path.exists():
+                    return thumb_name
+            except Exception as e:
+                logger.warning("waveform thumbnail failed {}: {}", filepath.name, e)
+        return None  # 音频无图可回退，缺缩略图由前端 no-thumb 占位
     else:
         # PIL: apply EXIF auto-rotation from camera
         try:

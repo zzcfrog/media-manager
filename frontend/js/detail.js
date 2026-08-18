@@ -166,15 +166,105 @@ const DetailPage = {
           </div>
           <div class="histogram-wrap" ref="histWrap"><canvas ref="histCanvas"></canvas></div>
         </div>
+        <!-- ═══ Audio (music) branch ═══ -->
+        <div v-else-if="media?.media_type==='audio'" style="flex:1;display:flex;flex-direction:column;min-height:0">
+          <div class="img-meta-bar" style="flex-wrap:wrap;gap:6px 18px">
+            <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--text3)">
+              <span class="meta-label">{{ t('d.music_track') }}</span><span style="color:var(--text2);min-width:120px">{{ media.music_title || media.file_name }}</span>
+              <template v-if="media.music_artist"><span class="meta-label">{{ t('d.music_artist') }}</span><span style="color:var(--text2)">{{ media.music_artist }}</span></template>
+              <template v-if="media.music_album"><span class="meta-label">{{ t('d.music_album') }}</span><span style="color:var(--text2)">{{ media.music_album }}</span></template>
+              <template v-if="media.duration"><span class="meta-label">{{ t('d.duration') }}</span><span style="color:var(--text2)">{{ fmtDetailTime(media.duration) }}</span></template>
+            </div>
+            <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--text3)">
+              <template v-if="media.audio_codec"><span class="meta-label">{{ t('d.music_codec') }}</span><span style="color:var(--text2)">{{ media.audio_codec }}</span></template>
+              <template v-if="media.audio_sample_rate"><span class="meta-label">{{ t('d.music_sr') }}</span><span style="color:var(--text2)">{{ Math.round(media.audio_sample_rate/1000) }} kHz</span></template>
+              <template v-if="media.audio_channels"><span class="meta-label">{{ t('d.music_ch') }}</span><span style="color:var(--text2)">{{ media.audio_channels === 1 ? t('d.music_mono') : t('d.music_stereo') }}</span></template>
+            </div>
+            <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--text3)">
+              <template v-if="media.date_taken && media.date_taken.slice(0,4) !== '0000'"><span class="meta-label">{{ t('d.date_taken') }}</span><span style="color:var(--text2)">{{ fmtDate(media.date_taken) }}</span></template>
+              <span class="meta-label">{{ t('d.size') }}</span><span style="color:var(--text2)">{{ fmtSize(media.file_size) }}</span>
+              <span style="display:flex;align-items:center;gap:4px"><span class="meta-path" style="cursor:default"><q-tooltip :delay="1000">{{ media.file_path }}</q-tooltip>{{ media.file_path }}</span><q-icon name="folder_open" size="13px" color="grey-6" style="cursor:pointer;flex-shrink:0" @click="openInFinder"></q-icon></span>
+            </div>
+          </div>
+
+          <audio ref="audioPlayer" :src="API.audioUrl(media.id)" preload="metadata"
+                 @timeupdate="onMusicTimeUpdate" @ended="onMusicEnded"
+                 @loadedmetadata="onMusicLoaded" style="display:none"></audio>
+
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:10px;padding:12px 24px;min-height:0">
+            <!-- arousal / valence 双线曲线（仅多段分析时；整曲模式单段直接显示双轴数值） -->
+            <div v-if="analysis.status==='done' && (analysis.segments?.length||0) > 1" style="flex-shrink:0">
+              <div style="display:flex;gap:12px;font-size:10px;color:var(--text3);margin-bottom:2px">
+                <span><span style="display:inline-block;width:8px;height:2px;background:#6c8cff;vertical-align:middle;margin-right:4px"></span>{{ t('d.music_arousal') }}</span>
+                <span><span style="display:inline-block;width:8px;height:2px;background:#ffb74d;vertical-align:middle;margin-right:4px"></span>{{ t('d.music_valence') }}</span>
+              </div>
+              <div ref="avChartWrap" @click="onAvChartClick" style="height:110px;cursor:pointer"><canvas ref="avCanvas" style="width:100%;height:100%"></canvas></div>
+            </div>
+            <!-- 整曲模式：双轴数值大字 -->
+            <div v-else-if="analysis.status==='done' && analysis.summary" style="flex-shrink:0;display:flex;gap:28px;padding:6px 2px">
+              <div style="display:flex;align-items:baseline;gap:8px">
+                <span style="font-size:11px;color:var(--text3)">{{ t('d.music_arousal') }}</span>
+                <span style="font-size:26px;font-weight:700;color:#6c8cff">{{ analysis.summary.arousal }}</span>
+              </div>
+              <div style="display:flex;align-items:baseline;gap:8px">
+                <span style="font-size:11px;color:var(--text3)">{{ t('d.music_valence') }}</span>
+                <span style="font-size:26px;font-weight:700;color:#ffb74d">{{ analysis.summary.valence }}</span>
+              </div>
+            </div>
+            <!-- 大波形（arousal 着色） -->
+            <div class="waveform-wrap music-wave" ref="waveformWrap" @click="onWaveformClick" style="flex:1;min-height:120px;max-height:220px;cursor:pointer">
+              <canvas ref="wfCanvas" style="width:100%;height:100%"></canvas>
+            </div>
+            <!-- 精简控制条 -->
+            <div class="wb-controls music-controls" style="position:static;flex-shrink:0">
+              <q-btn flat round dense :icon="musicPlaying ? 'pause' : 'play_arrow'" size="sm" color="white" @click="toggleMusicPlay"></q-btn>
+              <span class="wb-ctrl-time">{{ fmtDetailTime(musicTime) }} / {{ fmtDetailTime(media.duration || 0) }}</span>
+              <div class="wb-seekbar" style="flex:1">
+                <div v-for="(seg,i) in (analysis.segments||[])" :key="'ms'+i" class="wb-seg-mark"
+                     :style="{ left: segLeftPct(seg), width: segWidthPct(seg), background: musicSegColor(seg), opacity: activeSeg===i ? 0.85 : 0.4 }"
+                     @mouseenter="detailHoverSeg=i" @mouseleave="detailHoverSeg=-1">
+                  <q-tooltip v-if="detailHoverSeg===i" :delay="0">
+                    <div style="font-size:11px;line-height:1.7">
+                      <div>{{ seg.time_start }} → {{ seg.time_end }}</div>
+                      <div v-for="it in seg.mood" :key="it.label">{{ taxZh(it.label) }} {{ it.weight }}%</div>
+                      <div>{{ t('d.music_arousal') }} {{ seg.arousal }} · {{ t('d.music_valence') }} {{ seg.valence }}</div>
+                      <div v-if="seg.watermark==='Present'" style="color:#ffb74d">{{ t('d.music_watermark') }}</div>
+                    </div>
+                  </q-tooltip>
+                </div>
+                <div class="wb-seek-progress" :style="{width: ((media.duration ? musicTime/media.duration*100 : 0)) + '%'}"></div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="detail-sidebar">
         <!-- Analysis section -->
         <div v-if="analysis.status==='done' && analysis.segments?.length" style="border-top:1px solid var(--border);display:flex;flex-direction:column;flex:1;min-height:0">
           <div style="padding:10px 14px;font-size:12px;font-weight:600;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0">
             <span v-if="media?.media_type==='video'" style="color:var(--accent)">◎ {{ t('d.seg_count', {n: analysis.segments.length}) }}</span>
+            <span v-else-if="media?.media_type==='audio'" style="color:var(--accent)">♫ {{ t('d.music_summary_title') }}</span>
             <div style="flex:1"></div>
             <q-btn flat dense icon="delete_outline" :label="t('d.clear_analysis')" color="grey-6" size="sm" :disable="analyzing" @click="showClearDialog=true" style="font-size:11px"></q-btn>
             <q-btn dense icon="auto_awesome" :label="t('d.reanalyze')" color="primary" size="sm" :disable="analyzing" @click="openAnalysisConfirm" style="font-size:11px;border-radius:4px;padding-left:12px;padding-right:12px"></q-btn>
+          </div>
+          <!-- 音乐全曲汇总 -->
+          <div v-if="media?.media_type==='audio' && analysis.summary" style="padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0;max-height:46%;overflow-y:auto">
+            <div v-if="analysis.summary.watermark==='Present'" style="display:flex;gap:6px;align-items:flex-start;padding:6px 10px;border-radius:6px;background:rgba(255,179,0,0.12);font-size:11px;color:#ffb74d;margin-bottom:8px">
+              <span class="material-icons" style="font-size:14px">branding_watermark</span>
+              <span><b>{{ t('d.music_watermark') }}</b> — {{ analysis.summary.watermark_text }}</span>
+            </div>
+            <div v-for="dim in ['mood','genre','instrument','theme']" :key="dim" style="margin-bottom:8px">
+              <div style="font-size:10px;color:var(--text3);margin-bottom:3px">{{ t('d.music_dim_' + dim) }}</div>
+              <div style="display:flex;flex-wrap:wrap;gap:4px">
+                <span v-for="it in (analysis.summary[dim]||[])" :key="dim + it.label" class="mood-chip">{{ taxZh(it.label) }} <b style="opacity:0.7">{{ it.weight }}%</b></span>
+              </div>
+            </div>
+            <div style="display:flex;gap:14px;font-size:11px;color:var(--text2);flex-wrap:wrap">
+              <span>{{ t('d.music_vocals') }}: <b>{{ taxZh(analysis.summary.vocals || 'Instrumental') }}</b><template v-if="analysis.summary.vocals_language"> · {{ taxZh(analysis.summary.vocals_language) }}</template></span>
+              <span>{{ t('d.music_arousal') }}: <b>{{ analysis.summary.arousal }}</b></span>
+              <span>{{ t('d.music_valence') }}: <b>{{ analysis.summary.valence }}</b></span>
+            </div>
           </div>
           <q-scroll-area ref="segScroll" style="flex:1">
             <div v-for="(seg,i) in analysis.segments" :key="i" class="segment" :class="{active: activeSeg===i}" @click="seekTo(seg.time_start)">
@@ -184,8 +274,23 @@ const DetailPage = {
                   <span class="seg-dur">{{ fmtSegDur(seg.time_start, seg.time_end) }}</span>
                   <q-btn flat round dense icon="delete_outline" size="xs" color="grey-6" class="seg-del-btn" @click.stop="confirmDeleteSeg(seg, i)"><q-tooltip :delay="800">{{ t('d.delete_seg') }}</q-tooltip></q-btn>
                 </div></template>
+                <template v-else-if="media?.media_type==='audio'"><span class="seg-time">{{ seg.time_start }} → {{ seg.time_end }}</span>
+                <span class="seg-dur">{{ fmtSegDur(seg.time_start, seg.time_end) }}</span></template>
               </div>
-              <div class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'visual', e.target.innerText)" v-text="seg.visual"></div>
+              <!-- 音乐段主体 -->
+              <div v-if="media?.media_type==='audio'" style="display:flex;flex-direction:column;gap:5px">
+                <div style="display:flex;flex-wrap:wrap;gap:3px">
+                  <span v-for="it in seg.mood" :key="'m'+i+it.label" class="mood-chip">{{ taxZh(it.label) }} {{ it.weight }}%</span>
+                  <span v-for="it in seg.instrument" :key="'i'+i+it.label" class="mood-chip" style="color:var(--text2);background:var(--surface2)">{{ taxZh(it.label) }}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;font-size:10px;color:var(--text3)">
+                  <span :style="{color:'#6c8cff'}">{{ t('d.music_arousal') }} {{ seg.arousal }}</span>
+                  <span :style="{color:'#ffb74d'}">{{ t('d.music_valence') }} {{ seg.valence }}</span>
+                  <span v-if="seg.vocals && seg.vocals !== 'Instrumental'">{{ taxZh(seg.vocals) }}<template v-if="seg.vocals_language"> · {{ taxZh(seg.vocals_language) }}</template></span>
+                  <span v-if="seg.watermark==='Present'" style="color:#ffb74d;display:inline-flex;align-items:center;gap:2px"><span class="material-icons" style="font-size:11px">branding_watermark</span>{{ t('d.music_watermark') }}</span>
+                </div>
+              </div>
+              <div v-else class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'visual', e.target.innerText)" v-text="seg.visual"></div>
               <div v-if="seg.asr && seg.asr!=='无'" class="seg-text-line seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'asr', e.target.innerText)"><span class="prefix">{{ t('d.dialog_asr') }}</span><span v-text="seg.asr"></span></div>
               <div v-if="seg.subtitle && seg.subtitle!=='无'" class="seg-text-line seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'subtitle', e.target.innerText)"><span class="prefix">{{ t('d.dialog_subtitle') }}</span><span v-text="seg.subtitle"></span></div>
               <div v-if="dimRowCam(seg)" class="dim-row">
@@ -200,9 +305,11 @@ const DetailPage = {
                 <span style="font-size:12px">🎨</span>
                 <template v-for="f in styleFields" :key="f.key"><span v-if="seg[f.key]" class="dim-pair"><span class="dim-label">{{ t('d.dim.' + f.key) }}</span><span class="dim-value seg-editable" :class="f.cls" contenteditable @click.stop @blur="e => saveSegField(seg, f.key, e.target.innerText.trim())" v-text="seg[f.key]"></span></span></template>
               </div>
+              <template v-if="media?.media_type!=='audio'">
               <seg-emotions :seg="seg"></seg-emotions>
               <div class="array-group"><span class="array-label icon-label"><span class="label-icon">🌈</span>{{ t('d.colors') }}</span><div class="array-pills"><span v-for="c in (seg.dominant_colors||[])" :key="c" class="pill color seg-editable-tag" @click.stop="removeTag(seg, 'dominant_colors', c)">{{ c }}<span style="margin-left:2px;opacity:0.5">×</span></span><input class="tag-add-input" placeholder="+" @click.stop @keydown.enter.stop.prevent="e => { addTag(seg, 'dominant_colors', e.target); e.target.value='' }" /></div></div>
               <div class="array-group"><span class="array-label icon-label"><span class="label-icon">🏷️</span>{{ t('d.subjects') }}</span><div class="array-pills"><span v-for="s in (seg.main_subjects||[])" :key="s" class="pill subject seg-editable-tag" @click.stop="removeTag(seg, 'main_subjects', s)">{{ s }}<span style="margin-left:2px;opacity:0.5">×</span></span><input class="tag-add-input" placeholder="+" @click.stop @keydown.enter.stop.prevent="e => { addTag(seg, 'main_subjects', e.target); e.target.value='' }" /></div></div>
+              </template>
             </div>
           </q-scroll-area>
         </div>
@@ -285,6 +392,10 @@ const DetailPage = {
               <span class="text-grey-6" style="width:80px">{{ t('d.frame_extract') }}</span>
               <span>{{ t('d.local_frame_params', {fps: confirmInfo.localFps, res: confirmInfo.localRes, max: confirmInfo.localMaxFrames}) }}</span>
             </div>
+            <div v-if="media?.media_type==='audio'" class="row items-center">
+              <span class="text-grey-6" style="width:80px">{{ t('d.music_whole') }}</span>
+              <span>{{ t('d.music_whole_desc') }}</span>
+            </div>
             <div class="row items-center">
               <span class="text-grey-6" style="width:80px">{{ t('d.model') }}</span>
               <span>{{ confirmInfo.modelLabel }}</span>
@@ -354,6 +465,8 @@ const DetailPage = {
       detailDuration: 0,
       detailHoverTime: -1,
       detailHoverSeg: -1,
+      musicTime: 0,
+      musicPlaying: false,
     };
   },
   computed: {
@@ -404,6 +517,10 @@ const DetailPage = {
       location.hash = "#/gallery";
       return;
     }
+    // 音乐：初始化波形与 AV 曲线（canvas 需 DOM 就绪）
+    if (this.media?.media_type === "audio") {
+      this.$nextTick(() => { this.loadWaveform(); this.resizeAvCanvas(); this.drawAvChart(); });
+    }
     try {
       const res = await API.getAnalysis(id);
       if (res.status === "processing") res.status = "none";
@@ -423,6 +540,10 @@ const DetailPage = {
       this._localMerged = this._videoStageKind === "local" && bgTask.asrMode === "merged";
       this.analysisStages = isImage ? [
         { key: "analyze", label: t('d.img_analysis'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.analyzing'), doneText: t('d.analysis_done_short') },
+      ] : this.media?.media_type === "audio" ? [
+        { key: "engine", label: t('d.local_engine_stage'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.engine_starting'), doneText: t('d.engine_ready') },
+        { key: "analyze", label: t('d.music_seg_analysis'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.analyzing'), doneText: t('d.analysis_done_short') },
+        { key: "merge", label: t('d.merge_save'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.merging'), doneText: t('d.saved') },
       ] : this._videoStageKind === "local" ? (this._localMerged ? [
         { key: "engine", label: t('d.local_engine_stage'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.engine_starting'), doneText: t('d.engine_ready') },
         { key: "extract", label: t('d.frame_extract'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.extracting'), doneText: t('d.extract_done_short') },
@@ -456,6 +577,10 @@ const DetailPage = {
               this.analyzing = false;
               this._stopAnalyzeTips();
               this._stopAllStepTimers();
+              if (this.media?.media_type === "audio") {
+                this._colSeg = null;
+                this.$nextTick(() => { this.resizeAvCanvas(); this.drawAvChart(); this.drawWaveform(); });
+              }
             }).catch(() => { this.analyzing = false; });
           } else {
             this.analyzing = false;
@@ -503,9 +628,11 @@ const DetailPage = {
       const step = task.step || "";
       const stages = this.analysisStages;
       const isImage = stages.length === 1 && stages[0].key === "analyze";
-      // Map SSE step names to stage index (images only have stage 0; local video has no compress/encode)
+      // Map SSE step names to stage index (images only stage 0; music 3 steps; local video no compress/encode)
       const stepMap = isImage
         ? { queued: -1, compressing: -1, compressed: -1, analyzing: 0, analyze_done: 0 }
+        : this.media?.media_type === "audio"
+        ? { queued: -1, engine_starting: 0, engine_ready: 0, analyzing: 1, analyze_done: 1, merging: 2 }
         : this._videoStageKind === "local"
         ? (this._localMerged
            ? { queued: -1, engine_starting: 0, engine_ready: 0, extracting: 1, extract_done: 1, analyzing: 2, analyze_done: 2, merging: 3 }
@@ -757,9 +884,14 @@ const DetailPage = {
       try {
         const s = await API.getSettings();
         const modelLabels = { "glm-4v-plus": "智谱 GLM-4V-Plus", "glm-4.6v": "智谱 GLM-4.6V", "glm-4.6v-flash": "智谱 GLM-4.6V-Flash", "glm-4.6v-flashx": "智谱 GLM-4.6V-FlashX", "glm-4.5v": "智谱 GLM-4.5V" };
-        const engine = (this.media?.media_type === "image" ? s.image_engine : s.video_engine) || "cloud";
+        const mt = this.media?.media_type;
+        const engine = (mt === "image" ? s.image_engine : mt === "audio" ? s.music_engine : s.video_engine) || (mt === "audio" ? "local" : "cloud");
         this.confirmInfo.engine = engine;
-        if (engine === "local") {
+        if (mt === "audio") {
+          this.confirmInfo.modelLabel = s.music_model || "qwen3-omni-30b-a3b";
+          this.confirmInfo.useMultimodal = false;
+          this.confirmInfo.mergedAsr = false;
+        } else if (engine === "local") {
           // 本地引擎：显示本地模型与抽帧参数；音频方式 = 音视频一起（需模型支持音频输入）或 Whisper 独立转写
           this.confirmInfo.modelLabel = s.local_model || "qwen3-vl-8b";
           this.confirmInfo.useMultimodal = false;
@@ -989,7 +1121,8 @@ const DetailPage = {
       let localMerged = false;
       try {
         const s = await API.getSettings();
-        engine = (this.media?.media_type === "image" ? s.image_engine : s.video_engine) || "cloud";
+        const mt = this.media?.media_type;
+        engine = (mt === "image" ? s.image_engine : mt === "audio" ? s.music_engine : s.video_engine) || (mt === "audio" ? "local" : "cloud");
         // 本地引擎帧无音频 → 默认独立 ASR；模型支持音频输入时可「音视频一起」（与后端一致）
         localMerged = engine === "local" && await this._localModelAudio(s.local_model) && s.local_asr_mode === "merged";
         this.confirmInfo.useMultimodal = engine === "local" ? false : s.use_multimodal !== "false";
@@ -1005,6 +1138,10 @@ const DetailPage = {
       this._localMerged = this._videoStageKind === "local" && localMerged;
       this.analysisStages = isImage ? [
         { key: "analyze", label: t('d.img_analysis'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.analyzing'), doneText: t('d.analysis_done_short') },
+      ] : this.media?.media_type === "audio" ? [
+        { key: "engine", label: t('d.local_engine_stage'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.engine_starting'), doneText: t('d.engine_ready') },
+        { key: "analyze", label: t('d.music_seg_analysis'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.analyzing'), doneText: t('d.analysis_done_short') },
+        { key: "merge", label: t('d.merge_save'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.merging'), doneText: t('d.saved') },
       ] : this._videoStageKind === "local" ? (this._localMerged ? [
         { key: "engine", label: t('d.local_engine_stage'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.engine_starting'), doneText: t('d.engine_ready') },
         { key: "extract", label: t('d.frame_extract'), status: "pending", progress: 0, duration: null, t0: null, statusText: t('d.waiting'), activeText: t('d.extracting'), doneText: t('d.extract_done_short') },
@@ -1217,6 +1354,10 @@ const DetailPage = {
                   self.analysis = { status: "done", segments: [] };
                 }
                 self.analyzing = false;
+                if (self.media?.media_type === "audio") {
+                  self._colSeg = null;
+                  self.$nextTick(() => { self.resizeAvCanvas(); self.drawAvChart(); self.drawWaveform(); });
+                }
                 if (evt.tokens) {
                   const fmt = v => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v;
                   Quasar.Dialog.create({
@@ -1284,6 +1425,7 @@ const DetailPage = {
       player.play().catch(() => {});
     },
     toggleDetailPlay() {
+      if (this.media?.media_type === "audio") { this.toggleMusicPlay(); return; }
       const p = this.$refs.player;
       if (!p) return;
       p.paused ? p.play().catch(() => {}) : p.pause();
@@ -1398,8 +1540,12 @@ const DetailPage = {
         scroll.setScrollPosition("vertical", Math.max(0, scrollTo), 200);
       });
     },
+    waveformPlayer() {
+      // 视频/音乐共用波形绘制：按 media_type 取对应播放器 ref
+      return this.media?.media_type === 'audio' ? this.$refs.audioPlayer : this.$refs.player;
+    },
     async loadWaveform() {
-      const player = this.$refs.player;
+      const player = this.waveformPlayer();
       const canvas = this.$refs.wfCanvas;
       if (!player || !canvas) return;
       try {
@@ -1423,6 +1569,7 @@ const DetailPage = {
           }
           this._wfPeaks.push(max);
         }
+        this._colSeg = null;  // 波形柱→音乐分段映射缓存失效
         this.resizeWaveformCanvas();
         this.drawWaveform();
       } catch (e) { this._wfPeaks = null; }
@@ -1438,9 +1585,33 @@ const DetailPage = {
       const ctx = canvas.getContext('2d');
       ctx.scale(dpr, dpr);
     },
+    musicSegColor(seg) {
+      // arousal 0→1 映射 蓝→红（与分段色块/波形联动）
+      if (!seg || seg.arousal == null) return 'rgba(108,140,255,0.45)';
+      const t = Math.max(0, Math.min(1, seg.arousal));
+      const r = Math.round(77 + t * (255 - 77)), g = Math.round(124 + t * (82 - 124)), b = Math.round(255 + t * (82 - 255));
+      return `rgba(${r},${g},${b},0.9)`;
+    },
+    _segAtFrac(frac) {
+      // 波形柱(0..1)→所属音乐分段（缓存逐柱映射）
+      const segs = this.analysis?.segments;
+      if (!segs?.length || !this._wfDuration) return null;
+      if (!this._colSeg || this._colSeg.length !== (this._wfPeaks?.length || 0)) {
+        this._colSeg = (this._wfPeaks || []).map((_, i) => {
+          const t = (i / this._wfPeaks.length) * this._wfDuration;
+          const ts = this.parseTime(segs[0].time_start);
+          for (const s of segs) {
+            if (t >= this.parseTime(s.time_start) && t < this.parseTime(s.time_end)) return s;
+          }
+          return ts != null && t < ts ? segs[0] : segs[segs.length - 1];
+        });
+      }
+      const i = Math.min(this._colSeg.length - 1, Math.max(0, Math.floor(frac * this._colSeg.length)));
+      return this._colSeg[i];
+    },
     drawWaveform() {
       const canvas = this.$refs.wfCanvas;
-      const player = this.$refs.player;
+      const player = this.waveformPlayer();
       if (!canvas || !player || !this._wfPeaks) return;
       const wrap = this.$refs.waveformWrap;
       const rect = wrap.getBoundingClientRect();
@@ -1453,9 +1624,19 @@ const DetailPage = {
       const mid = h / 2;
       const time = player.currentTime;
       const played = (time / this._wfDuration) * w;
+      const isMusic = this.media?.media_type === 'audio';
+      const border2 = getComputedStyle(document.documentElement).getPropertyValue('--border2').trim();
       for (let i = 0; i < this._wfPeaks.length; i++) {
         const barH = Math.max(1, this._wfPeaks[i] * mid * 0.85);
-        ctx.fillStyle = i < played ? 'rgba(108,140,255,0.5)' : getComputedStyle(document.documentElement).getPropertyValue('--border2').trim();
+        if (isMusic) {
+          // 音乐：按所属分段的 arousal 着色，播放侧加深
+          const seg = this._segAtFrac(i / this._wfPeaks.length);
+          ctx.globalAlpha = i < played ? 0.95 : 0.45;
+          ctx.fillStyle = this.musicSegColor(seg);
+          ctx.globalAlpha = 1;
+        } else {
+          ctx.fillStyle = i < played ? 'rgba(108,140,255,0.5)' : border2;
+        }
         ctx.fillRect(i, mid - barH, 1, barH * 2);
       }
       const x = (time / this._wfDuration) * w;
@@ -1466,8 +1647,10 @@ const DetailPage = {
     startWaveformAnim() {
       if (this._wfAnimFrame) return;
       const loop = () => {
-        if (this.$refs.player?.paused) { this._wfAnimFrame = null; return; }
+        const p = this.waveformPlayer();
+        if (!p || p.paused) { this._wfAnimFrame = null; return; }
         this.drawWaveform();
+        if (this.media?.media_type === 'audio') this.drawAvChart();
         this._wfAnimFrame = requestAnimationFrame(loop);
       };
       this._wfAnimFrame = requestAnimationFrame(loop);
@@ -1476,12 +1659,117 @@ const DetailPage = {
       if (this._wfAnimFrame) { cancelAnimationFrame(this._wfAnimFrame); this._wfAnimFrame = null; }
     },
     onWaveformClick(e) {
-      const player = this.$refs.player;
+      const player = this.waveformPlayer();
       if (!player || !this._wfPeaks || !this._wfDuration) return;
       const rect = this.$refs.waveformWrap.getBoundingClientRect();
       const ratio = (e.clientX - rect.left) / rect.width;
       player.currentTime = ratio * this._wfDuration;
       this.drawWaveform();
+    },
+    // -- Music playback & arousal/valence chart --
+    toggleMusicPlay() {
+      const p = this.$refs.audioPlayer;
+      if (!p) return;
+      if (p.paused) { p.play(); this.musicPlaying = true; this.startWaveformAnim(); }
+      else { p.pause(); this.musicPlaying = false; this.stopWaveformAnim(); }
+    },
+    seekMusic(t) {
+      const p = this.$refs.audioPlayer;
+      if (!p) return;
+      p.currentTime = Math.max(0, Math.min(t, p.duration || t));
+      this.drawWaveform(); this.drawAvChart();
+    },
+    onMusicTimeUpdate() {
+      const p = this.$refs.audioPlayer;
+      if (p) this.musicTime = p.currentTime;
+      this.updateActiveSeg();
+    },
+    onMusicEnded() {
+      this.musicPlaying = false;
+      this.stopWaveformAnim();
+      this.drawWaveform(); this.drawAvChart();
+    },
+    onAvChartClick(e) {
+      if (!this.media?.duration) return;
+      const rect = this.$refs.avChartWrap.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      this.seekMusic(ratio * this.media.duration);
+    },
+    resizeAvCanvas() {
+      const c = this.$refs.avCanvas, wrap = this.$refs.avChartWrap;
+      if (!c || !wrap) return;
+      const dpr = window.devicePixelRatio || 1;
+      const r = wrap.getBoundingClientRect();
+      c.width = Math.round(r.width * dpr);
+      c.height = Math.round(r.height * dpr);
+      const ctx = c.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    },
+    drawAvChart() {
+      const c = this.$refs.avCanvas, wrap = this.$refs.avChartWrap;
+      if (!c || !wrap) return;
+      const segs = this.analysis?.segments;
+      const ctx = c.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const r = wrap.getBoundingClientRect();
+      const w = r.width, h = r.height;
+      ctx.save();
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      if (!segs?.length || !this.media?.duration) { ctx.restore(); return; }
+      const dur = this.media.duration;
+      const pad = 6;
+      const x = t => (t / dur) * w;
+      const yA = v => h - pad - v * (h - pad * 2);            // arousal 0-1
+      const yV = v => h - pad - ((v + 1) / 2) * (h - pad * 2); // valence -1~+1
+      // 中线（valence=0 / arousal=0.5 参考）
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.setLineDash([3, 4]);
+      ctx.beginPath(); ctx.moveTo(0, yA(0.5)); ctx.lineTo(w, yA(0.5)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, yV(0)); ctx.lineTo(w, yV(0)); ctx.stroke();
+      ctx.setLineDash([]);
+      // 段边界浅竖线
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+      for (const s of segs) {
+        const ts = this.parseTime(s.time_start);
+        if (ts != null) { ctx.beginPath(); ctx.moveTo(x(ts), 0); ctx.lineTo(x(ts), h); ctx.stroke(); }
+      }
+      // 双折线（段中点取值）
+      const poly = (getter, ym, color) => {
+        ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.beginPath();
+        let first = true;
+        for (const s of segs) {
+          const t0 = this.parseTime(s.time_start), t1 = this.parseTime(s.time_end);
+          if (t0 == null || t1 == null) continue;
+          const mx = x((t0 + t1) / 2);
+          const v = getter(s);
+          if (v == null) continue;
+          if (first) { ctx.moveTo(mx, ym(v)); first = false; } else ctx.lineTo(mx, ym(v));
+        }
+        ctx.stroke();
+      };
+      poly(s => s.arousal, yA, '#6c8cff');
+      poly(s => s.valence, yV, '#ffb74d');
+      // 播放标线
+      const px = x(this.musicTime || 0);
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      ctx.fillRect(Math.round(px) - 1, 0, 2, h);
+      ctx.restore();
+    },
+    taxZh(en) {
+      return this.$root.musicTaxZh?.[en] || en;
+    },
+    segLeftPct(seg) {
+      if (!this.media?.duration) return "0%";
+      return (this.parseTime(seg.time_start) / this.media.duration * 100) + "%";
+    },
+    segWidthPct(seg) {
+      if (!this.media?.duration) return "0%";
+      const w = (this.parseTime(seg.time_end) - this.parseTime(seg.time_start)) / this.media.duration * 100;
+      return Math.max(0.5, w) + "%";
+    },
+    onMusicLoaded() {
+      this.$nextTick(() => { this.resizeAvCanvas(); this.drawAvChart(); });
     },
     // -- Video scopes --
     initScopes() {

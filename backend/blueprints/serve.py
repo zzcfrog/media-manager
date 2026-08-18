@@ -21,10 +21,17 @@ MIME_MAP = {
     ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
     ".heic": "image/heic", ".webp": "image/webp", ".bmp": "image/bmp",
     ".tiff": "image/tiff",
+    ".mp3": "audio/mpeg", ".m4a": "audio/mp4", ".wav": "audio/wav",
+    ".flac": "audio/flac", ".ogg": "audio/ogg", ".oga": "audio/ogg",
+    ".aac": "audio/aac", ".wma": "audio/x-ms-wma", ".aiff": "audio/aiff", ".aif": "audio/aiff",
 }
 
 # Extensions that browsers can play natively (MP4 H.264, WebM, MOV)
 _BROWSER_NATIVE_EXTS = {".mp4", ".m4v", ".webm", ".mov"}
+
+# 浏览器（Electron/Chromium）原生可播的音频：直接 send_file 支持 Range（可拖动进度条）。
+# .mp4 = 纯音轨的 mp4（此路由仅 media_type=audio 走到，容器即 AAC，无需转码）
+_AUDIO_NATIVE_EXTS = {".mp3", ".m4a", ".wav", ".flac", ".ogg", ".oga", ".aac", ".mp4"}
 
 
 def _media_or_404(media_id):
@@ -72,6 +79,39 @@ def _transcode_to_mp4(path):
         "-c:a", "aac", "-movflags", "frag_keyframe+empty_moov",
         "-f", "mp4", "-",
     ]
+    return _stream_ffmpeg(cmd, "video/mp4")
+
+
+@bp.route("/media/audio/<int:media_id>")
+def serve_audio(media_id):
+    row = _media_or_404(media_id)
+    path = Path(row["file_path"])
+    if not path.exists():
+        from flask import abort
+        abort(404)
+
+    ext = path.suffix.lower()
+    # 原生可播（Electron/Chromium）：Range 支持 = 可拖动进度条
+    if ext in _AUDIO_NATIVE_EXTS:
+        mime = "audio/mp4" if ext in (".mp4", ".m4a") else MIME_MAP.get(ext, "audio/mpeg")
+        return send_file(path, mimetype=mime, conditional=True)
+
+    # wma/aiff：流式转码 AAC ADTS（不可 seek）
+    return _transcode_to_aac(path)
+
+
+def _transcode_to_aac(path):
+    if not shutil.which("ffmpeg"):
+        return send_file(path, mimetype="audio/mpeg", conditional=True)
+
+    cmd = [
+        "ffmpeg", "-i", str(path),
+        "-c:a", "aac", "-b:a", "192k", "-f", "adts", "-",
+    ]
+    return _stream_ffmpeg(cmd, "audio/aac")
+
+
+def _stream_ffmpeg(cmd, mimetype):
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 
     def generate():
@@ -85,7 +125,7 @@ def _transcode_to_mp4(path):
             proc.kill()
             proc.wait()
 
-    return Response(generate(), mimetype="video/mp4")
+    return Response(generate(), mimetype=mimetype)
 
 
 def _extract_raw_preview(path):

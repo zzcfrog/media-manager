@@ -1,0 +1,79 @@
+{
+  "_source": "Artlist.io 音乐筛选标签体系（SEO 分类页无障碍版本完整枚举，抓取于 2026-08-18）；中文为对照翻译",
+  "_usage": "音乐分析受控词表：让模型从以下标签中选取（而非自由发挥），保证输出可检索、可筛选、与商用配乐库语义对齐。en 为规范值（与 Artlist 对齐），zh 为界面显示用。**输出格式：mood/genre/instrument/video_theme 每个标签带权重（该维度内合计 100%），单选维度（energy/vocals/watermark）不带权重。场景描绘类自由文字经评估主观性过强，不采用（2026-08-18 决定）。**",
+  "_extensions": "带 \"ext\" 字段的条目为扩展集（非 Artlist 原生）：mood 扩展对照 AllMusic 情绪表 + 本库实测需求（悲壮/苍凉/怀旧/治愈/庄重——Artlist 21 情绪对中文纪录片配乐覆盖不足）；instrument 扩展为民乐通行分类（Artlist 仅 Ethnic 一档过粗，本库中式 BGM 占比高）；genre 扩展为通行中文分类。energy 与 vocals_language 为新增维度：Artlist 仅 BPM 数值与人声布尔，缺能量档与语言档，无法满足选曲筛选。",
+  "mood": [
+    {"en": "Uplifting", "zh": "振奋"}, {"en": "Epic", "zh": "史诗"}, {"en": "Powerful", "zh": "强劲"},
+    {"en": "Exciting", "zh": "激动"}, {"en": "Happy", "zh": "欢快"}, {"en": "Funny", "zh": "滑稽"},
+    {"en": "Carefree", "zh": "轻松自在"}, {"en": "Hopeful", "zh": "希望"}, {"en": "Love", "zh": "浪漫"},
+    {"en": "Playful", "zh": "俏皮"}, {"en": "Groovy", "zh": "律动"}, {"en": "Sexy", "zh": "性感"},
+    {"en": "Peaceful", "zh": "宁静"}, {"en": "Mysterious", "zh": "神秘"}, {"en": "Serious", "zh": "严肃"},
+    {"en": "Dramatic", "zh": "戏剧性"}, {"en": "Angry", "zh": "愤怒"}, {"en": "Tense", "zh": "紧张"},
+    {"en": "Sad", "zh": "悲伤"}, {"en": "Scary", "zh": "惊悚"}, {"en": "Dark", "zh": "阴郁"},
+    {"en": "Tragic-Heroic", "zh": "悲壮", "ext": "AllMusic 对照 + 实测需求"},
+    {"en": "Desolate", "zh": "苍凉", "ext": "实测需求（京味/不屈 原生无法落位）"},
+    {"en": "Nostalgic", "zh": "怀旧", "ext": "AllMusic 对照（Artlist 缺失）"},
+    {"en": "Healing", "zh": "治愈", "ext": "实测需求"},
+    {"en": "Solemn", "zh": "庄重", "ext": "实测需求"}
+  ],
+  "genre": [
+    {"en": "Acoustic", "zh": "原声"}, {"en": "Ambient", "zh": "氛围"}, {"en": "Blues", "zh": "布鲁斯"},
+    {"en": "Children", "zh": "儿童"}, {"en": "Cinematic", "zh": "影视配乐"}, {"en": "Classical", "zh": "古典"},
+    {"en": "Corporate", "zh": "企业"}, {"en": "Country", "zh": "乡村"}, {"en": "Electronic", "zh": "电子"},
+    {"en": "Fantasy", "zh": "奇幻"}, {"en": "Folk", "zh": "民谣"}, {"en": "Funk", "zh": "放克"},
+    {"en": "Hip Hop", "zh": "嘻哈"}, {"en": "Holiday", "zh": "节日"}, {"en": "Indie", "zh": "独立"},
+    {"en": "Jazz", "zh": "爵士"}, {"en": "Latin", "zh": "拉丁"}, {"en": "Lofi & Chill Beats", "zh": "Lo-fi 舒缓节拍"},
+    {"en": "Lounge", "zh": "沙发音乐"}, {"en": "Pop", "zh": "流行"}, {"en": "Reggae", "zh": "雷鬼"},
+    {"en": "Retro", "zh": "复古"}, {"en": "Rock", "zh": "摇滚"}, {"en": "Singer-Songwriter", "zh": "唱作人"},
+    {"en": "Soul & RnB", "zh": "灵魂与节奏布鲁斯"}, {"en": "World", "zh": "世界音乐"}, {"en": "Worship", "zh": "敬拜音乐"},
+    {"en": "Chinese Style", "zh": "中国风", "ext": "通行中文分类（原 World+Folk+Cinematic 交集过糊）"}
+  ],
+  "instrument": [
+    {"en": "Acoustic Drums", "zh": "架子鼓"}, {"en": "Acoustic Guitar", "zh": "木吉他"}, {"en": "Backing Vocals", "zh": "和声伴唱"},
+    {"en": "Bass", "zh": "贝斯"}, {"en": "Bells", "zh": "铃铛钟琴"}, {"en": "Brass", "zh": "铜管"},
+    {"en": "Claps & Snaps", "zh": "拍手与响指"}, {"en": "Electric Guitar", "zh": "电吉他"}, {"en": "Electronic Drums", "zh": "电子鼓"},
+    {"en": "Ethnic", "zh": "民族乐器"}, {"en": "Keys", "zh": "键盘"}, {"en": "Mandolin & Ukulele", "zh": "曼陀林与尤克里里"},
+    {"en": "Orchestra", "zh": "管弦乐"}, {"en": "Pads", "zh": "铺底音色"}, {"en": "Percussion", "zh": "打击乐"},
+    {"en": "Piano", "zh": "钢琴"}, {"en": "Special Wind Instruments", "zh": "特殊管乐器"}, {"en": "Strings", "zh": "弦乐"},
+    {"en": "Synth", "zh": "合成器"}, {"en": "Vocal", "zh": "人声"}, {"en": "Whistle", "zh": "口哨"},
+    {"en": "Woodwinds", "zh": "木管"},
+    {"en": "Guzheng", "zh": "古筝", "ext": "民乐扩展"},
+    {"en": "Erhu", "zh": "二胡", "ext": "民乐扩展"},
+    {"en": "Pipa", "zh": "琵琶", "ext": "民乐扩展"},
+    {"en": "Dizi", "zh": "笛", "ext": "民乐扩展"},
+    {"en": "Xiao", "zh": "箫", "ext": "民乐扩展"},
+    {"en": "Suona", "zh": "唢呐", "ext": "民乐扩展"},
+    {"en": "Yangqin", "zh": "扬琴", "ext": "民乐扩展"},
+    {"en": "Guqin", "zh": "古琴", "ext": "民乐扩展"},
+    {"en": "Morin Khuur", "zh": "马头琴", "ext": "民乐扩展"},
+    {"en": "Hulusi", "zh": "葫芦丝", "ext": "民乐扩展"}
+  ],
+  "video_theme": [
+    {"en": "Business", "zh": "商务"}, {"en": "Commercial", "zh": "广告"}, {"en": "Documentary", "zh": "纪录片"},
+    {"en": "Drone Shots", "zh": "航拍"}, {"en": "Education", "zh": "教育"}, {"en": "Fashion", "zh": "时尚"},
+    {"en": "Food", "zh": "美食"}, {"en": "Gaming", "zh": "游戏"}, {"en": "Industry", "zh": "工业"},
+    {"en": "Intros & Logos", "zh": "片头与标志"}, {"en": "Landscape", "zh": "风景"}, {"en": "Lifestyle", "zh": "生活方式"},
+    {"en": "Medical", "zh": "医疗"}, {"en": "Nature", "zh": "自然"}, {"en": "Party", "zh": "派对"},
+    {"en": "Road Trip", "zh": "公路旅行"}, {"en": "Science", "zh": "科学"}, {"en": "Slow Motion", "zh": "慢动作"},
+    {"en": "Sport & Fitness", "zh": "运动健身"}, {"en": "Technology", "zh": "科技"}, {"en": "Time-Lapse", "zh": "延时摄影"},
+    {"en": "Trailer", "zh": "预告片"}, {"en": "Travel", "zh": "旅行"}, {"en": "Urban", "zh": "都市"},
+    {"en": "Vlog", "zh": "生活记录"}, {"en": "Weddings", "zh": "婚礼"}, {"en": "Shorts", "zh": "短视频"},
+    {"en": "History", "zh": "历史人文", "ext": "本库需求（纪录片素材为主）"}
+  ],
+  "vocals": [
+    {"en": "Instrumental", "zh": "纯音乐"}, {"en": "Male", "zh": "男声"}, {"en": "Female", "zh": "女声"},
+    {"en": "Choir", "zh": "合唱"}, {"en": "Spoken Word", "zh": "念白"},
+    {"en": "Wordless Vocals", "zh": "无词吟唱", "ext": "vocalise/哼唱/吟诵式元音演唱（epic 常见的飙高音人声），无歌词 → vocals_language 必须留空"}
+  ],
+  "watermark": [
+    {"en": "None", "zh": "无"},
+    {"en": "Present", "zh": "有", "ext": "版权平台试听版语音水印（如 \"Artlist.io. Music licensing reimagined.\"），与音乐本体无关、周期性插入；判定 vocals 时必须排除水印人声，水印单独在此标记"}
+  ],
+  "arousal": {"en": "Arousal", "zh": "唤醒", "range": "0.0-1.0", "ext_note": "与视频侧 emotion_labels.py 的 Russell 骨架同尺度（0=极静 ~ 1=极动），由响度/节奏密度/配器厚度/速度决定。替代原 energy 维度（energy 低/中/高 由 arousal 自动派生：<0.33 低、<0.66 中、≥0.66 高）。建议按段输出（如每 30s 一点）形成全曲曲线再取均值/曲线，单一采样段不代表全曲动态"},
+  "valence": {"en": "Valence", "zh": "效价", "range": "-1.0-+1.0", "ext_note": "同 Russell 骨架（-1 消极阴郁 ~ +1 积极明朗，0 中性），由调式明暗/和声紧张度/旋律走向决定。已知难点：悲壮/崇高类曲目的效价存在主观分歧（被激励=正 vs 悲伤=负），该类标注容差应放宽；宏大史诗感 ≠ 积极"},
+  "vocals_language": [
+    {"en": "Chinese", "zh": "中文"}, {"en": "Cantonese", "zh": "粤语"}, {"en": "English", "zh": "英语"},
+    {"en": "Japanese", "zh": "日语"}, {"en": "Korean", "zh": "韩语"}, {"en": "Other", "zh": "其他"}
+  ],
+  "note": "另有数值维度不在受控词表内：BPM（数值，建议 DSP 估计——实测 LLM 听 BPM 不可靠）、Duration（数值）、Stems（布尔）。建议双轨输出：受控标签+权重（可检索筛选）与 arousal/valence 数值（与视频侧 Russell 骨架同尺度，为情绪曲线匹配服务）。**arousal/valence 应按段输出形成曲线（与视频 segments 同构），全曲单值会抹平动态。watermark 为独立维度：判定 vocals 前必须先识别并排除水印人声（平台广告语音），水印曲目标 watermark=有 并在 watermark_text 记录逐字转写（如 \"Artlist.io. Music licensing reimagined.\"，可据此识别来源平台与试听版身份）；watermark=有时建议对 vocals 做二次独立推理复核。**"
+}
