@@ -26,6 +26,11 @@ def _delete_media_records(db, ids: list[int], thumb_paths: list[str | None] = No
             thumb = THUMB_DIR / tp
             if thumb.exists():
                 thumb.unlink()
+        cov = db.execute("SELECT cover_art_path FROM media WHERE id = ?", (mid,)).fetchone()
+        if cov and cov["cover_art_path"]:
+            cp = THUMB_DIR / cov["cover_art_path"]
+            if cp.exists():
+                cp.unlink()
         db.execute("DELETE FROM media_tags WHERE media_id = ?", (mid,))
         db.execute("DELETE FROM media_segment WHERE media_id = ?", (mid,))
         db.execute("DELETE FROM music_segment WHERE media_id = ?", (mid,))
@@ -147,6 +152,12 @@ def _import_one(db, filepath: Path, force_update: bool = False) -> dict | None:
     if thumb:
         meta["thumbnail_path"] = thumb
 
+    cover = None
+    if media_type == "audio":
+        cover = _extract_cover_art(filepath)
+        if cover:
+            meta["cover_art_path"] = cover
+
     embedding = None
     if media_type == "image":
         try:
@@ -161,8 +172,9 @@ def _import_one(db, filepath: Path, force_update: bool = False) -> dict | None:
         "INSERT INTO media (file_path, file_name, media_type, file_size, file_mtime, duration, width, height, fps, "
         "video_codec, video_profile, bit_rate, audio_codec, audio_sample_rate, audio_channels, "
         "color_space, color_range, pix_fmt, camera_make, camera_model, lens_model, date_taken, thumbnail_path, "
+        "cover_art_path, "
         "has_xmp, picture_control, embedding, music_title, music_artist, music_album) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             str(filepath), filepath.name, media_type,
             stat.st_size, stat.st_mtime,
@@ -172,6 +184,7 @@ def _import_one(db, filepath: Path, force_update: bool = False) -> dict | None:
             meta.get("audio_channels"), meta.get("color_space"), meta.get("color_range"),
             meta.get("pix_fmt"), meta.get("camera_make"), meta.get("camera_model"),
             meta.get("lens_model"), meta.get("date_taken"), meta.get("thumbnail_path"),
+            meta.get("cover_art_path"),
             xmp_exists, meta.get("picture_control"), embedding,
             meta.get("music_title"), meta.get("music_artist"), meta.get("music_album"),
         ),
@@ -501,6 +514,62 @@ def _generate_thumbnail(filepath: Path, media_type: str) -> str | None:
             except Exception:
                 pass
 
+    return None
+
+
+def _extract_cover_art(filepath: Path) -> str | None:
+    """提取音频内嵌封面（ID3 APIC / M4A covr / FLAC PICTURE / OGG picture）到 THUMB_DIR。
+
+    返回文件名（如 uuid.jpg）；无封面/提取失败返回 None（前端回落波形图）。
+    主路径 ffmpeg（attached-pic 视频流，一步缩放转 JPEG），兜底 exiftool 原始字节 + PIL 缩放。
+    """
+    cover_name = f"{uuid.uuid4().hex}.jpg"
+    cover_path = THUMB_DIR / cover_name
+
+    # 主：ffmpeg 取第一个 attached-pic 流（无封面时退出码非 0，不会产生有效输出）
+    if shutil.which("ffmpeg"):
+        cmd = [
+            "ffmpeg", "-i", str(filepath),
+            "-an", "-map", "0:v:0",
+            "-frames:v", "1",
+            "-vf", "scale=320:-1",
+            "-y", str(cover_path),
+        ]
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT)
+            if result.returncode == 0 and cover_path.exists() and cover_path.stat().st_size > 100:
+                return cover_name
+        except Exception as e:
+            logger.warning("cover extract (ffmpeg) failed {}: {}", filepath.name, e)
+        if cover_path.exists():
+            cover_path.unlink(missing_ok=True)
+
+    # 兜底：exiftool 原始封面字节 + PIL 缩放（wma WM/Picture、ffmpeg 不认的格式）
+    if shutil.which("exiftool"):
+        try:
+            from PIL import Image, ImageOps
+            import io
+            for tag in ("Picture", "CoverArt", "PreviewImage"):
+                result = subprocess.run(
+                    ["exiftool", "-b", f"-{tag}", str(filepath)],
+                    capture_output=True, timeout=EXIFTOOL_TIMEOUT,
+                )
+                if result.returncode != 0 or len(result.stdout) <= 100:
+                    continue
+                img = Image.open(io.BytesIO(result.stdout))
+                img = ImageOps.exif_transpose(img)
+                if img.mode != "RGB":
+                    img = img.convert("RGB")
+                img.thumbnail((320, 320), Image.LANCZOS)
+                img.save(cover_path, "JPEG", quality=85)
+                if cover_path.exists():
+                    return cover_name
+                break
+        except Exception as e:
+            logger.warning("cover extract (exiftool) failed {}: {}", filepath.name, e)
+
+    if cover_path.exists():
+        cover_path.unlink(missing_ok=True)
     return None
 
 

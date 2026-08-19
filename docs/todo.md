@@ -1,5 +1,32 @@
 # TODO
 
+## 已完成：框架级高级筛选——按媒体类型自动展开的维度面板（2026-08-19）
+
+封面/波形切换升级为「高级筛选」框架：切换媒体类型自动展开面板，每类型一组维度，后端维度参数 + facets 端点支撑（[library.py](../backend/blueprints/library.py) + [gallery.js](../frontend/js/gallery.js)）。
+
+- **后端**：
+  - 桶阈值单点常量：`RES_BUCKETS_IMAGE`（S/M/L/XL，MP 半开区间）、`RES_BUCKETS_VIDEO`（480/720/1080/2160，height px）、`FPS_BUCKETS`（24/30/60/120，float，PAL 25/50 近似入 24/60）、`DUR_BUCKETS`（short/mid/long，秒）；`FPS_AS_FLOAT` SQL 表达式把 `"N/D"` 文本 fps 转 float，helpers `_parse_fps`/`_bucket_key`/`_bucket_pred`。
+  - `list_media` 新参数：图片 `res`/`aspect`/`camera_make`/`camera_model`/`date_from`/`date_to`；视频 `res`/`fps`/`dur`。`date_to` 用 `substr(date_taken,1,10) <= ?` 含整天，兼容 EXIF（空格分隔）与 mtime 回退（T 分隔）两种存储格式。复用共享 `where_clauses`/`params` → total/分页/`fields=id`（selectAll）自动继承。
+  - 新端点 `GET /api/library/facets?media_type=`：image → `camera_make`/`camera_model` DISTINCT（count DESC，cap 200）+ `date_min`/`date_max` + `res`/`aspect` 桶计数；video → `res`/`fps`/`dur` 桶计数；audio → 占位；非法 media_type → 400。
+- **前端**：gallery.js 声明式 spec（`ADVANCED_FILTER_SPEC` per media_type）+ `currentSpec` 驱动面板渲染；`_buildParams` 统一发射。audio = 封面/波形 toggle（displayOnly）+ 未来标签下拉扩展位（mood/genre/instrument，数据源 `music_summary` + `music_taxonomy.json`）；image = 分辨率档/相机品牌/相机型号/拍摄日期范围/宽高比；video = 分辨率档/帧率档/时长档。切换类型自动展开（`advPanelOpen`）；每维度带计数徽标（0 置灰）+ 激活后清除 ×（q-btn-toggle 无法点选取消）；facet 按类型缓存、下拉 >200 截断；`thumbMode` localStorage 持久化。
+- **验证**：后端 test_client 全过（桶边界/NULL 维度活跃筛选下被排除/`media_type=all` 忽略 res/date_to 含整天/两格式日期/facets 计数与下拉/非法 400）；前端 Playwright 全过（面板自动展开/各类型 dims/过滤/Footer 标签/清除 ×/重置/折叠保持到下次切换/selectAll 继承 dims/日期弹窗自动关+整日/刷新持久化）。真实库 9104 行不受影响。
+
+## 已完成：修复 import-one 对图片 500——embedding BLOB 序列化（2026-08-19）
+
+`POST /api/library/import-one` 导入**图片**时返回 500：`_import_one` 返回 `dict(row)` 含 `embedding` BLOB（bytes），`jsonify` 无法序列化（音频行 embedding 为 NULL 所以正常）。修复：路由内 `result.pop("embedding", None)` 后再 `jsonify`，与 `import-batch`/`sync-folder` 既有模式一致（[library.py](../backend/blueprints/library.py)）。验证：图片 import-one 200 且 embedding 已剥离；音频 import-one 回归通过（cover_art_path 正常返回）。
+
+## 已完成：音频封面提取 + 封面/波形切换（2026-08-19）
+
+音乐卡片从「只显示波形图」升级为「封面优先，无封面回落波形」。
+
+- **实测价值**：用户 BGM 库（`/Volumes/zack's disk/素材/BGM/`）364 个音频中 **86 个（24%）带真实嵌入封面**（ffmpeg `attached_pic` disposition 判定）。
+- **后端**：
+  - [db.py](../backend/db.py)：media 表新增 `cover_art_path TEXT` 列（_SCHEMA + _MIGRATIONS 双定义，新库/旧库/重建路径一致）。
+  - [services/importer.py](../backend/services/importer.py)：新增 `_extract_cover_art()`（ffmpeg 主路径 `-an -map 0:v:0 -frames:v 1 -vf scale=320:-1`，`returncode==0 AND 存在 AND size>100` 守卫防损坏图；exiftool `-Picture/-CoverArt/-PreviewImage` + PIL 兜底；失败清理半成品）。`_import_one` 音频导入接线；`_delete_media_records` 删除时清理封面文件防孤儿。
+  - [blueprints/serve.py](../backend/blueprints/serve.py)：新路由 `GET /media/cover/<id>`，镜像 `serve_thumbnail` 懒生成模式——历史音频首次访问自动回填落库。
+- **前端**：[js/gallery.js](../frontend/js/gallery.js) 筛选「音乐」时出现封面/波形切换按钮（复用 `.engine-toggle` 药丸样式），**默认封面**、`localStorage` 持久化；混排视图（全部/图片/视频）音频卡恒**封面优先**且切换隐藏；8 处卡片 `<img>` 接 `thumbSrc`/`onImgLoad`/`onThumbError` 有界回落链（封面→波形→no-thumb，Map 防死循环 + 防 Vue 还原 404 src）；封面不挂 `.portrait`（防 16:9 卡对正方形封面 contain 留黑边）。
+- **验证**：后端临时库 7 项全过（迁移/提取/无封面 None/兜底/路由 200·404/懒回填/删除清理）；前端 Playwright 7 场景全过（切换出现+默认封面 / 带封面卡 src=cover 无 portrait / 无封面卡回落波形 / 切换往返 / 刷新持久化 / 混排封面优先+切换隐藏 / 无错误循环）。真实库迁移 43 列 9104 行无损。
+
 ## 已完成：修复 ASR 一句话被拆进两个分镜——两级句子缝合（2026-08-16）
 
 **问题**：一句话没说完经常被拆成两个分片。根因不在 `_merge_asr`（它本就整句分配、不切文本），在上游：①whisper 在句中停顿处（换气/VAD）把一句话切成多段，两半各自按「重叠最大」落到不同分镜；②多模态模式下 GLM 按镜头转写，句子跨镜头时各写各的。

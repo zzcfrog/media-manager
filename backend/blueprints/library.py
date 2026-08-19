@@ -22,6 +22,57 @@ def _segment_query(q):
     return " AND ".join(words) if words else q
 
 
+# ── 高级筛选桶阈值。单一事实来源（后端），前端只认桶 key + 标签。
+# 半开区间 [lo, hi)；hi=None 表示无上限。ffprobe r_frame_rate 是 "N/D" 文本（如 30000/1001）。
+RES_BUCKETS_IMAGE = {"S": (0, 8), "M": (8, 24), "L": (24, 45), "XL": (45, None)}        # 兆像素 (w*h/1e6)
+RES_BUCKETS_VIDEO = {"480": (0, 720), "720": (720, 1080), "1080": (1080, 2160), "2160": (2160, None)}  # 高度 px
+# PAL 25/50fps 近似归入 24/60 桶（非精确匹配，可接受）
+FPS_BUCKETS = {"24": (23.0, 26.0), "30": (26.0, 33.0), "60": (48.0, 80.0), "120": (100.0, None)}
+DUR_BUCKETS = {"short": (0, 60), "mid": (60, 300), "long": (300, None)}                  # 秒
+
+# fps TEXT "N/D" → float 的 SQL 表达式；空/垃圾 → NULL（该行仅在其维度筛选活跃时被排除）
+FPS_AS_FLOAT = (
+    "CASE WHEN fps IS NULL OR trim(fps) = '' THEN NULL "
+    "WHEN instr(fps, '/') = 0 THEN CAST(fps AS REAL) "
+    "ELSE CAST(substr(fps, 1, instr(fps, '/') - 1) AS REAL) "
+    "    / CAST(substr(fps, instr(fps, '/') + 1) AS REAL) END"
+)
+
+
+def _parse_fps(s):
+    """把 ffprobe 'N/D' 或 'N' 的 fps 文本解析为 float；垃圾/除零返回 None。"""
+    if not s:
+        return None
+    s = s.strip()
+    try:
+        if "/" in s:
+            a, b = s.split("/", 1)
+            return float(a) / float(b) if float(b) else None
+        return float(s)
+    except ValueError:
+        return None
+
+
+def _bucket_key(buckets, value):
+    """把数值映射到其半开区间所属的桶 key；None/越界 → None。"""
+    if value is None:
+        return None
+    for key, (lo, hi) in buckets.items():
+        if value >= lo and (hi is None or value < hi):
+            return key
+    return None
+
+
+def _bucket_pred(expr, buckets, key):
+    """为桶 key 生成 (sql 谓词, 参数)；未知 key → (None, []) 跳过。"""
+    if key not in buckets:
+        return None, []
+    lo, hi = buckets[key]
+    if hi is None:
+        return f"({expr} >= ?)", [lo]
+    return f"({expr} >= ? AND {expr} < ?)", [lo, hi]
+
+
 bp = Blueprint("library", __name__)
 
 
@@ -40,6 +91,15 @@ def list_media():
     folder = request.args.get("folder")
     q = request.args.get("q", "").strip()
     exclude_ids = request.args.get("exclude_ids", "").strip()
+    # 高级筛选维度参数（按 media_type 解释，面板按类型作用域所以只会有一种活跃）
+    res_key = request.args.get("res")
+    aspect = request.args.get("aspect")
+    camera_make = (request.args.get("camera_make") or "").strip()
+    camera_model = (request.args.get("camera_model") or "").strip()
+    date_from = (request.args.get("date_from") or "").strip()
+    date_to = (request.args.get("date_to") or "").strip()
+    fps_key = request.args.get("fps")
+    dur_key = request.args.get("dur")
 
     allowed_sorts = {"imported_at", "date_taken", "rating", "file_name", "file_size", "duration", "resolution"}
     if sort not in allowed_sorts:
@@ -51,6 +111,49 @@ def list_media():
     if media_type and media_type != "all":
         where_clauses.append("media_type = ?")
         params.append(media_type)
+        if media_type == "image":
+            if res_key:
+                pred, ps = _bucket_pred("(width * height) / 1000000.0", RES_BUCKETS_IMAGE, res_key)
+                if pred:
+                    where_clauses.append(pred)
+                    params.extend(ps)
+            if aspect == "landscape":
+                where_clauses.append("(width IS NOT NULL AND height IS NOT NULL AND width > height)")
+            elif aspect == "portrait":
+                where_clauses.append("(width IS NOT NULL AND height IS NOT NULL AND width < height)")
+            elif aspect == "square":
+                where_clauses.append("(width IS NOT NULL AND height IS NOT NULL AND width = height)")
+            if camera_make:
+                where_clauses.append("camera_make = ?")
+                params.append(camera_make)
+            if camera_model:
+                where_clauses.append("camera_model = ?")
+                params.append(camera_model)
+            if date_from:
+                where_clauses.append("date_taken >= ?")
+                params.append(date_from)
+            if date_to:
+                # 按前 10 位日期比较，含整天；兼容 EXIF（"YYYY-MM-DD HH:MM:SS"）与
+                # mtime 回退（"YYYY-MM-DDTHH:MM:SS.ffffff"）两种存储格式。
+                where_clauses.append("substr(date_taken, 1, 10) <= ?")
+                params.append(date_to)
+        elif media_type == "video":
+            if res_key:
+                pred, ps = _bucket_pred("height", RES_BUCKETS_VIDEO, res_key)
+                if pred:
+                    where_clauses.append(pred)
+                    params.extend(ps)
+            if fps_key:
+                pred, ps = _bucket_pred(FPS_AS_FLOAT, FPS_BUCKETS, fps_key)
+                if pred:
+                    where_clauses.append(pred)
+                    params.extend(ps)
+            if dur_key:
+                pred, ps = _bucket_pred("duration", DUR_BUCKETS, dur_key)
+                if pred:
+                    where_clauses.append(pred)
+                    params.extend(ps)
+        # media_type == 'audio' 或 'all'：无维度筛选（面板不会出现这些 dim）
     if rating is not None:
         where_clauses.append("rating >= ?")
         params.append(rating)
@@ -119,6 +222,55 @@ def list_media():
             "pages": (total + per_page - 1) // per_page,
         },
     })
+
+
+@bp.route("/facets")
+def library_facets():
+    """高级筛选下拉选项 + 桶计数。作用域仅 media_type（P1 无交叉筛选）。"""
+    db = get_db()
+    mt = request.args.get("media_type", "")
+    if mt not in ("image", "video", "audio"):
+        return jsonify({"error": "media_type must be image|video|audio"}), 400
+    resp = {"media_type": mt}
+    if mt == "image":
+        resp["camera_make"] = [dict(r) for r in db.execute(
+            "SELECT camera_make AS value, COUNT(*) AS count FROM media "
+            "WHERE media_type='image' AND camera_make IS NOT NULL AND trim(camera_make) != '' "
+            "GROUP BY camera_make ORDER BY count DESC, value LIMIT 200").fetchall()]
+        resp["camera_model"] = [dict(r) for r in db.execute(
+            "SELECT camera_model AS value, COUNT(*) AS count FROM media "
+            "WHERE media_type='image' AND camera_model IS NOT NULL AND trim(camera_model) != '' "
+            "GROUP BY camera_model ORDER BY count DESC, value LIMIT 200").fetchall()]
+        row = db.execute(
+            "SELECT MIN(substr(date_taken,1,10)) AS dmin, MAX(substr(date_taken,1,10)) AS dmax "
+            "FROM media WHERE media_type='image' AND date_taken IS NOT NULL AND trim(date_taken) != ''").fetchone()
+        resp["date_min"], resp["date_max"] = row["dmin"], row["dmax"]
+        resp["res"] = {k: 0 for k in RES_BUCKETS_IMAGE}
+        resp["aspect"] = {"landscape": 0, "portrait": 0, "square": 0}
+        for r in db.execute("SELECT width, height FROM media WHERE media_type='image'").fetchall():
+            w, h = r["width"], r["height"]
+            if w and h:
+                k = _bucket_key(RES_BUCKETS_IMAGE, (w * h) / 1000000.0)
+                if k:
+                    resp["res"][k] += 1
+                resp["aspect"]["landscape" if w > h else "portrait" if w < h else "square"] += 1
+    elif mt == "video":
+        resp["res"] = {k: 0 for k in RES_BUCKETS_VIDEO}
+        resp["fps"] = {k: 0 for k in FPS_BUCKETS}
+        resp["dur"] = {k: 0 for k in DUR_BUCKETS}
+        for r in db.execute("SELECT height, fps, duration FROM media WHERE media_type='video'").fetchall():
+            k = _bucket_key(RES_BUCKETS_VIDEO, r["height"])
+            if k:
+                resp["res"][k] += 1
+            k = _bucket_key(FPS_BUCKETS, _parse_fps(r["fps"]))
+            if k:
+                resp["fps"][k] += 1
+            k = _bucket_key(DUR_BUCKETS, r["duration"])
+            if k:
+                resp["dur"][k] += 1
+    # audio：无 facet 维度（封面/波形是 displayOnly）。未来音乐标签下拉（mood/genre/instrument
+    # 来自 music_summary JSON）在此加键。
+    return jsonify(resp)
 
 
 @bp.route("/segment-stats", methods=["POST"])
@@ -270,6 +422,7 @@ def import_one():
         return jsonify({"error": "No path"}), 400
     result = import_single_file(file_path)
     if result:
+        result.pop("embedding", None)
         return jsonify({"data": result})
     return jsonify({"data": None})
 

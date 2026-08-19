@@ -393,6 +393,31 @@ body.body--dark .filter-bar .q-field__control { color: #eee !important; }
 body.body--dark .filter-bar .q-placeholder { color: #555 !important; }
 body.body--dark .filter-bar .q-field__append .q-icon { color: #666 !important; }
 .filter-bar .q-field__control-container { padding-top: 0 !important; }
+
+/* Advanced filter panel: auto-expands per media type, dims from ADVANCED_FILTER_SPEC */
+.adv-filter-panel { border-top: 1px solid var(--border); padding: 8px 14px 10px; background: var(--surface); flex-shrink: 0; }
+.adv-filter-head { display: flex; align-items: center; justify-content: space-between; }
+.adv-filter-title { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--text3); letter-spacing: 0.5px; }
+.adv-filter-dims { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; padding-top: 8px; }
+.adv-dim { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; }
+.adv-dim-label { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text3); white-space: nowrap; }
+.adv-dim.active .adv-dim-label { color: var(--accent); }
+.adv-dim-clear { margin-left: 2px; }
+.adv-date-range { display: inline-flex; align-items: center; gap: 4px; }
+.adv-date-range .q-input { width: 140px; }
+.adv-date-sep { font-size: 11px; color: var(--text3); }
+/* Panel field height mirrors .filter-bar rules (panel is outside .filter-bar) */
+.adv-filter-panel .q-field { font-size: 12px; }
+.adv-filter-panel .q-field__control { height: 28px !important; min-height: 28px !important; }
+.adv-filter-panel .q-field__marginal { height: 28px !important; }
+.adv-filter-panel .q-field__native,
+.adv-filter-panel .q-field__input { min-height: 28px !important; padding: 0 !important; line-height: 28px !important; }
+.adv-filter-panel .q-field__control-container { padding-top: 0 !important; }
+body.body--dark .adv-filter-panel .q-field__native,
+body.body--dark .adv-filter-panel .q-field__input,
+body.body--dark .adv-filter-panel .q-field__control { color: #eee !important; }
+body.body--dark .adv-filter-panel .q-placeholder { color: #555 !important; }
+body.body--dark .adv-filter-panel .q-field__append .q-icon { color: #666 !important; }
 /* Drawer styling */
 body.body--dark .q-drawer .q-item-label { font-size: 11px; font-weight: 700; color: #fff; letter-spacing: 0.5px; padding: 10px 16px 4px; text-transform: uppercase; }
 body.body--dark .q-drawer .q-item { font-size: 13px; color: #aaa; padding: 6px 12px 6px 16px; min-height: 32px; }

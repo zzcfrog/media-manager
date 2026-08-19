@@ -113,7 +113,7 @@ media (id, file_path UNIQUE, file_name, media_type, file_size, duration,
        audio_codec, audio_sample_rate, audio_channels,
        color_space, color_range, pix_fmt,
        camera_make, camera_model, lens_model, picture_control,
-       date_taken, thumbnail_path,
+       date_taken, thumbnail_path, cover_art_path,
        file_hash TEXT, phash TEXT, embedding BLOB, has_xmp,
        analysis_status, analysis_model, analysis_date,
        rating, color_label, favorite, notes,
@@ -187,7 +187,32 @@ project_tracks (id PK, project_id FK, version INT, position INT, track_type TEXT
 
 **`folder` 筛选参数**：在 `list_media` 中通过 `file_path LIKE '<folder>/%'` 实现，匹配目标文件夹及其所有子文件夹下的媒体。
 
-### 3.5 相似检测与排除 API
+### 3.5 高级筛选 API（维度参数 + facets）
+
+框架级「高级筛选」：切换媒体类型自动展开面板，每类型一组维度。前端只认桶 key + 标签 + facet 计数，**桶阈值在后端单点定义**（[library.py](../backend/blueprints/library.py) 模块常量）：
+
+```python
+RES_BUCKETS_IMAGE  = {"S":(0,8),  "M":(8,24),  "L":(24,45),  "XL":(45,None)}   # MP，半开区间
+RES_BUCKETS_VIDEO  = {"480":(0,720), "720":(720,1080), "1080":(1080,2160), "2160":(2160,None)}  # height px
+FPS_BUCKETS        = {"24":(23,26), "30":(26,33), "60":(48,80), "120":(100,None)}  # float，PAL 25/50 近似入 24/60
+DUR_BUCKETS        = {"short":(0,60), "mid":(60,300), "long":(300,None)}          # 秒
+FPS_AS_FLOAT       # SQL 表达式：把 "N/D" 文本 fps 转 float（NULL/空 → NULL），/0 除零在 _parse_fps 守卫
+```
+
+**`list_media` 新参数**（复用共享 `where_clauses`/`params` → total/分页/`fields=id` 自动继承，仅 `media_type != "all"` 分支生效）：
+- image：`res` → `_bucket_pred("(width*height)/1000000.0", RES_BUCKETS_IMAGE, res)`；`aspect` → landscape/portrait/square 的 w/h 比较；`camera_make`/`camera_model` 精确匹配；`date_from`/`date_to`。
+- video：`res` → `_bucket_pred("height", RES_BUCKETS_VIDEO)`；`fps` → `_bucket_pred(FPS_AS_FLOAT, FPS_BUCKETS)`；`dur` → `_bucket_pred("duration", DUR_BUCKETS)`。
+- audio / all：忽略（面板不出现这些 dim）。NULL 维度行仅在对应筛选活跃时被排除。
+
+**日期边界（真实 bug 修复沉淀）**：`date_taken` 存在两种存储格式——EXIF `"YYYY-MM-DD HH:MM:SS"` 与 mtime 回退 `"YYYY-MM-DDTHH:MM:SS.ffffff"`（isoformat）。`date_to` 用 **`substr(date_taken, 1, 10) <= ?`** 按前 10 位比较：既含整天，又天然兼容两种格式（若用 `<= 'YYYY-MM-DD 23:59:59'`，T-格式同一天行因 `'T' > ' '` 被错误排除）。
+
+**新端点 `GET /api/library/facets?media_type=image|video|audio`**（`list_media` 后、`/segment-stats` 前）：
+- image → `camera_make`/`camera_model`（`SELECT value, COUNT(*) ... GROUP BY ORDER BY count DESC, value LIMIT 200`）、`date_min`/`date_max`（`substr(date_taken,1,10)`）、`res`/`aspect` 桶计数（Python 全量扫 type 行，个人库规模可接受；桶计数含 0 值，UI 置灰）。
+- video → `res`/`fps`/`dur` 桶计数（Python 扫行，fps 用 `_parse_fps`）。
+- audio → `{"media_type":"audio"}` 占位（未来音乐标签下拉在此加键）。
+- 非法 media_type → 400。
+
+### 3.6 相似检测与排除 API
 
 | 路由 | 方法 | 说明 |
 |------|------|------|
@@ -203,7 +228,7 @@ project_tracks (id PK, project_id FK, version INT, position INT, track_type TEXT
 
 **`GET /<id>/similar` 实现**：获取源图片 embedding → 与所有图片计算余弦相似度 → 按阈值（near 0.96 / similar 0.90）筛选 → 排除已排除的 pair → HDBSCAN 聚类取源图片所在聚类 → 返回 `{ source, near, similar, cluster }`。
 
-### 3.6 分段编辑 API
+### 3.7 分段编辑 API
 
 | 路由 | 方法 | 说明 |
 |------|------|------|
@@ -241,6 +266,7 @@ import_single_file() × 5 并发（ThreadPoolExecutor）
     │   └── 图片额外检测：XMP 侧车文件是否存在
     ├── compute_embedding() — ResNet50 ONNX 特征向量（仅图片，2048 维 L2 归一化）
     ├── _generate_thumbnail() — ffmpeg 截帧 / exiftool 提取（RAW 内嵌缩略图），UUID 随机文件名
+    ├── _extract_cover_art() — 音频内嵌封面（仅 media_type=audio）：ffmpeg `-an -map 0:v:0 -frames:v 1 -vf scale=320:-1` 主路径，`returncode==0 AND 存在 AND size>100` 守卫；exiftool `-Picture/-CoverArt/-PreviewImage` + PIL `ImageOps.exif_transpose` 兜底；失败清理半成品返回 None；结果存 `cover_art_path` 列（THUMB_DIR 扁平结构）
     └── INSERT media + media_fts
 ```
 
@@ -255,6 +281,7 @@ import_single_file() × 5 并发（ThreadPoolExecutor）
     │   └── 图片额外检测：XMP 侧车文件是否存在
     ├── compute_embedding() — ResNet50 ONNX 特征向量（仅图片，2048 维 L2 归一化）
     ├── _generate_thumbnail() — ffmpeg 截帧 / exiftool 提取（RAW 内嵌缩略图），UUID 随机文件名
+    ├── _extract_cover_art() — 音频内嵌封面（仅 media_type=audio），同单条导入路径，结果存 `cover_art_path`
     └── INSERT media + media_fts
 ```
 
@@ -375,6 +402,7 @@ class AsrSegment:
 | 主题色统一 | 所有 UI 控件通过 CSS 变量 `--accent` / `--accent-dim` 跟随主题色。Quasar 组件通过 `style="--q-primary:var(--accent)"` 元素级覆盖。侧边栏选中使用 `.sidebar-active-item` 类 |
 | 50% 缩放紧凑模式 | `gridScale <= 0.5` 时添加 `.grid-compact` class，隐藏 `.media-card .info` |
 | 媒体类型筛选 | `q-btn-group` 包含独立 `q-btn`（带 `q-tooltip`），替代 `q-btn-toggle` |
+| 高级筛选面板 | 声明式 spec `ADVANCED_FILTER_SPEC`（audio/image/video 各一组维度）+ `currentSpec` 驱动模板渲染；`_buildParams` 遍历 spec 统一发射 `res/aspect/camera_make/camera_model/date_from/date_to/fps/dur`；切换类型 watcher 自动展开 + `_loadFacets` 按类型缓存 `GET /api/library/facets`；维度计数徽标（0 置灰）+ 清除 ×；displayOnly（音乐显示切换）只存不重载，`thumbMode` localStorage 持久化；q-date 必须 `mask="YYYY-MM-DD"`（否则字典序比较静默失效） |
 | 分段编辑 | `contenteditable` + `@blur` → `saveSegField()`（文本字段）；`×` 按钮 → `removeTag()`（标签字段） |
 | 键盘快捷键 | `document.addEventListener("keydown")` 全局监听，`created()` 注册 / `beforeUnmount()` 清理；`isContentEditable` 检测避免编辑冲突 |
 | 全屏看图 | 浏览器 Fullscreen API（`imgContainer.requestFullscreen()`），`fullscreenchange` 事件追踪状态；F 键切换，仅图片类型生效 |
@@ -570,6 +598,7 @@ hdbscan>=0.8.0      # HDBSCAN 聚类（图片相似检测）
 | `/media/video/<id>` | 原生格式（mp4/m4v/webm/mov）直接发送（支持 Range）；其他格式实时 ffmpeg 转码为 H.264 |
 | `/media/image/<id>` | JPG/PNG 等直接发送；RAW 用 rawpy 解码为 JPEG；HEIC/AVIF 用 pillow-heif 解码 |
 | `/media/thumbnail/<id>` | 从 DB 查 thumbnail_path，与 THUMB_DIR 拼接后发送；文件不存在时自动重新生成 |
+| `/media/cover/<id>` | 音频内嵌封面：非 audio → 404；查 cover_art_path 存在则发送；缺失且源文件在 → 懒提取 + UPDATE 落库（历史音频自动回填）后发送；否则 404 |
 
 ## 8. 图片相似检测
 

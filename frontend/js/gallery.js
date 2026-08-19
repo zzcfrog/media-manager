@@ -1,3 +1,72 @@
+// ---- 高级筛选框架：按媒体类型声明的维度 spec ----
+// 后端桶阈值是唯一事实源（backend/blueprints/library.py）；前端只认桶 key + 标签 + facet 计数。
+const ADV_FILTER_DEFAULTS = {
+  thumbMode: "cover", // 音乐显示：cover 封面 / waveform 波形（displayOnly，仅影响渲染）
+  res: "", aspect: "", camera_make: "", camera_model: "", date_from: "", date_to: "",
+  fps: "", dur: "",
+};
+const ADVANCED_FILTER_SPEC = {
+  audio: [
+    {
+      type: "toggle", displayOnly: true, param: "thumbMode", label: "g.adv_display", icon: "visibility",
+      options: [
+        { value: "cover", labelKey: "g.adv_cover" },
+        { value: "waveform", labelKey: "g.adv_waveform" },
+      ],
+    },
+    // 未来扩展位：mood / genre / instrument 下拉（数据源 music_summary + music_taxonomy.json）
+  ],
+  image: [
+    {
+      type: "segmented", param: "res", label: "g.adv_res", icon: "photo_size_select_actual",
+      facetKey: "res",
+      options: [
+        { value: "S", labelKey: "g.adv_res_s" }, { value: "M", labelKey: "g.adv_res_m" },
+        { value: "L", labelKey: "g.adv_res_l" }, { value: "XL", labelKey: "g.adv_res_xl" },
+      ],
+    },
+    { type: "dropdown", param: "camera_make", label: "g.adv_camera_make", icon: "photo_camera", facetKey: "camera_make" },
+    { type: "dropdown", param: "camera_model", label: "g.adv_camera_model", icon: "camera", facetKey: "camera_model" },
+    { type: "dateRange", param: "date_range", label: "g.adv_date_range", icon: "date_range" },
+    {
+      type: "segmented", param: "aspect", label: "g.adv_aspect", icon: "aspect_ratio",
+      facetKey: "aspect",
+      options: [
+        { value: "landscape", labelKey: "g.adv_aspect_landscape" },
+        { value: "portrait", labelKey: "g.adv_aspect_portrait" },
+        { value: "square", labelKey: "g.adv_aspect_square" },
+      ],
+    },
+  ],
+  video: [
+    {
+      type: "segmented", param: "res", label: "g.adv_res", icon: "photo_size_select_actual",
+      facetKey: "res",
+      options: [
+        { value: "480", labelKey: "g.adv_res_480" }, { value: "720", labelKey: "g.adv_res_720" },
+        { value: "1080", labelKey: "g.adv_res_1080" }, { value: "2160", labelKey: "g.adv_res_2160" },
+      ],
+    },
+    {
+      type: "segmented", param: "fps", label: "g.adv_fps", icon: "speed",
+      facetKey: "fps",
+      options: [
+        { value: "24", labelKey: "g.adv_fps_24" }, { value: "30", labelKey: "g.adv_fps_30" },
+        { value: "60", labelKey: "g.adv_fps_60" }, { value: "120", labelKey: "g.adv_fps_120" },
+      ],
+    },
+    {
+      type: "segmented", param: "dur", label: "g.adv_dur", icon: "schedule",
+      facetKey: "dur",
+      options: [
+        { value: "short", labelKey: "g.adv_dur_short" },
+        { value: "mid", labelKey: "g.adv_dur_mid" },
+        { value: "long", labelKey: "g.adv_dur_long" },
+      ],
+    },
+  ],
+};
+
 const GalleryPage = {
   template: `
   <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
@@ -86,6 +155,54 @@ const GalleryPage = {
         </q-btn>
       </q-btn-group>
     </div>
+    <!-- 高级筛选面板：按媒体类型自动展开，dim 由 ADVANCED_FILTER_SPEC 声明 -->
+    <div v-if="currentSpec.length" class="adv-filter-panel">
+      <div class="adv-filter-head">
+        <span class="adv-filter-title"><q-icon name="tune" size="15px"></q-icon>{{ t('g.adv_filter_panel') }}</span>
+        <q-btn flat round dense size="sm" :icon="advPanelOpen ? 'expand_less' : 'expand_more'" color="grey-6" @click="advPanelOpen = !advPanelOpen"></q-btn>
+      </div>
+      <div v-show="advPanelOpen" class="adv-filter-dims">
+        <div v-for="(dim, i) in currentSpec" :key="i" class="adv-dim" :class="{ active: advDimActive(dim) }">
+          <span class="adv-dim-label"><q-icon :name="dim.icon" size="14px"></q-icon>{{ t(dim.label) }}</span>
+          <q-btn-toggle v-if="dim.type === 'toggle' || dim.type === 'segmented'"
+                        :model-value="filters[dim.param] || ''"
+                        class="engine-toggle" no-caps unelevated dense
+                        :options="dimOptions(dim)"
+                        @update:model-value="setAdvDim(dim, $event)"></q-btn-toggle>
+          <q-select v-else-if="dim.type === 'dropdown'"
+                    :model-value="filters[dim.param] || ''"
+                    dense filled options-dense clearable emit-value map-options
+                    :options="facetOptions(dim)"
+                    :placeholder="t('g.adv_all')"
+                    style="min-width:180px"
+                    @update:model-value="setAdvDropdown(dim, $event)"></q-select>
+          <div v-else-if="dim.type === 'dateRange'" class="adv-date-range">
+            <q-input readonly :model-value="filters.date_from" dense filled :placeholder="t('g.adv_date_from')">
+              <template v-slot:append>
+                <q-icon name="event" class="cursor-pointer">
+                  <q-popup-proxy cover transition-show="scale" transition-hide="scale">
+                    <q-date :model-value="filters.date_from" mask="YYYY-MM-DD" dense @update:model-value="onAdvDate(dim, 'date_from', $event)"></q-date>
+                  </q-popup-proxy>
+                </q-icon>
+              </template>
+            </q-input>
+            <span class="adv-date-sep">~</span>
+            <q-input readonly :model-value="filters.date_to" dense filled :placeholder="t('g.adv_date_to')">
+              <template v-slot:append>
+                <q-icon name="event" class="cursor-pointer">
+                  <q-popup-proxy cover transition-show="scale" transition-hide="scale">
+                    <q-date :model-value="filters.date_to" mask="YYYY-MM-DD" dense @update:model-value="onAdvDate(dim, 'date_to', $event)"></q-date>
+                  </q-popup-proxy>
+                </q-icon>
+              </template>
+            </q-input>
+          </div>
+          <q-btn v-if="advDimActive(dim)" flat round dense size="xs" icon="close" color="grey-6" class="adv-dim-clear" @click="clearAdvDim(dim)">
+            <q-tooltip :delay="1000">{{ t('g.adv_clear') }}</q-tooltip>
+          </q-btn>
+        </div>
+      </div>
+    </div>
     <!-- Main gallery area with grid/list views and lasso selection -->
     <div ref="galleryPage" class="gallery-page" @mousedown="startLasso" @contextmenu.prevent>
       <!-- Grid view: grouped with timeline -->
@@ -105,7 +222,7 @@ const GalleryPage = {
               <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
               <div class="thumb-wrap">
-                <img class="thumb" :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
+                <img class="thumb" :src="thumbSrc(m)" :data-stage="thumbStage(m)" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
                 <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
                 <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
                 <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
@@ -141,7 +258,7 @@ const GalleryPage = {
           <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
           <div class="thumb-wrap">
-            <img class="thumb" :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
+            <img class="thumb" :src="thumbSrc(m)" :data-stage="thumbStage(m)" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
             <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
             <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
             <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
@@ -179,7 +296,7 @@ const GalleryPage = {
               <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
               <div class="masonry-img">
-                <img :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
+                <img :src="thumbSrc(m)" :data-stage="thumbStage(m)" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
                 <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
                 <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
                 <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
@@ -209,7 +326,7 @@ const GalleryPage = {
           <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
           <div class="masonry-img">
-            <img :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
+            <img :src="thumbSrc(m)" :data-stage="thumbStage(m)" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
             <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
             <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
             <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
@@ -240,7 +357,7 @@ const GalleryPage = {
                    @contextmenu.prevent="showCtx($event, m)">
                 <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
-                <img :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
+                <img :src="thumbSrc(m)" :data-stage="thumbStage(m)" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
                 <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
                 <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
                 <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
@@ -269,7 +386,7 @@ const GalleryPage = {
                @contextmenu.prevent="showCtx($event, m)">
             <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
-            <img :src="API.thumbUrl(m.id)" loading="lazy" @load="onThumbLoad" @error="$event.target.src='/static/img/no-thumb.svg'">
+            <img :src="thumbSrc(m)" :data-stage="thumbStage(m)" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
             <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
             <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
             <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
@@ -298,7 +415,7 @@ const GalleryPage = {
                  @dblclick="openDetail(m.id)"
                  @contextmenu.prevent="showCtx($event, m)">
               <div class="row-thumb-wrap">
-                <img class="row-thumb" :src="API.thumbUrl(m.id)" loading="lazy" @error="$event.target.src='/static/img/no-thumb.svg'">
+                <img class="row-thumb" :src="thumbSrc(m)" :data-stage="thumbStage(m)" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
                 <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
               </div>
               <div class="row-name" :title="m.file_name">{{ m.file_name }}</div>
@@ -339,7 +456,7 @@ const GalleryPage = {
              @dblclick="openDetail(m.id)"
              @contextmenu.prevent="showCtx($event, m)">
           <div class="row-thumb-wrap">
-            <img class="row-thumb" :src="API.thumbUrl(m.id)" loading="lazy" @error="$event.target.src='/static/img/no-thumb.svg'">
+            <img class="row-thumb" :src="thumbSrc(m)" :data-stage="thumbStage(m)" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
             <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
           </div>
           <div class="row-name" :title="m.file_name">{{ m.file_name }}</div>
@@ -715,7 +832,10 @@ const GalleryPage = {
       similarCtxMenu: { show: false, item: null, x: 0, y: 0 },
       similarExcludeDlg: { show: false, item: null, candidates: [] },
       similarDeleteConfirm: { show: false, id: null, name: "" },
-      filters: { media_type: "all", rating: "", color_label: "" },
+      filters: { media_type: "all", rating: "", color_label: "", ...ADV_FILTER_DEFAULTS },
+      _coverFallback: new Map(), // m.id -> 'waveform' | 'none'（封面 404 回落链，防死循环）
+      advPanelOpen: false,       // 高级筛选面板（切换媒体类型自动展开）
+      _advFacets: { image: null, video: null, audio: null }, // 预置键；mt -> facets | null
       favFilter: null,       // null → 'fav' → 'unfav' → null
       analysisFilter: null,  // null → 'analyzed' → 'not' → null
       groupBy: "",
@@ -732,6 +852,11 @@ const GalleryPage = {
       else if (val !== this._prevSortBy) this.groupBy = "";
       this._prevSortBy = val;
     },
+    "filters.media_type"(val) {
+      // 切换即自动展开（音频/图片/视频）；"全部" 隐藏面板
+      this.advPanelOpen = !!ADVANCED_FILTER_SPEC[val];
+      this._loadFacets(val);
+    },
     selArr: {
       handler(val) {
         if (this.$root.pickerMode) this.$root.pickerSelected = val;
@@ -740,6 +865,9 @@ const GalleryPage = {
     },
   },
   computed: {
+    currentSpec() {
+      return ADVANCED_FILTER_SPEC[this.filters.media_type] || [];
+    },
     sortOptions() {
       return [
         { label: this.t('g.sort_imported_at'), value: "imported_at" },
@@ -777,7 +905,7 @@ const GalleryPage = {
       return this.similarExcludeDlg.candidates.filter(c => c.selected).length;
     },
     hasFilters() {
-      return this.filters.media_type !== "all" || this.filters.rating || this.filters.color_label || this.favFilter || this.analysisFilter || this.searchText;
+      return this.filters.media_type !== "all" || this.filters.rating || this.filters.color_label || this.favFilter || this.analysisFilter || this.searchText || this.advAnyActive();
     },
     activeFilterTags() {
       const tags = [];
@@ -798,6 +926,17 @@ const GalleryPage = {
       if (this.analysisFilter === 'analyzed') tags.push({ icon: 'auto_awesome', label: this.t('g.filter_analyzed') });
       else if (this.analysisFilter === 'not') tags.push({ icon: 'auto_awesome', label: this.t('g.filter_not_analyzed'), off: true });
       if (this.searchText) tags.push({ icon: 'search', label: this.searchText });
+      for (const dim of this.currentSpec) {
+        if (dim.displayOnly) continue; // thumbMode 是显示偏好，不是筛选，不产生标签
+        if (dim.type === 'dateRange') {
+          if (this.filters.date_from || this.filters.date_to) {
+            tags.push({ icon: dim.icon, label: [this.filters.date_from, this.filters.date_to].filter(Boolean).join(' ~ ') });
+          }
+        } else if (dim.param && this.filters[dim.param]) {
+          const opt = (dim.options || []).find(o => o.value === this.filters[dim.param]);
+          tags.push({ icon: dim.icon, label: `${this.t(dim.label)}: ${opt ? this.t(opt.labelKey) : this.filters[dim.param]}` });
+        }
+      }
       return tags;
     },
     isTimeSort() {
@@ -872,7 +1011,8 @@ const GalleryPage = {
           localStorage.setItem('galleryFilters', JSON.stringify({
             filters: this.filters, favFilter: this.favFilter, analysisFilter: this.analysisFilter,
             sortBy: this.sortBy, sortOrder: this.sortOrder, groupBy: this.groupBy,
-            viewMode: this.viewMode, gridScale: this.gridScale,
+            viewMode: this.viewMode,
+            gridScale: this.gridScale,
             masonryCols: this.masonryCols, justifiedRowH: this.justifiedRowH,
             searchText: this.searchText,
           }));
@@ -889,6 +1029,9 @@ const GalleryPage = {
     if (this.$root.pickerMode && this.$root.pickerSelected?.length) {
       this.selArr = [...this.$root.pickerSelected];
     }
+    // 高级筛选：按恢复的媒体类型初始化面板展开 + 拉取 facets
+    this.advPanelOpen = !!ADVANCED_FILTER_SPEC[this.filters.media_type];
+    this._loadFacets(this.filters.media_type);
     this.load();
     document.addEventListener("mousedown", this.closeCtx);
     document.addEventListener("keydown", this.handleKey, true);
@@ -922,6 +1065,106 @@ const GalleryPage = {
       const en = m.music_summary?.mood?.[0]?.label || '';
       return this.$root.musicTaxZh?.[en] || en;
     },
+    // 音频卡片封面/波形：音乐筛选下按 filters.thumbMode；混排恒封面优先（无封面回落波形）
+    useCoverFor(m) {
+      if (m.media_type !== 'audio') return false;
+      if (this.filters.media_type === 'audio') return this.filters.thumbMode === 'cover';
+      return true;
+    },
+    thumbSrc(m) {
+      if (!this.useCoverFor(m)) return API.thumbUrl(m.id);
+      const fb = this._coverFallback.get(m.id);
+      if (fb === 'waveform') return API.thumbUrl(m.id);
+      if (fb === 'none') return '/static/img/no-thumb.svg';
+      return API.coverUrl(m.id);
+    },
+    thumbStage(m) {
+      if (!this.useCoverFor(m)) return 'waveform';
+      return this._coverFallback.get(m.id) || 'cover';
+    },
+    onImgLoad(e) {
+      if ((e.target.dataset.stage || 'waveform') === 'cover') {
+        // 正方形封面居中裁剪，不挂 portrait（contain 留黑边）
+        e.target.classList.remove('portrait');
+      } else {
+        onThumbLoad(e);
+      }
+    },
+    onThumbError(e, m) {
+      const s = this.thumbStage(m);
+      if (s === 'cover') this._coverFallback.set(m.id, 'waveform');
+      else if (s === 'waveform') this._coverFallback.set(m.id, 'none');
+      else return; // 已在占位图，停止回落
+      e.target.dataset.stage = this.thumbStage(m);
+      e.target.src = this.thumbSrc(m);
+    },
+    // ---- 高级筛选：维度赋值 / 清除 / 选项与 facets ----
+    // q-btn-toggle 选中后不可取消（不重发事件）→ 取消由每维的清除 × 按钮负责
+    setAdvDim(dim, value) {
+      if (dim.displayOnly) {
+        this.filters[dim.param] = value;
+        if (dim.param === 'thumbMode') this._coverFallback.clear(); // 切换后重试封面
+        if (this._saveFilters) this._saveFilters();
+        return;
+      }
+      this.filters[dim.param] = value;
+      this.load();
+    },
+    // dropdown：q-select 自带 clear 按钮，选中即 set；重复选同值不清除
+    setAdvDropdown(dim, value) {
+      this.filters[dim.param] = value || '';
+      this.load();
+    },
+    onAdvDate(dim, field, val) {
+      this.filters[field] = val || '';
+      this.load();
+    },
+    clearAdvDim(dim) {
+      if (dim.type === 'dateRange') {
+        this.filters.date_from = '';
+        this.filters.date_to = '';
+      } else if (dim.param) {
+        this.filters[dim.param] = '';
+      }
+      this.load();
+    },
+    advDimActive(dim) {
+      if (dim.displayOnly) return false;
+      if (dim.type === 'dateRange') return !!(this.filters.date_from || this.filters.date_to);
+      return dim.param && !!this.filters[dim.param];
+    },
+    advAnyActive() {
+      return this.currentSpec.some(d => this.advDimActive(d));
+    },
+    // segmented/toggle 选项：叠加桶计数徽标；0 计数置灰
+    dimOptions(dim) {
+      const facets = this._advFacets[this.filters.media_type] || {};
+      const counts = dim.facetKey ? facets[dim.facetKey] : null;
+      return (dim.options || []).map(o => {
+        const opt = { label: this.t(o.labelKey), value: o.value };
+        if (counts && counts[o.value] != null) {
+          opt.label = `${this.t(o.labelKey)} (${counts[o.value]})`;
+          if (counts[o.value] === 0) opt.disable = true;
+        }
+        return opt;
+      });
+    },
+    // dropdown 选项：后端已过滤空行，按 count 降序
+    facetOptions(dim) {
+      const facets = this._advFacets[this.filters.media_type] || {};
+      return (facets[dim.facetKey] || []).map(x => ({ label: `${x.value} (${x.count})`, value: x.value }));
+    },
+    // 按媒体类型缓存 facets（audio 无下拉不发请求）；失败保 null，下次切换类型重试
+    async _loadFacets(mt) {
+      if (!ADVANCED_FILTER_SPEC[mt]) return;
+      if (this._advFacets[mt]) return;
+      try {
+        this._advFacets[mt] = await API.getLibraryFacets(mt);
+      } catch (e) {
+        this._advFacets[mt] = null;
+        console.error("facets error:", e);
+      }
+    },
     t,
     API,
     // Build query params from current filters (shared by load, loadMore, selectAll)
@@ -939,6 +1182,16 @@ const GalleryPage = {
       const folder = this.$root.pickerMode ? this.$root.pickerFolder : this.$root.selectedFolder;
       if (folder) params.folder = folder;
       if (this.$root.pickerMode && this.$root.pickerExcludeIds?.length) params.exclude_ids = this.$root.pickerExcludeIds.join(",");
+      // 高级筛选：按当前媒体类型 spec 发射维度参数（displayOnly 不发射；dateRange 拆两字段）
+      for (const dim of this.currentSpec) {
+        if (dim.displayOnly) continue;
+        if (dim.type === 'dateRange') {
+          if (this.filters.date_from) params.date_from = this.filters.date_from;
+          if (this.filters.date_to) params.date_to = this.filters.date_to;
+        } else if (dim.param && this.filters[dim.param]) {
+          params[dim.param] = this.filters[dim.param];
+        }
+      }
       return params;
     },
     // Select all items matching current filters (fetches all IDs from backend)
@@ -1062,6 +1315,8 @@ const GalleryPage = {
       this.filters.media_type = "all";
       this.filters.rating = null;
       this.filters.color_label = null;
+      Object.assign(this.filters, ADV_FILTER_DEFAULTS); // 高级筛选维度归零（含 thumbMode）
+      this.advPanelOpen = false;
       this.favFilter = null;
       this.analysisFilter = null;
       this.searchText = "";

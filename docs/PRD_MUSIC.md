@@ -28,8 +28,8 @@
 ## 三、范围
 
 ### P1 本期（已确认全链路）
-1. **导入**：音频扩展名识别、ffprobe 元数据、波形缩略图
-2. **素材库**：筛选第四档「音乐」、波形卡片、水印角标、批量分析弹窗支持
+1. **导入**：音频扩展名识别、ffprobe 元数据、波形缩略图、内嵌封面提取（APIC/covr/FLAC PICTURE/OGG）
+2. **素材库**：筛选第四档「音乐」、卡片封面优先（无封面回落波形）、**高级筛选面板**（音乐=封面/波形切换 + 未来标签下拉扩展位；图片=分辨率/相机品牌/型号/拍摄日期/宽高比；视频=分辨率/帧率/时长）、水印角标、批量分析弹窗支持
 3. **详情页**：播放器 + 波形 + 分析结果（标签/曲线/分段）+ 元信息
 4. **分析**：`music_prompt.txt` + 本地 Omni（分段标签+权重+双轴+水印，两步水印判定）
 5. **存储与搜索**：DB 迁移（media_type 加 'audio'）、音乐分段表、FTS 标签搜索
@@ -48,10 +48,16 @@
 - 加密格式（.ncm/.kwflac 等）：跳过，导入汇总提示"N 个加密格式已跳过"
 - probe：duration/bit_rate/audio_codec/audio_sample_rate/audio_channels + ID3/元标签（title/artist/album，存新列，仅展示不编辑）
 - **波形缩略图**：`ffmpeg -filter_complex showwavespic` 生成 320×? PNG，走现有 THUMB_DIR 扁平结构，卡片/后台任务栏复用 `/media/thumbnail/<id>`
+- **封面提取**：`_extract_cover_art()` 主用 ffmpeg `-an -map 0:v:0 -frames:v 1 -vf scale=320:-1`（APIC/covr/FLAC PICTURE/OGG picture 通吃），`returncode==0 AND 存在 AND size>100` 守卫防损坏图；exiftool `-Picture/-CoverArt/-PreviewImage` + PIL 兜底；结果存 `cover_art_path` 列 + THUMB_DIR，卡片/详情经 `/media/cover/<id>`（懒生成，历史音频首次访问自动回填）。无封面 → None，保留波形
 
 ### 4.2 素材库（gallery.js）
 - 筛选条四档：全部/图片/视频/音乐（图标 music_note）
-- 卡片：波形缩略图 + 时长角标 + 音符类型角标 + **水印角标**（分析后且 watermark=有 时显示小标识）+ mood 主标签 chip（分析后）
+- 卡片：**封面优先**（有封面显示封面，无封面回落波形；封面以现有 16:9 卡 `object-fit:cover` 居中裁剪，不挂 `.portrait` 防正方形封面 contain 留黑边）+ 时长角标 + 音符类型角标 + **水印角标**（分析后且 watermark=有 时显示小标识）+ mood 主标签 chip（分析后）
+- **高级筛选面板**：切换媒体类型自动展开（全部时隐藏），面板内每类型一组维度：
+  - **音乐**：「显示」封面/波形两档（`.engine-toggle` 药丸，**默认封面**，`localStorage` 持久化；混排视图恒封面优先且切换隐藏）。spec 预留未来标签下拉扩展位（mood/genre/instrument，数据源 `music_summary` + `music_taxonomy.json`，P2）
+  - **图片**：分辨率档位（S/M/L/XL）· 相机品牌 · 相机型号 · 拍摄日期范围 · 宽高比（横/竖/方）
+  - **视频**：分辨率档位（480/720/1080/2160）· 帧率档位（24/30/60/120）· 时长档位（短片/中片/长片）
+  - 每维度带计数徽标（0 置灰）、激活后行尾出现清除 ×；活跃维度出现在 Footer 筛选条件标签
 - 批量分析弹窗：混选含音乐时显示「音乐 N 个」与音乐模型行；右键菜单沿用（「查找相似」对音乐隐藏）
 
 ### 4.3 详情页（detail.js 第三分支）

@@ -27,6 +27,9 @@ const API = {
     const qs = new URLSearchParams(params).toString();
     return this._fetch(`/api/library/?${qs}`);
   },
+  getLibraryFacets(mediaType) {
+    return this._fetch(`/api/library/facets?media_type=${encodeURIComponent(mediaType)}`);
+  },
   getMedia(id) {
     return this._fetch(`/api/library/${id}`);
   },
@@ -147,6 +150,7 @@ scanPaths(paths) {
     return this._fetch(`/api/library/batch-write-xmp`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) });
   },
   thumbUrl(id) { return `/media/thumbnail/${id}`; },
+  coverUrl(id) { return `/media/cover/${id}`; },
   videoUrl(id) { return `/media/video/${id}`; },
   audioUrl(id) { return `/media/audio/${id}`; },
   getMusicTaxonomy() {

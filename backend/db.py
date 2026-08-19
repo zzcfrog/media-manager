@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS media (
     camera_model    TEXT,
     date_taken      TEXT,
     thumbnail_path  TEXT,
+    cover_art_path  TEXT,
     analysis_status TEXT DEFAULT 'none',
     analysis_model  TEXT,
     analysis_date   TEXT,
@@ -209,6 +210,7 @@ _MIGRATIONS = [
     ("emotions", "ALTER TABLE media_segment ADD COLUMN emotions TEXT DEFAULT ''"),
     ("creative_brief", "ALTER TABLE projects ADD COLUMN creative_brief TEXT"),
     ("ai_plan", "ALTER TABLE projects ADD COLUMN ai_plan TEXT"),
+    ("cover_art_path", "ALTER TABLE media ADD COLUMN cover_art_path TEXT"),
 ]
 
 

@@ -254,6 +254,36 @@ def serve_thumbnail(media_id):
     abort(404)
 
 
+@bp.route("/media/cover/<int:media_id>")
+def serve_cover(media_id):
+    """音频内嵌封面。优先已提取文件；缺失且源文件在 → 懒提取落库（历史音频自动回填）。"""
+    db = get_db()
+    row = db.execute(
+        "SELECT id, file_path, media_type, cover_art_path FROM media WHERE id = ?",
+        (media_id,),
+    ).fetchone()
+    if not row or row["media_type"] != "audio":
+        from flask import abort
+        abort(404)
+
+    if row["cover_art_path"]:
+        path = THUMB_DIR / row["cover_art_path"]
+        if path.exists():
+            return send_file(path, mimetype="image/jpeg")
+
+    from ..services.importer import _extract_cover_art
+    fp = Path(row["file_path"])
+    if fp.exists():
+        cover = _extract_cover_art(fp)
+        if cover:
+            db.execute("UPDATE media SET cover_art_path = ? WHERE id = ?", (cover, row["id"]))
+            db.commit()
+            return send_file(THUMB_DIR / cover, mimetype="image/jpeg")
+
+    from flask import abort
+    abort(404)
+
+
 @bp.route("/media/filmstrip/<int:media_id>")
 def serve_filmstrip(media_id):
     import subprocess, json
