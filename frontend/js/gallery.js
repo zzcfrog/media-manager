@@ -236,7 +236,7 @@ const GalleryPage = {
                     :model-value="filters[dim.param] || ''"
                     dense filled options-dense clearable emit-value map-options
                     :options="dimOptions(dim)"
-                    :placeholder="t(dim.label)"
+                    :label="t(dim.label)"
                     style="min-width:150px"
                     @update:model-value="setAdvDropdown(dim, $event)"></q-select>
           <div v-else-if="dim.type === 'dateRange'" class="adv-date-range">
