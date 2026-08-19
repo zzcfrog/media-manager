@@ -1,5 +1,23 @@
 # TODO
 
+## 已完成：高级筛选 v2——按钮展开独占一行 + 全维度下拉 + 视频片段语义（2026-08-19）
+
+v1（切换类型自动展开 + 药丸分段 + 仅元数据维度）整体重构：筛选栏一个「高级筛选」按钮，收起即栏内待展开按钮、展开独占一行全维度下拉面板；**全部筛选项用下拉菜单**，空值占位符 = 维度标题，选项带计数（0 置灰）。维度来自 AI 分析字段，图片 19 / 视频 18 / 音乐 6。
+
+- **维度清单（全）**：
+  - 图片 19：景别·焦段·视角·透视·场景·光线·天气·风格·色调·影调·景深·构图·颜色·主体·编码(JPG/RAW/HIF)·相机品牌·相机型号·方向(横/竖/方)·拍摄日期(from~to)
+  - 视频 18：景别·焦段·视角·运镜·透视·场景·光线·天气·情绪·颜色·主体·相机品牌·相机型号·方向·分辨率·帧率·时长·色彩空间；**任一片段命中即视频命中**
+  - 音乐 5+显示：封面/波形切换(displayOnly)·情绪·曲风·乐器·使用画面·人声（词表 en 值 + zh 显示）
+  - 选项 = **标准枚举 + 并入数据新值**（带计数）；动态维度（颜色/主体/相机/色彩空间）走 facets；音乐固定词表
+- **后端（[library.py](../backend/blueprints/library.py)）**：`_seg_pred`（EXISTS 片段子查询，图片 1 片段/视频 N 片段天然满足「任一片段命中=视频命中」）、`_arr_pred`（数组维度 instr 匹配 json.dumps 元素，规避 json_each 空串/非法 JSON 整查询报错）、`_music_pred`/`_music_vocals_pred`（music_summary instr 匹配，`json.dumps({"label": value})` 去花括号）、`_orient_pred`（w/h 比较替代 v1 aspect）、`_ENC_EXTS`+`_ENCODING_CASE`（扩展名派生编码）；`list_media` 每类型分支按 spec 拼 where；`library_facets` 扩展（片段 dim facets `_seg_facet`/`_arr_facet` + 编码/方向/色彩空间 GROUP BY + 音乐标签扫 music_summary + res/fps/dur 桶为 dict）
+- **前端（[gallery.js](../frontend/js/gallery.js)）**：`ADVANCED_FILTER_SPEC` 重写三类型全维度 spec + `dimOptions(dim)` 统一选项（枚举+计数/disable+并入 facets 新值；音乐 `root.musicTax` 建项 zh 显示）；模板按钮（`v-if="currentSpec.length"`，活跃高亮 `adv-btn-active`）+ 面板删头部改全下拉；`_buildParams` load/loadMore/selectAll 共享发射；切换类型 watcher 去自动展开只 `_loadFacets`；`advPanelOpen` 持久化；i18n 22 个维度标题键；CSS `.adv-filter-panel` 全宽维度行 + 按钮高亮
+- **顺带修复 4 个前端 bug**（verification 暴露的潜在缺陷）：
+  1. 视频面板崩溃：res/fps/dur 桶 facets 是 **dict** 不是数组，`for...of` 遍历报「object is not iterable」→ `Array.isArray` 守卫
+  2. 音乐下拉只剩 2 项：动态数据分支 `if (!dim.options)` 短路了 taxKey 分支 → 改 `if (!dim.options && !dim.taxKey)`
+  3. loadMore 重试风暴：过滤请求失败后 `allLoaded` 仍 false → `_checkFill` 无限重试 page=2 拖垮服务 → 两个 catch 都置 `allLoaded=true`
+  4. facets 拉取失败后下拉全禁用且无重试 → `load()` 成功后补拉 `_loadFacets`（已加载则 no-op，曾失败自动重试）
+- **验证**：后端 [test_adv_filter_v2.py](../scripts/test_adv_filter_v2.py) 49 断言全过（片段等值/数组元素/编码/方向/色彩空间/视频片段语义/音乐 5 维/facets 计数与并入/非法 400/date_to 含整天）；前端 Playwright 全过（按钮收起/展开独占一行、19/18/6 维度与清单一致、placeholder=标题、枚举并入数据新值可见且可筛、0 计数禁用、音乐词表 zh、日期范围、刷新持久化、重置、picker 模式、selectAll 继承维度参数）
+
 ## 已完成：框架级高级筛选——按媒体类型自动展开的维度面板（2026-08-19）
 
 封面/波形切换升级为「高级筛选」框架：切换媒体类型自动展开面板，每类型一组维度，后端维度参数 + facets 端点支撑（[library.py](../backend/blueprints/library.py) + [gallery.js](../frontend/js/gallery.js)）。

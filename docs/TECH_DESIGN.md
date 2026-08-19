@@ -199,17 +199,28 @@ DUR_BUCKETS        = {"short":(0,60), "mid":(60,300), "long":(300,None)}        
 FPS_AS_FLOAT       # SQL 表达式：把 "N/D" 文本 fps 转 float（NULL/空 → NULL），/0 除零在 _parse_fps 守卫
 ```
 
-**`list_media` 新参数**（复用共享 `where_clauses`/`params` → total/分页/`fields=id` 自动继承，仅 `media_type != "all"` 分支生效）：
-- image：`res` → `_bucket_pred("(width*height)/1000000.0", RES_BUCKETS_IMAGE, res)`；`aspect` → landscape/portrait/square 的 w/h 比较；`camera_make`/`camera_model` 精确匹配；`date_from`/`date_to`。
-- video：`res` → `_bucket_pred("height", RES_BUCKETS_VIDEO)`；`fps` → `_bucket_pred(FPS_AS_FLOAT, FPS_BUCKETS)`；`dur` → `_bucket_pred("duration", DUR_BUCKETS)`。
-- audio / all：忽略（面板不出现这些 dim）。NULL 维度行仅在对应筛选活跃时被排除。
+**`list_media` 新参数**（复用共享 `where_clauses`/`params` → total/分页/`fields=id` 自动继承，仅 `media_type != "all"` 分支生效）。所有视觉分析维度都在 `media_segment`（图片恰 1 条片段、视频 N 条）→ 图片/视频共用**片段语义**谓词：
+
+```python
+# 枚举维度（景别/焦段/视角/运镜/透视/场景/光线/天气/情绪/风格/色调/影调/景深/构图）：
+EXISTS (SELECT 1 FROM media_segment ms WHERE ms.media_id = media.id AND ms.<col> = ?)
+# 数组维度（颜色/主体，json.dumps ensure_ascii=False 存数组）：
+EXISTS (SELECT 1 FROM media_segment ms WHERE ms.media_id = media.id AND instr(ms.<col>, ?) > 0)   # 参数 = json.dumps(value, ensure_ascii=False)
+# 视频多片段：任一片段命中即视频命中（EXISTS 天然满足）
+```
+
+- image：片段枚举 dim + 数组 dim（`dominant_colors`/`main_subjects`）；`encoding` → `_ENCODING_CASE = ?`（按扩展名派生 JPG/RAW/HIF/OTHER，`_ENC_EXTS` 取自 config `RAW_EXTS`/`HEIF_EXTS`）；`orientation` → `_orient_pred`（w/h 比较 横/竖/方，替代 v1 aspect）；`camera_make`/`camera_model` 精确匹配；`date_from`/`date_to`。
+- video：同片段 dim + `camera_movement`/`mood`；`res` → `_bucket_pred("height", RES_BUCKETS_VIDEO)`；`fps` → `_bucket_pred(FPS_AS_FLOAT, FPS_BUCKETS)`；`dur` → `_bucket_pred("duration", DUR_BUCKETS)`；`camera_make`/`camera_model`；`orientation`；`color_space = ?`。
+- audio：`music_mood`/`music_genre`/`music_instrument`/`music_theme` → `instr(media.music_summary, ?) > 0`，参数 = `json.dumps({"label": value}, ensure_ascii=False)`（去首尾花括号，精确匹配 `"label": "Epic"`）；`music_vocals` → 同法匹配 `"vocals": value`。
+- all：忽略全部维度。**匹配用 `instr` 而非 `json_each`**（空串/非法 JSON 会整查询报错；instr 精确匹配 JSON 字符串元素、空串天然不命中，转义由 `json.dumps` 保证）。NULL 维度行仅在对应筛选活跃时被排除。
 
 **日期边界（真实 bug 修复沉淀）**：`date_taken` 存在两种存储格式——EXIF `"YYYY-MM-DD HH:MM:SS"` 与 mtime 回退 `"YYYY-MM-DDTHH:MM:SS.ffffff"`（isoformat）。`date_to` 用 **`substr(date_taken, 1, 10) <= ?`** 按前 10 位比较：既含整天，又天然兼容两种格式（若用 `<= 'YYYY-MM-DD 23:59:59'`，T-格式同一天行因 `'T' > ' '` 被错误排除）。
 
-**新端点 `GET /api/library/facets?media_type=image|video|audio`**（`list_media` 后、`/segment-stats` 前）：
-- image → `camera_make`/`camera_model`（`SELECT value, COUNT(*) ... GROUP BY ORDER BY count DESC, value LIMIT 200`）、`date_min`/`date_max`（`substr(date_taken,1,10)`）、`res`/`aspect` 桶计数（Python 全量扫 type 行，个人库规模可接受；桶计数含 0 值，UI 置灰）。
-- video → `res`/`fps`/`dur` 桶计数（Python 扫行，fps 用 `_parse_fps`）。
-- audio → `{"media_type":"audio"}` 占位（未来音乐标签下拉在此加键）。
+**新端点 `GET /api/library/facets?media_type=image|video|audio`**（`list_media` 后、`/segment-stats` 前；作用域仅 media_type，无交叉筛选；枚举 dim 的 facets 只含数据里出现的值，0 计数由前端禁用）：
+- 通用片段 facet：`_seg_facet(db, col, mt)` = `SELECT ms.<col> AS value, COUNT(DISTINCT ms.media_id) AS count FROM media_segment ms JOIN media m ON m.id=ms.media_id WHERE m.media_type=? AND ms.<col>!='' GROUP BY ms.<col> ORDER BY count DESC, ms.<col> LIMIT 200`；数组维度 `_arr_facet` = Python 扫行 `json.loads` 逐元素计数（与 v1 桶计数同风格）。
+- image → 全部片段 dim facets + `camera_make`/`camera_model`（既有）+ `encoding`/`orientation` GROUP BY + `date_min`/`date_max`（`substr(date_taken,1,10)`）+ `res` 桶计数。
+- video → 片段 dim facets + `res`/`fps`/`dur` 桶计数（Python 扫行，fps 用 `_parse_fps`；桶为 **dict** `{key: count}`）+ `camera_make`/`camera_model` + `orientation` + `color_space` GROUP BY。
+- audio → `music_mood`/`music_genre`/`music_instrument`/`music_theme` = Python 扫 `music_summary` 逐 label 计数；`music_vocals` = 扫 vocals 值计数。
 - 非法 media_type → 400。
 
 ### 3.6 相似检测与排除 API
@@ -402,7 +413,7 @@ class AsrSegment:
 | 主题色统一 | 所有 UI 控件通过 CSS 变量 `--accent` / `--accent-dim` 跟随主题色。Quasar 组件通过 `style="--q-primary:var(--accent)"` 元素级覆盖。侧边栏选中使用 `.sidebar-active-item` 类 |
 | 50% 缩放紧凑模式 | `gridScale <= 0.5` 时添加 `.grid-compact` class，隐藏 `.media-card .info` |
 | 媒体类型筛选 | `q-btn-group` 包含独立 `q-btn`（带 `q-tooltip`），替代 `q-btn-toggle` |
-| 高级筛选面板 | 声明式 spec `ADVANCED_FILTER_SPEC`（audio/image/video 各一组维度）+ `currentSpec` 驱动模板渲染；`_buildParams` 遍历 spec 统一发射 `res/aspect/camera_make/camera_model/date_from/date_to/fps/dur`；切换类型 watcher 自动展开 + `_loadFacets` 按类型缓存 `GET /api/library/facets`；维度计数徽标（0 置灰）+ 清除 ×；displayOnly（音乐显示切换）只存不重载，`thumbMode` localStorage 持久化；q-date 必须 `mask="YYYY-MM-DD"`（否则字典序比较静默失效） |
+| 高级筛选面板 | 声明式 spec `ADVANCED_FILTER_SPEC`（audio/image/video 各一组维度，image 19 / video 18 / audio 6）+ `currentSpec` 驱动；筛选栏「高级筛选」按钮（`v-if="currentSpec.length"`，有活跃维度高亮，点击切 `advPanelOpen`）收起为栏内按钮、展开独占一行；面板删头部，`q-select`（dense clearable options-dense，placeholder=维度标题）全下拉 + 拍摄日期 from/to 双日期弹窗 + 音乐显示 toggle（displayOnly）；`dimOptions(dim)` 统一选项来源——枚举 + 计数/0 置灰 + 并入 facets 新值、音乐从 `root.musicTax` 建项（en 值 + zh 显示）、动态 dim 走 facets；`_buildParams` 遍历 spec 统一发射（displayOnly 跳过、dateRange 拆 `date_from`/`date_to`），load/loadMore/selectAll 共享；切换类型 watcher 只 `_loadFacets` 不自动展开；`_advFacets` 按类型缓存，加载成功后再补拉（曾失败自动重试，避免下拉全禁用）；`advPanelOpen` 随 `_saveFilters` 持久化、picker 模式不持久化；q-date 必须 `mask="YYYY-MM-DD"`（否则字典序比较静默失效） |
 | 分段编辑 | `contenteditable` + `@blur` → `saveSegField()`（文本字段）；`×` 按钮 → `removeTag()`（标签字段） |
 | 键盘快捷键 | `document.addEventListener("keydown")` 全局监听，`created()` 注册 / `beforeUnmount()` 清理；`isContentEditable` 检测避免编辑冲突 |
 | 全屏看图 | 浏览器 Fullscreen API（`imgContainer.requestFullscreen()`），`fullscreenchange` 事件追踪状态；F 键切换，仅图片类型生效 |

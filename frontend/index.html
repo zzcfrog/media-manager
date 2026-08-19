@@ -777,6 +777,7 @@ const app = Vue.createApp({
       showShortcuts: false,
       settingsForm: { resolution: "480", fps: "30", model: "glm-4.6v", useMultimodal: true, asrEngine: "whisper", asrMode: "local", asrModel: "large-v3", videoApiKey: "", asrApiKey: "", imageResolution: "1920", imageApiKey: "", imageModel: "glm-4.6v", imageEngine: "cloud", videoEngine: "cloud", localModel: "qwen3-vl-8b", localFps: "1", localMaxFrames: "32", localRes: "480", localAsrMode: "separate", musicEngine: "local", musicModel: "qwen3-omni-30b-a3b", hwAccel: false, language: "zh", creativeModel: "glm-5-turbo" },
       localModels: [],
+      musicTax: null,     // 音乐词表原始数据（{dim: [{en, zh}]}，高级筛选音乐下拉选项用）
       musicTaxZh: null,   // 音乐词表 en→zh 映射（卡片 chip/详情页共用，来自 /api/analysis/music-taxonomy）
       vlmDownload: { state: "idle", model_id: null, total_bytes: 0, done_bytes: 0, speed_bps: 0, error: null },
       settingsTab: "general",
@@ -838,6 +839,7 @@ const app = Vue.createApp({
     this.resolveRoute();
     // Restore bgTasks from backend (survives page refresh)
     API.getMusicTaxonomy().then(tax => {
+      this.musicTax = tax;
       const zh = {};
       for (const dim of ["mood", "genre", "instrument", "video_theme", "vocals", "vocals_language"]) {
         for (const x of (tax[dim] || [])) zh[x.en] = x.zh;

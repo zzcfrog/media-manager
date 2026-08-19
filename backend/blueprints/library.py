@@ -8,6 +8,7 @@ from loguru import logger
 import jieba
 
 from ..db import get_db
+from ..config import HEIF_EXTS, RAW_EXTS
 
 # Core CRUD routes for the media library: list, detail, import, scan, delete,
 # batch operations, duplicate detection, folder tree, and XMP sidecar export.
@@ -24,7 +25,6 @@ def _segment_query(q):
 
 # ── 高级筛选桶阈值。单一事实来源（后端），前端只认桶 key + 标签。
 # 半开区间 [lo, hi)；hi=None 表示无上限。ffprobe r_frame_rate 是 "N/D" 文本（如 30000/1001）。
-RES_BUCKETS_IMAGE = {"S": (0, 8), "M": (8, 24), "L": (24, 45), "XL": (45, None)}        # 兆像素 (w*h/1e6)
 RES_BUCKETS_VIDEO = {"480": (0, 720), "720": (720, 1080), "1080": (1080, 2160), "2160": (2160, None)}  # 高度 px
 # PAL 25/50fps 近似归入 24/60 桶（非精确匹配，可接受）
 FPS_BUCKETS = {"24": (23.0, 26.0), "30": (26.0, 33.0), "60": (48.0, 80.0), "120": (100.0, None)}
@@ -73,6 +73,82 @@ def _bucket_pred(expr, buckets, key):
     return f"({expr} >= ? AND {expr} < ?)", [lo, hi]
 
 
+# ── 高级筛选 v2：片段维度（EXISTS 语义）+ 数组 / 音乐 / 编码谓词 ──
+# 视觉分析维度只存在于 media_segment 表；图片恰好 1 条片段（time_start/time_end 为空）、视频 N 条。
+# 统一用 EXISTS 片段子查询 → 图片/视频共用同一语义，且天然满足「任一片段命中 = 视频命中」。
+_SEG_EQ_COLS = {
+    "shot_type", "focal_length", "camera_angle", "camera_movement", "perspective",
+    "scene_type", "mood", "lighting", "weather", "color_tone", "tone", "dof",
+    "style", "composition",
+}
+_SEG_ARR_COLS = {"dominant_colors", "main_subjects"}
+
+# 编码桶：JPG / HIF / RAW（from config），其余（png/webp/bmp/tiff/gif…）→ OTHER
+_ENC_EXTS = {"JPG": {".jpg", ".jpeg"}, "HIF": HEIF_EXTS, "RAW": RAW_EXTS}
+
+
+def _build_encoding_case():
+    """把扩展名桶生成 SQL CASE 表达式（lower(file_name) instr 匹配；常量扩展名安全）。"""
+    clauses = []
+    for key, exts in _ENC_EXTS.items():
+        conds = " OR ".join(f"instr(lower(file_name), '{ext}') > 0" for ext in sorted(exts))
+        clauses.append(f"WHEN {conds} THEN '{key}'")
+    return "CASE " + " ".join(clauses) + " ELSE 'OTHER' END"
+
+
+_ENCODING_CASE = _build_encoding_case()
+
+
+def _seg_pred(col, value):
+    """片段等值维度谓词：任一片段命中 = 该媒体命中。col 来自受控常量集，可安全拼接。"""
+    return (f"EXISTS (SELECT 1 FROM media_segment ms WHERE ms.media_id = media.id "
+            f"AND ms.{col} = ?)", [value])
+
+
+def _arr_pred(col, value):
+    """片段数组维度（dominant_colors/main_subjects）：JSON 字符串数组含指定元素。
+    instr 匹配 json.dumps 元素（含闭合引号）→ 精确元素匹配，`"蓝"` 不会误配 `"深蓝"`；
+    空串/非法 JSON 天然不命中，不会拖垮整查询。"""
+    return (f"EXISTS (SELECT 1 FROM media_segment ms WHERE ms.media_id = media.id "
+            f"AND instr(ms.{col}, ?) > 0)", [json.dumps(value, ensure_ascii=False)])
+
+
+def _music_pred(dim, value):
+    """音乐曲级汇总（music_summary JSON）：标签数组 {label, weight} 含指定 label。
+    匹配 `"label": "Epic"`（去掉外层花括号，因存储中 label 后常带 `, "weight"`）。"""
+    return "instr(media.music_summary, ?) > 0", [json.dumps({"label": value}, ensure_ascii=False)[1:-1]]
+
+
+def _music_vocals_pred(value):
+    """音乐 vocals 单值匹配：匹配 `"vocals": "Choir"`。"""
+    return "instr(media.music_summary, ?) > 0", [json.dumps({"vocals": value}, ensure_ascii=False)[1:-1]]
+
+
+def _orient_pred(value):
+    """横/竖/方（宽高比派生）；未知值 → (None, []) 跳过。"""
+    if value == "landscape":
+        return "(width IS NOT NULL AND height IS NOT NULL AND width > height)", []
+    if value == "portrait":
+        return "(width IS NOT NULL AND height IS NOT NULL AND width < height)", []
+    if value == "square":
+        return "(width IS NOT NULL AND height IS NOT NULL AND width = height)", []
+    return None, []
+
+
+def _apply_seg_dims(where_clauses, params, seg_dims, arr_dims):
+    """片段维度谓词：等值（EXISTS 任一命中）+ 数组（instr JSON 元素）。图片/视频共用。"""
+    for col, val in seg_dims.items():
+        if val:
+            pred, ps = _seg_pred(col, val)
+            where_clauses.append(pred)
+            params.extend(ps)
+    for col, val in arr_dims.items():
+        if val:
+            pred, ps = _arr_pred(col, val)
+            where_clauses.append(pred)
+            params.extend(ps)
+
+
 bp = Blueprint("library", __name__)
 
 
@@ -93,13 +169,23 @@ def list_media():
     exclude_ids = request.args.get("exclude_ids", "").strip()
     # 高级筛选维度参数（按 media_type 解释，面板按类型作用域所以只会有一种活跃）
     res_key = request.args.get("res")
-    aspect = request.args.get("aspect")
+    fps_key = request.args.get("fps")
+    dur_key = request.args.get("dur")
     camera_make = (request.args.get("camera_make") or "").strip()
     camera_model = (request.args.get("camera_model") or "").strip()
     date_from = (request.args.get("date_from") or "").strip()
     date_to = (request.args.get("date_to") or "").strip()
-    fps_key = request.args.get("fps")
-    dur_key = request.args.get("dur")
+    # 高级筛选 v2：片段维度（图片/视频共用）+ 编码/方向/色彩空间 + 音乐 5 维
+    seg_dims = {c: request.args.get(c) for c in _SEG_EQ_COLS}
+    arr_dims = {c: request.args.get(c) for c in _SEG_ARR_COLS}
+    encoding = (request.args.get("encoding") or "").strip()
+    orientation = request.args.get("orientation")
+    color_space = (request.args.get("color_space") or "").strip()
+    music_mood = (request.args.get("music_mood") or "").strip()
+    music_genre = (request.args.get("music_genre") or "").strip()
+    music_instrument = (request.args.get("music_instrument") or "").strip()
+    music_theme = (request.args.get("music_theme") or "").strip()
+    music_vocals = (request.args.get("music_vocals") or "").strip()
 
     allowed_sorts = {"imported_at", "date_taken", "rating", "file_name", "file_size", "duration", "resolution"}
     if sort not in allowed_sorts:
@@ -112,17 +198,15 @@ def list_media():
         where_clauses.append("media_type = ?")
         params.append(media_type)
         if media_type == "image":
-            if res_key:
-                pred, ps = _bucket_pred("(width * height) / 1000000.0", RES_BUCKETS_IMAGE, res_key)
+            _apply_seg_dims(where_clauses, params, seg_dims, arr_dims)
+            if encoding:
+                where_clauses.append(f"{_ENCODING_CASE} = ?")
+                params.append(encoding)
+            if orientation:
+                pred, ps = _orient_pred(orientation)
                 if pred:
                     where_clauses.append(pred)
                     params.extend(ps)
-            if aspect == "landscape":
-                where_clauses.append("(width IS NOT NULL AND height IS NOT NULL AND width > height)")
-            elif aspect == "portrait":
-                where_clauses.append("(width IS NOT NULL AND height IS NOT NULL AND width < height)")
-            elif aspect == "square":
-                where_clauses.append("(width IS NOT NULL AND height IS NOT NULL AND width = height)")
             if camera_make:
                 where_clauses.append("camera_make = ?")
                 params.append(camera_make)
@@ -138,6 +222,7 @@ def list_media():
                 where_clauses.append("substr(date_taken, 1, 10) <= ?")
                 params.append(date_to)
         elif media_type == "video":
+            _apply_seg_dims(where_clauses, params, seg_dims, arr_dims)
             if res_key:
                 pred, ps = _bucket_pred("height", RES_BUCKETS_VIDEO, res_key)
                 if pred:
@@ -153,7 +238,41 @@ def list_media():
                 if pred:
                     where_clauses.append(pred)
                     params.extend(ps)
-        # media_type == 'audio' 或 'all'：无维度筛选（面板不会出现这些 dim）
+            if camera_make:
+                where_clauses.append("camera_make = ?")
+                params.append(camera_make)
+            if camera_model:
+                where_clauses.append("camera_model = ?")
+                params.append(camera_model)
+            if orientation:
+                pred, ps = _orient_pred(orientation)
+                if pred:
+                    where_clauses.append(pred)
+                    params.extend(ps)
+            if color_space:
+                where_clauses.append("color_space = ?")
+                params.append(color_space)
+        elif media_type == "audio":
+            if music_mood:
+                pred, ps = _music_pred("mood", music_mood)
+                where_clauses.append(pred)
+                params.extend(ps)
+            if music_genre:
+                pred, ps = _music_pred("genre", music_genre)
+                where_clauses.append(pred)
+                params.extend(ps)
+            if music_instrument:
+                pred, ps = _music_pred("instrument", music_instrument)
+                where_clauses.append(pred)
+                params.extend(ps)
+            if music_theme:
+                pred, ps = _music_pred("theme", music_theme)
+                where_clauses.append(pred)
+                params.extend(ps)
+            if music_vocals:
+                pred, ps = _music_vocals_pred(music_vocals)
+                where_clauses.append(pred)
+                params.extend(ps)
     if rating is not None:
         where_clauses.append("rating >= ?")
         params.append(rating)
@@ -224,36 +343,118 @@ def list_media():
     })
 
 
+def _seg_facet(db, col, mt):
+    """片段等值维度选项：GROUP BY 值 + COUNT(DISTINCT media_id)（视频任一片段命中语义）。"""
+    return [dict(r) for r in db.execute(
+        "SELECT ms." + col + " AS value, COUNT(DISTINCT ms.media_id) AS count "
+        "FROM media_segment ms JOIN media m ON m.id = ms.media_id "
+        "WHERE m.media_type = ? AND ms." + col + " IS NOT NULL AND ms." + col + " != '' "
+        "GROUP BY ms." + col + " ORDER BY count DESC, ms." + col + " LIMIT 200", (mt,)).fetchall()]
+
+
+def _arr_facet(db, col, mt):
+    """数组维度（dominant_colors/main_subjects）：扫行 json.loads，按 media 去重计数。"""
+    per_media = defaultdict(set)
+    for r in db.execute(
+        "SELECT ms.media_id, ms." + col + " FROM media_segment ms "
+        "JOIN media m ON m.id = ms.media_id "
+        "WHERE m.media_type = ? AND ms." + col + " IS NOT NULL AND trim(ms." + col + ") != ''",
+        (mt,)).fetchall():
+        try:
+            arr = json.loads(r[col])
+        except Exception:
+            continue
+        if isinstance(arr, list):
+            for v in arr:
+                if isinstance(v, str) and v.strip():
+                    per_media[r["media_id"]].add(v.strip())
+    counts = defaultdict(int)
+    for vals in per_media.values():
+        for v in vals:
+            counts[v] += 1
+    return [{"value": k, "count": v} for k, v in
+            sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:200]]
+
+
+def _media_col_facet(db, mt, col):
+    """media 表列等值选项（camera_make/camera_model/color_space…）。"""
+    return [dict(r) for r in db.execute(
+        f"SELECT {col} AS value, COUNT(*) AS count FROM media "
+        f"WHERE media_type=? AND {col} IS NOT NULL AND trim({col}) != '' "
+        "GROUP BY value ORDER BY count DESC, value LIMIT 200", (mt,)).fetchall()]
+
+
+def _orientation_facet(db, mt):
+    """方向（横/竖/方）计数：由 media 宽高派生。"""
+    return [dict(r) for r in db.execute(
+        "SELECT CASE WHEN width IS NOT NULL AND height IS NOT NULL AND width > height THEN 'landscape' "
+        "WHEN width IS NOT NULL AND height IS NOT NULL AND width < height THEN 'portrait' "
+        "WHEN width IS NOT NULL AND height IS NOT NULL AND width = height THEN 'square' "
+        "ELSE NULL END AS value, COUNT(*) AS count FROM media "
+        "WHERE media_type=? AND width IS NOT NULL AND height IS NOT NULL "
+        "GROUP BY value ORDER BY count DESC, value LIMIT 200", (mt,)).fetchall()]
+
+
+def _music_facet(db, dim):
+    """音乐标签维度（mood/genre/instrument/theme）：扫 music_summary 逐 label 计数。"""
+    counts = defaultdict(int)
+    for r in db.execute("SELECT music_summary FROM media WHERE media_type='audio'").fetchall():
+        raw = r["music_summary"]
+        if not raw:
+            continue
+        try:
+            summary = json.loads(raw)
+        except Exception:
+            continue
+        for it in summary.get(dim, []) or []:
+            label = it.get("label")
+            if label:
+                counts[label] += 1
+    return [{"value": k, "count": v} for k, v in
+            sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:200]]
+
+
+def _music_vocals_facet(db):
+    counts = defaultdict(int)
+    for r in db.execute("SELECT music_summary FROM media WHERE media_type='audio'").fetchall():
+        raw = r["music_summary"]
+        if not raw:
+            continue
+        try:
+            summary = json.loads(raw)
+        except Exception:
+            continue
+        v = summary.get("vocals")
+        if v:
+            counts[v] += 1
+    return [{"value": k, "count": v} for k, v in
+            sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:200]]
+
+
 @bp.route("/facets")
 def library_facets():
-    """高级筛选下拉选项 + 桶计数。作用域仅 media_type（P1 无交叉筛选）。"""
+    """高级筛选下拉选项 + 计数。作用域仅 media_type（P1 无交叉筛选）。"""
     db = get_db()
     mt = request.args.get("media_type", "")
     if mt not in ("image", "video", "audio"):
         return jsonify({"error": "media_type must be image|video|audio"}), 400
     resp = {"media_type": mt}
+    if mt in ("image", "video"):
+        for col in _SEG_EQ_COLS:
+            resp[col] = _seg_facet(db, col, mt)
+        for col in _SEG_ARR_COLS:
+            resp[col] = _arr_facet(db, col, mt)
+        resp["camera_make"] = _media_col_facet(db, mt, "camera_make")
+        resp["camera_model"] = _media_col_facet(db, mt, "camera_model")
+        resp["orientation"] = _orientation_facet(db, mt)
     if mt == "image":
-        resp["camera_make"] = [dict(r) for r in db.execute(
-            "SELECT camera_make AS value, COUNT(*) AS count FROM media "
-            "WHERE media_type='image' AND camera_make IS NOT NULL AND trim(camera_make) != '' "
-            "GROUP BY camera_make ORDER BY count DESC, value LIMIT 200").fetchall()]
-        resp["camera_model"] = [dict(r) for r in db.execute(
-            "SELECT camera_model AS value, COUNT(*) AS count FROM media "
-            "WHERE media_type='image' AND camera_model IS NOT NULL AND trim(camera_model) != '' "
-            "GROUP BY camera_model ORDER BY count DESC, value LIMIT 200").fetchall()]
+        resp["encoding"] = [dict(r) for r in db.execute(
+            f"SELECT {_ENCODING_CASE} AS value, COUNT(*) AS count FROM media "
+            "WHERE media_type='image' GROUP BY value ORDER BY count DESC, value LIMIT 200").fetchall()]
         row = db.execute(
             "SELECT MIN(substr(date_taken,1,10)) AS dmin, MAX(substr(date_taken,1,10)) AS dmax "
             "FROM media WHERE media_type='image' AND date_taken IS NOT NULL AND trim(date_taken) != ''").fetchone()
         resp["date_min"], resp["date_max"] = row["dmin"], row["dmax"]
-        resp["res"] = {k: 0 for k in RES_BUCKETS_IMAGE}
-        resp["aspect"] = {"landscape": 0, "portrait": 0, "square": 0}
-        for r in db.execute("SELECT width, height FROM media WHERE media_type='image'").fetchall():
-            w, h = r["width"], r["height"]
-            if w and h:
-                k = _bucket_key(RES_BUCKETS_IMAGE, (w * h) / 1000000.0)
-                if k:
-                    resp["res"][k] += 1
-                resp["aspect"]["landscape" if w > h else "portrait" if w < h else "square"] += 1
     elif mt == "video":
         resp["res"] = {k: 0 for k in RES_BUCKETS_VIDEO}
         resp["fps"] = {k: 0 for k in FPS_BUCKETS}
@@ -268,8 +469,13 @@ def library_facets():
             k = _bucket_key(DUR_BUCKETS, r["duration"])
             if k:
                 resp["dur"][k] += 1
-    # audio：无 facet 维度（封面/波形是 displayOnly）。未来音乐标签下拉（mood/genre/instrument
-    # 来自 music_summary JSON）在此加键。
+        resp["color_space"] = _media_col_facet(db, mt, "color_space")
+    elif mt == "audio":
+        resp["music_mood"] = _music_facet(db, "mood")
+        resp["music_genre"] = _music_facet(db, "genre")
+        resp["music_instrument"] = _music_facet(db, "instrument")
+        resp["music_theme"] = _music_facet(db, "theme")
+        resp["music_vocals"] = _music_vocals_facet(db)
     return jsonify(resp)
 
 
