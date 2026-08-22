@@ -1,5 +1,12 @@
 # TODO
 
+## 已完成：高级筛选面板七轮打磨——选中态 × 替换下拉三角（2026-08-22）
+
+用户更正：选中态不应「三角 + 左侧 ×」并存，而是**去掉三角只显示 ×、靠右对齐**（[main.css](../frontend/css/main.css) 一处，模板不动）：
+
+1. **`.adv-dim.active .q-select__dropdown-icon { display: none }`**——`active` 类即「有值」，有值时隐藏下拉三角，append slot 的 14px `cancel` × 独占右侧；空值时三角恢复（下拉语义提示仍在）。`margin-right: -2px` 精确对齐（× 右缘距控件右缘 12px = 空态三角右缘 12px）。
+- **实测**：有值维度三角 `display:none`、× 14px 且右缘 12px 与空态三角右缘 12px 完全对齐、无三角仍可点控件开菜单；空值维度三角显示无 ×；视觉确认（选中仅 × 靠右/空态三角/块内两行/无重叠）。
+
 ## 已完成：高级筛选面板六轮打磨——组段单行横向滚动 + 清除小 × 左置（2026-08-22）
 
 用户两点反馈落地（[gallery.js](../frontend/js/gallery.js) + [main.css](../frontend/css/main.css)，后端零改动）：

@@ -425,9 +425,10 @@ body.body--dark .filter-bar .q-field__append .q-icon { color: #666 !important; }
 .adv-filter-panel .q-field__prepend { padding: 0 0 0 8px; }
 .adv-filter-panel .q-field__prepend .q-icon { color: var(--text3); }
 .adv-filter-panel .adv-dim.active .q-field__prepend .q-icon { color: var(--accent) !important; }
-/* 清除小 ×（append，下拉三角左侧）：14px 小号，hover 变 accent */
-.adv-filter-panel .adv-clear-icon { color: var(--text3); }
+/* 清除小 ×（append）：14px 小号，hover 变 accent；有值时隐藏下拉三角、× 靠右独占 */
+.adv-filter-panel .adv-clear-icon { color: var(--text3); margin-right: -2px; }   /* -2px 与下拉三角右缘对齐 */
 .adv-filter-panel .adv-clear-icon:hover { color: var(--accent); }
+.adv-filter-panel .adv-dim.active .q-select__dropdown-icon { display: none; }
 /* 两区字段（34px）：空态 = 维度名全宽水平居中；float 态 = 小标签 [2,14] + 值文字 [14,34] */
 .adv-filter-panel .q-field { font-size: 12px; }
 .adv-filter-panel .q-field__control { height: 34px !important; min-height: 34px !important; border-radius: 6px !important; }
