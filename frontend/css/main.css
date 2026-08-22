@@ -403,9 +403,9 @@ body.body--dark .filter-bar .q-field__append .q-icon { color: #666 !important; }
 /* 展开时按钮呈面板「卡舌」：bar 底边透明去缝，面板 accent-dim 顶边衔接 */
 .filter-bar.adv-open { border-bottom-color: transparent; }
 /* 组段恒单行：放不下不折行，横向滚动（滚轮竖转横 + 按住拖拽，见 gallery.js）。
-   展开态与筛选栏连成一块：背景透明融入栏区、无顶边线（栏底边已随 adv-open 透明），按钮 accent-dim 底方角即「卡舌」 */
+   展开态整块底色（--surface）给足整体感；无顶边线，按钮 accent-dim 卡舌延伸条焊到块顶边上（栏底边随 adv-open 透明） */
 .adv-filter-panel { display: flex; flex-wrap: nowrap; overflow-x: auto; padding: 10px 14px 6px;
-  background: transparent; flex-shrink: 0; border-bottom: 1px solid var(--border); }
+  background: var(--surface); flex-shrink: 0; border-bottom: 1px solid var(--border); }
 .adv-filter-panel::-webkit-scrollbar { height: 6px; }
 .adv-filter-panel::-webkit-scrollbar-track { background: transparent; }
 .adv-filter-panel::-webkit-scrollbar-thumb { background: var(--text3); border-radius: 3px; opacity: .4; }
