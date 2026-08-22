@@ -1,5 +1,16 @@
 # TODO
 
+## 已完成：高级筛选面板二轮打磨——单行流式布局 + 日期合一控件 + 菜单紧凑化（2026-08-22）
+
+上轮分组落地后用户实测 4 项反馈，全部落地（[gallery.js](../frontend/js/gallery.js) + [main.css](../frontend/css/main.css)，后端零改动）：
+
+1. **分组行改单行流式 + 组色点**（用户选型）：上轮「每组一行 + 组标签」仍显分散支离——改为所有维度汇入一个流式换行区域，维度前 5px 组色圆点标记所属分组（镜头=蓝/场景光线=绿/风格=紫/画面内容=橙/相机文件=青/相机=金/技术=灰/音乐=粉），组间 1px 细分隔线，维度悬停 title 提示组名（组的归属信息不丢失）。面板高度 ~210px→~181px。删 `groupedSpec` computed 与组行 CSS（spec 的 `group` 键与 8 个组 i18n 键保留复用）。
+2. **拍摄日期起止合一控件**：两个 from/to 输入 + `~` 分隔 → 单个只读输入（placeholder「拍摄日期」居中，同其他维度空态），点日历图标弹 **QDate range 范围选择**（第一击起点不提交、第二击终点才提交并自动关弹层，`advDatePopup` v-model 控制关闭）；显示 `from ~ to` 文本。
+3. **日期可取消（确认真 bug 并修复）**：根因——Quasar `clearable` 的 × 只对 editable（非 readonly）字段渲染，readonly 日期输入永远没有清除图标（上轮两输入版同样如此）。修复：自定义 `cancel` 图标（有值才显示）点击清空两端。
+4. **下拉菜单紧凑化**：选项行高 32→28px、字号 12.5→12px、内距收紧，计数徽标 11→10px/6px 圆角，菜单内边距 4→3px。
+- **顺带**：Footer 日期标签补「拍摄日期:」前缀（对齐其他维度 `维度: 值` 格式与 UE_DESIGN 既有承诺）；删孤儿 i18n 键 `g.adv_date_from`/`g.adv_date_to`。
+- **验证**：Playwright 实测——图片 19 维流式（6/3/3/2/5 组类、4 分隔线、5 色点）、视频 18 维 5 组、音乐 6 维（toggle 无点 + 粉点）；日期链路（选范围→提交→弹层自动关→过滤命中变化→footer 标签→× 清空两端→localStorage 同步→刷新持久恢复）；菜单 28px/12px/3px 断言；亮暗双主题色点可辨；后端 [test_adv_filter_v2.py](../scripts/test_adv_filter_v2.py) 49 断言全绿。
+
 ## 已完成：高级筛选 UI 打磨——分组 + 5 项样式修复（2026-08-22）
 
 高级筛选 v2 用户实测 5 项 UI 问题 + 新增筛选条件分组，全部落地（[gallery.js](../frontend/js/gallery.js) + [main.css](../frontend/css/main.css) + [i18n.js](../frontend/js/i18n.js)，后端零改动）：

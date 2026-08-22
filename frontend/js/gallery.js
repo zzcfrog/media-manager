@@ -26,7 +26,7 @@ const ADV_FILTER_DEFAULTS = {
   // 音乐
   music_mood: "", music_genre: "", music_instrument: "", music_theme: "", music_vocals: "",
 };
-// group = 摄影领域分类的组标签 i18n 键（同组必须连续，groupedSpec 按连续段聚合）；无 group = 不分组（音乐显示切换）
+// group = 摄影领域分类的组 i18n 键（同组必须连续；模板按组色点 + 组间分隔线渲染，悬停提示组名）；无 group = 不分组（音乐显示切换）
 const ADVANCED_FILTER_SPEC = {
   audio: [
     { type: "toggle", displayOnly: true, param: "thumbMode", label: "g.adv_display", icon: "visibility",
@@ -226,61 +226,52 @@ const GalleryPage = {
         </q-btn>
       </q-btn-group>
     </div>
-    <!-- 高级筛选面板：按摄影领域分组，每组一行（组标签 + 组内下拉），折叠由栏内「高级筛选」按钮负责 -->
+    <!-- 高级筛选面板：单行流式布局，维度前组色点标记所属分组（悬停提示组名），组间细分隔线；折叠由栏内「高级筛选」按钮负责 -->
     <div v-if="advPanelOpen && currentSpec.length" class="adv-filter-panel">
-      <div v-for="grp in groupedSpec" :key="grp.key || 'misc'" class="adv-filter-group">
-        <span class="adv-group-label" :class="{ invisible: !grp.key }">{{ grp.key ? t(grp.key) : '' }}</span>
-        <div class="adv-filter-dims">
-          <div v-for="dim in grp.dims" :key="dim.param" class="adv-dim" :class="{ active: advDimActive(dim) }">
-            <q-btn-toggle v-if="dim.type === 'toggle'"
-                          :model-value="filters[dim.param] || ''"
-                          class="engine-toggle" no-caps unelevated dense
-                          :options="dimOptions(dim)"
-                          @update:model-value="setAdvDim(dim, $event)"></q-btn-toggle>
-            <q-select v-else-if="dim.type === 'dropdown'"
-                      :model-value="filters[dim.param] || ''"
-                      dense filled options-dense clearable emit-value map-options
-                      :options="dimOptions(dim)"
-                      :label="t(dim.label)"
-                      popup-content-class="adv-select-menu"
-                      style="min-width:150px"
-                      @update:model-value="setAdvDropdown(dim, $event)">
-              <template v-slot:option="scope">
-                <q-item v-bind="scope.itemProps" :class="{ 'adv-opt-selected': scope.selected }">
-                  <q-item-section>{{ scope.opt.label }}</q-item-section>
-                  <q-item-section side>
-                    <div style="display:flex;align-items:center;gap:6px">
-                      <span v-if="scope.opt.count != null" class="adv-opt-count">{{ scope.opt.count }}</span>
-                      <q-icon v-if="scope.selected" name="check" size="14px"></q-icon>
-                    </div>
-                  </q-item-section>
-                </q-item>
-              </template>
-            </q-select>
-            <div v-else-if="dim.type === 'dateRange'" class="adv-date-range">
-              <q-input clearable readonly :model-value="filters.date_from" dense filled :placeholder="t('g.adv_date_from')"
-                       @update:model-value="onAdvDate(dim, 'date_from', $event)">
-                <template v-slot:append>
-                  <q-icon name="event" class="cursor-pointer">
-                    <q-popup-proxy cover transition-show="scale" transition-hide="scale">
-                      <q-date :model-value="filters.date_from" mask="YYYY-MM-DD" dense @update:model-value="onAdvDate(dim, 'date_from', $event)"></q-date>
-                    </q-popup-proxy>
-                  </q-icon>
-                </template>
-              </q-input>
-              <span class="adv-date-sep">~</span>
-              <q-input clearable readonly :model-value="filters.date_to" dense filled :placeholder="t('g.adv_date_to')"
-                       @update:model-value="onAdvDate(dim, 'date_to', $event)">
-                <template v-slot:append>
-                  <q-icon name="event" class="cursor-pointer">
-                    <q-popup-proxy cover transition-show="scale" transition-hide="scale">
-                      <q-date :model-value="filters.date_to" mask="YYYY-MM-DD" dense @update:model-value="onAdvDate(dim, 'date_to', $event)"></q-date>
-                    </q-popup-proxy>
-                  </q-icon>
-                </template>
-              </q-input>
-            </div>
-          </div>
+      <div class="adv-filter-dims">
+        <div v-for="(dim, i) in currentSpec" :key="dim.param" class="adv-dim"
+             :class="['adv-g-' + (dim.group ? dim.group.replace('g.adv_group_', '') : 'none'),
+                      { active: advDimActive(dim), 'group-start': i > 0 && dim.group !== currentSpec[i-1].group }]"
+             :title="dim.group ? t(dim.group) : ''">
+          <q-btn-toggle v-if="dim.type === 'toggle'"
+                        :model-value="filters[dim.param] || ''"
+                        class="engine-toggle" no-caps unelevated dense
+                        :options="dimOptions(dim)"
+                        @update:model-value="setAdvDim(dim, $event)"></q-btn-toggle>
+          <q-select v-else-if="dim.type === 'dropdown'"
+                    :model-value="filters[dim.param] || ''"
+                    dense filled options-dense clearable emit-value map-options
+                    :options="dimOptions(dim)"
+                    :label="t(dim.label)"
+                    popup-content-class="adv-select-menu"
+                    style="min-width:150px"
+                    @update:model-value="setAdvDropdown(dim, $event)">
+            <template v-slot:option="scope">
+              <q-item v-bind="scope.itemProps" :class="{ 'adv-opt-selected': scope.selected }">
+                <q-item-section>{{ scope.opt.label }}</q-item-section>
+                <q-item-section side>
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <span v-if="scope.opt.count != null" class="adv-opt-count">{{ scope.opt.count }}</span>
+                    <q-icon v-if="scope.selected" name="check" size="14px"></q-icon>
+                  </div>
+                </q-item-section>
+              </q-item>
+            </template>
+          </q-select>
+          <q-input v-else-if="dim.type === 'dateRange'" readonly
+                   :model-value="advDateText" dense filled :placeholder="t('g.adv_date_range')">
+            <template v-slot:append>
+              <!-- clearable 的 × 对 readonly 字段不渲染（Quasar 仅 editable 才出），自定义清除图标 -->
+              <q-icon v-if="advDateText" name="cancel" class="cursor-pointer" style="color:var(--text3)" @click.stop="onAdvDateClear"></q-icon>
+              <q-icon name="event" class="cursor-pointer">
+                <q-popup-proxy v-model="advDatePopup" cover transition-show="scale" transition-hide="scale"
+                               @show="advDatePick = advDateModel">
+                  <q-date v-model="advDatePick" range mask="YYYY-MM-DD" dense
+                          @update:model-value="onAdvDateRange"></q-date>
+                </q-popup-proxy>
+              </q-icon>
+            </template>
+          </q-input>
         </div>
       </div>
     </div>
@@ -916,6 +907,8 @@ const GalleryPage = {
       filters: { media_type: "all", rating: "", color_label: "", ...ADV_FILTER_DEFAULTS },
       _coverFallback: new Map(), // m.id -> 'waveform' | 'none'（封面 404 回落链，防死循环）
       advPanelOpen: false,       // 高级筛选面板（展开时独占一行，由栏内「高级筛选」按钮切换）
+      advDatePick: null,         // 拍摄日期范围选择器的就地状态（{from,to}，提交后写回 filters）
+      advDatePopup: false,       // 拍摄日期日历弹层开关（范围选完自动关）
       _advFacets: { image: null, video: null, audio: null }, // 预置键；mt -> facets | null
       favFilter: null,       // null → 'fav' → 'unfav' → null
       analysisFilter: null,  // null → 'analyzed' → 'not' → null
@@ -948,16 +941,13 @@ const GalleryPage = {
     currentSpec() {
       return ADVANCED_FILTER_SPEC[this.filters.media_type] || [];
     },
-    // 按连续 group 段聚合（无 group 的归入空串组，组标签隐藏但占位对齐）
-    groupedSpec() {
-      const groups = [];
-      for (const dim of this.currentSpec) {
-        const key = dim.group || "";
-        let g = groups[groups.length - 1];
-        if (!g || g.key !== key) { g = { key, label: key, dims: [] }; groups.push(g); }
-        g.dims.push(dim);
-      }
-      return groups;
+    // 拍摄日期合一控件：显示文本 + 范围选择器模型（两端齐才成范围，残缺视为无）
+    advDateText() {
+      return [this.filters.date_from, this.filters.date_to].filter(Boolean).join(" ~ ");
+    },
+    advDateModel() {
+      const { date_from, date_to } = this.filters;
+      return date_from && date_to ? { from: date_from, to: date_to } : null;
     },
     sortOptions() {
       return [
@@ -1021,7 +1011,7 @@ const GalleryPage = {
         if (dim.displayOnly) continue; // thumbMode 是显示偏好，不是筛选，不产生标签
         if (dim.type === 'dateRange') {
           if (this.filters.date_from || this.filters.date_to) {
-            tags.push({ icon: dim.icon, label: [this.filters.date_from, this.filters.date_to].filter(Boolean).join(' ~ ') });
+            tags.push({ icon: dim.icon, label: `${this.t(dim.label)}: ${[this.filters.date_from, this.filters.date_to].filter(Boolean).join(' ~ ')}` });
           }
         } else if (dim.param && this.filters[dim.param]) {
           tags.push({ icon: dim.icon, label: `${this.t(dim.label)}: ${this.dimValueLabel(dim, this.filters[dim.param])}` });
@@ -1205,9 +1195,19 @@ const GalleryPage = {
       this.filters[dim.param] = value || '';
       this.load();
     },
-    onAdvDate(dim, field, val) {
-      this.filters[field] = val || '';
+    // 拍摄日期合一控件：自定义 × 清空两端
+    onAdvDateClear() {
+      this.filters.date_from = '';
+      this.filters.date_to = '';
       this.load();
+    },
+    // 范围选完（from+to 齐）才提交并关弹层；中途态只留在选择器里
+    onAdvDateRange(val) {
+      if (!val || !val.from || !val.to) return;
+      this.filters.date_from = val.from;
+      this.filters.date_to = val.to;
+      this.load();
+      this.advDatePopup = false;
     },
     advDimActive(dim) {
       if (dim.displayOnly) return false;
