@@ -226,11 +226,11 @@ const GalleryPage = {
         </q-btn>
       </q-btn-group>
     </div>
-    <!-- 高级筛选面板：Office Ribbon 同屏组段式——每分组一段（组间竖分隔线 + 组底小字组名），组内维度流式一行或两行 -->
+    <!-- 高级筛选面板：Office Ribbon 同屏组段式——每分组一段（组间竖分隔线 + 组底小字组名），组内维度固定两行网格 -->
     <div v-if="advPanelOpen && currentSpec.length" class="adv-filter-panel">
       <div v-for="(grp, gi) in groupedSpec" :key="grp.key || 'misc-' + gi" class="adv-group"
            :class="{ 'adv-group-plain': !grp.key }">
-        <div class="adv-group-dims">
+        <div class="adv-group-dims" :style="{ gridTemplateColumns: 'repeat(' + groupColCount(grp) + ', auto)' }">
           <div v-for="dim in grp.dims" :key="dim.param" class="adv-dim"
                :class="{ active: advDimActive(dim) }">
           <q-btn-toggle v-if="dim.type === 'toggle'"
@@ -1228,6 +1228,10 @@ const GalleryPage = {
       if (dim.displayOnly) return false;
       if (dim.type === 'dateRange') return !!(this.filters.date_from || this.filters.date_to);
       return dim.param && !!this.filters[dim.param];
+    },
+    // 组段内维度固定两行：列数 = ceil(维度数/2)，网格按行填充即上下两行（单维段如音乐「显示」仍一行）
+    groupColCount(grp) {
+      return Math.ceil(grp.dims.length / 2);
     },
     advAnyActive() {
       return this.currentSpec.some(d => this.advDimActive(d));

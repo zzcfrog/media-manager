@@ -401,12 +401,13 @@ body.body--dark .filter-bar .q-field__append .q-icon { color: #666 !important; }
 .filter-bar.adv-open { border-bottom-color: transparent; }
 .adv-filter-panel { display: flex; flex-wrap: wrap; padding: 10px 14px 6px; background: var(--surface); flex-shrink: 0;
   border-top: 2px solid var(--accent-dim); border-bottom: 1px solid var(--border); }
-/* 组段：段间竖分隔线；段超行宽时 shrink 触发组内维度折两行（整段不散开换行） */
+/* 组段：段间竖分隔线；段为固定形状块（不收缩），行宽不够整段换行 */
 .adv-group { display: flex; flex-direction: column; gap: 2px; padding: 0 14px; max-width: 100%;
-  border-left: 1px solid var(--border); flex: 0 1 auto; min-width: 0; }
+  border-left: 1px solid var(--border); flex: 0 0 auto; }
 .adv-group:first-child { border-left: none; padding-left: 0; }
 .adv-group-plain { border-left: none; padding-left: 0; }   /* 无组段（音乐显示切换）无边线 */
-.adv-group-dims { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+/* 组内维度固定两行：grid 列数由模板内联（ceil(n/2)），按行填充即上下两行 */
+.adv-group-dims { display: grid; align-items: center; gap: 6px 10px; }
 .adv-group-name { font-size: 10px; line-height: 14px; color: var(--text3); text-align: center; }
 .adv-dim { display: inline-flex; align-items: center; min-height: 34px; }
 .adv-filter-panel .engine-toggle .q-btn { min-height: 34px; }

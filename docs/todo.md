@@ -1,5 +1,13 @@
 # TODO
 
+## 已完成：高级筛选面板五轮打磨——组段内维度固定两行（2026-08-22）
+
+用户明确要求：**每一个区块（组段）内是两行**下拉，否则单行排布会把段拉成长条「串行」。落地（[gallery.js](../frontend/js/gallery.js) + [main.css](../frontend/css/main.css)，后端零改动）：
+
+1. **组内两行网格**：`.adv-group-dims` 从 flex-wrap 改 `display: grid`，列数由模板内联 `gridTemplateColumns: repeat(ceil(n/2), auto)`（新增 `groupColCount(grp)` 方法）——按行填充天然形成恰好上下两行（6 维 = 3×2，3 维 = 2+1，2 维 = 1×2 竖排）；音乐「显示」单维段仍一行。各段等高（实测 90px），Ribbon 块感整齐。
+2. **段改固定形状块**：`.adv-group` `flex: 0 1 auto` 收缩行为移除（改 `0 0 auto`，删 `min-width:0`）——段不再靠收缩挤一行，保持两行块形，行宽不够时**整段换行**（外层 panel flex-wrap 即 flow 布局）。
+- **实测**：图片 5 段全部 rows=2（镜头语言 394px · 场景光线 279 · 风格色调 279 · 画面内容 149（1×2 竖排）· 相机与文件 465，段高全 90px），外层两行 flow（394+279 / 279+149+465），面板 199px 高；视频 5 段全 rows=2（…技术参数 409px）；音乐 无组段 1 行 + 音乐特征 rows=2，面板 109px。交互回归：景别=全景 → 1 卡 + active + Footer 标签、日期 prepend 图标弹层正常；视觉确认两行/flow/无重叠（段间分隔线程序化验证存在，深色下配色较淡为既有配色）。
+
 ## 已完成：高级筛选面板四轮打磨——下拉四字定宽 + 维度小图标（2026-08-22）
 
 组段布局落地后用户实测反馈：下拉太宽、块内不够紧凑。本轮把字段收窄到四字宽并补维度语义小图标（[gallery.js](../frontend/js/gallery.js) + [main.css](../frontend/css/main.css)，后端零改动）：
