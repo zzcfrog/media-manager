@@ -376,7 +376,7 @@ body.body--dark .filter-bar .q-btn-group { background: #222; }
 .filter-bar .q-field--filled.q-field--focused .q-field__control::after { border: none !important; }
 /* Sort group container */
 .sort-group { display: flex; align-items: center; border-radius: 6px; overflow: hidden; }
-body.body--dark .sort-group { background: #1c1c1c; }
+body.body--dark .sort-group { background: #222; }
 .sort-group .q-select { flex: 1; }
 .sort-group .q-field .q-field__control { border: none !important; background: transparent !important; }
 .sort-group .q-field .q-field__control::before,
@@ -398,16 +398,19 @@ body.body--dark .filter-bar .q-field__append .q-icon { color: #666 !important; }
 
 /* Advanced filter panel: Office Ribbon 同屏组段——每分组一段（组间竖分隔线 + 组底小字组名），dims from ADVANCED_FILTER_SPEC */
 .adv-btn-active { color: var(--accent) !important; background: var(--accent-dim) !important; }
-.adv-btn-open { color: var(--accent) !important; background: transparent !important; border-radius: 6px 6px 0 0 !important; }
+/* 展开态按钮 = 页签：底色与高级筛选整区（面板）一致，较工具栏底反差一档肉眼可辨（暗更亮/亮更深，十五轮）；
+   向下 16px 同色零模糊投影 = 桥：盖过按钮至面板的全部间隔（8px 下内边距 + 居中悬空量），溢出被栏 overflow 裁掉 */
+.adv-btn-open { color: var(--accent) !important; background: var(--surface2) !important; border-radius: 6px 6px 0 0 !important; box-shadow: 0 16px 0 0 var(--surface2); }
+body.body--dark .adv-btn-open { background: var(--surface3) !important; box-shadow: 0 16px 0 0 var(--surface3); }
 .filter-bar .adv-toggle-btn { flex-shrink: 0; }   /* 防栏溢出时按钮被挤压折行 */
-/* 展开态栏-按钮-面板连成一体（Office 选中页签式）：栏/面板同用 surface 底连成整块 ribbon 区
-   （较页面底深一档：暗 #141414 / 亮 #fff，与媒体卡片同级——整块肉眼可辨，十四轮），
-   按钮透明底即露栏底仍连通，栏底边透明去缝，面板底边线即整个 ribbon 区外缘 */
-.filter-bar.adv-open { border-bottom-color: transparent; }
+/* 展开态栏底边整条去除（0 而非透明——透明仍有 1px 栏底色缝，会隔断按钮桥与面板；1px 高度跳变被面板开合掩盖），
+   工具栏与高级筛选整区的边界即两者色差本身 */
+.filter-bar.adv-open { border-bottom: 0; }
 /* 组段恒单行：放不下不折行，横向滚动（滚轮竖转横 + 按住拖拽，见 gallery.js）。
-   面板与栏区同底色（--surface），仅底边 1px 作 ribbon 外缘收边 */
+   面板底 = 高级筛选整区底（--surface2 / 暗 --surface3，与展开按钮同色），仅底边 1px 作整区外缘收边 */
 .adv-filter-panel { display: flex; flex-wrap: nowrap; overflow-x: auto; padding: 10px 14px 6px;
-  background: var(--surface); flex-shrink: 0; border-bottom: 1px solid var(--border); }
+  background: var(--surface2); flex-shrink: 0; border-bottom: 1px solid var(--border); }
+body.body--dark .adv-filter-panel { background: var(--surface3); }
 .adv-filter-panel::-webkit-scrollbar { height: 6px; }
 .adv-filter-panel::-webkit-scrollbar-track { background: transparent; }
 .adv-filter-panel::-webkit-scrollbar-thumb { background: var(--text3); border-radius: 3px; opacity: .4; }
