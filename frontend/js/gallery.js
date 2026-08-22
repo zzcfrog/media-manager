@@ -256,11 +256,8 @@ const GalleryPage = {
             <template v-slot:option="scope">
               <q-item v-bind="scope.itemProps" :class="{ 'adv-opt-selected': scope.selected }">
                 <q-item-section>{{ scope.opt.label }}</q-item-section>
-                <q-item-section side>
-                  <div style="display:flex;align-items:center;gap:6px">
-                    <span v-if="scope.opt.count != null" class="adv-opt-count">{{ scope.opt.count }}</span>
-                    <q-icon v-if="scope.selected" name="check" size="14px"></q-icon>
-                  </div>
+                <q-item-section v-if="scope.selected" side>
+                  <q-icon name="check" size="14px"></q-icon>
                 </q-item-section>
               </q-item>
             </template>
@@ -1302,37 +1299,30 @@ const GalleryPage = {
       if (o) return o.label != null ? o.label : this.t(o.labelKey);
       return value;
     },
-    // 统一选项：枚举/词表项 + 计数徽标（count 字段，菜单里独立渲染）+ 并入数据新值；
-    // 动态 dim（无 options）直接来自 facets；音乐 dim 用词表（en 值 + zh 显示，数据已按词表清洗无需并入）；
-    // facets 已加载时缺失/0 计数禁用；未加载或无 facetKey（如显示 toggle）不禁用
+    // 统一选项：枚举/词表项 + 并入数据新值；动态 dim（无 options）直接来自 facets；
+    // 音乐 dim 用词表（en 值 + zh 显示，数据已按词表清洗无需并入）。
+    // 计数徽标/0 计数禁用已移除（十八轮）：全局计数不含交叉筛选，对多选组合无指导意义
     dimOptions(dim) {
       const facets = this._advFacets[this.filters.media_type] || {};
       const counts = dim.facetKey ? facets[dim.facetKey] : null;
-      const countMap = {};
-      if (Array.isArray(counts)) counts.forEach(x => { countMap[x.value] = x.count; });
-      else if (counts) Object.assign(countMap, counts); // 桶计数 dict（res/fps/dur）
-      const cnt = v => (counts ? (countMap[v] || 0) : null);
-      const off = v => (counts ? cnt(v) === 0 : false);
       if (!dim.options && !dim.taxKey) {
-        // 动态 dim：仅数据里出现的值（已带计数）
-        return (counts || []).map(x => ({ label: x.value, value: x.value, count: x.count }));
+        // 动态 dim：仅数据里出现的值
+        return (counts || []).map(x => ({ label: x.value, value: x.value }));
       }
       const base = dim.taxKey
         ? ((this.$root.musicTax?.[dim.taxKey]) || []).map(x => ({
             label: this.$root.musicTaxZh?.[x.en] || x.en,
             value: x.en,
-            count: cnt(x.en),
-            disable: off(x.en),
           }))
-        : dim.options.map(o => {
-            const label = o.label != null ? o.label : this.t(o.labelKey);
-            return { label, value: o.value, count: cnt(o.value), disable: off(o.value) };
-          });
-      // 标准枚举 + 并入数据新值（带计数，仅非词表 dim；桶 facets 是 dict，无需并入）
+        : dim.options.map(o => ({
+            label: o.label != null ? o.label : this.t(o.labelKey),
+            value: o.value,
+          }));
+      // 标准枚举 + 并入数据新值（仅非词表 dim；桶 facets 是 dict，无需并入）
       if (!dim.taxKey && Array.isArray(counts)) {
         const seen = new Set(dim.options.map(o => o.value));
         for (const x of counts) {
-          if (!seen.has(x.value)) base.push({ label: x.value, value: x.value, count: x.count });
+          if (!seen.has(x.value)) base.push({ label: x.value, value: x.value });
         }
       }
       return base;

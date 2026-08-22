@@ -1,5 +1,15 @@
 # TODO
 
+## 已完成：高级筛选面板十八轮——下拉选项移除计数徽标，0 置灰同撤（2026-08-22）
+
+「每一个下拉菜单里都会显示一个数量……它是指单一条件下的数量，我在选择的时候可能起不到太多的指导作用。」——徽标的全局计数不含交叉筛选，对多选组合确实无指导意义，移除（[gallery.js](../frontend/js/gallery.js) / [main.css](../frontend/css/main.css)）：
+
+1. **模板 option slot**：删徽标 span，选项仅剩文字 + 选中项右侧对勾（`v-if="scope.selected"`）。
+2. **dimOptions**：删 countMap/cnt/off 与选项 count/disable 字段——徽标既去，0 置灰的「灰」失去可见依据，一并撤；选项来源逻辑不变（枚举 + 并入 facets 新值 / 词表 / 动态 dim 走 facets）。
+3. **CSS**：删 `.adv-opt-count`（含暗色变体）与 `.q-item.disabled` 置灰规则。
+4. **facets 请求保留**：仍供选项来源（动态维度唯一来源 + 枚举并入新值），仅不再用于计数。
+- **实测**：全部下拉 0 徽标 0 禁用；原 0 计数项（远景）可选、菜单不关、对勾/字段值/刷新持久化正常；暗亮双主题视觉四项全过（无残留/布局整齐/强调态清晰/无违和）。
+
 ## 已完成：高级筛选面板十七轮——下拉全维多选，同维度 OR（2026-08-22）
 
 「高级筛选的每一个下拉菜单，能不能支持多选？」——全部 `type: "dropdown"` 维度支持多选，语义 = **同维度内 OR（任一命中）**、不同维度间仍 AND（[library.py](../backend/blueprints/library.py) / [gallery.js](../frontend/js/gallery.js) / [api.js](../frontend/js/api.js) / [i18n.js](../frontend/js/i18n.js)）：

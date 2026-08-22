@@ -472,19 +472,16 @@ body.body--dark .adv-filter-panel { background: var(--surface3); }
 .adv-filter-panel .adv-dim.active .q-field__control::after { transform: scaleX(1) !important; background: var(--accent) !important; }
 .adv-filter-panel .adv-dim.active .q-field__native { color: var(--accent) !important; font-weight: 500; }
 .adv-filter-panel .adv-dim.active .q-field__input { color: var(--accent) !important; font-weight: 500; }
-/* 下拉菜单（portal 到 body，规则必须全局）：紧凑行高 + 计数徽标 + 选中对勾态 + 0 计数灰化 */
+/* 下拉菜单（portal 到 body，规则必须全局）：紧凑行高 + 选中对勾态（计数徽标/0 灰化已移除，十八轮） */
 .adv-select-menu { border-radius: 8px !important; padding: 3px !important; min-width: 168px !important; }
 .adv-select-menu .q-item { border-radius: 5px; min-height: 28px; padding: 0 8px; font-size: 12px; }
-.adv-select-menu .q-item.disabled { opacity: .45 !important; }
 .adv-select-menu .adv-opt-selected { background: var(--accent-dim) !important; color: var(--accent) !important; }
-.adv-opt-count { font-size: 10px; line-height: 16px; color: var(--text3); background: var(--surface3); border-radius: 6px; padding: 0 5px; }
 body.body--dark .adv-filter-panel .q-field__native,
 body.body--dark .adv-filter-panel .q-field__input,
 body.body--dark .adv-filter-panel .q-field__control { color: #eee !important; }
 body.body--dark .adv-filter-panel .q-placeholder { color: #555 !important; }
 body.body--dark .adv-filter-panel .q-field__append .q-icon { color: #666 !important; }
 body.body--dark .adv-select-menu .adv-opt-selected { color: #8ea2ff !important; }
-body.body--dark .adv-opt-count { background: #2a2a2a; }
 /* Drawer styling */
 body.body--dark .q-drawer .q-item-label { font-size: 11px; font-weight: 700; color: #fff; letter-spacing: 0.5px; padding: 10px 16px 4px; text-transform: uppercase; }
 body.body--dark .q-drawer .q-item { font-size: 13px; color: #aaa; padding: 6px 12px 6px 16px; min-height: 32px; }
