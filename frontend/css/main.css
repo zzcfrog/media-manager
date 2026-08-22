@@ -420,8 +420,9 @@ body.body--dark .adv-filter-panel { background: var(--surface3); }
   border-left: 1px solid var(--border2); flex: 0 0 auto; }
 .adv-group:first-child { border-left: none; padding-left: 0; }
 .adv-group-plain { border-left: none; padding-left: 0; }   /* 无组段（音乐显示切换）无边线 */
-/* 组内维度固定两行：grid 列数由模板内联（ceil(n/2)），按行填充即上下两行 */
-.adv-group-dims { display: grid; align-items: center; gap: 6px 10px; }
+/* 组内维度固定两行：两行 flex（前 ceil(n/2) 一行）——等宽下拉天然竖向对齐，宽日期不撑共享列（十九轮 grid 改） */
+.adv-group-dims { display: flex; flex-direction: column; gap: 6px; }
+.adv-group-row { display: flex; align-items: center; gap: 10px; }
 .adv-group-name { font-size: 10px; line-height: 14px; color: var(--text3); text-align: center; }
 .adv-dim { display: inline-flex; align-items: center; min-height: 34px; }
 .adv-filter-panel .engine-toggle .q-btn { min-height: 34px; }
@@ -429,8 +430,8 @@ body.body--dark .adv-filter-panel { background: var(--surface3); }
 .adv-filter-panel .adv-dim .q-select { width: 108px; }
 .adv-filter-panel .adv-dim .q-input { width: 176px; }
 .adv-filter-panel .adv-dim .q-field__native { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* 维度小图标（prepend）：左侧语义图标，active 时变 accent */
-.adv-filter-panel .q-field__prepend { padding: 0 0 0 8px; }
+/* 维度小图标（prepend）：左侧语义图标贴左（十九轮 8→0，图标落在 12px 控件内距线上），active 时变 accent */
+.adv-filter-panel .q-field__prepend { padding: 0; }
 .adv-filter-panel .q-field__prepend .q-icon { color: var(--text3); }
 .adv-filter-panel .adv-dim.active .q-field__prepend .q-icon { color: var(--accent) !important; }
 /* 清除小 ×（append）：14px 小号，hover 变 accent；有值时隐藏下拉三角、× 靠右独占 */
@@ -439,12 +440,13 @@ body.body--dark .adv-filter-panel { background: var(--surface3); }
 .adv-filter-panel .adv-dim.active .q-select__dropdown-icon { display: none; }
 /* 字段（34px）：空态 = 维度名全宽水平居中；有值（active）= 隐藏维度名、值全宽水平居中 */
 .adv-filter-panel .q-field { font-size: 12px; }
-.adv-filter-panel .q-field__control { height: 34px !important; min-height: 34px !important; border-radius: 6px !important; }
+.adv-filter-panel .q-field__control { height: 34px !important; min-height: 34px !important; border-radius: 6px !important;
+  padding-right: 4px; }   /* 十九轮 12→4：下拉三角贴右（对冲左侧图标 8→0，居中基准不变） */
 .adv-filter-panel .q-field__marginal { height: 34px !important; }
 .adv-filter-panel .q-field__control-container { padding-top: 0 !important; }
-/* 空态居中基准 = 整个控件：right 外扩 30px 抵消右侧下拉箭头 append、left 外扩 22px 抵消左侧维度图标 prepend */
+/* 空态居中基准 = 整个控件：left 外扩 14px 抵消左侧维度图标 prepend、right 外扩 18px 抵消右侧下拉箭头 append（十九轮实测标定：图标贴左/三角贴右后 14/18 为居中零偏移） */
 .adv-filter-panel .q-field--labeled:not(.q-field--float) .q-field__label {
-  top: 0; left: -22px; right: -30px; max-width: none;
+  top: 0; left: -14px; right: -18px; max-width: none;
   text-align: center; font-size: 12px; line-height: 34px; transform: none;
 }
 /* 仅空态聚焦（开菜单未选）时上浮小标签兜底；active 有值时该标签整体隐藏（见下） */

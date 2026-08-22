@@ -231,8 +231,9 @@ const GalleryPage = {
          @wheel="onAdvPanelWheel" @mousedown="startAdvDrag" @click.capture="onAdvPanelClickCapture">
       <div v-for="(grp, gi) in groupedSpec" :key="grp.key || 'misc-' + gi" class="adv-group"
            :class="{ 'adv-group-plain': !grp.key }">
-        <div class="adv-group-dims" :style="{ gridTemplateColumns: 'repeat(' + groupColCount(grp) + ', auto)' }">
-          <div v-for="dim in grp.dims" :key="dim.param" class="adv-dim"
+        <div class="adv-group-dims">
+          <div v-for="row in groupRows(grp)" :key="row.map(d => d.param).join('-')" class="adv-group-row">
+          <div v-for="dim in row" :key="dim.param" class="adv-dim"
                :class="{ active: advDimActive(dim) }">
           <q-btn-toggle v-if="dim.type === 'toggle'"
                         :model-value="filters[dim.param] || ''"
@@ -278,6 +279,7 @@ const GalleryPage = {
               <q-icon v-if="advDateText" name="cancel" size="14px" class="cursor-pointer adv-clear-icon" @click.stop="onAdvDateClear"></q-icon>
             </template>
           </q-input>
+          </div>
           </div>
         </div>
         <div v-if="grp.key" class="adv-group-name">{{ t(grp.key) }}</div>
@@ -1252,9 +1254,11 @@ const GalleryPage = {
       if (dim.type === 'dateRange') return !!(this.filters.date_from || this.filters.date_to);
       return dim.param && this.advVal(dim).length > 0;
     },
-    // 组段内维度固定两行：列数 = ceil(维度数/2)，网格按行填充即上下两行（单维段如音乐「显示」仍一行）
-    groupColCount(grp) {
-      return Math.ceil(grp.dims.length / 2);
+    // 组段内维度固定两行：前 ceil(n/2) 一行、其余第二行。两行 flex 而非 grid——等宽下拉天然竖向对齐，
+    // 宽日期组件不再撑宽共享列顶开右侧维度（十九轮前 grid 列 108/176/108，相机型号被顶右 68px）
+    groupRows(grp) {
+      const half = Math.ceil(grp.dims.length / 2);
+      return [grp.dims.slice(0, half), grp.dims.slice(half)].filter(r => r.length);
     },
     // 面板恒单行：组段放不下时横向滚动——滚轮竖转横 + 按住拖拽滑动（lasso 同款 document 监听模式）
     onAdvPanelWheel(e) {
