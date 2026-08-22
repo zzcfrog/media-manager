@@ -1,5 +1,15 @@
 # TODO
 
+## 已完成：高级筛选面板十七轮——下拉全维多选，同维度 OR（2026-08-22）
+
+「高级筛选的每一个下拉菜单，能不能支持多选？」——全部 `type: "dropdown"` 维度支持多选，语义 = **同维度内 OR（任一命中）**、不同维度间仍 AND（[library.py](../backend/blueprints/library.py) / [gallery.js](../frontend/js/gallery.js) / [api.js](../frontend/js/api.js) / [i18n.js](../frontend/js/i18n.js)）：
+
+1. **线上格式 = 重复参数**（`?shot_type=特写&shot_type=全景`），不用逗号拼接——`camera_make` 等 facet 值来自 EXIF 可能含逗号（全仓唯一多值先例 `exclude_ids` 是纯数字 ID 不可比）。后端新增 `_args_list`（getlist + `dict.fromkeys` 去空去重）与 `_any_pred`（逐值 build 谓词 OR 连接；**单值不包括号，SQL 与原单值完全一致 = 向后兼容**）；片段枚举/数组维、编码、方向、相机品牌/型号、色彩空间、视频桶 res/fps/dur、音乐 5 维全部包装；date_from/date_to 与显示 toggle 不多选。
+2. **前端 filters 恒存数组**：`advVal(dim)` 强制数组视图（旧 localStorage 标量 → 单值数组自动迁移、默认 `""` → `[]`，免改 30 个默认键）；`advModel` 空数组传 **null**——Quasar 把 `[]` 判为有值，清空后 label 不回落居中占位（实测踩坑）；`advDisplayValue` 有值显「首值 +N」（108px 定宽放不下逗号连接串），空 → undefined 回落 label 占位。
+3. **交互**（Quasar multiple 免费所得）：点选项即切换且**菜单不关**（Ribbon 式连选）、选中项对勾 + accent 常驻；字段 × 清空整维；Footer 多值标签顿号连接（新 i18n 键 `g.adv_join`：zh `、` / en `, `）。
+4. **api.js** 抽 `_qs`：数组值逐个 append 成重复参数（getLibrary/getLibraryIds 共用）；`_buildParams` 数组直接下发、`activeFilterTags`/`advDimActive` 改走 `advVal`。
+- **实测**：12 条多值断言全过（并集/单元素退化/含未知值/数组维/编码/方向/相机/视频片段 OR/双桶/色彩空间/音乐同曲去重），单值套件原样全绿 = 向后兼容；curl 实证单值 1+1 → OR 并集 2 → 跨维 AND 1；Playwright 验证菜单不关/对勾/字段「特写 +1」/Footer「景别: 特写、全景」/× 清空回居中占位/刷新持久化（localStorage 存数组）/网络确为重复参数/音乐双选抽查；暗亮双主题视觉四项全过。
+
 ## 已完成：高级筛选面板十六轮打磨——组段竖分割线提档 + 下拉整体收窄（2026-08-22）
 
 十五轮整区换底（暗 #222 / 亮 #eee）的连带回归（[main.css](../frontend/css/main.css)）：

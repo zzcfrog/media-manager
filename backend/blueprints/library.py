@@ -135,18 +135,40 @@ def _orient_pred(value):
     return None, []
 
 
+def _args_list(name):
+    """同维度多值：重复参数（?p=a&p=b）→ 去空去重的值列表。"""
+    return list(dict.fromkeys(v.strip() for v in request.args.getlist(name) if v and v.strip()))
+
+
+def _any_pred(build, values):
+    """同一维度多值 OR：逐值调 build(value)，谓词 OR 连接；单值不包括号（与原单值 SQL 全同）。"""
+    preds, ps = [], []
+    for v in values:
+        p, args = build(v)
+        if p:
+            preds.append(p)
+            ps.extend(args)
+    if not preds:
+        return None, []
+    if len(preds) == 1:
+        return preds[0], ps
+    return "(" + " OR ".join(preds) + ")", ps
+
+
 def _apply_seg_dims(where_clauses, params, seg_dims, arr_dims):
-    """片段维度谓词：等值（EXISTS 任一命中）+ 数组（instr JSON 元素）。图片/视频共用。"""
-    for col, val in seg_dims.items():
-        if val:
-            pred, ps = _seg_pred(col, val)
-            where_clauses.append(pred)
-            params.extend(ps)
-    for col, val in arr_dims.items():
-        if val:
-            pred, ps = _arr_pred(col, val)
-            where_clauses.append(pred)
-            params.extend(ps)
+    """片段维度谓词：等值（EXISTS 任一命中）+ 数组（instr JSON 元素）。图片/视频共用；同维度多值 OR。"""
+    for col, vals in seg_dims.items():
+        if vals:
+            pred, ps = _any_pred(lambda v: _seg_pred(col, v), vals)
+            if pred:
+                where_clauses.append(pred)
+                params.extend(ps)
+    for col, vals in arr_dims.items():
+        if vals:
+            pred, ps = _any_pred(lambda v: _arr_pred(col, v), vals)
+            if pred:
+                where_clauses.append(pred)
+                params.extend(ps)
 
 
 bp = Blueprint("library", __name__)
@@ -167,25 +189,26 @@ def list_media():
     folder = request.args.get("folder")
     q = request.args.get("q", "").strip()
     exclude_ids = request.args.get("exclude_ids", "").strip()
-    # 高级筛选维度参数（按 media_type 解释，面板按类型作用域所以只会有一种活跃）
-    res_key = request.args.get("res")
-    fps_key = request.args.get("fps")
-    dur_key = request.args.get("dur")
-    camera_make = (request.args.get("camera_make") or "").strip()
-    camera_model = (request.args.get("camera_model") or "").strip()
+    # 高级筛选维度参数（按 media_type 解释，面板按类型作用域所以只会有一种活跃）；
+    # 多值 = 重复参数（?p=a&p=b），同维度 OR（_any_pred），单值向后兼容
+    res_keys = _args_list("res")
+    fps_keys = _args_list("fps")
+    dur_keys = _args_list("dur")
+    camera_make = _args_list("camera_make")
+    camera_model = _args_list("camera_model")
     date_from = (request.args.get("date_from") or "").strip()
     date_to = (request.args.get("date_to") or "").strip()
     # 高级筛选 v2：片段维度（图片/视频共用）+ 编码/方向/色彩空间 + 音乐 5 维
-    seg_dims = {c: request.args.get(c) for c in _SEG_EQ_COLS}
-    arr_dims = {c: request.args.get(c) for c in _SEG_ARR_COLS}
-    encoding = (request.args.get("encoding") or "").strip()
-    orientation = request.args.get("orientation")
-    color_space = (request.args.get("color_space") or "").strip()
-    music_mood = (request.args.get("music_mood") or "").strip()
-    music_genre = (request.args.get("music_genre") or "").strip()
-    music_instrument = (request.args.get("music_instrument") or "").strip()
-    music_theme = (request.args.get("music_theme") or "").strip()
-    music_vocals = (request.args.get("music_vocals") or "").strip()
+    seg_dims = {c: _args_list(c) for c in _SEG_EQ_COLS}
+    arr_dims = {c: _args_list(c) for c in _SEG_ARR_COLS}
+    encoding = _args_list("encoding")
+    orientation = _args_list("orientation")
+    color_space = _args_list("color_space")
+    music_mood = _args_list("music_mood")
+    music_genre = _args_list("music_genre")
+    music_instrument = _args_list("music_instrument")
+    music_theme = _args_list("music_theme")
+    music_vocals = _args_list("music_vocals")
 
     allowed_sorts = {"imported_at", "date_taken", "rating", "file_name", "file_size", "duration", "resolution"}
     if sort not in allowed_sorts:
@@ -200,19 +223,25 @@ def list_media():
         if media_type == "image":
             _apply_seg_dims(where_clauses, params, seg_dims, arr_dims)
             if encoding:
-                where_clauses.append(f"{_ENCODING_CASE} = ?")
-                params.append(encoding)
+                pred, ps = _any_pred(lambda v: (f"{_ENCODING_CASE} = ?", [v]), encoding)
+                if pred:
+                    where_clauses.append(pred)
+                    params.extend(ps)
             if orientation:
-                pred, ps = _orient_pred(orientation)
+                pred, ps = _any_pred(_orient_pred, orientation)
                 if pred:
                     where_clauses.append(pred)
                     params.extend(ps)
             if camera_make:
-                where_clauses.append("camera_make = ?")
-                params.append(camera_make)
+                pred, ps = _any_pred(lambda v: ("camera_make = ?", [v]), camera_make)
+                if pred:
+                    where_clauses.append(pred)
+                    params.extend(ps)
             if camera_model:
-                where_clauses.append("camera_model = ?")
-                params.append(camera_model)
+                pred, ps = _any_pred(lambda v: ("camera_model = ?", [v]), camera_model)
+                if pred:
+                    where_clauses.append(pred)
+                    params.extend(ps)
             if date_from:
                 where_clauses.append("date_taken >= ?")
                 params.append(date_from)
@@ -223,56 +252,54 @@ def list_media():
                 params.append(date_to)
         elif media_type == "video":
             _apply_seg_dims(where_clauses, params, seg_dims, arr_dims)
-            if res_key:
-                pred, ps = _bucket_pred("height", RES_BUCKETS_VIDEO, res_key)
+            if res_keys:
+                pred, ps = _any_pred(lambda v: _bucket_pred("height", RES_BUCKETS_VIDEO, v), res_keys)
                 if pred:
                     where_clauses.append(pred)
                     params.extend(ps)
-            if fps_key:
-                pred, ps = _bucket_pred(FPS_AS_FLOAT, FPS_BUCKETS, fps_key)
+            if fps_keys:
+                pred, ps = _any_pred(lambda v: _bucket_pred(FPS_AS_FLOAT, FPS_BUCKETS, v), fps_keys)
                 if pred:
                     where_clauses.append(pred)
                     params.extend(ps)
-            if dur_key:
-                pred, ps = _bucket_pred("duration", DUR_BUCKETS, dur_key)
+            if dur_keys:
+                pred, ps = _any_pred(lambda v: _bucket_pred("duration", DUR_BUCKETS, v), dur_keys)
                 if pred:
                     where_clauses.append(pred)
                     params.extend(ps)
             if camera_make:
-                where_clauses.append("camera_make = ?")
-                params.append(camera_make)
+                pred, ps = _any_pred(lambda v: ("camera_make = ?", [v]), camera_make)
+                if pred:
+                    where_clauses.append(pred)
+                    params.extend(ps)
             if camera_model:
-                where_clauses.append("camera_model = ?")
-                params.append(camera_model)
+                pred, ps = _any_pred(lambda v: ("camera_model = ?", [v]), camera_model)
+                if pred:
+                    where_clauses.append(pred)
+                    params.extend(ps)
             if orientation:
-                pred, ps = _orient_pred(orientation)
+                pred, ps = _any_pred(_orient_pred, orientation)
                 if pred:
                     where_clauses.append(pred)
                     params.extend(ps)
             if color_space:
-                where_clauses.append("color_space = ?")
-                params.append(color_space)
+                pred, ps = _any_pred(lambda v: ("color_space = ?", [v]), color_space)
+                if pred:
+                    where_clauses.append(pred)
+                    params.extend(ps)
         elif media_type == "audio":
-            if music_mood:
-                pred, ps = _music_pred("mood", music_mood)
-                where_clauses.append(pred)
-                params.extend(ps)
-            if music_genre:
-                pred, ps = _music_pred("genre", music_genre)
-                where_clauses.append(pred)
-                params.extend(ps)
-            if music_instrument:
-                pred, ps = _music_pred("instrument", music_instrument)
-                where_clauses.append(pred)
-                params.extend(ps)
-            if music_theme:
-                pred, ps = _music_pred("theme", music_theme)
-                where_clauses.append(pred)
-                params.extend(ps)
+            for dim, vals in (("mood", music_mood), ("genre", music_genre),
+                              ("instrument", music_instrument), ("theme", music_theme)):
+                if vals:
+                    pred, ps = _any_pred(lambda v: _music_pred(dim, v), vals)
+                    if pred:
+                        where_clauses.append(pred)
+                        params.extend(ps)
             if music_vocals:
-                pred, ps = _music_vocals_pred(music_vocals)
-                where_clauses.append(pred)
-                params.extend(ps)
+                pred, ps = _any_pred(_music_vocals_pred, music_vocals)
+                if pred:
+                    where_clauses.append(pred)
+                    params.extend(ps)
     if rating is not None:
         where_clauses.append("rating >= ?")
         params.append(rating)

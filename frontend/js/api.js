@@ -17,15 +17,22 @@ const API = {
   getSegmentStats(mediaIds) {
     return this._fetch(`/api/library/segment-stats`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ media_ids: mediaIds }) });
   },
+  // 查询串序列化：数组值逐个 append 成重复参数（高级筛选同维度多选 OR）；空串跳过（服务端本就忽略）
+  _qs(params) {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) {
+      if (Array.isArray(v)) v.forEach(x => qs.append(k, x));
+      else if (v !== null && v !== undefined && v !== "") qs.append(k, v);
+    }
+    return qs.toString();
+  },
   getLibraryIds(params = {}) {
     params.fields = "id";
     params.per_page = 1; // ignored by backend in id mode, but keeps params clean
-    const qs = new URLSearchParams(params).toString();
-    return this._fetch(`/api/library/?${qs}`);
+    return this._fetch(`/api/library/?${this._qs(params)}`);
   },
   getLibrary(params = {}) {
-    const qs = new URLSearchParams(params).toString();
-    return this._fetch(`/api/library/?${qs}`);
+    return this._fetch(`/api/library/?${this._qs(params)}`);
   },
   getLibraryFacets(mediaType) {
     return this._fetch(`/api/library/facets?media_type=${encodeURIComponent(mediaType)}`);

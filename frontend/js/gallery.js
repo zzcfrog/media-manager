@@ -240,17 +240,18 @@ const GalleryPage = {
                         :options="dimOptions(dim)"
                         @update:model-value="setAdvDim(dim, $event)"></q-btn-toggle>
           <q-select v-else-if="dim.type === 'dropdown'"
-                    :model-value="filters[dim.param] || ''"
-                    dense filled options-dense emit-value map-options
+                    :model-value="advModel(dim)"
+                    multiple dense filled options-dense emit-value map-options
                     :options="dimOptions(dim)"
                     :label="t(dim.label)"
+                    :display-value="advDisplayValue(dim)"
                     popup-content-class="adv-select-menu"
                     @update:model-value="setAdvDropdown(dim, $event)">
             <template v-slot:prepend><q-icon :name="dim.icon" size="14px"></q-icon></template>
-            <!-- 有值时 × 在下拉三角左侧（Quasar clearable 会把三角替换成 × 且偏大，弃用改自定义小 ×） -->
+            <!-- 有值时 × 在下拉三角左侧（Quasar clearable 会把三角替换成 × 且偏大，弃用改自定义小 ×）；多选 × 清空整维 -->
             <template v-slot:append>
-              <q-icon v-if="filters[dim.param]" name="cancel" size="14px" class="cursor-pointer adv-clear-icon"
-                      @click.stop="setAdvDropdown(dim, '')"></q-icon>
+              <q-icon v-if="advVal(dim).length" name="cancel" size="14px" class="cursor-pointer adv-clear-icon"
+                      @click.stop="setAdvDropdown(dim, [])"></q-icon>
             </template>
             <template v-slot:option="scope">
               <q-item v-bind="scope.itemProps" :class="{ 'adv-opt-selected': scope.selected }">
@@ -1034,8 +1035,9 @@ const GalleryPage = {
           if (this.filters.date_from || this.filters.date_to) {
             tags.push({ icon: dim.icon, label: `${this.t(dim.label)}: ${[this.filters.date_from, this.filters.date_to].filter(Boolean).join(' ~ ')}` });
           }
-        } else if (dim.param && this.filters[dim.param]) {
-          tags.push({ icon: dim.icon, label: `${this.t(dim.label)}: ${this.dimValueLabel(dim, this.filters[dim.param])}` });
+        } else if (dim.param && this.advVal(dim).length) {
+          const joiner = this.t('g.adv_join');
+          tags.push({ icon: dim.icon, label: `${this.t(dim.label)}: ${this.advVal(dim).map(v => this.dimValueLabel(dim, v)).join(joiner)}` });
         }
       }
       return tags;
@@ -1212,8 +1214,26 @@ const GalleryPage = {
       this.filters[dim.param] = value;
       this.load();
     },
+    // 下拉多选：filters 里恒存数组（旧存档标量 → 单选迁移；默认 "" → 空）；_ 前缀 Vue 不代理，模板要用故无前缀
+    advVal(dim) {
+      const v = this.filters[dim.param];
+      if (Array.isArray(v)) return v;
+      return v ? [v] : [];
+    },
+    // 多选 model：空数组必须传 null——Quasar 把 [] 判为有值，清空后 label 不回落居中占位
+    advModel(dim) {
+      const v = this.advVal(dim);
+      return v.length ? v : null;
+    },
+    // 多选字段显示：空 → undefined 回落 label 占位；有值 → 首值 +N（108px 定宽放不下逗号连接串）
+    advDisplayValue(dim) {
+      const vals = this.advVal(dim);
+      if (!vals.length) return undefined;
+      const first = this.dimValueLabel(dim, vals[0]);
+      return vals.length > 1 ? `${first} +${vals.length - 1}` : first;
+    },
     setAdvDropdown(dim, value) {
-      this.filters[dim.param] = value || '';
+      this.filters[dim.param] = Array.isArray(value) ? value : (value ? [value] : []);
       this.load();
     },
     // 拍摄日期合一控件：自定义 × 清空两端
@@ -1233,7 +1253,7 @@ const GalleryPage = {
     advDimActive(dim) {
       if (dim.displayOnly) return false;
       if (dim.type === 'dateRange') return !!(this.filters.date_from || this.filters.date_to);
-      return dim.param && !!this.filters[dim.param];
+      return dim.param && this.advVal(dim).length > 0;
     },
     // 组段内维度固定两行：列数 = ceil(维度数/2)，网格按行填充即上下两行（单维段如音乐「显示」仍一行）
     groupColCount(grp) {
@@ -1351,8 +1371,9 @@ const GalleryPage = {
         if (dim.type === 'dateRange') {
           if (this.filters.date_from) params.date_from = this.filters.date_from;
           if (this.filters.date_to) params.date_to = this.filters.date_to;
-        } else if (dim.param && this.filters[dim.param]) {
-          params[dim.param] = this.filters[dim.param];
+        } else if (dim.param) {
+          const vals = this.advVal(dim);
+          if (vals.length) params[dim.param] = vals; // 数组 → api.js 逐值 append 重复参数（同维度 OR）
         }
       }
       return params;
