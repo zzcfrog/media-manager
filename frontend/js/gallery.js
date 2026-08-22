@@ -244,8 +244,8 @@ const GalleryPage = {
                     :options="dimOptions(dim)"
                     :label="t(dim.label)"
                     popup-content-class="adv-select-menu"
-                    style="min-width:150px"
                     @update:model-value="setAdvDropdown(dim, $event)">
+            <template v-slot:prepend><q-icon :name="dim.icon" size="14px"></q-icon></template>
             <template v-slot:option="scope">
               <q-item v-bind="scope.itemProps" :class="{ 'adv-opt-selected': scope.selected }">
                 <q-item-section>{{ scope.opt.label }}</q-item-section>
@@ -260,16 +260,18 @@ const GalleryPage = {
           </q-select>
           <q-input v-else-if="dim.type === 'dateRange'" readonly
                    :model-value="advDateText" dense filled :placeholder="t('g.adv_date_range')">
-            <template v-slot:append>
-              <!-- clearable 的 × 对 readonly 字段不渲染（Quasar 仅 editable 才出），自定义清除图标 -->
-              <q-icon v-if="advDateText" name="cancel" class="cursor-pointer" style="color:var(--text3)" @click.stop="onAdvDateClear"></q-icon>
-              <q-icon name="event" class="cursor-pointer">
+            <template v-slot:prepend>
+              <q-icon :name="dim.icon" size="14px" class="cursor-pointer">
                 <q-popup-proxy v-model="advDatePopup" cover transition-show="scale" transition-hide="scale"
                                @show="advDatePick = advDateModel">
                   <q-date v-model="advDatePick" range mask="YYYY-MM-DD" dense
                           @update:model-value="onAdvDateRange"></q-date>
                 </q-popup-proxy>
               </q-icon>
+            </template>
+            <template v-slot:append>
+              <!-- clearable 的 × 对 readonly 字段不渲染（Quasar 仅 editable 才出），自定义清除图标 -->
+              <q-icon v-if="advDateText" name="cancel" class="cursor-pointer" style="color:var(--text3)" @click.stop="onAdvDateClear"></q-icon>
             </template>
           </q-input>
           </div>

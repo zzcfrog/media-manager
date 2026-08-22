@@ -1,5 +1,15 @@
 # TODO
 
+## 已完成：高级筛选面板四轮打磨——下拉四字定宽 + 维度小图标（2026-08-22）
+
+组段布局落地后用户实测反馈：下拉太宽、块内不够紧凑。本轮把字段收窄到四字宽并补维度语义小图标（[gallery.js](../frontend/js/gallery.js) + [main.css](../frontend/css/main.css)，后端零改动）：
+
+1. **下拉定宽四字**：`.adv-filter-panel .adv-dim .q-select { width:120px }`（prepend 图标 22px + 四个中文字 48px + 内距/下拉箭头，实测刚好容纳）；日期范围文本较长单独 176px；超宽值 `.q-field__native` ellipsis 截断。字段收窄后组段显著紧凑——图片 5 段实测全部单行（镜头语言 784px · 场景光线 409px · 风格色调 409px · 画面内容 279px · 相机与文件 725px），面板 219px 高 × 940px 宽。
+2. **维度小图标（prepend）**：每个维度下拉左侧加 14px 语义图标——直接复用 spec 既有 `icon` 字段（原用于标签页），零新增配置；色 var(--text3)，`.adv-dim.active` 时变 accent。日期合一控件的日历入口从 append 移到 prepend（`date_range` 维度图标即日历按钮），append 只留条件清除 ×。
+3. **空态居中补偿改双向外扩**：label `left:-22px; right:-30px`（左抵消 prepend 图标、右抵消下拉箭头 append），实测居中偏移 0。
+4. **菜单宽度保底**：`.adv-select-menu { min-width:168px !important }`——Quasar 会给 portal 菜单设内联 `min-width` = 锚点宽度（收窄后仅 120px），普通 CSS 规则打不赢内联样式，必须 `!important` 对冲；菜单宽度不随字段收窄。
+- **验证**：Playwright 实测——字段宽 120px/高 34px、prepend 图标（center_focus_strong/mood/date_range 等）、居中偏移 0、菜单 168px 含计数徽标（全景 1/远景 0…）、active 图标变 accent、图片 5 段全单行、音乐无组段 + 音乐特征段；日期链路（prepend 图标弹层 → 范围 → 自动关 → × 清空）与 localStorage 持久化回归全过；视觉确认（四字宽、小图标、组段分隔清晰、无截断重叠）；后端未动无回归。
+
 ## 已完成：高级筛选面板三轮打磨——Office Ribbon 同屏组段布局（2026-08-22）
 
 用户更正：筛选面板 UI 架构应为 **Office Ribbon 式**（上轮「单行流式 + 组色点」方案作废），选定**同屏组段**形态——像 Office「开始」页签内部样式，每个分组占一块，组内维度下拉一到两行排布，选项全留在下拉里，既区分分组又紧凑（[gallery.js](../frontend/js/gallery.js) + [main.css](../frontend/css/main.css)，后端零改动）：

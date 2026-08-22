@@ -410,14 +410,22 @@ body.body--dark .filter-bar .q-field__append .q-icon { color: #666 !important; }
 .adv-group-name { font-size: 10px; line-height: 14px; color: var(--text3); text-align: center; }
 .adv-dim { display: inline-flex; align-items: center; min-height: 34px; }
 .adv-filter-panel .engine-toggle .q-btn { min-height: 34px; }
+/* 字段定宽（紧凑 Ribbon）：下拉 = 图标 + 四字宽，日期范围文本长单独加宽；值溢出 ellipsis */
+.adv-filter-panel .adv-dim .q-select { width: 120px; }
+.adv-filter-panel .adv-dim .q-input { width: 176px; }
+.adv-filter-panel .adv-dim .q-field__native { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 维度小图标（prepend）：左侧语义图标，active 时变 accent */
+.adv-filter-panel .q-field__prepend { padding: 0 0 0 8px; }
+.adv-filter-panel .q-field__prepend .q-icon { color: var(--text3); }
+.adv-filter-panel .adv-dim.active .q-field__prepend .q-icon { color: var(--accent) !important; }
 /* 两区字段（34px）：空态 = 维度名全宽水平居中；float 态 = 小标签 [2,14] + 值文字 [14,34] */
 .adv-filter-panel .q-field { font-size: 12px; }
 .adv-filter-panel .q-field__control { height: 34px !important; min-height: 34px !important; border-radius: 6px !important; }
 .adv-filter-panel .q-field__marginal { height: 34px !important; }
 .adv-filter-panel .q-field__control-container { padding-top: 0 !important; }
-/* 空态居中基准 = 整个控件：right 外扩 30px 抵消右侧下拉箭头 append（dense 稳定值） */
+/* 空态居中基准 = 整个控件：right 外扩 30px 抵消右侧下拉箭头 append、left 外扩 22px 抵消左侧维度图标 prepend */
 .adv-filter-panel .q-field--labeled:not(.q-field--float) .q-field__label {
-  top: 0; left: 0; right: -30px; max-width: none;
+  top: 0; left: -22px; right: -30px; max-width: none;
   text-align: center; font-size: 12px; line-height: 34px; transform: none;
 }
 .adv-filter-panel .q-field--labeled.q-field--float .q-field__label {
@@ -439,7 +447,7 @@ body.body--dark .filter-bar .q-field__append .q-icon { color: #666 !important; }
 .adv-filter-panel .adv-dim.active .q-field__input { color: var(--accent) !important; font-weight: 500; }
 .adv-filter-panel .adv-dim.active .q-field--float .q-field__label { color: var(--accent) !important; }
 /* 下拉菜单（portal 到 body，规则必须全局）：紧凑行高 + 计数徽标 + 选中对勾态 + 0 计数灰化 */
-.adv-select-menu { border-radius: 8px !important; padding: 3px !important; }
+.adv-select-menu { border-radius: 8px !important; padding: 3px !important; min-width: 168px !important; }
 .adv-select-menu .q-item { border-radius: 5px; min-height: 28px; padding: 0 8px; font-size: 12px; }
 .adv-select-menu .q-item.disabled { opacity: .45 !important; }
 .adv-select-menu .adv-opt-selected { background: var(--accent-dim) !important; color: var(--accent) !important; }
