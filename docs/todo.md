@@ -1,5 +1,14 @@
 # TODO
 
+## 已完成：高级筛选面板三轮打磨——Office Ribbon 同屏组段布局（2026-08-22）
+
+用户更正：筛选面板 UI 架构应为 **Office Ribbon 式**（上轮「单行流式 + 组色点」方案作废），选定**同屏组段**形态——像 Office「开始」页签内部样式，每个分组占一块，组内维度下拉一到两行排布，选项全留在下拉里，既区分分组又紧凑（[gallery.js](../frontend/js/gallery.js) + [main.css](../frontend/css/main.css)，后端零改动）：
+
+1. **组段结构**：恢复 `groupedSpec` computed（按连续 `group` 段聚合），面板 = flex-wrap 容器，每分组一段 `.adv-group`（段内 `.adv-group-dims` 流式区 + 段底 `.adv-group-name` 10px 居中小字组名）；**段间 1px 竖分隔线**（首段与无组段无边线），组名底对齐（段等高于行高）。
+2. **段内折行不散开**：`.adv-group` 用 `flex: 0 1 auto + max-width:100% + min-width:0`——段过宽时先收缩、组内维度折成两行（整段不拆散换行）；一行放得下多个段时同屏并列。图片类型实测：镜头语言 6 维一段（912px 折两行）· 场景光线/风格色调各 3 维 · 画面内容 2 维 · 相机与文件 5 维，共 5 段。
+3. **删色点系统**：`.adv-g-*` 组色类、`group-start`、`::before` 色点、title 悬停提示全部移除（组归属改由段结构 + 组名表达）；两区字段/active 强调/菜单紧凑/日期合一控件/持久化等上轮成果全部保留。
+- **验证**：Playwright 实测——图片 5 段（组名/竖线/段内折行断言）、视频 5 段、音乐无组段（toggle）+ 音乐特征段；下拉筛选（全景→1 卡 + active + Footer 标签 + × 清除）、菜单 28px/12px + 计数徽标、日期合一（范围选择→自动关→标签→× 清空）、resetFilters、localStorage 刷新恢复（面板开/组段/active/标签全恢复）、亮暗双主题（组名/分隔线/accent 底条）；后端 [test_adv_filter_v2.py](../scripts/test_adv_filter_v2.py) 13 项全 PASS。
+
 ## 已完成：高级筛选面板二轮打磨——单行流式布局 + 日期合一控件 + 菜单紧凑化（2026-08-22）
 
 上轮分组落地后用户实测 4 项反馈，全部落地（[gallery.js](../frontend/js/gallery.js) + [main.css](../frontend/css/main.css)，后端零改动）：

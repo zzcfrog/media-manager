@@ -394,27 +394,21 @@ body.body--dark .filter-bar .q-placeholder { color: #555 !important; }
 body.body--dark .filter-bar .q-field__append .q-icon { color: #666 !important; }
 .filter-bar .q-field__control-container { padding-top: 0 !important; }
 
-/* Advanced filter panel: single flowing row + group color dots, dims from ADVANCED_FILTER_SPEC */
+/* Advanced filter panel: Office Ribbon 同屏组段——每分组一段（组间竖分隔线 + 组底小字组名），dims from ADVANCED_FILTER_SPEC */
 .adv-btn-active { color: var(--accent) !important; background: var(--accent-dim) !important; }
 .adv-btn-open { color: var(--accent) !important; background: var(--accent-dim) !important; border-radius: 6px 6px 0 0 !important; }
 /* 展开时按钮呈面板「卡舌」：bar 底边透明去缝，面板 accent-dim 顶边衔接 */
 .filter-bar.adv-open { border-bottom-color: transparent; }
-.adv-filter-panel { display: flex; padding: 8px 14px 10px; background: var(--surface); flex-shrink: 0;
+.adv-filter-panel { display: flex; flex-wrap: wrap; padding: 10px 14px 6px; background: var(--surface); flex-shrink: 0;
   border-top: 2px solid var(--accent-dim); border-bottom: 1px solid var(--border); }
-.adv-filter-dims { flex: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+/* 组段：段间竖分隔线；段超行宽时 shrink 触发组内维度折两行（整段不散开换行） */
+.adv-group { display: flex; flex-direction: column; gap: 2px; padding: 0 14px; max-width: 100%;
+  border-left: 1px solid var(--border); flex: 0 1 auto; min-width: 0; }
+.adv-group:first-child { border-left: none; padding-left: 0; }
+.adv-group-plain { border-left: none; padding-left: 0; }   /* 无组段（音乐显示切换）无边线 */
+.adv-group-dims { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.adv-group-name { font-size: 10px; line-height: 14px; color: var(--text3); text-align: center; }
 .adv-dim { display: inline-flex; align-items: center; min-height: 34px; }
-/* 组色点（维度前小圆点标记所属分组，.adv-dim 带组名 title 悬停提示）+ 组间细分隔线 */
-.adv-dim::before { content: ''; flex-shrink: 0; width: 5px; height: 5px; border-radius: 50%; margin-right: 5px; background: var(--text3); }
-.adv-dim.adv-g-none::before { display: none; }
-.adv-dim.group-start { margin-left: 6px; padding-left: 12px; border-left: 1px solid var(--border); }
-.adv-g-lens::before { background: #6c8cff; }
-.adv-g-scene::before { background: #3fae72; }
-.adv-g-style::before { background: #a06cff; }
-.adv-g-content::before { background: #ff9350; }
-.adv-g-meta::before { background: #3fb8c4; }
-.adv-g-camera::before { background: #d9a441; }
-.adv-g-tech::before { background: #8a93a6; }
-.adv-g-music::before { background: #ef6bb0; }
 .adv-filter-panel .engine-toggle .q-btn { min-height: 34px; }
 /* 两区字段（34px）：空态 = 维度名全宽水平居中；float 态 = 小标签 [2,14] + 值文字 [14,34] */
 .adv-filter-panel .q-field { font-size: 12px; }

@@ -26,7 +26,7 @@ const ADV_FILTER_DEFAULTS = {
   // 音乐
   music_mood: "", music_genre: "", music_instrument: "", music_theme: "", music_vocals: "",
 };
-// group = 摄影领域分类的组 i18n 键（同组必须连续；模板按组色点 + 组间分隔线渲染，悬停提示组名）；无 group = 不分组（音乐显示切换）
+// group = 摄影领域分类的组 i18n 键（同组必须连续；模板按 Ribbon 组段渲染：组间竖分隔线 + 组底小字组名）；无 group = 不分组（音乐显示切换，段无组名无边线）
 const ADVANCED_FILTER_SPEC = {
   audio: [
     { type: "toggle", displayOnly: true, param: "thumbMode", label: "g.adv_display", icon: "visibility",
@@ -226,13 +226,13 @@ const GalleryPage = {
         </q-btn>
       </q-btn-group>
     </div>
-    <!-- 高级筛选面板：单行流式布局，维度前组色点标记所属分组（悬停提示组名），组间细分隔线；折叠由栏内「高级筛选」按钮负责 -->
+    <!-- 高级筛选面板：Office Ribbon 同屏组段式——每分组一段（组间竖分隔线 + 组底小字组名），组内维度流式一行或两行 -->
     <div v-if="advPanelOpen && currentSpec.length" class="adv-filter-panel">
-      <div class="adv-filter-dims">
-        <div v-for="(dim, i) in currentSpec" :key="dim.param" class="adv-dim"
-             :class="['adv-g-' + (dim.group ? dim.group.replace('g.adv_group_', '') : 'none'),
-                      { active: advDimActive(dim), 'group-start': i > 0 && dim.group !== currentSpec[i-1].group }]"
-             :title="dim.group ? t(dim.group) : ''">
+      <div v-for="(grp, gi) in groupedSpec" :key="grp.key || 'misc-' + gi" class="adv-group"
+           :class="{ 'adv-group-plain': !grp.key }">
+        <div class="adv-group-dims">
+          <div v-for="dim in grp.dims" :key="dim.param" class="adv-dim"
+               :class="{ active: advDimActive(dim) }">
           <q-btn-toggle v-if="dim.type === 'toggle'"
                         :model-value="filters[dim.param] || ''"
                         class="engine-toggle" no-caps unelevated dense
@@ -272,7 +272,9 @@ const GalleryPage = {
               </q-icon>
             </template>
           </q-input>
+          </div>
         </div>
+        <div v-if="grp.key" class="adv-group-name">{{ t(grp.key) }}</div>
       </div>
     </div>
     <!-- Main gallery area with grid/list views and lasso selection -->
@@ -940,6 +942,17 @@ const GalleryPage = {
   computed: {
     currentSpec() {
       return ADVANCED_FILTER_SPEC[this.filters.media_type] || [];
+    },
+    // 按连续 group 段聚合（无 group 归空串段，段渲染不加组名/边线）
+    groupedSpec() {
+      const groups = [];
+      for (const dim of this.currentSpec) {
+        const key = dim.group || "";
+        let g = groups[groups.length - 1];
+        if (!g || g.key !== key) { g = { key, dims: [] }; groups.push(g); }
+        g.dims.push(dim);
+      }
+      return groups;
     },
     // 拍摄日期合一控件：显示文本 + 范围选择器模型（两端齐才成范围，残缺视为无）
     advDateText() {
