@@ -226,8 +226,9 @@ const GalleryPage = {
         </q-btn>
       </q-btn-group>
     </div>
-    <!-- 高级筛选面板：Office Ribbon 同屏组段式——每分组一段（组间竖分隔线 + 组底小字组名），组内维度固定两行网格 -->
-    <div v-if="advPanelOpen && currentSpec.length" class="adv-filter-panel">
+    <!-- 高级筛选面板：Office Ribbon 同屏组段式——每分组一段（组间竖分隔线 + 组底小字组名），组内维度固定两行网格；组段恒单行，放不下横向滚动 -->
+    <div v-if="advPanelOpen && currentSpec.length" class="adv-filter-panel" ref="advPanel"
+         @wheel="onAdvPanelWheel" @mousedown="startAdvDrag" @click.capture="onAdvPanelClickCapture">
       <div v-for="(grp, gi) in groupedSpec" :key="grp.key || 'misc-' + gi" class="adv-group"
            :class="{ 'adv-group-plain': !grp.key }">
         <div class="adv-group-dims" :style="{ gridTemplateColumns: 'repeat(' + groupColCount(grp) + ', auto)' }">
@@ -240,12 +241,17 @@ const GalleryPage = {
                         @update:model-value="setAdvDim(dim, $event)"></q-btn-toggle>
           <q-select v-else-if="dim.type === 'dropdown'"
                     :model-value="filters[dim.param] || ''"
-                    dense filled options-dense clearable emit-value map-options
+                    dense filled options-dense emit-value map-options
                     :options="dimOptions(dim)"
                     :label="t(dim.label)"
                     popup-content-class="adv-select-menu"
                     @update:model-value="setAdvDropdown(dim, $event)">
             <template v-slot:prepend><q-icon :name="dim.icon" size="14px"></q-icon></template>
+            <!-- 有值时 × 在下拉三角左侧（Quasar clearable 会把三角替换成 × 且偏大，弃用改自定义小 ×） -->
+            <template v-slot:append>
+              <q-icon v-if="filters[dim.param]" name="cancel" size="14px" class="cursor-pointer adv-clear-icon"
+                      @click.stop="setAdvDropdown(dim, '')"></q-icon>
+            </template>
             <template v-slot:option="scope">
               <q-item v-bind="scope.itemProps" :class="{ 'adv-opt-selected': scope.selected }">
                 <q-item-section>{{ scope.opt.label }}</q-item-section>
@@ -271,7 +277,7 @@ const GalleryPage = {
             </template>
             <template v-slot:append>
               <!-- clearable 的 × 对 readonly 字段不渲染（Quasar 仅 editable 才出），自定义清除图标 -->
-              <q-icon v-if="advDateText" name="cancel" class="cursor-pointer" style="color:var(--text3)" @click.stop="onAdvDateClear"></q-icon>
+              <q-icon v-if="advDateText" name="cancel" size="14px" class="cursor-pointer adv-clear-icon" @click.stop="onAdvDateClear"></q-icon>
             </template>
           </q-input>
           </div>
@@ -1232,6 +1238,38 @@ const GalleryPage = {
     // 组段内维度固定两行：列数 = ceil(维度数/2)，网格按行填充即上下两行（单维段如音乐「显示」仍一行）
     groupColCount(grp) {
       return Math.ceil(grp.dims.length / 2);
+    },
+    // 面板恒单行：组段放不下时横向滚动——滚轮竖转横 + 按住拖拽滑动（lasso 同款 document 监听模式）
+    onAdvPanelWheel(e) {
+      const el = this.$refs.advPanel;
+      if (!el || el.scrollWidth <= el.clientWidth) return;
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { el.scrollLeft += e.deltaY; e.preventDefault(); }
+    },
+    startAdvDrag(e) {
+      if (e.button !== 0) return;
+      const el = this.$refs.advPanel;
+      if (!el || el.scrollWidth <= el.clientWidth) return;
+      const sx = e.clientX, startLeft = el.scrollLeft;
+      let moved = false;
+      const onMove = (ev) => {
+        const dx = ev.clientX - sx;
+        if (!moved && Math.abs(dx) < 4) return;
+        moved = true;
+        this._advDragged = true;   // 拖拽后的 click 吞掉（否则拖完会误开下拉）
+        el.scrollLeft = startLeft - dx;
+      };
+      const onUp = () => {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        setTimeout(() => { this._advDragged = false; }, 0);   // 无 click（松在面板外）也要复位
+      };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    },
+    onAdvPanelClickCapture(e) {
+      if (!this._advDragged) return;
+      e.stopPropagation();
+      e.preventDefault();
     },
     advAnyActive() {
       return this.currentSpec.some(d => this.advDimActive(d));

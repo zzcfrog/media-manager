@@ -399,8 +399,14 @@ body.body--dark .filter-bar .q-field__append .q-icon { color: #666 !important; }
 .adv-btn-open { color: var(--accent) !important; background: var(--accent-dim) !important; border-radius: 6px 6px 0 0 !important; }
 /* 展开时按钮呈面板「卡舌」：bar 底边透明去缝，面板 accent-dim 顶边衔接 */
 .filter-bar.adv-open { border-bottom-color: transparent; }
-.adv-filter-panel { display: flex; flex-wrap: wrap; padding: 10px 14px 6px; background: var(--surface); flex-shrink: 0;
+/* 组段恒单行：放不下不折行，横向滚动（滚轮竖转横 + 按住拖拽，见 gallery.js） */
+.adv-filter-panel { display: flex; flex-wrap: nowrap; overflow-x: auto; padding: 10px 14px 6px;
+  background: var(--surface); flex-shrink: 0;
   border-top: 2px solid var(--accent-dim); border-bottom: 1px solid var(--border); }
+.adv-filter-panel::-webkit-scrollbar { height: 6px; }
+.adv-filter-panel::-webkit-scrollbar-track { background: transparent; }
+.adv-filter-panel::-webkit-scrollbar-thumb { background: var(--text3); border-radius: 3px; opacity: .4; }
+.adv-filter-panel::-webkit-scrollbar-thumb:hover { opacity: .8; }
 /* 组段：段间竖分隔线；段为固定形状块（不收缩），行宽不够整段换行 */
 .adv-group { display: flex; flex-direction: column; gap: 2px; padding: 0 14px; max-width: 100%;
   border-left: 1px solid var(--border); flex: 0 0 auto; }
@@ -419,6 +425,9 @@ body.body--dark .filter-bar .q-field__append .q-icon { color: #666 !important; }
 .adv-filter-panel .q-field__prepend { padding: 0 0 0 8px; }
 .adv-filter-panel .q-field__prepend .q-icon { color: var(--text3); }
 .adv-filter-panel .adv-dim.active .q-field__prepend .q-icon { color: var(--accent) !important; }
+/* 清除小 ×（append，下拉三角左侧）：14px 小号，hover 变 accent */
+.adv-filter-panel .adv-clear-icon { color: var(--text3); }
+.adv-filter-panel .adv-clear-icon:hover { color: var(--accent); }
 /* 两区字段（34px）：空态 = 维度名全宽水平居中；float 态 = 小标签 [2,14] + 值文字 [14,34] */
 .adv-filter-panel .q-field { font-size: 12px; }
 .adv-filter-panel .q-field__control { height: 34px !important; min-height: 34px !important; border-radius: 6px !important; }

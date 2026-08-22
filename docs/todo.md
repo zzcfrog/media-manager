@@ -1,5 +1,13 @@
 # TODO
 
+## 已完成：高级筛选面板六轮打磨——组段单行横向滚动 + 清除小 × 左置（2026-08-22）
+
+用户两点反馈落地（[gallery.js](../frontend/js/gallery.js) + [main.css](../frontend/css/main.css)，后端零改动）：
+
+1. **组段恒单行，不折行**：面板 `flex-wrap: nowrap + overflow-x: auto`——组段放不下时不换行而是横向滚动。滚动三通道：① macOS 触控板原生横扫；② **滚轮竖转横**（`onAdvPanelWheel`，`|deltaY|>|deltaX|` 时 `scrollLeft += deltaY`，无溢出不拦截）；③ **按住拖拽滑动**（`startAdvDrag`，lasso 同款 document 监听闭包，4px 阈值后 `scrollLeft = start - dx`）。拖拽后的 click 由 `@click.capture`（`onAdvPanelClickCapture`）吞掉防误开下拉，`setTimeout(0)` 复位标志（无 click 时也复位）。6px 细滚动条（text3 40% 不透明度，hover 80%）。面板高度 199→115px。
+2. **清除小 × 左置**：弃 Quasar `clearable`（它会把下拉三角**替换**成偏大的 ×）——改 append slot 自定义 14px `cancel` 图标（`adv-clear-icon`），有值才显示、位于**下拉三角左侧**（Quasar 的用户 append slot 渲染在三角前），hover 变 accent；点击 `setAdvDropdown(dim, '')` 清空。日期控件 × 同步统一 14px/同款样式。
+- **实测**：图片 5 段全 singleRow（scrollW 1594 > clientW 940 溢出）、视频同、音乐 2 段刚好放下无溢出；滚轮 scrollLeft 0→120、拖拽 240→340→440（按住左移右滚）；拖拽后同任务 click 不开菜单、复位后正常开；× 实测 14px 且 `xLeftOfArrow=true`、三角仍在；× 点击清空（值/active/× 全消）；空值维度无 ×；视觉确认单行 + 右侧组段裁切 + 块内两行。
+
 ## 已完成：高级筛选面板五轮打磨——组段内维度固定两行（2026-08-22）
 
 用户明确要求：**每一个区块（组段）内是两行**下拉，否则单行排布会把段拉成长条「串行」。落地（[gallery.js](../frontend/js/gallery.js) + [main.css](../frontend/css/main.css)，后端零改动）：
