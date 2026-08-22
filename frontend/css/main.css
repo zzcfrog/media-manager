@@ -415,9 +415,9 @@ body.body--dark .adv-filter-panel { background: var(--surface3); }
 .adv-filter-panel::-webkit-scrollbar-track { background: transparent; }
 .adv-filter-panel::-webkit-scrollbar-thumb { background: var(--text3); border-radius: 3px; opacity: .4; }
 .adv-filter-panel::-webkit-scrollbar-thumb:hover { opacity: .8; }
-/* 组段：段间竖分隔线；段为固定形状块（不收缩），行宽不够整段换行 */
+/* 组段：段间竖分隔线（border2——十五轮整区换 surface2/#222 底后 --border 对比不足，提一档还原换底前 Δ17/Δ34）；段为固定形状块（不收缩），行宽不够整段换行 */
 .adv-group { display: flex; flex-direction: column; gap: 2px; padding: 0 14px; max-width: 100%;
-  border-left: 1px solid var(--border); flex: 0 0 auto; }
+  border-left: 1px solid var(--border2); flex: 0 0 auto; }
 .adv-group:first-child { border-left: none; padding-left: 0; }
 .adv-group-plain { border-left: none; padding-left: 0; }   /* 无组段（音乐显示切换）无边线 */
 /* 组内维度固定两行：grid 列数由模板内联（ceil(n/2)），按行填充即上下两行 */
@@ -426,7 +426,7 @@ body.body--dark .adv-filter-panel { background: var(--surface3); }
 .adv-dim { display: inline-flex; align-items: center; min-height: 34px; }
 .adv-filter-panel .engine-toggle .q-btn { min-height: 34px; }
 /* 字段定宽（紧凑 Ribbon）：下拉 = 图标 + 四字宽，日期范围文本长单独加宽；值溢出 ellipsis */
-.adv-filter-panel .adv-dim .q-select { width: 120px; }
+.adv-filter-panel .adv-dim .q-select { width: 108px; }
 .adv-filter-panel .adv-dim .q-input { width: 176px; }
 .adv-filter-panel .adv-dim .q-field__native { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 维度小图标（prepend）：左侧语义图标，active 时变 accent */
