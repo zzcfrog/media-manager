@@ -428,7 +428,7 @@ body.body--dark .adv-filter-panel { background: var(--surface3); }
 .adv-filter-panel .engine-toggle .q-btn { min-height: 34px; }
 /* 字段定宽（紧凑 Ribbon）：下拉 = 图标 + 四字宽，日期范围文本长单独加宽；值溢出 ellipsis */
 .adv-filter-panel .adv-dim .q-select { width: 108px; }
-.adv-filter-panel .adv-dim .q-input { width: 176px; }
+.adv-filter-panel .adv-dim .q-input { width: 200px; }   /* 二十一轮 176→200：完整范围文本 139px + 两侧图标区 53px，176 下尾部月日被裁 */
 .adv-filter-panel .adv-dim .q-field__native { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 维度小图标（prepend）：左侧语义图标贴左（十九轮 8→0，图标落在 12px 控件内距线上），active 时变 accent */
 .adv-filter-panel .q-field__prepend { padding: 0; }
