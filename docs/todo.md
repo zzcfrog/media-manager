@@ -1,5 +1,18 @@
 # TODO
 
+## 已完成：高级筛选 UI 打磨——分组 + 5 项样式修复（2026-08-22）
+
+高级筛选 v2 用户实测 5 项 UI 问题 + 新增筛选条件分组，全部落地（[gallery.js](../frontend/js/gallery.js) + [main.css](../frontend/css/main.css) + [i18n.js](../frontend/js/i18n.js)，后端零改动）：
+
+1. **筛选条件按摄影领域分组**：spec 每 dim 加 `group` 键（同组连续），`groupedSpec` computed 按连续段聚合，面板每组一行（组标签 + 组内 flex-wrap 下拉）。图片 5 组 19 维（镜头语言 6·场景光线 3·风格色调 3·画面内容 2·相机与文件 5，景深/构图上移入镜头语言）；视频 5 组 18 维（镜头语言 5·场景光线 3·画面内容 3·相机 2·技术参数 5）；音乐 1 组（音乐特征 5）+ 无组显示切换（组标签隐形占位对齐）。8 个组标签 i18n 键（zh/en）。
+2. **空值占位维度名水平居中**：字段 28→34px 两区布局——空态 label 全宽 `text-align:center` + `line-height:34px`，居中基准为整个控件（`right:-30px` 外扩抵消右侧下拉箭头 append，因 label 定位父级 `.q-field__control-container` 被箭头挤窄 30px）。
+3. **选中后维度名与值不再重叠**：float 态 label 压缩至 [2,14] 小标签区（10px/12px，`transform:none` 精确坐标替代 Quasar 的 translateY+scale），值文字落 [14,34] 区（`.q-select .q-field__native` padding-top 14px + 显式 `align-items:flex-start`）；`q-select`/`q-input` native 规则拆分写，日期 input 不受影响。
+4. **有选中值的下拉突出显示**：`.adv-dim.active` 强调 = accent-dim 底 + accent 2px 底条（filled `::after` scaleX(1)）+ accent 值文字（500 字重）+ accent 上浮标签。
+5. **按钮展开/收起区分 + 与面板融合**：展开态 `adv-btn-open`（accent 色 + accent-dim 底 + 底部方角呈面板「卡舌」）+ 尾部箭头 expand_less/expand_more；filter-bar 根 `adv-open` 类把底边置透明去缝，面板顶边 2px accent-dim 衔接；收起全部恢复（有筛选时按钮回 `adv-btn-active` 态）。
+6. **下拉菜单精致化**：`popup-content-class="adv-select-menu"`（菜单 portal 到 body，CSS 全局写）——8px 圆角 + 4px 内边距 + 32px 行高选项；**计数从 label 拼接 "(N)" 改为独立徽标**（`adv-opt-count` 胶囊）+ 选中项对勾图标 + accent-dim 底；0 计数项 `opacity:.45 !important` 灰化不可点（Quasar 自带 .6 带 !important，需对冲）。
+- **顺带修复 2 个真 bug**（`dimOptions` 重构）：(a) 音乐「显示」切换两按钮全被禁用——thumbMode 无 facetKey 时 countMap 空，旧 `disable:isZero(undefined)=true`；改 `off(v)=counts ? cnt(v)===0 : false` 守卫。(b) facets 未加载/拉取失败时全部枚举选项误禁——同一守卫修复，加载完计数响应式补上。
+- **验证**：Playwright 实测——图片 5 组(6/3/3/2/5)/视频 5 组(5/3/3/2/5)/音乐 1 组+隐形 toggle 组、空态居中(labelCX=controlCX)、float 几何 label[2,14]/值[14,34] 相接不重叠、active 四项 accent 断言、展开/收起按钮三态与 bar 去缝/恢复、菜单徽标/对勾/禁用 0.45、重置清空+持久化、音乐 toggle 可点(bug 修复)+词表 zh、亮暗双主题；后端 [test_adv_filter_v2.py](../scripts/test_adv_filter_v2.py) 49 断言全绿（后端未动）。
+
 ## 已完成：修复高级筛选下拉空值占位符不可见（2026-08-19）
 
 下拉未选中时应在框内显示维度名称（如「景别」），但实际不渲染——根因：Quasar 2 的 `q-select` 把 `placeholder` prop 铺到 `.q-field__native` **div** 上（`splitAttrs` 展开），浏览器只对 `<input>`/`<textarea>` 渲染 placeholder，对 div 无效（对比 `q-input` 的 placeholder 落在真实 input 上所以正常）。修复：改 `q-select` 用 `:label="t(dim.label)"`（[gallery.js](../frontend/js/gallery.js) 高级面板模板唯一一处 q-select）——空值未聚焦时 label 居中显示为占位样式（维度标题），选中或聚焦后 label 上浮缩小、选中值正常显示，`q-field--float` 状态干净不重叠。验证：图片 18 下拉 + 2 日期输入（日期仍走 q-input placeholder 正常）、视频 18 下拉、音乐 5 下拉 + 1 切换，全部显示维度名；选中 景别=全景 后框内显示「全景 (1)」、标签上浮。设计不变，文档所述「空值占位符=维度标题」此前是未生效的预期，现真正落地。
@@ -182,16 +195,6 @@ v1（切换类型自动展开 + 药丸分段 + 仅元数据维度）整体重构
   - **验证**：端点三态（真实文件 true / 缺失 false——恰逢用户外置盘未挂载，9126 即真实案例 / 无记录 404）✓。需重启后端生效。
 - **预留（用户提议，未实现）**：音乐分析 tab——识别乐器、表达的情绪、描绘的画面，作为设置页独立 tab 后续加入。
 - **下一步 Step4**：模型下载管理（hf-mirror 镜像、断点续传、SSE 进度、删除、`local_dir_use_symlinks=False`）+ 设置页模型卡片 UI。**注（2026-08-17 实测）**：whisper large-v3 加载 78~82s 的根因是 CTranslate2 在本机 CPU 后端不支持 fp16 计算 → `compute_type=auto` 落到 int8 → 每次启动现场把 fp16 权重逐矩阵量化成 int8（纯 CPU、不随 cpu_threads 扩展；磁盘读 2.9GB 仅 0.24s 非瓶颈；llama-server 5.76GB 仅 3.5~11s 是因为 GGUF mmap 免转换）。**解法**：下载后一次性本地转换为 int8 格式缓存（CT2 转换器），之后加载秒级——并入 Step4 实现。
-
-## 待办：高级筛选 UI 打磨（2026-08-19）
-
-高级筛选 v2 已上线，用户实测提出 5 项 UI 问题待修（[gallery.js](../frontend/js/gallery.js) 高级面板 + [main.css](../frontend/css/main.css)）：
-
-1. **空值占位维度名未水平居中**：未选中时框内显示的维度名称（现为 q-select `label` 左对齐）应水平居中显示。
-2. **高级筛选按钮缺展开/收起区分且未与面板融合**：展开时按钮应与面板视觉连成一体（如高亮/下接样式），收起时恢复普通态——现在两种状态无差别。
-3. **下拉菜单样式不够精致**：面板下拉的整体观感需打磨（圆角/内边距/字号/箭头对齐等）。
-4. **选中后维度名与选项名重叠（确认真实 bug）**：有值后 `q-field--float` 上浮的维度名与居中显示的选项值重叠——面板 CSS 强制 `padding:0 !important` 破坏了 Quasar 浮动 label 的避让间距，需给 `q-field--float` 态补上边距/压缩字号。
-5. **有选中值的下拉应突出显示**：与未选过的下拉形成视觉区别（如强调色边框/底色）。
 
 ## 待办：产品化打包——后端自包含（Python/ffmpeg/exiftool 不再依赖用户环境）（2026-08-16）
 

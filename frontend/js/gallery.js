@@ -26,6 +26,7 @@ const ADV_FILTER_DEFAULTS = {
   // 音乐
   music_mood: "", music_genre: "", music_instrument: "", music_theme: "", music_vocals: "",
 };
+// group = 摄影领域分类的组标签 i18n 键（同组必须连续，groupedSpec 按连续段聚合）；无 group = 不分组（音乐显示切换）
 const ADVANCED_FILTER_SPEC = {
   audio: [
     { type: "toggle", displayOnly: true, param: "thumbMode", label: "g.adv_display", icon: "visibility",
@@ -33,99 +34,99 @@ const ADVANCED_FILTER_SPEC = {
         { value: "cover", labelKey: "g.adv_cover" },
         { value: "waveform", labelKey: "g.adv_waveform" },
       ] },
-    { type: "dropdown", param: "music_mood", label: "g.adv_music_mood", icon: "mood", facetKey: "music_mood", taxKey: "mood" },
-    { type: "dropdown", param: "music_genre", label: "g.adv_music_genre", icon: "library_music", facetKey: "music_genre", taxKey: "genre" },
-    { type: "dropdown", param: "music_instrument", label: "g.adv_music_instrument", icon: "piano", facetKey: "music_instrument", taxKey: "instrument" },
-    { type: "dropdown", param: "music_theme", label: "g.adv_music_theme", icon: "movie_filter", facetKey: "music_theme", taxKey: "video_theme" },
-    { type: "dropdown", param: "music_vocals", label: "g.adv_music_vocals", icon: "record_voice_over", facetKey: "music_vocals", taxKey: "vocals" },
+    { type: "dropdown", group: "g.adv_group_music", param: "music_mood", label: "g.adv_music_mood", icon: "mood", facetKey: "music_mood", taxKey: "mood" },
+    { type: "dropdown", group: "g.adv_group_music", param: "music_genre", label: "g.adv_music_genre", icon: "library_music", facetKey: "music_genre", taxKey: "genre" },
+    { type: "dropdown", group: "g.adv_group_music", param: "music_instrument", label: "g.adv_music_instrument", icon: "piano", facetKey: "music_instrument", taxKey: "instrument" },
+    { type: "dropdown", group: "g.adv_group_music", param: "music_theme", label: "g.adv_music_theme", icon: "movie_filter", facetKey: "music_theme", taxKey: "video_theme" },
+    { type: "dropdown", group: "g.adv_group_music", param: "music_vocals", label: "g.adv_music_vocals", icon: "record_voice_over", facetKey: "music_vocals", taxKey: "vocals" },
   ],
   image: [
-    { type: "dropdown", param: "shot_type", label: "g.adv_shot_type", icon: "center_focus_strong", facetKey: "shot_type",
+    { type: "dropdown", group: "g.adv_group_lens", param: "shot_type", label: "g.adv_shot_type", icon: "center_focus_strong", facetKey: "shot_type",
       options: _enum(["全景", "远景", "中景", "近景", "特写"]) },
-    { type: "dropdown", param: "focal_length", label: "g.adv_focal_length", icon: "zoom_in", facetKey: "focal_length",
+    { type: "dropdown", group: "g.adv_group_lens", param: "focal_length", label: "g.adv_focal_length", icon: "zoom_in", facetKey: "focal_length",
       options: _enum(["广角", "中焦", "长焦", "微距"]) },
-    { type: "dropdown", param: "camera_angle", label: "g.adv_camera_angle", icon: "camera_front", facetKey: "camera_angle",
+    { type: "dropdown", group: "g.adv_group_lens", param: "camera_angle", label: "g.adv_camera_angle", icon: "camera_front", facetKey: "camera_angle",
       options: _enum(["俯视", "仰视", "平视", "上帝视角"]) },
-    { type: "dropdown", param: "perspective", label: "g.adv_perspective", icon: "visibility", facetKey: "perspective",
+    { type: "dropdown", group: "g.adv_group_lens", param: "perspective", label: "g.adv_perspective", icon: "visibility", facetKey: "perspective",
       options: _enum(["主观", "客观", "旁听"]) },
-    { type: "dropdown", param: "scene_type", label: "g.adv_scene_type", icon: "landscape", facetKey: "scene_type",
-      options: _enum(["室内", "室外", "自然", "城市", "水下", "晨昏", "星空"]) },
-    { type: "dropdown", param: "lighting", label: "g.adv_lighting", icon: "light_mode", facetKey: "lighting",
-      options: _enum(["自然光", "逆光", "侧光", "室内光", "顶光", "混合光"]) },
-    { type: "dropdown", param: "weather", label: "g.adv_weather", icon: "cloud", facetKey: "weather",
-      options: _enum(["晴天", "多云", "阴天", "晨昏", "雨", "雪", "夜景", "雾"]) },
-    { type: "dropdown", param: "style", label: "g.adv_style", icon: "palette", facetKey: "style",
-      options: _enum(["风光", "人像", "纪实", "人文", "街拍", "建筑", "静物", "美食", "动物", "植物", "运动", "时尚", "航拍", "艺术", "商业"]) },
-    { type: "dropdown", param: "color_tone", label: "g.adv_color_tone", icon: "tune", facetKey: "color_tone",
-      options: _enum(["暖调", "冷调", "中性"]) },
-    { type: "dropdown", param: "tone", label: "g.adv_tone", icon: "brightness_6", facetKey: "tone",
-      options: _enum(["高调", "低调", "中间调", "高反差", "柔和"]) },
-    { type: "dropdown", param: "dof", label: "g.adv_dof", icon: "blur_on", facetKey: "dof",
+    { type: "dropdown", group: "g.adv_group_lens", param: "dof", label: "g.adv_dof", icon: "blur_on", facetKey: "dof",
       options: _enum(["浅景深", "深景深"]) },
-    { type: "dropdown", param: "composition", label: "g.adv_composition", icon: "grid_view", facetKey: "composition",
+    { type: "dropdown", group: "g.adv_group_lens", param: "composition", label: "g.adv_composition", icon: "grid_view", facetKey: "composition",
       options: _enum(["三分法", "对称", "引导线", "框架", "中心", "对角线"]) },
-    { type: "dropdown", param: "dominant_colors", label: "g.adv_colors", icon: "colorize", facetKey: "dominant_colors" },
-    { type: "dropdown", param: "main_subjects", label: "g.adv_subjects", icon: "category", facetKey: "main_subjects" },
-    { type: "dropdown", param: "encoding", label: "g.adv_encoding", icon: "file_copy", facetKey: "encoding",
+    { type: "dropdown", group: "g.adv_group_scene", param: "scene_type", label: "g.adv_scene_type", icon: "landscape", facetKey: "scene_type",
+      options: _enum(["室内", "室外", "自然", "城市", "水下", "晨昏", "星空"]) },
+    { type: "dropdown", group: "g.adv_group_scene", param: "lighting", label: "g.adv_lighting", icon: "light_mode", facetKey: "lighting",
+      options: _enum(["自然光", "逆光", "侧光", "室内光", "顶光", "混合光"]) },
+    { type: "dropdown", group: "g.adv_group_scene", param: "weather", label: "g.adv_weather", icon: "cloud", facetKey: "weather",
+      options: _enum(["晴天", "多云", "阴天", "晨昏", "雨", "雪", "夜景", "雾"]) },
+    { type: "dropdown", group: "g.adv_group_style", param: "style", label: "g.adv_style", icon: "palette", facetKey: "style",
+      options: _enum(["风光", "人像", "纪实", "人文", "街拍", "建筑", "静物", "美食", "动物", "植物", "运动", "时尚", "航拍", "艺术", "商业"]) },
+    { type: "dropdown", group: "g.adv_group_style", param: "color_tone", label: "g.adv_color_tone", icon: "tune", facetKey: "color_tone",
+      options: _enum(["暖调", "冷调", "中性"]) },
+    { type: "dropdown", group: "g.adv_group_style", param: "tone", label: "g.adv_tone", icon: "brightness_6", facetKey: "tone",
+      options: _enum(["高调", "低调", "中间调", "高反差", "柔和"]) },
+    { type: "dropdown", group: "g.adv_group_content", param: "dominant_colors", label: "g.adv_colors", icon: "colorize", facetKey: "dominant_colors" },
+    { type: "dropdown", group: "g.adv_group_content", param: "main_subjects", label: "g.adv_subjects", icon: "category", facetKey: "main_subjects" },
+    { type: "dropdown", group: "g.adv_group_meta", param: "encoding", label: "g.adv_encoding", icon: "file_copy", facetKey: "encoding",
       options: [
         { value: "JPG", label: "JPG" }, { value: "RAW", label: "RAW" },
         { value: "HIF", label: "HIF" }, { value: "OTHER", labelKey: "g.adv_other" },
       ] },
-    { type: "dropdown", param: "camera_make", label: "g.adv_camera_make", icon: "photo_camera", facetKey: "camera_make" },
-    { type: "dropdown", param: "camera_model", label: "g.adv_camera_model", icon: "camera", facetKey: "camera_model" },
-    { type: "dropdown", param: "orientation", label: "g.adv_orientation", icon: "aspect_ratio", facetKey: "orientation",
+    { type: "dropdown", group: "g.adv_group_meta", param: "camera_make", label: "g.adv_camera_make", icon: "photo_camera", facetKey: "camera_make" },
+    { type: "dropdown", group: "g.adv_group_meta", param: "camera_model", label: "g.adv_camera_model", icon: "camera", facetKey: "camera_model" },
+    { type: "dropdown", group: "g.adv_group_meta", param: "orientation", label: "g.adv_orientation", icon: "aspect_ratio", facetKey: "orientation",
       options: [
         { value: "landscape", labelKey: "g.adv_aspect_landscape" },
         { value: "portrait", labelKey: "g.adv_aspect_portrait" },
         { value: "square", labelKey: "g.adv_aspect_square" },
       ] },
-    { type: "dateRange", param: "date_range", label: "g.adv_date_range", icon: "date_range" },
+    { type: "dateRange", group: "g.adv_group_meta", param: "date_range", label: "g.adv_date_range", icon: "date_range" },
   ],
   video: [
-    { type: "dropdown", param: "shot_type", label: "g.adv_shot_type", icon: "center_focus_strong", facetKey: "shot_type",
+    { type: "dropdown", group: "g.adv_group_lens", param: "shot_type", label: "g.adv_shot_type", icon: "center_focus_strong", facetKey: "shot_type",
       options: _enum(["全景", "远景", "中景", "近景", "特写"]) },
-    { type: "dropdown", param: "focal_length", label: "g.adv_focal_length", icon: "zoom_in", facetKey: "focal_length",
+    { type: "dropdown", group: "g.adv_group_lens", param: "focal_length", label: "g.adv_focal_length", icon: "zoom_in", facetKey: "focal_length",
       options: _enum(["广角", "中焦", "长焦"]) },
-    { type: "dropdown", param: "camera_angle", label: "g.adv_camera_angle", icon: "camera_front", facetKey: "camera_angle",
+    { type: "dropdown", group: "g.adv_group_lens", param: "camera_angle", label: "g.adv_camera_angle", icon: "camera_front", facetKey: "camera_angle",
       options: _enum(["俯视", "仰视", "平视", "上帝视角"]) },
-    { type: "dropdown", param: "camera_movement", label: "g.adv_camera_movement", icon: "video_camera_back", facetKey: "camera_movement",
+    { type: "dropdown", group: "g.adv_group_lens", param: "camera_movement", label: "g.adv_camera_movement", icon: "video_camera_back", facetKey: "camera_movement",
       options: _enum(["推", "拉", "摇", "移", "绕", "固定"]) },
-    { type: "dropdown", param: "perspective", label: "g.adv_perspective", icon: "visibility", facetKey: "perspective",
+    { type: "dropdown", group: "g.adv_group_lens", param: "perspective", label: "g.adv_perspective", icon: "visibility", facetKey: "perspective",
       options: _enum(["主观", "客观", "旁听"]) },
-    { type: "dropdown", param: "scene_type", label: "g.adv_scene_type", icon: "landscape", facetKey: "scene_type",
+    { type: "dropdown", group: "g.adv_group_scene", param: "scene_type", label: "g.adv_scene_type", icon: "landscape", facetKey: "scene_type",
       options: _enum(["室内", "室外", "自然", "城市", "水下", "晨昏"]) },
-    { type: "dropdown", param: "lighting", label: "g.adv_lighting", icon: "light_mode", facetKey: "lighting",
+    { type: "dropdown", group: "g.adv_group_scene", param: "lighting", label: "g.adv_lighting", icon: "light_mode", facetKey: "lighting",
       options: _enum(["自然光", "逆光", "侧光", "室内光", "顶光", "混合光"]) },
-    { type: "dropdown", param: "weather", label: "g.adv_weather", icon: "cloud", facetKey: "weather",
+    { type: "dropdown", group: "g.adv_group_scene", param: "weather", label: "g.adv_weather", icon: "cloud", facetKey: "weather",
       options: _enum(["晴天", "多云", "阴天", "雨", "雪", "夜景", "雾"]) },
-    { type: "dropdown", param: "mood", label: "g.adv_mood", icon: "mood", facetKey: "mood", options: EMOTION_OPTIONS },
-    { type: "dropdown", param: "dominant_colors", label: "g.adv_colors", icon: "colorize", facetKey: "dominant_colors" },
-    { type: "dropdown", param: "main_subjects", label: "g.adv_subjects", icon: "category", facetKey: "main_subjects" },
-    { type: "dropdown", param: "camera_make", label: "g.adv_camera_make", icon: "photo_camera", facetKey: "camera_make" },
-    { type: "dropdown", param: "camera_model", label: "g.adv_camera_model", icon: "camera", facetKey: "camera_model" },
-    { type: "dropdown", param: "orientation", label: "g.adv_orientation", icon: "aspect_ratio", facetKey: "orientation",
+    { type: "dropdown", group: "g.adv_group_content", param: "mood", label: "g.adv_mood", icon: "mood", facetKey: "mood", options: EMOTION_OPTIONS },
+    { type: "dropdown", group: "g.adv_group_content", param: "dominant_colors", label: "g.adv_colors", icon: "colorize", facetKey: "dominant_colors" },
+    { type: "dropdown", group: "g.adv_group_content", param: "main_subjects", label: "g.adv_subjects", icon: "category", facetKey: "main_subjects" },
+    { type: "dropdown", group: "g.adv_group_camera", param: "camera_make", label: "g.adv_camera_make", icon: "photo_camera", facetKey: "camera_make" },
+    { type: "dropdown", group: "g.adv_group_camera", param: "camera_model", label: "g.adv_camera_model", icon: "camera", facetKey: "camera_model" },
+    { type: "dropdown", group: "g.adv_group_tech", param: "orientation", label: "g.adv_orientation", icon: "aspect_ratio", facetKey: "orientation",
       options: [
         { value: "landscape", labelKey: "g.adv_aspect_landscape" },
         { value: "portrait", labelKey: "g.adv_aspect_portrait" },
         { value: "square", labelKey: "g.adv_aspect_square" },
       ] },
-    { type: "dropdown", param: "res", label: "g.adv_res", icon: "photo_size_select_actual", facetKey: "res",
+    { type: "dropdown", group: "g.adv_group_tech", param: "res", label: "g.adv_res", icon: "photo_size_select_actual", facetKey: "res",
       options: [
         { value: "480", labelKey: "g.adv_res_480" }, { value: "720", labelKey: "g.adv_res_720" },
         { value: "1080", labelKey: "g.adv_res_1080" }, { value: "2160", labelKey: "g.adv_res_2160" },
       ] },
-    { type: "dropdown", param: "fps", label: "g.adv_fps", icon: "speed", facetKey: "fps",
+    { type: "dropdown", group: "g.adv_group_tech", param: "fps", label: "g.adv_fps", icon: "speed", facetKey: "fps",
       options: [
         { value: "24", labelKey: "g.adv_fps_24" }, { value: "30", labelKey: "g.adv_fps_30" },
         { value: "60", labelKey: "g.adv_fps_60" }, { value: "120", labelKey: "g.adv_fps_120" },
       ] },
-    { type: "dropdown", param: "dur", label: "g.adv_dur", icon: "schedule", facetKey: "dur",
+    { type: "dropdown", group: "g.adv_group_tech", param: "dur", label: "g.adv_dur", icon: "schedule", facetKey: "dur",
       options: [
         { value: "short", labelKey: "g.adv_dur_short" },
         { value: "mid", labelKey: "g.adv_dur_mid" },
         { value: "long", labelKey: "g.adv_dur_long" },
       ] },
-    { type: "dropdown", param: "color_space", label: "g.adv_color_space", icon: "gradient", facetKey: "color_space" },
+    { type: "dropdown", group: "g.adv_group_tech", param: "color_space", label: "g.adv_color_space", icon: "gradient", facetKey: "color_space" },
   ],
 };
 
@@ -133,7 +134,7 @@ const GalleryPage = {
   template: `
   <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
     <!-- Filter bar: type, fav/analyzed, stars, colors, reset, search, sort, group, view -->
-    <div class="filter-bar">
+    <div class="filter-bar" :class="{ 'adv-open': advPanelOpen && currentSpec.length }">
       <q-btn-group unelevated style="border-radius:6px;overflow:hidden">
         <q-btn unelevated dense size="sm" label="ALL"
                :style="filters.media_type==='all'?'background:var(--accent) !important;color:#fff !important':''"
@@ -156,10 +157,12 @@ const GalleryPage = {
           <q-tooltip :delay="1000">{{ t('g.music') }}</q-tooltip>
         </q-btn>
       </q-btn-group>
-      <q-btn v-if="currentSpec.length" flat dense size="sm" icon="tune" no-caps
-             :label="t('g.adv_filter_panel')"
-             :class="advAnyActive() ? 'adv-btn-active' : ''"
+      <q-btn v-if="currentSpec.length" flat dense size="sm" no-caps
+             :class="advPanelOpen ? 'adv-btn-open' : (advAnyActive() ? 'adv-btn-active' : '')"
              @click="advPanelOpen = !advPanelOpen">
+        <q-icon name="tune" size="18px" style="margin-right:6px"></q-icon>
+        {{ t('g.adv_filter_panel') }}
+        <q-icon :name="advPanelOpen ? 'expand_less' : 'expand_more'" size="16px" style="margin-left:2px"></q-icon>
         <q-tooltip :delay="1000">{{ t('g.adv_filter_panel') }}</q-tooltip>
       </q-btn>
       <div style="display:flex;gap:2px">
@@ -223,44 +226,60 @@ const GalleryPage = {
         </q-btn>
       </q-btn-group>
     </div>
-    <!-- 高级筛选面板：展开时独占一行（全维度下拉），折叠由栏内「高级筛选」按钮负责 -->
+    <!-- 高级筛选面板：按摄影领域分组，每组一行（组标签 + 组内下拉），折叠由栏内「高级筛选」按钮负责 -->
     <div v-if="advPanelOpen && currentSpec.length" class="adv-filter-panel">
-      <div class="adv-filter-dims">
-        <div v-for="(dim, i) in currentSpec" :key="i" class="adv-dim" :class="{ active: advDimActive(dim) }">
-          <q-btn-toggle v-if="dim.type === 'toggle'"
-                        :model-value="filters[dim.param] || ''"
-                        class="engine-toggle" no-caps unelevated dense
-                        :options="dimOptions(dim)"
-                        @update:model-value="setAdvDim(dim, $event)"></q-btn-toggle>
-          <q-select v-else-if="dim.type === 'dropdown'"
-                    :model-value="filters[dim.param] || ''"
-                    dense filled options-dense clearable emit-value map-options
-                    :options="dimOptions(dim)"
-                    :label="t(dim.label)"
-                    style="min-width:150px"
-                    @update:model-value="setAdvDropdown(dim, $event)"></q-select>
-          <div v-else-if="dim.type === 'dateRange'" class="adv-date-range">
-            <q-input clearable readonly :model-value="filters.date_from" dense filled :placeholder="t('g.adv_date_from')"
-                     @update:model-value="onAdvDate(dim, 'date_from', $event)">
-              <template v-slot:append>
-                <q-icon name="event" class="cursor-pointer">
-                  <q-popup-proxy cover transition-show="scale" transition-hide="scale">
-                    <q-date :model-value="filters.date_from" mask="YYYY-MM-DD" dense @update:model-value="onAdvDate(dim, 'date_from', $event)"></q-date>
-                  </q-popup-proxy>
-                </q-icon>
+      <div v-for="grp in groupedSpec" :key="grp.key || 'misc'" class="adv-filter-group">
+        <span class="adv-group-label" :class="{ invisible: !grp.key }">{{ grp.key ? t(grp.key) : '' }}</span>
+        <div class="adv-filter-dims">
+          <div v-for="dim in grp.dims" :key="dim.param" class="adv-dim" :class="{ active: advDimActive(dim) }">
+            <q-btn-toggle v-if="dim.type === 'toggle'"
+                          :model-value="filters[dim.param] || ''"
+                          class="engine-toggle" no-caps unelevated dense
+                          :options="dimOptions(dim)"
+                          @update:model-value="setAdvDim(dim, $event)"></q-btn-toggle>
+            <q-select v-else-if="dim.type === 'dropdown'"
+                      :model-value="filters[dim.param] || ''"
+                      dense filled options-dense clearable emit-value map-options
+                      :options="dimOptions(dim)"
+                      :label="t(dim.label)"
+                      popup-content-class="adv-select-menu"
+                      style="min-width:150px"
+                      @update:model-value="setAdvDropdown(dim, $event)">
+              <template v-slot:option="scope">
+                <q-item v-bind="scope.itemProps" :class="{ 'adv-opt-selected': scope.selected }">
+                  <q-item-section>{{ scope.opt.label }}</q-item-section>
+                  <q-item-section side>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <span v-if="scope.opt.count != null" class="adv-opt-count">{{ scope.opt.count }}</span>
+                      <q-icon v-if="scope.selected" name="check" size="14px"></q-icon>
+                    </div>
+                  </q-item-section>
+                </q-item>
               </template>
-            </q-input>
-            <span class="adv-date-sep">~</span>
-            <q-input clearable readonly :model-value="filters.date_to" dense filled :placeholder="t('g.adv_date_to')"
-                     @update:model-value="onAdvDate(dim, 'date_to', $event)">
-              <template v-slot:append>
-                <q-icon name="event" class="cursor-pointer">
-                  <q-popup-proxy cover transition-show="scale" transition-hide="scale">
-                    <q-date :model-value="filters.date_to" mask="YYYY-MM-DD" dense @update:model-value="onAdvDate(dim, 'date_to', $event)"></q-date>
-                  </q-popup-proxy>
-                </q-icon>
-              </template>
-            </q-input>
+            </q-select>
+            <div v-else-if="dim.type === 'dateRange'" class="adv-date-range">
+              <q-input clearable readonly :model-value="filters.date_from" dense filled :placeholder="t('g.adv_date_from')"
+                       @update:model-value="onAdvDate(dim, 'date_from', $event)">
+                <template v-slot:append>
+                  <q-icon name="event" class="cursor-pointer">
+                    <q-popup-proxy cover transition-show="scale" transition-hide="scale">
+                      <q-date :model-value="filters.date_from" mask="YYYY-MM-DD" dense @update:model-value="onAdvDate(dim, 'date_from', $event)"></q-date>
+                    </q-popup-proxy>
+                  </q-icon>
+                </template>
+              </q-input>
+              <span class="adv-date-sep">~</span>
+              <q-input clearable readonly :model-value="filters.date_to" dense filled :placeholder="t('g.adv_date_to')"
+                       @update:model-value="onAdvDate(dim, 'date_to', $event)">
+                <template v-slot:append>
+                  <q-icon name="event" class="cursor-pointer">
+                    <q-popup-proxy cover transition-show="scale" transition-hide="scale">
+                      <q-date :model-value="filters.date_to" mask="YYYY-MM-DD" dense @update:model-value="onAdvDate(dim, 'date_to', $event)"></q-date>
+                    </q-popup-proxy>
+                  </q-icon>
+                </template>
+              </q-input>
+            </div>
           </div>
         </div>
       </div>
@@ -929,6 +948,17 @@ const GalleryPage = {
     currentSpec() {
       return ADVANCED_FILTER_SPEC[this.filters.media_type] || [];
     },
+    // 按连续 group 段聚合（无 group 的归入空串组，组标签隐藏但占位对齐）
+    groupedSpec() {
+      const groups = [];
+      for (const dim of this.currentSpec) {
+        const key = dim.group || "";
+        let g = groups[groups.length - 1];
+        if (!g || g.key !== key) { g = { key, label: key, dims: [] }; groups.push(g); }
+        g.dims.push(dim);
+      }
+      return groups;
+    },
     sortOptions() {
       return [
         { label: this.t('g.sort_imported_at'), value: "imported_at" },
@@ -1195,35 +1225,37 @@ const GalleryPage = {
       if (o) return o.label != null ? o.label : this.t(o.labelKey);
       return value;
     },
-    // 统一选项：枚举/词表项 + 计数徽标（缺失或 0 计数禁用）+ 并入数据新值；
-    // 动态 dim（无 options）直接来自 facets；音乐 dim 用词表（en 值 + zh 显示，数据已按词表清洗无需并入）
+    // 统一选项：枚举/词表项 + 计数徽标（count 字段，菜单里独立渲染）+ 并入数据新值；
+    // 动态 dim（无 options）直接来自 facets；音乐 dim 用词表（en 值 + zh 显示，数据已按词表清洗无需并入）；
+    // facets 已加载时缺失/0 计数禁用；未加载或无 facetKey（如显示 toggle）不禁用
     dimOptions(dim) {
       const facets = this._advFacets[this.filters.media_type] || {};
       const counts = dim.facetKey ? facets[dim.facetKey] : null;
       const countMap = {};
       if (Array.isArray(counts)) counts.forEach(x => { countMap[x.value] = x.count; });
       else if (counts) Object.assign(countMap, counts); // 桶计数 dict（res/fps/dur）
-      const isZero = v => v == null || v === 0;
-      const fmt = (label, value) => countMap[value] != null ? `${label} (${countMap[value]})` : label;
+      const cnt = v => (counts ? (countMap[v] || 0) : null);
+      const off = v => (counts ? cnt(v) === 0 : false);
       if (!dim.options && !dim.taxKey) {
         // 动态 dim：仅数据里出现的值（已带计数）
-        return (counts || []).map(x => ({ label: `${x.value} (${x.count})`, value: x.value }));
+        return (counts || []).map(x => ({ label: x.value, value: x.value, count: x.count }));
       }
       const base = dim.taxKey
         ? ((this.$root.musicTax?.[dim.taxKey]) || []).map(x => ({
-            label: fmt(this.$root.musicTaxZh?.[x.en] || x.en, x.en),
+            label: this.$root.musicTaxZh?.[x.en] || x.en,
             value: x.en,
-            disable: isZero(countMap[x.en]),
+            count: cnt(x.en),
+            disable: off(x.en),
           }))
         : dim.options.map(o => {
             const label = o.label != null ? o.label : this.t(o.labelKey);
-            return { label: fmt(label, o.value), value: o.value, disable: isZero(countMap[o.value]) };
+            return { label, value: o.value, count: cnt(o.value), disable: off(o.value) };
           });
       // 标准枚举 + 并入数据新值（带计数，仅非词表 dim；桶 facets 是 dict，无需并入）
       if (!dim.taxKey && Array.isArray(counts)) {
         const seen = new Set(dim.options.map(o => o.value));
         for (const x of counts) {
-          if (!seen.has(x.value)) base.push({ label: `${x.value} (${x.count})`, value: x.value });
+          if (!seen.has(x.value)) base.push({ label: x.value, value: x.value, count: x.count });
         }
       }
       return base;
