@@ -157,7 +157,7 @@ const GalleryPage = {
           <q-tooltip :delay="1000">{{ t('g.music') }}</q-tooltip>
         </q-btn>
       </q-btn-group>
-      <q-btn v-if="currentSpec.length" flat dense size="sm" no-caps
+      <q-btn v-if="currentSpec.length" flat dense size="sm" no-caps class="adv-toggle-btn"
              :class="advPanelOpen ? 'adv-btn-open' : (advAnyActive() ? 'adv-btn-active' : '')"
              @click="advPanelOpen = !advPanelOpen">
         <q-icon name="tune" size="18px" style="margin-right:6px"></q-icon>
@@ -231,6 +231,7 @@ const GalleryPage = {
          @wheel="onAdvPanelWheel" @mousedown="startAdvDrag" @click.capture="onAdvPanelClickCapture">
       <div v-for="(grp, gi) in groupedSpec" :key="grp.key || 'misc-' + gi" class="adv-group"
            :class="{ 'adv-group-plain': !grp.key }">
+        <div v-if="grp.key" class="adv-group-name">{{ t(grp.key) }}</div>
         <div class="adv-group-dims" :style="{ gridTemplateColumns: 'repeat(' + groupColCount(grp) + ', auto)' }">
           <div v-for="dim in grp.dims" :key="dim.param" class="adv-dim"
                :class="{ active: advDimActive(dim) }">
@@ -282,7 +283,6 @@ const GalleryPage = {
           </q-input>
           </div>
         </div>
-        <div v-if="grp.key" class="adv-group-name">{{ t(grp.key) }}</div>
       </div>
     </div>
     <!-- Main gallery area with grid/list views and lasso selection -->

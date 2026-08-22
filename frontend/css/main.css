@@ -397,12 +397,15 @@ body.body--dark .filter-bar .q-field__append .q-icon { color: #666 !important; }
 /* Advanced filter panel: Office Ribbon 同屏组段——每分组一段（组间竖分隔线 + 组底小字组名），dims from ADVANCED_FILTER_SPEC */
 .adv-btn-active { color: var(--accent) !important; background: var(--accent-dim) !important; }
 .adv-btn-open { color: var(--accent) !important; background: var(--accent-dim) !important; border-radius: 6px 6px 0 0 !important; }
+/* 卡舌延伸条：穿过栏 padding/居中差/透明底边（实测缝 ~12px）伸入面板 4px，按钮与面板连成一块 */
+.adv-btn-open::after { content: ''; position: absolute; left: 0; right: 0; bottom: -16px; height: 16px; background: var(--accent-dim); }
+.filter-bar .adv-toggle-btn { flex-shrink: 0; }   /* 防栏溢出时按钮被挤压折行 */
 /* 展开时按钮呈面板「卡舌」：bar 底边透明去缝，面板 accent-dim 顶边衔接 */
 .filter-bar.adv-open { border-bottom-color: transparent; }
-/* 组段恒单行：放不下不折行，横向滚动（滚轮竖转横 + 按住拖拽，见 gallery.js） */
+/* 组段恒单行：放不下不折行，横向滚动（滚轮竖转横 + 按住拖拽，见 gallery.js）。
+   展开态与筛选栏连成一块：背景透明融入栏区、无顶边线（栏底边已随 adv-open 透明），按钮 accent-dim 底方角即「卡舌」 */
 .adv-filter-panel { display: flex; flex-wrap: nowrap; overflow-x: auto; padding: 10px 14px 6px;
-  background: var(--surface); flex-shrink: 0;
-  border-top: 2px solid var(--accent-dim); border-bottom: 1px solid var(--border); }
+  background: transparent; flex-shrink: 0; border-bottom: 1px solid var(--border); }
 .adv-filter-panel::-webkit-scrollbar { height: 6px; }
 .adv-filter-panel::-webkit-scrollbar-track { background: transparent; }
 .adv-filter-panel::-webkit-scrollbar-thumb { background: var(--text3); border-radius: 3px; opacity: .4; }
