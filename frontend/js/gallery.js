@@ -226,12 +226,11 @@ const GalleryPage = {
         </q-btn>
       </q-btn-group>
     </div>
-    <!-- 高级筛选面板：Office Ribbon 同屏组段式——每分组一段（组间竖分隔线 + 组顶小字组名），组内维度固定两行网格；组段恒单行，放不下横向滚动 -->
+    <!-- 高级筛选面板：Office Ribbon 同屏组段式——每分组一段（组间竖分隔线 + 组底小字组名），组内维度固定两行网格；组段恒单行，放不下横向滚动 -->
     <div v-if="advPanelOpen && currentSpec.length" class="adv-filter-panel" ref="advPanel"
          @wheel="onAdvPanelWheel" @mousedown="startAdvDrag" @click.capture="onAdvPanelClickCapture">
       <div v-for="(grp, gi) in groupedSpec" :key="grp.key || 'misc-' + gi" class="adv-group"
            :class="{ 'adv-group-plain': !grp.key }">
-        <div v-if="grp.key" class="adv-group-name">{{ t(grp.key) }}</div>
         <div class="adv-group-dims" :style="{ gridTemplateColumns: 'repeat(' + groupColCount(grp) + ', auto)' }">
           <div v-for="dim in grp.dims" :key="dim.param" class="adv-dim"
                :class="{ active: advDimActive(dim) }">
@@ -283,6 +282,7 @@ const GalleryPage = {
           </q-input>
           </div>
         </div>
+        <div v-if="grp.key" class="adv-group-name">{{ t(grp.key) }}</div>
       </div>
     </div>
     <!-- Main gallery area with grid/list views and lasso selection -->

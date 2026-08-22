@@ -1,5 +1,14 @@
 # TODO
 
+## 已完成：高级筛选面板十二轮打磨——有值仅显居中值、组名回段底、面板与栏区同底连成一体（2026-08-22）
+
+用户三点定调（Office「开始」页签意象）：① 下拉有选项时不显示维度名，值垂直+水平居中；② 组名放回区块下边；③ 面板不用主题色也不用灰底，与 ribbon 栏区同底色、展开时融合连通。落地（[main.css](../frontend/css/main.css) + [gallery.js](../frontend/js/gallery.js) 模板换序）：
+
+1. **有值 = 仅显居中值**：`.adv-dim.active` 下 float 小标签 `display:none`（不再显示维度名），`.q-field__native` 34px 单行 `align-items:center + justify-content:center` 垂直水平居中；`padding-left:2px` 对冲左右图标区宽度差（prepend 22px / append 30px），实测值中心偏移 +2px == 空态标题中心偏移 +2px（两态同一视觉中心）。日期控件顺带统一：placeholder 与已选范围文本均 `text-align:center`。
+2. **组名回段底**：`.adv-group-name` 从段顶（八轮上移）移回 `.adv-group-dims` 之后——先看维度、小字组名收尾。实测首段名「镜头语言」top 173 > 维度区 bottom 171。
+3. **面板与栏区同底融合（Office 页签式）**：面板底 `--surface2` → `var(--bg)`（页面底色）；`.adv-btn-open` 底色 accent-dim → **透明**（文字仍 accent）——选中态像 Office 选中「开始」页签：按钮与菜单同底连成一块，仅以 accent 文字示选中；`.filter-bar` 本就无背景（透明衬页面底），栏底边随 `adv-open` 透明，面板底边 1px `--border` 即整个 ribbon 区外缘。顺带删除已死的 active float-label accent 色规则（标签已整体隐藏）。
+- **实测**：暗面板 rgb(10,10,10) = 页面底、亮 rgb(245,245,245) = 页面底；栏底边展开 rgba(0,0,0,0) / 收起恢复 --border；栏底 y 87.008 == 面板顶 y 87.008 零缝；接缝带 20 行逐行扫描 100% 纯页面底色（像素级无缝）；active 标签 display:none、值文本仅「暖调」、垂直偏移 0；亮色视觉四项全过（同底融合/组名在底/值居中/分隔线可辨），暗色按 DOM 实测 + 像素扫描 + 视觉复核认定（暗色低对比小字视觉模型误读率高，以像素证据为准）。
+
 ## 已完成：高级筛选面板十一轮打磨——面板浅灰底（--surface2）+ 按钮下侧无分隔线（2026-08-22）
 
 用户定调：面板**不用主题色**，改用亮/暗两主题平衡的**浅灰**，且「高级筛选」按钮下侧不出现分隔线。落地（[main.css](../frontend/css/main.css) 两处）：

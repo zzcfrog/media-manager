@@ -394,16 +394,17 @@ body.body--dark .filter-bar .q-placeholder { color: #555 !important; }
 body.body--dark .filter-bar .q-field__append .q-icon { color: #666 !important; }
 .filter-bar .q-field__control-container { padding-top: 0 !important; }
 
-/* Advanced filter panel: Office Ribbon 同屏组段——每分组一段（组间竖分隔线 + 组顶小字组名），dims from ADVANCED_FILTER_SPEC */
+/* Advanced filter panel: Office Ribbon 同屏组段——每分组一段（组间竖分隔线 + 组底小字组名），dims from ADVANCED_FILTER_SPEC */
 .adv-btn-active { color: var(--accent) !important; background: var(--accent-dim) !important; }
-.adv-btn-open { color: var(--accent) !important; background: var(--accent-dim) !important; border-radius: 6px 6px 0 0 !important; }
+.adv-btn-open { color: var(--accent) !important; background: transparent !important; border-radius: 6px 6px 0 0 !important; }
 .filter-bar .adv-toggle-btn { flex-shrink: 0; }   /* 防栏溢出时按钮被挤压折行 */
-/* 展开时按钮下侧无分隔线：bar 底边透明去缝（面板浅灰顶边直接衔接按钮底边） */
+/* 展开态栏-按钮-面板连成一体（Office 选中页签式）：按钮/面板底色与栏区一致（透明衬页面底），
+   栏底边透明去缝，面板底边线即整个 ribbon 区外缘 */
 .filter-bar.adv-open { border-bottom-color: transparent; }
 /* 组段恒单行：放不下不折行，横向滚动（滚轮竖转横 + 按住拖拽，见 gallery.js）。
-   展开态整块浅灰底（--surface2：暗 #1c1c1c / 亮 #eee，双主题平衡灰度），无顶边线；栏底边随 adv-open 透明——按钮下侧无分隔线 */
+   面板与栏区同底色（--bg 页面底），仅底边 1px 作 ribbon 外缘收边 */
 .adv-filter-panel { display: flex; flex-wrap: nowrap; overflow-x: auto; padding: 10px 14px 6px;
-  background: var(--surface2); flex-shrink: 0; border-bottom: 1px solid var(--border); }
+  background: var(--bg); flex-shrink: 0; border-bottom: 1px solid var(--border); }
 .adv-filter-panel::-webkit-scrollbar { height: 6px; }
 .adv-filter-panel::-webkit-scrollbar-track { background: transparent; }
 .adv-filter-panel::-webkit-scrollbar-thumb { background: var(--text3); border-radius: 3px; opacity: .4; }
@@ -430,7 +431,7 @@ body.body--dark .filter-bar .q-field__append .q-icon { color: #666 !important; }
 .adv-filter-panel .adv-clear-icon { color: var(--text3); margin-right: -2px; }   /* -2px 与下拉三角右缘对齐 */
 .adv-filter-panel .adv-clear-icon:hover { color: var(--accent); }
 .adv-filter-panel .adv-dim.active .q-select__dropdown-icon { display: none; }
-/* 两区字段（34px）：空态 = 维度名全宽水平居中；float 态 = 小标签 [2,14] + 值文字 [14,34] */
+/* 字段（34px）：空态 = 维度名全宽水平居中；有值（active）= 隐藏维度名、值全宽水平居中 */
 .adv-filter-panel .q-field { font-size: 12px; }
 .adv-filter-panel .q-field__control { height: 34px !important; min-height: 34px !important; border-radius: 6px !important; }
 .adv-filter-panel .q-field__marginal { height: 34px !important; }
@@ -440,6 +441,7 @@ body.body--dark .filter-bar .q-field__append .q-icon { color: #666 !important; }
   top: 0; left: -22px; right: -30px; max-width: none;
   text-align: center; font-size: 12px; line-height: 34px; transform: none;
 }
+/* 仅空态聚焦（开菜单未选）时上浮小标签兜底；active 有值时该标签整体隐藏（见下） */
 .adv-filter-panel .q-field--labeled.q-field--float .q-field__label {
   top: 2px; left: 0; right: auto; text-align: left;
   font-size: 10px; line-height: 12px; transform: none; color: var(--text3);
@@ -448,16 +450,22 @@ body.body--dark .filter-bar .q-field__append .q-icon { color: #666 !important; }
   min-height: 0 !important; padding: 14px 0 0 0 !important; line-height: 20px !important;
   align-items: flex-start;
 }
+/* 有值（active）：不显示维度名，值垂直 + 水平居中——padding-left 2px 对冲左右图标区宽度差，
+   使值中心与空态标题中心（≈ 整控件中心）一致 */
+.adv-filter-panel .adv-dim.active .q-field--labeled.q-field--float .q-field__label { display: none; }
+.adv-filter-panel .adv-dim.active .q-select .q-field__native {
+  min-height: 34px !important; padding: 0 0 0 2px !important; line-height: 34px !important;
+  align-items: center !important; justify-content: center;
+}
 .adv-filter-panel .q-input .q-field__native,
 .adv-filter-panel .q-input .q-field__input { min-height: 34px !important; padding: 0 !important; line-height: 34px !important; }
-/* 日期合一控件空态：placeholder 居中，与其他维度的居中标题对齐（q-input 真 input 类 = q-field__native） */
-.adv-filter-panel .q-input .q-field__native:placeholder-shown { text-align: center; }
+/* 日期合一控件：placeholder 与已选范围文本均居中（q-input 真 input 类 = q-field__native） */
+.adv-filter-panel .q-input .q-field__native { text-align: center; }
 /* 有选中值的维度强调：accent-dim 底 + accent 底条 + accent 文字，与未选过的区分 */
 .adv-filter-panel .adv-dim.active .q-field--filled .q-field__control::before { background: var(--accent-dim) !important; opacity: 1 !important; }
 .adv-filter-panel .adv-dim.active .q-field__control::after { transform: scaleX(1) !important; background: var(--accent) !important; }
 .adv-filter-panel .adv-dim.active .q-field__native { color: var(--accent) !important; font-weight: 500; }
 .adv-filter-panel .adv-dim.active .q-field__input { color: var(--accent) !important; font-weight: 500; }
-.adv-filter-panel .adv-dim.active .q-field--float .q-field__label { color: var(--accent) !important; }
 /* 下拉菜单（portal 到 body，规则必须全局）：紧凑行高 + 计数徽标 + 选中对勾态 + 0 计数灰化 */
 .adv-select-menu { border-radius: 8px !important; padding: 3px !important; min-width: 168px !important; }
 .adv-select-menu .q-item { border-radius: 5px; min-height: 28px; padding: 0 8px; font-size: 12px; }
