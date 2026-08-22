@@ -80,7 +80,7 @@ body.body--dark input::placeholder { color: #555 !important; -webkit-text-fill-c
 .row-ai { display: inline-flex; align-items: center; vertical-align: middle; margin-left: 4px; }
 
 /* Filter bar */
-.filter-bar { padding: 8px 16px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; flex-wrap: nowrap; overflow-x: auto; }
+.filter-bar { padding: 8px 16px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; flex-wrap: nowrap; overflow-x: auto; background: var(--surface); }
 .filter-sep { width: 1px; height: 16px; background: var(--border2); }
 .filter-bar .spacer { flex: 1; }
 
@@ -366,7 +366,9 @@ body.body--dark .q-separator { background: #252525 !important; }
 .filter-bar .q-field__native,
 .filter-bar .q-field__input { min-height: 28px !important; padding: 0 !important; line-height: 28px !important; }
 /* Search input: no border, subtle fill */
-body.body--dark .filter-bar .q-field--filled .q-field__control { background: #1c1c1c !important; border-radius: 6px !important; }
+/* 十四轮：栏区有 surface 底后，栏内填充控件同步提一档（#1c1c1c→#222），保持与栏底分层可辨 */
+body.body--dark .filter-bar .q-field--filled .q-field__control { background: #222 !important; border-radius: 6px !important; }
+body.body--dark .filter-bar .q-btn-group { background: #222; }
 .filter-bar .q-field--filled .q-field__control { border-radius: 6px !important; }
 .filter-bar .q-field--filled .q-field__control::before { border: none !important; }
 .filter-bar .q-field--filled .q-field__control:hover::before { border: none !important; }
@@ -398,13 +400,14 @@ body.body--dark .filter-bar .q-field__append .q-icon { color: #666 !important; }
 .adv-btn-active { color: var(--accent) !important; background: var(--accent-dim) !important; }
 .adv-btn-open { color: var(--accent) !important; background: transparent !important; border-radius: 6px 6px 0 0 !important; }
 .filter-bar .adv-toggle-btn { flex-shrink: 0; }   /* 防栏溢出时按钮被挤压折行 */
-/* 展开态栏-按钮-面板连成一体（Office 选中页签式）：按钮/面板底色与栏区一致（透明衬页面底），
-   栏底边透明去缝，面板底边线即整个 ribbon 区外缘 */
+/* 展开态栏-按钮-面板连成一体（Office 选中页签式）：栏/面板同用 surface 底连成整块 ribbon 区
+   （较页面底深一档：暗 #141414 / 亮 #fff，与媒体卡片同级——整块肉眼可辨，十四轮），
+   按钮透明底即露栏底仍连通，栏底边透明去缝，面板底边线即整个 ribbon 区外缘 */
 .filter-bar.adv-open { border-bottom-color: transparent; }
 /* 组段恒单行：放不下不折行，横向滚动（滚轮竖转横 + 按住拖拽，见 gallery.js）。
-   面板与栏区同底色（--bg 页面底），仅底边 1px 作 ribbon 外缘收边 */
+   面板与栏区同底色（--surface），仅底边 1px 作 ribbon 外缘收边 */
 .adv-filter-panel { display: flex; flex-wrap: nowrap; overflow-x: auto; padding: 10px 14px 6px;
-  background: var(--bg); flex-shrink: 0; border-bottom: 1px solid var(--border); }
+  background: var(--surface); flex-shrink: 0; border-bottom: 1px solid var(--border); }
 .adv-filter-panel::-webkit-scrollbar { height: 6px; }
 .adv-filter-panel::-webkit-scrollbar-track { background: transparent; }
 .adv-filter-panel::-webkit-scrollbar-thumb { background: var(--text3); border-radius: 3px; opacity: .4; }
@@ -461,9 +464,6 @@ body.body--dark .filter-bar .q-field__append .q-icon { color: #666 !important; }
 .adv-filter-panel .q-input .q-field__input { min-height: 34px !important; padding: 0 !important; line-height: 34px !important; }
 /* 日期合一控件：placeholder 与已选范围文本均居中（q-input 真 input 类 = q-field__native） */
 .adv-filter-panel .q-input .q-field__native { text-align: center; }
-/* 十三轮：面板底改页面底（十二轮）后，半透明字段叠层与背景只差 Δ17（暗）/Δ13（亮）肉眼难辨——
-   空态字段显式 surface3 底（暗 #222 Δ24 / 亮 #e0e0e0 Δ21）；面板底仍 = 页面底，融合观感不变 */
-.adv-filter-panel .q-field--filled .q-field__control::before { background: var(--surface3) !important; opacity: 1 !important; }
 /* 有选中值的维度强调：accent-dim 底 + accent 底条 + accent 文字，与未选过的区分 */
 .adv-filter-panel .adv-dim.active .q-field--filled .q-field__control::before { background: var(--accent-dim) !important; opacity: 1 !important; }
 .adv-filter-panel .adv-dim.active .q-field__control::after { transform: scaleX(1) !important; background: var(--accent) !important; }
@@ -478,9 +478,6 @@ body.body--dark .filter-bar .q-field__append .q-icon { color: #666 !important; }
 body.body--dark .adv-filter-panel .q-field__native,
 body.body--dark .adv-filter-panel .q-field__input,
 body.body--dark .adv-filter-panel .q-field__control { color: #eee !important; }
-/* 暗色选中态：accent-dim(.15) 在页面底上合成 rgb(25,29,46)，会被空态 #222 反超——
-   提到 .26 合成 rgb(35,44,74)，蓝通道领先空态 +40，选中仍最醒目 */
-body.body--dark .adv-filter-panel .adv-dim.active .q-field--filled .q-field__control::before { background: rgba(108,140,255,.26) !important; }
 body.body--dark .adv-filter-panel .q-placeholder { color: #555 !important; }
 body.body--dark .adv-filter-panel .q-field__append .q-icon { color: #666 !important; }
 body.body--dark .adv-select-menu .adv-opt-selected { color: #8ea2ff !important; }
