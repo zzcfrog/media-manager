@@ -19,8 +19,12 @@ def _segment(text):
 
 
 def _segment_query(q):
-    words = [w.strip() for w in jieba.cut(q) if w.strip() and w.strip() not in ("，", "。", "、", "的", "了", "在", "是", "和", "与", "有", "被", "把", "让", "向", "从", "到", "为", "着", "也", "都", "又", "而", "及", "等", "中", "上", "下", "里")]
-    return " AND ".join(words) if words else q
+    words = [w.strip() for w in jieba.cut(q) if any(c.isalnum() for c in w) and w.strip() not in ("，", "。", "、", "的", "了", "在", "是", "和", "与", "有", "被", "把", "让", "向", "从", "到", "为", "着", "也", "都", "又", "而", "及", "等", "中", "上", "下", "里")]
+    return " AND ".join('"' + w.replace('"', '""') + '"' for w in (words or [q]))
+
+
+def _folder_pattern(path):
+    return str(path).rstrip('/').replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_') + '/%'
 
 
 # ── 高级筛选桶阈值。单一事实来源（后端），前端只认桶 key + 标签。
@@ -315,8 +319,8 @@ def list_media():
     elif analysis_status == "not_analyzed":
         where_clauses.append("(analysis_status IS NULL OR analysis_status != 'done')")
     if folder:
-        where_clauses.append("file_path LIKE ?")
-        params.append(folder.rstrip("/") + "/%")
+        where_clauses.append("file_path LIKE ? ESCAPE '\\'")
+        params.append(_folder_pattern(folder))
     if exclude_ids:
         ids = [x.strip() for x in exclude_ids.split(",") if x.strip().isdigit()]
         if ids:
@@ -771,6 +775,7 @@ def backfill_thumbnails():
             if r["thumbnail_path"] and not (THUMB_DIR / r["thumbnail_path"]).exists():
                 rows.append(r)
     count = 0
+    obsolete = []
     for row in rows:
         fp = Path(row["file_path"])
         if not fp.exists():
@@ -778,9 +783,8 @@ def backfill_thumbnails():
         thumb = _generate_thumbnail(fp, row["media_type"])
         if thumb:
             if row["thumbnail_path"]:
-                old = THUMB_DIR / row["thumbnail_path"]
-                if old.exists():
-                    old.unlink(missing_ok=True)
+                if row["thumbnail_path"] != thumb:
+                    obsolete.append(row["thumbnail_path"])
             # Fix width/height: read raw dimensions from exiftool, apply orientation swap
             if row["media_type"] == "image":
                 import subprocess, json, shutil
@@ -826,6 +830,8 @@ def backfill_thumbnails():
                 db.execute("UPDATE media SET thumbnail_path = ? WHERE id = ?", (thumb, row["id"]))
             count += 1
     db.commit()
+    from ..services.importer import cleanup_thumbnails
+    cleanup_thumbnails(obsolete)
     return jsonify({"ok": True, "count": count})
 def backfill_picture_control():
     from ..services.importer import _run_exiftool, _apply_exif_tags
@@ -912,6 +918,7 @@ def _attach_excluded(groups, excluded_pairs, id_map, id_to_row):
 def _union_find_groups(sim_matrix, threshold, id_map=None, excluded_pairs=None):
     n = len(sim_matrix)
     parent = list(range(n))
+    members = [{id_map[i] if id_map is not None else i} for i in range(n)]
 
     def find(x):
         while parent[x] != x:
@@ -922,7 +929,14 @@ def _union_find_groups(sim_matrix, threshold, id_map=None, excluded_pairs=None):
     def union(a, b):
         a, b = find(a), find(b)
         if a != b:
+            if excluded_pairs and id_map is not None and any(
+                (left in members[a] and right in members[b]) or (right in members[a] and left in members[b])
+                for left, right in excluded_pairs
+            ):
+                return
             parent[a] = b
+            members[b].update(members[a])
+            members[a].clear()
 
     for i in range(n):
         for j in range(i + 1, n):
@@ -955,7 +969,7 @@ def find_duplicates():
     excluded = _load_exclusions(db, dup_type)
 
     rows = _fetch_embedding_rows(db)
-    if not rows:
+    if len(rows) < 2:
         return jsonify({"groups": []})
 
     id_map = [r["id"] for r in rows]
@@ -970,7 +984,7 @@ def find_duplicates():
 
     if dup_type == "cluster":
         import hdbscan
-        labels = hdbscan.HDBSCAN(min_cluster_size=2, metric="euclidean").fit_predict(vecs)
+        labels = hdbscan.HDBSCAN(min_cluster_size=2, min_samples=min(2, max(1, len(vecs) - 1)), metric="euclidean").fit_predict(vecs)
         indices_groups = [
             [i for i, l in enumerate(labels) if l == label]
             for label in set(labels) if label != -1
@@ -993,25 +1007,8 @@ def find_duplicates():
                 if not sub_excl:
                     split_groups.append(group)
                 else:
-                    # Re-run union-find on subgroup without excluded pairs
-                    sub_parent = list(range(len(group)))
-                    def sfind(x):
-                        while sub_parent[x] != x:
-                            sub_parent[x] = sub_parent[sub_parent[x]]
-                            x = sub_parent[x]
-                        return x
-                    for ai in range(len(group)):
-                        for bi in range(ai + 1, len(group)):
-                            if (ai, bi) in sub_excl:
-                                continue
-                            if sub_sim[ai][bi] >= 0.5:
-                                a, b = sfind(ai), sfind(bi)
-                                if a != b:
-                                    sub_parent[a] = b
-                    sub_map = {}
-                    for ai in range(len(group)):
-                        sub_map.setdefault(sfind(ai), []).append(group[ai])
-                    split_groups.extend(v for v in sub_map.values() if len(v) >= 2)
+                    for subgroup in _union_find_groups(sub_sim, 0.5, sub_ids, excluded):
+                        split_groups.append([group[i] for i in subgroup])
             return jsonify({"groups": _attach_excluded(_rows_to_groups(rows, split_groups, vecs=vecs), excluded, id_map, id_to_row)})
 
         return jsonify({"groups": _attach_excluded(_rows_to_groups(rows, indices_groups, vecs=vecs), excluded, id_map, id_to_row)})
@@ -1074,7 +1071,7 @@ def find_similar(media_id):
     cluster_items = []
     try:
         import hdbscan
-        labels = hdbscan.HDBSCAN(min_cluster_size=2, metric="euclidean").fit_predict(vecs)
+        labels = hdbscan.HDBSCAN(min_cluster_size=2, min_samples=min(2, max(1, len(vecs) - 1)), metric="euclidean").fit_predict(vecs)
         src_label = labels[source_idx]
         if src_label != -1:
             for i in range(len(rows)):
@@ -1468,9 +1465,9 @@ def delete_folder():
     if not path:
         return jsonify({"error": "Missing path"}), 400
     db = get_db()
-    like = str(path) + "/%"
+    like = _folder_pattern(path)
     rows = db.execute(
-        "SELECT id, thumbnail_path FROM media WHERE file_path LIKE ? OR file_path = ?",
+        "SELECT id, thumbnail_path FROM media WHERE file_path LIKE ? ESCAPE '\\' OR file_path = ?",
         (like, str(path)),
     ).fetchall()
     _delete_media_records(db, [r["id"] for r in rows], [r["thumbnail_path"] for r in rows])
@@ -1493,19 +1490,21 @@ def sync_folder():
     logger.info("sync-folder: {}", path)
 
     # Scan disk files outside generator (no DB needed)
-    disk_files = set()
-    for f in _collect_files([path]):
-        if f.suffix.lower() in (VIDEO_EXTS | IMAGE_EXTS | AUDIO_EXTS):
-            disk_files.add(str(f))
+    try:
+        if not Path(path).is_dir():
+            raise OSError("目录不存在或磁盘未挂载")
+        disk_files = {str(f) for f in _collect_files([path], strict=True)}
+    except OSError as e:
+        return jsonify({"error": f"扫描失败，已保留库中记录：{e}"}), 400
     work = sorted(disk_files)
 
     def generate():
         db = get_db()
 
         # Get all DB records for this folder
-        like = str(path) + "/%"
+        like = _folder_pattern(path)
         db_rows = db.execute(
-            "SELECT id, file_path, thumbnail_path FROM media WHERE file_path LIKE ? OR file_path = ?",
+            "SELECT id, file_path, thumbnail_path FROM media WHERE file_path LIKE ? ESCAPE '\\' OR file_path = ?",
             (like, str(path)),
         ).fetchall()
         db_paths = {r["file_path"]: r for r in db_rows}
@@ -1570,20 +1569,9 @@ def batch_update():
     elif action == "favorite":
         db.execute(f"UPDATE media SET favorite = ?, updated_at = datetime('now') WHERE id IN ({placeholders})", [value] + ids)
     elif action == "delete":
-        rows = db.execute(f"SELECT thumbnail_path FROM media WHERE id IN ({placeholders})", ids).fetchall()
-        for row in rows:
-            if row["thumbnail_path"]:
-                from ..config import THUMB_DIR
-                thumb = THUMB_DIR / row["thumbnail_path"]
-                if thumb.exists():
-                    thumb.unlink()
-        db.execute(f"DELETE FROM media_tags WHERE media_id IN ({placeholders})", ids)
-        db.execute(f"DELETE FROM media_segment WHERE media_id IN ({placeholders})", ids)
-        db.execute(f"DELETE FROM music_segment WHERE media_id IN ({placeholders})", ids)
-        db.execute(f"DELETE FROM media_fts WHERE media_id IN ({placeholders})", ids)
-        for mid in ids:
-            db.execute("DELETE FROM dup_exclusions WHERE media_id_a = ? OR media_id_b = ?", (mid, mid))
-        db.execute(f"DELETE FROM media WHERE id IN ({placeholders})", ids)
+        from ..services.importer import _delete_media_records
+        rows = db.execute(f"SELECT id, thumbnail_path FROM media WHERE id IN ({placeholders})", ids).fetchall()
+        _delete_media_records(db, [r["id"] for r in rows], [r["thumbnail_path"] for r in rows])
 
     db.commit()
     return jsonify({"ok": True})

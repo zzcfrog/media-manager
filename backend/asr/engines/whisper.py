@@ -37,7 +37,7 @@ def _get_model(model_name: str | None = None):
         _model_name = model_name
         _model_loaded = True
         logger.info("Whisper {} 模型加载完成，耗时 {:.1f}s", model_name, time.time() - t0)
-    return _model
+        return _model
 
 
 def preload(model_name: str | None = None):

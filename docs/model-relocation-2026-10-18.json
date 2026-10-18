@@ -1,0 +1,48 @@
+{
+  "completed_at": "2026-10-18T02:03:27.634451+00:00",
+  "destination": "/Users/zack/models",
+  "logical_bytes": 74170555072,
+  "regular_files_verified": 45,
+  "internal_model_links": 33,
+  "same_filesystem_move": true,
+  "all_file_inodes_preserved": true,
+  "all_sha256_match_before_move": true,
+  "compatibility_paths": [
+    "/Users/zack/program/python/video_analyzer/backend/models",
+    "/Users/zack/.cache/huggingface/hub/models--Qwen--Qwen3-VL-30B-A3B-Instruct-GGUF",
+    "/Users/zack/.cache/huggingface/hub/models--Qwen--Qwen3-VL-8B-Instruct-GGUF",
+    "/Users/zack/.cache/huggingface/hub/models--Systran--faster-whisper-base",
+    "/Users/zack/.cache/huggingface/hub/models--Systran--faster-whisper-large-v3",
+    "/Users/zack/.cache/huggingface/hub/models--Systran--faster-whisper-medium",
+    "/Users/zack/.cache/huggingface/hub/models--Systran--faster-whisper-small",
+    "/Users/zack/.cache/huggingface/hub/models--Systran--faster-whisper-tiny"
+  ],
+  "configuration": {
+    "modelsDir": "/Users/zack/models",
+    "hfHome": "/Users/zack/models/huggingface"
+  },
+  "application": {
+    "ok": true,
+    "external_model_root": "/Users/zack/models",
+    "hf_home": "/Users/zack/models/huggingface",
+    "recognizedVlmModels": [
+      "qwen3-vl-8b",
+      "qwen3-vl-30b-a3b",
+      "qwen3.6-35b-a3b",
+      "qwen3-omni-30b-a3b"
+    ],
+    "offline_whisper_large_v3_loaded": true,
+    "media_records": 9104,
+    "projects": 2,
+    "page_errors": []
+  },
+  "resnet_and_gguf_validation": {
+    "embedding_bytes": 8192,
+    "gguf_headers_verified": 8,
+    "all_gguf_targets_inside_new_root": true
+  },
+  "all_database_tables_unchanged": true,
+  "no_paid_ai_calls": true,
+  "backend_stopped_after_validation": true,
+  "receipt": "/Users/zack/models/relocation-2026-10-18.json"
+}

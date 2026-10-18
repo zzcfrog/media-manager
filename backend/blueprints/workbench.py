@@ -91,7 +91,7 @@ def get_project(pid):
         from .library import _segment_query
         seg_q = _segment_query(q)
         media = db.execute(
-            "SELECT m.id, m.file_name, m.media_type, m.thumbnail_path, m.duration, m.date_taken, m.analysis_status "
+            "SELECT DISTINCT m.id, m.file_name, m.media_type, m.thumbnail_path, m.duration, m.date_taken, m.analysis_status "
             "FROM media m JOIN project_media pm ON pm.media_id = m.id "
             "JOIN media_fts fts ON fts.media_id = m.id "
             "WHERE pm.project_id = ? AND media_fts MATCH ?",
@@ -187,29 +187,32 @@ def replace_project_tracks(pid):
     proj = db.execute("SELECT id FROM projects WHERE id = ?", (pid,)).fetchone()
     if not proj:
         return jsonify({"error": "Not found"}), 404
-    db.execute("DELETE FROM project_tracks WHERE project_id = ? AND version = 1", (pid,))
-    for i, tr in enumerate(tracks):
-        db.execute(
-            "INSERT INTO project_tracks "
-            "(project_id, version, position, track_type, segment_id, content, "
-            "time_start, time_end, emotion_value, metadata) "
-            "VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                pid,
-                i,
-                tr.get("track_type", "video"),
-                tr.get("segment_id"),
-                tr.get("content", ""),
-                tr.get("time_start", ""),
-                tr.get("time_end", ""),
-                tr.get("emotion_value", 0.5),
-                tr.get("metadata", "{}"),
-            ),
-        )
-    db.execute("UPDATE projects SET updated_at = datetime('now') WHERE id = ?", (pid,))
-    db.commit()
-    return jsonify({"ok": True})
-
+    with db:
+        db.execute("DELETE FROM project_tracks WHERE project_id = ? AND version = 1", (pid,))
+        for i, tr in enumerate(tracks):
+            db.execute(
+                "INSERT INTO project_tracks "
+                "(project_id, version, position, track_type, segment_id, content, "
+                "time_start, time_end, emotion_value, metadata) "
+                "VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    pid,
+                    i,
+                    tr.get("track_type", "video"),
+                    tr.get("segment_id"),
+                    tr.get("content", ""),
+                    tr.get("time_start", ""),
+                    tr.get("time_end", ""),
+                    tr.get("emotion_value", 0.5),
+                    tr.get("metadata", "{}"),
+                ),
+            )
+        if "plan" in data:
+            import json
+            db.execute("UPDATE projects SET ai_plan=? WHERE id=?", (json.dumps(data["plan"], ensure_ascii=False), pid))
+        db.execute("UPDATE projects SET updated_at = datetime('now') WHERE id = ?", (pid,))
+        db.commit()
+        return jsonify({"ok": True})
 
 # ── Project Media ─────────────────────────────────────────────
 
@@ -264,10 +267,15 @@ def export_fcpxml(pid):
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
             z.writestr(f"{safe}.fcpxml", res["xml"])
             z.writestr(f"{safe}.srt", srt)
+            if res["warnings"]:
+                z.writestr("warnings.txt", "\n".join(res["warnings"]))
         resp = Response(buf.getvalue(), mimetype="application/zip")
         # Content-Disposition 的文件名用 percent-encode（quote）确保 ASCII，避免中文触发
         # latin-1 编码错误。不再用自定义 X- 头放项目名（HTTP 头不支持非 ASCII）。
+        resp.headers["X-Export-Warning-Count"] = str(len(res["warnings"]))
         resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(safe)}.zip"
         return resp
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500

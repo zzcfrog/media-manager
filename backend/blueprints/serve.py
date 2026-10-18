@@ -1,4 +1,7 @@
 import io
+import hashlib
+import threading
+import tempfile
 import shutil
 import subprocess
 from pathlib import Path
@@ -7,7 +10,7 @@ from loguru import logger
 from flask import Blueprint, Response, send_file, send_from_directory, current_app, request, jsonify
 
 from ..db import get_db
-from ..config import THUMB_DIR, IMAGE_EXTS
+from ..config import THUMB_DIR, IMAGE_EXTS, DATA_DIR
 
 bp = Blueprint("serve", __name__)
 
@@ -68,18 +71,47 @@ def serve_video(media_id):
     return _transcode_to_mp4(path)
 
 
+_preview_lock = threading.Lock()
+_PREVIEW_CACHE_LIMIT = 2 * 1024 ** 3
+
+
 def _transcode_to_mp4(path):
-    """Transcode a non-native video to MP4/H.264 via ffmpeg and stream the result."""
+    """Complete a seekable MP4 before serving it with normal HTTP Range support."""
     if not shutil.which("ffmpeg"):
         return send_file(path, mimetype="video/mp4", conditional=True)
-
-    cmd = [
-        "ffmpeg", "-i", str(path),
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
-        "-c:a", "aac", "-movflags", "frag_keyframe+empty_moov",
-        "-f", "mp4", "-",
-    ]
-    return _stream_ffmpeg(cmd, "video/mp4")
+    stat = path.stat()
+    key = hashlib.sha256(f"{path.resolve()}:{stat.st_size}:{stat.st_mtime_ns}".encode()).hexdigest()
+    directory = DATA_DIR / "preview-cache"
+    cached = directory / (key + ".mp4")
+    if request.method == "HEAD" and not cached.exists():
+        return Response(mimetype="video/mp4", headers={"Cache-Control": "no-store"})
+    with _preview_lock:
+        if not cached.exists():
+            directory.mkdir(parents=True, exist_ok=True)
+            with tempfile.TemporaryDirectory(prefix="transcode-", dir=directory) as scratch:
+                output = Path(scratch) / "preview.mp4"
+                result = subprocess.run([
+                    "ffmpeg", "-v", "error", "-i", str(path),
+                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+                    "-c:a", "aac", "-movflags", "+faststart", "-y", str(output),
+                ], capture_output=True, timeout=600)
+                if result.returncode or not output.exists() or not output.stat().st_size:
+                    return jsonify({"error": "视频预览转码失败"}), 422
+                current = path.stat()
+                if (current.st_size, current.st_mtime_ns) != (stat.st_size, stat.st_mtime_ns):
+                    return jsonify({"error": "源文件已变化，请重试"}), 409
+                output.replace(cached)
+        cached.touch()
+        # Bound retained previews; an individual large active preview may exceed the limit.
+        others = sorted((f for f in directory.glob("*.mp4") if f != cached), key=lambda f: f.stat().st_mtime)
+        total = cached.stat().st_size + sum(f.stat().st_size for f in others)
+        for file in others:
+            if total <= _PREVIEW_CACHE_LIMIT:
+                break
+            size = file.stat().st_size
+            file.unlink(missing_ok=True)
+            total -= size
+        return send_file(cached, mimetype="video/mp4", conditional=True, etag=key, last_modified=stat.st_mtime)
 
 
 @bp.route("/media/audio/<int:media_id>")
@@ -112,9 +144,8 @@ def _transcode_to_aac(path):
 
 
 def _stream_ffmpeg(cmd, mimetype):
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-
     def generate():
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         try:
             while True:
                 chunk = proc.stdout.read(65536)
@@ -224,7 +255,7 @@ def serve_thumbnail(media_id):
                 ]
                 subprocess.run(cmd, capture_output=True, timeout=10)
                 if Path(tmp.name).exists() and Path(tmp.name).stat().st_size > 0:
-                    return send_file(tmp.name, mimetype="image/jpeg")
+                    return send_file(io.BytesIO(Path(tmp.name).read_bytes()), mimetype="image/jpeg")
             except Exception:
                 pass
             finally:
@@ -240,7 +271,6 @@ def serve_thumbnail(media_id):
             return send_file(path, mimetype="image/jpeg")
 
     # Thumbnail missing — regenerate on the fly
-    from pathlib import Path
     from ..services.importer import _generate_thumbnail
     fp = Path(row["file_path"])
     if fp.exists():

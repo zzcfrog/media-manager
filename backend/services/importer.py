@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import subprocess
 import uuid
@@ -20,26 +21,33 @@ FFMPEG_TIMEOUT = 60
 
 def _delete_media_records(db, ids: list[int], thumb_paths: list[str | None] = None):
     """Delete media records by IDs, including thumbnails, tags, segments, FTS, exclusion pairs."""
-    for i, mid in enumerate(ids):
-        tp = thumb_paths[i] if thumb_paths and i < len(thumb_paths) else None
-        if tp:
-            thumb = THUMB_DIR / tp
-            if thumb.exists():
-                thumb.unlink()
-        cov = db.execute("SELECT cover_art_path FROM media WHERE id = ?", (mid,)).fetchone()
-        if cov and cov["cover_art_path"]:
-            cp = THUMB_DIR / cov["cover_art_path"]
-            if cp.exists():
-                cp.unlink()
-        db.execute("DELETE FROM media_tags WHERE media_id = ?", (mid,))
-        db.execute("DELETE FROM media_segment WHERE media_id = ?", (mid,))
-        db.execute("DELETE FROM music_segment WHERE media_id = ?", (mid,))
-        db.execute("DELETE FROM media_fts WHERE media_id = ?", (mid,))
-        db.execute("DELETE FROM dup_exclusions WHERE media_id_a = ? OR media_id_b = ?", (mid, mid))
-        db.execute("DELETE FROM media WHERE id = ?", (mid,))
+    obsolete = []
+    with db:
+        for i, mid in enumerate(ids):
+            tp = thumb_paths[i] if thumb_paths and i < len(thumb_paths) else None
+            if tp:
+                obsolete.append(tp)
+            cov = db.execute("SELECT cover_art_path FROM media WHERE id = ?", (mid,)).fetchone()
+            if cov and cov["cover_art_path"]:
+                obsolete.append(cov["cover_art_path"])
+            db.execute("DELETE FROM media_tags WHERE media_id = ?", (mid,))
+            db.execute("DELETE FROM media_segment WHERE media_id = ?", (mid,))
+            db.execute("DELETE FROM music_segment WHERE media_id = ?", (mid,))
+            db.execute("DELETE FROM media_fts WHERE media_id = ?", (mid,))
+            db.execute("DELETE FROM dup_exclusions WHERE media_id_a = ? OR media_id_b = ?", (mid, mid))
+            db.execute("DELETE FROM media WHERE id = ?", (mid,))
+    cleanup_thumbnails(obsolete)
 
 
-def _collect_files(paths: list[str]) -> list[Path]:
+def cleanup_thumbnails(names):
+    for name in set(names):
+        try:
+            (THUMB_DIR / name).unlink(missing_ok=True)
+        except OSError as e:
+            logger.warning("缓存清理失败 {}: {}", name, e)
+
+
+def _collect_files(paths: list[str], strict: bool = False) -> list[Path]:
     files = []
     for p in paths:
         path = Path(p)
@@ -48,9 +56,17 @@ def _collect_files(paths: list[str]) -> list[Path]:
         if path.is_file() and path.suffix.lower() in (VIDEO_EXTS | IMAGE_EXTS | AUDIO_EXTS):
             files.append(path)
         elif path.is_dir():
-            for f in path.rglob("*"):
-                if f.is_file() and not f.name.startswith("._") and f.suffix.lower() in (VIDEO_EXTS | IMAGE_EXTS | AUDIO_EXTS):
-                    files.append(f)
+            def scan_error(error):
+                if strict:
+                    raise error
+            for directory, _, names in os.walk(path, onerror=scan_error):
+                for name in names:
+                    f = Path(directory) / name
+                    if not name.startswith("._") and f.suffix.lower() in (VIDEO_EXTS | IMAGE_EXTS | AUDIO_EXTS):
+                        if strict:
+                            f.stat()  # Disappearance/unreadable entries must not look like a successful empty scan.
+                        if f.is_file():
+                            files.append(f)
     return files
 
 
@@ -113,7 +129,7 @@ def _import_one(db, filepath: Path, force_update: bool = False) -> dict | None:
 
     stat = filepath.stat()
     existing = db.execute(
-        "SELECT id, file_size, file_mtime, thumbnail_path FROM media WHERE file_path = ?",
+        "SELECT * FROM media WHERE file_path = ?",
         (str(filepath),),
     ).fetchone()
 
@@ -123,8 +139,7 @@ def _import_one(db, filepath: Path, force_update: bool = False) -> dict | None:
         # Skip if file hasn't changed (same size and mtime)
         if existing["file_size"] == stat.st_size and existing["file_mtime"] == stat.st_mtime:
             return None
-        # File changed — clean up old record and re-import
-        _delete_media_records(db, [existing["id"]], [existing["thumbnail_path"]])
+        # Probe and prepare replacements before changing the existing record.
 
     if ext in AUDIO_EXTS:
         media_type, meta = "audio", _probe_audio(filepath)
@@ -168,34 +183,44 @@ def _import_one(db, filepath: Path, force_update: bool = False) -> dict | None:
 
     xmp_exists = 1 if media_type == "image" and filepath.with_suffix(".xmp").exists() else 0
 
-    cur = db.execute(
-        "INSERT INTO media (file_path, file_name, media_type, file_size, file_mtime, duration, width, height, fps, "
-        "video_codec, video_profile, bit_rate, audio_codec, audio_sample_rate, audio_channels, "
-        "color_space, color_range, pix_fmt, camera_make, camera_model, lens_model, date_taken, thumbnail_path, "
-        "cover_art_path, "
-        "has_xmp, picture_control, embedding, music_title, music_artist, music_album) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (
-            str(filepath), filepath.name, media_type,
-            stat.st_size, stat.st_mtime,
-            meta.get("duration"), meta.get("width"), meta.get("height"),
-            meta.get("fps"), meta.get("video_codec"), meta.get("video_profile"),
-            meta.get("bit_rate"), meta.get("audio_codec"), meta.get("audio_sample_rate"),
-            meta.get("audio_channels"), meta.get("color_space"), meta.get("color_range"),
-            meta.get("pix_fmt"), meta.get("camera_make"), meta.get("camera_model"),
-            meta.get("lens_model"), meta.get("date_taken"), meta.get("thumbnail_path"),
-            meta.get("cover_art_path"),
-            xmp_exists, meta.get("picture_control"), embedding,
-            meta.get("music_title"), meta.get("music_artist"), meta.get("music_album"),
-        ),
-    )
-    media_id = cur.lastrowid
-
-    db.execute(
-        "INSERT INTO media_fts (media_id, file_name) VALUES (?, ?)",
-        (media_id, filepath.name),
-    )
-    db.commit()
+    columns = [
+        "file_path", "file_name", "media_type", "file_size", "file_mtime", "duration", "width", "height", "fps",
+        "video_codec", "video_profile", "bit_rate", "audio_codec", "audio_sample_rate", "audio_channels",
+        "color_space", "color_range", "pix_fmt", "camera_make", "camera_model", "lens_model", "date_taken",
+        "thumbnail_path", "cover_art_path", "has_xmp", "picture_control", "embedding", "music_title", "music_artist", "music_album",
+    ]
+    values = {c: meta.get(c) for c in columns}
+    values.update(file_path=str(filepath), file_name=filepath.name, media_type=media_type,
+                  file_size=stat.st_size, file_mtime=stat.st_mtime, has_xmp=xmp_exists, embedding=embedding)
+    if existing:
+        for c in ("thumbnail_path", "cover_art_path"):
+            if values[c] is None:
+                values[c] = existing[c]
+    try:
+        if existing:
+            media_id = existing["id"]
+            db.execute("UPDATE media SET " + ",".join(c + "=?" for c in columns) +
+                       ", file_hash=NULL, phash=NULL, updated_at=datetime('now') WHERE id=?",
+                       [values[c] for c in columns] + [media_id])
+        else:
+            media_id = db.execute("INSERT INTO media (" + ",".join(columns) + ") VALUES (" +
+                                  ",".join("?" for _ in columns) + ")", [values[c] for c in columns]).lastrowid
+        from ..blueprints.analysis import refresh_media_fts
+        refresh_media_fts(db, media_id)
+        db.commit()
+    except Exception:
+        db.rollback()
+        for name in (thumb, cover):
+            if name and (not existing or name not in (existing["thumbnail_path"], existing["cover_art_path"])):
+                (THUMB_DIR / name).unlink(missing_ok=True)
+        raise
+    if existing:
+        for c in ("thumbnail_path", "cover_art_path"):
+            if existing[c] and existing[c] != values[c]:
+                try:
+                    (THUMB_DIR / existing[c]).unlink(missing_ok=True)
+                except OSError:
+                    logger.warning("旧缓存清理失败: {}", existing[c])
 
     row = db.execute("SELECT * FROM media WHERE id = ?", (media_id,)).fetchone()
     logger.info("imported: {} id={}", filepath.name, media_id)

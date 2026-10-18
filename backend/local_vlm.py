@@ -20,7 +20,7 @@ from pathlib import Path
 
 from loguru import logger
 
-from .config import BASE_DIR, LOG_DIR
+from .config import RESOURCE_DIR, MODELS_ROOT, LOG_DIR
 
 # ── 模型清单（体积为 HF API 实测值，2026-08-16/17）──────────────────────
 MODELS: dict[str, dict] = {
@@ -63,7 +63,7 @@ MODELS: dict[str, dict] = {
     },
 }
 
-MODELS_DIR = BASE_DIR / "backend" / "models" / "vlm"
+MODELS_DIR = MODELS_ROOT / "vlm"
 BASE_PORT = 8080
 CONTEXT_SIZE = 32768  # 单窗 64 帧 × ~400 token + prompt + JSON 输出的预算
 STARTUP_TIMEOUT = 180  # 冷加载 17GB 模型可能较慢
@@ -79,12 +79,12 @@ _started_at: float = 0.0
 
 
 def _llama_server_path() -> Path | None:
-    """按平台解析 llama-server 二进制（绝对路径，不依赖 PATH）。TODO: 打包后改从应用资源目录解析。"""
+    """按平台解析 llama-server 二进制（绝对路径，不依赖 PATH）。打包使用独立应用资源目录。"""
     if platform.system() == "Darwin" and platform.machine() == "arm64":
         plat_dir = "darwin-arm64"
     else:
         return None
-    candidates = sorted(glob.glob(str(BASE_DIR / "electron" / "resources" / "bin" / plat_dir / "llama-b*" / "llama-server")))
+    candidates = sorted(glob.glob(str(RESOURCE_DIR / "bin" / plat_dir / "llama-b*" / "llama-server")))
     return Path(candidates[-1]) if candidates else None
 
 
@@ -258,26 +258,21 @@ def _repo_cache_dir(repo: str) -> Path:
     return _hf_hub_dir() / ("models--" + repo.replace("/", "--"))
 
 
-def download_status() -> dict:
-    """轮询端点数据源：累计已下字节 = 已完成文件字节 + 当前 *.part 字节。"""
-    st = _download_state
-    out = {"state": st["state"], "model_id": st["model_id"], "error": st["error"],
-           "total_bytes": st["total_bytes"], "done_bytes": st["files_done_bytes"],
-           "speed_bps": 0}
-    if st["state"] == "downloading" and st["model_id"]:
-        m = MODELS.get(st["model_id"])
-        if m:
-            d = MODELS_DIR / st["model_id"]
-            inc = sum(f.stat().st_size for f in d.glob("*.part") if f.is_file())
-            done = st["files_done_bytes"] + inc
-            now = time.time()
-            if st["_last_t"] and now > st["_last_t"] + 0.2:
-                st["speed_bps"] = max(0, (done - st["_last_bytes"]) / (now - st["_last_t"]))
-            st["_last_bytes"], st["_last_t"] = done, now
-            out["done_bytes"] = done
-            out["speed_bps"] = round(st["speed_bps"], 0)
-    return out
+_download_lock = threading.Lock()
 
+
+def download_status() -> dict:
+    """Report transferred prefixes, never the length of a preallocated file."""
+    with _download_lock:
+        st = _download_state
+        done = st["files_done_bytes"] + st.get("current_file_bytes", 0)
+        now = time.time()
+        if st["_last_t"] and now > st["_last_t"] + 0.2:
+            st["speed_bps"] = max(0, (done - st["_last_bytes"]) / (now - st["_last_t"]))
+        st["_last_bytes"], st["_last_t"] = done, now
+        return {"state": st["state"], "model_id": st["model_id"], "error": st["error"],
+                "total_bytes": st["total_bytes"], "done_bytes": done,
+                "speed_bps": round(st["speed_bps"], 0)}
 
 _SEG = 8            # 大文件并发连接数（镜像单连接限速，多段并发提升总吞吐）
 _SEG_BLOCK = 64 << 20  # 每段推进单位（断点续传粒度，块内中断则该块重下）
@@ -286,125 +281,158 @@ _SEG_MIN = 128 << 20   # 超过此大小才启用分片
 
 def _download_file(repo: str, filename: str, dest: Path, expected_size: int,
                    session=None) -> None:
-    """带超时与重试的断点续传下载：dest.part 落盘，完成校验大小后 rename。
-    大文件（≥128MB 且已知大小）走 _SEG 段并发分片；小文件单连接。"""
+    """Publish a complete file atomically; keep a valid completed file on retry."""
+    if dest.is_file() and expected_size and dest.stat().st_size == expected_size:
+        return
     url = f"{MIRROR}/{repo}/resolve/main/{filename}"
     part = dest.with_name(dest.name + ".part")
     part.parent.mkdir(parents=True, exist_ok=True)
+    meta_path = part.with_name(part.name + ".json")
+    _download_state["current_file_bytes"] = 0
     if expected_size >= _SEG_MIN:
         _download_segmented(url, filename, part, expected_size)
     else:
+        # A segmented preallocation is never a sequential resume prefix.
+        if meta_path.exists():
+            part.unlink(missing_ok=True)
+            meta_path.unlink(missing_ok=True)
         _download_plain(url, filename, part, session)
     got = part.stat().st_size
-    if expected_size and got != expected_size:
+    if not got or (expected_size and got != expected_size):
         part.unlink(missing_ok=True)
+        meta_path.unlink(missing_ok=True)
         raise RuntimeError(f"文件大小不符: {filename} 期望 {expected_size} 实得 {got}")
-    if dest.exists() or dest.is_symlink():
-        dest.unlink()
-    part.rename(dest)
-    part.with_name(part.name + ".json").unlink(missing_ok=True)  # 分片进度 sidecar
+    part.replace(dest)
+    meta_path.unlink(missing_ok=True)
 
 
 def _download_plain(url: str, filename: str, part: Path, session=None) -> None:
-    """单连接断点续传（小文件 / 大小未知时）。"""
     import requests
     s = session or requests.Session()
-    retries = 0
-    while True:
-        pos = part.stat().st_size if part.exists() else 0
-        headers = {"Range": f"bytes={pos}-"} if pos else {}
-        try:
-            r = s.get(url, stream=True, timeout=(10, 60), headers=headers)
-            if r.status_code == 416:  # Range 越界 = 已下完
-                r.close()
-                break
-            r.raise_for_status()
-            append = r.status_code == 206  # 200 = 服务器不支持续传，重写
-            with open(part, "ab" if append else "wb") as f:
-                for chunk in r.iter_content(256 * 1024):
-                    f.write(chunk)
-            r.close()
-            break
-        except Exception as e:
-            retries += 1
-            if retries > 10:
-                raise RuntimeError(f"下载失败（已重试 {retries} 次）: {e}")
-            logger.warning("download retry #{}: {} (at {:.1f}MB) {}",
-                           retries, e, pos / 1048576, filename)
-            time.sleep(min(30, 2 ** retries))
+    try:
+        for retry in range(11):
+            pos = part.stat().st_size if part.exists() else 0
+            response = None
+            try:
+                response = s.get(url, stream=True, timeout=(10, 60),
+                                 headers={"Range": f"bytes={pos}-"} if pos else {})
+                if response.status_code == 416:
+                    # Restart an unverified sequential prefix instead of declaring it complete.
+                    part.unlink(missing_ok=True)
+                response.raise_for_status()
+                append = response.status_code == 206
+                if append:
+                    import re
+                    match = re.fullmatch(r"bytes (\d+)-(\d+)/(\d+)", response.headers.get("Content-Range", ""))
+                    if not match or int(match[1]) != pos or int(match[2]) != int(match[3]) - 1:
+                        raise RuntimeError("无效的续传响应")
+                elif response.status_code != 200:
+                    raise RuntimeError("无效的下载响应")
+                with open(part, "ab" if append else "wb") as output:
+                    for chunk in response.iter_content(256 * 1024):
+                        output.write(chunk)
+                        _download_state["current_file_bytes"] = output.tell()
+                if append and part.stat().st_size != int(match[3]):
+                    raise RuntimeError("续传响应不完整")
+                return
+            except Exception as e:
+                if retry == 10:
+                    raise RuntimeError(f"下载失败: {filename}: {e}") from e
+                time.sleep(min(30, 2 ** (retry + 1)))
+            finally:
+                if response is not None:
+                    response.close()
+    finally:
+        if session is None:
+            s.close()
 
 
 def _download_segmented(url: str, filename: str, part: Path, total: int) -> None:
-    """N 段并发分片：预分配 part 整文件，各线程 pwrite 自己区间；
-    `<part>.json` 记录每段连续完成前缀（块级断点），全部完成后由调用方校验+rename。
-    兼容旧单线程 .part：无 json 时把已有顺序前缀映射为各段进度。"""
+    """Checkpoint only validated contiguous blocks, after flushing their bytes."""
+    from contextlib import closing
+    import requests
     meta_path = part.with_name(part.name + ".json")
-    if meta_path.exists():
-        meta = json.loads(meta_path.read_text())
-    else:
-        segs = [0] * _SEG
-        if part.exists():
-            # 旧单线程顺序 .part → [0,X) 区间完整：整段落在 X 内的算完成
-            x = part.stat().st_size
-            bounds = [(i * total // _SEG, (i + 1) * total // _SEG - 1) for i in range(_SEG)]
-            for i, (lo, hi) in enumerate(bounds):
-                segs[i] = (hi - lo + 1) if x > hi else 0
-        meta = {"segs": segs}
-        meta_path.write_text(json.dumps(meta))
     bounds = [(i * total // _SEG, (i + 1) * total // _SEG - 1) for i in range(_SEG)]
-    with open(part, "r+b" if part.exists() else "wb") as f:
-        f.truncate(total)
+    meta = None
+    try:
+        candidate = json.loads(meta_path.read_text())
+        segs = candidate["segs"]
+        if (candidate.get("version") == 1 and candidate.get("url") == url and candidate.get("total") == total
+                and part.is_file() and part.stat().st_size == total and isinstance(segs, list)
+                and len(segs) == _SEG and all(type(v) is int and 0 <= v <= hi - lo + 1
+                                             for v, (lo, hi) in zip(segs, bounds))):
+            meta = candidate
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    if meta is None:
+        # Unknown/stale sidecars and unpaired preallocations cannot prove any bytes complete.
+        meta = {"version": 1, "url": url, "total": total, "segs": [0] * _SEG}
+        with open(part, "wb") as output:
+            output.truncate(total)
+    lock = threading.Lock()
+    errors = []
 
-    errors: dict[int, Exception] = {}
+    def checkpoint():
+        temporary = meta_path.with_name(meta_path.name + ".tmp")
+        temporary.write_text(json.dumps(meta))
+        temporary.replace(meta_path)
+        _download_state["current_file_bytes"] = sum(meta["segs"])
 
-    def worker(i: int, lo: int, hi: int) -> None:
-        import requests
-        seg_len = hi - lo + 1
-        s = requests.Session()
-        retries = 0
-        done = meta["segs"][i]
-        while done < seg_len:
-            pos = lo + done
-            want = min(_SEG_BLOCK, hi - pos + 1)
-            try:
-                r = s.get(url, stream=True, timeout=(10, 60),
-                          headers={"Range": f"bytes={pos}-{pos + want - 1}"})
-                if r.status_code == 416:
-                    r.close()
-                    done = seg_len
-                else:
-                    r.raise_for_status()
-                    n = 0
-                    with open(part, "r+b") as f:
-                        f.seek(pos)
-                        for chunk in r.iter_content(256 * 1024):
-                            f.write(chunk)
-                            n += len(chunk)
-                    r.close()
-                    if n != want:
-                        raise RuntimeError(f"块不完整: 期望 {want} 实收 {n}")
-                    done += want
-                meta["segs"][i] = done
-                meta_path.write_text(json.dumps(meta))
+    checkpoint()
+
+    def worker(index, lo, hi):
+        try:
+            with closing(requests.Session()) as session:
+                done = meta["segs"][index]
                 retries = 0
-            except Exception as e:
-                retries += 1
-                if retries > 10:
-                    errors[i] = RuntimeError(f"段 {i} 下载失败（已重试 {retries} 次）: {e}")
-                    return
-                logger.warning("seg download retry #{}: {} (at {:.1f}MB) {}",
-                               retries, e, pos / 1048576, filename)
-                time.sleep(min(30, 2 ** retries))
+                while done < hi - lo + 1:
+                    pos = lo + done
+                    want = min(_SEG_BLOCK, hi - pos + 1)
+                    response = None
+                    try:
+                        response = session.get(url, stream=True, timeout=(10, 60),
+                                               headers={"Range": f"bytes={pos}-{pos + want - 1}"})
+                        response.raise_for_status()
+                        expected = f"bytes {pos}-{pos + want - 1}/{total}"
+                        if response.status_code != 206 or response.headers.get("Content-Range") != expected:
+                            raise RuntimeError("服务器未返回请求的分片区间")
+                        received = 0
+                        with open(part, "r+b") as output:
+                            output.seek(pos)
+                            for chunk in response.iter_content(256 * 1024):
+                                received += len(chunk)
+                                if received > want:
+                                    raise RuntimeError("分片超过请求大小")
+                                output.write(chunk)
+                            if received != want:
+                                raise RuntimeError("分片响应不完整")
+                            output.flush()
+                            os.fsync(output.fileno())
+                        done += want
+                        with lock:
+                            meta["segs"][index] = done
+                            checkpoint()
+                        retries = 0
+                    except Exception:
+                        retries += 1
+                        if retries > 10:
+                            raise
+                        time.sleep(min(30, 2 ** retries))
+                    finally:
+                        if response is not None:
+                            response.close()
+        except Exception as e:
+            with lock:
+                errors.append(f"分片 {index}: {e}")
 
-    threads = [threading.Thread(target=worker, args=(i, lo, hi),
-                                daemon=True, name=f"dl-seg{i}")
+    threads = [threading.Thread(target=worker, args=(i, lo, hi), daemon=True)
                for i, (lo, hi) in enumerate(bounds)]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
-    if errors:
-        raise RuntimeError("; ".join(str(e) for e in errors.values()))
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    if errors or any(done != hi - lo + 1 for done, (lo, hi) in zip(meta["segs"], bounds)):
+        raise RuntimeError("; ".join(errors) or "分片下载未完成")
 
 
 def _download_thread(model_id: str) -> None:
@@ -421,19 +449,20 @@ def _download_thread(model_id: str) -> None:
         except Exception as e:
             logger.warning("model size query failed (fallback to estimate): {}", e)
         total = sum(sizes.values()) or int((m["size_gb"] + 1.0) * 1e9)
-        _download_state.update(state="downloading", model_id=model_id, error=None,
-                               total_bytes=total, files_done_bytes=0,
-                               _last_bytes=0, _last_t=0.0, speed_bps=0.0)
+        _download_state.update(total_bytes=total)
 
         d = MODELS_DIR / model_id
         d.mkdir(parents=True, exist_ok=True)
         free = shutil.disk_usage(d).free
-        if free < total * 1.05:
+        remaining = sum(sizes.get(name, 0) for name in (m["main_file"], m["mmproj_file"])
+                        if not (d / name).is_file()) or (total if not sizes else 0)
+        if free < remaining * 1.05:
             raise RuntimeError(f"磁盘空间不足：需 {total / 1e9:.1f}GB，剩余 {free / 1e9:.1f}GB")
         for name in (m["main_file"], m["mmproj_file"]):
             _download_file(m["repo"], name, d / name, sizes.get(name, 0))
-            _download_state["files_done_bytes"] += sizes.get(name, 0) or \
-                (d / name).stat().st_size
+            with _download_lock:
+                _download_state["files_done_bytes"] += (d / name).stat().st_size
+                _download_state["current_file_bytes"] = 0
         _download_state.update(state="done", model_id=model_id)
         logger.info("model downloaded: {} ({:.1f}GB)", model_id, total / 1e9)
     except Exception as e:
@@ -444,13 +473,19 @@ def _download_thread(model_id: str) -> None:
 def start_download(model_id: str) -> dict:
     if model_id not in MODELS:
         raise ValueError(f"未知模型: {model_id}")
-    if _download_state["state"] == "downloading":
-        raise RuntimeError("已有下载任务进行中，请等待完成")
-    m = MODELS[model_id]
-    if (MODELS_DIR / model_id / m["main_file"]).exists():
-        raise RuntimeError("模型已下载")
-    threading.Thread(target=_download_thread, args=(model_id,),
-                     daemon=True, name=f"dl-{model_id}").start()
+    with _download_lock:
+        if _download_state["state"] == "downloading":
+            raise RuntimeError("已有下载任务进行中，请等待完成")
+        m = MODELS[model_id]
+        if all((MODELS_DIR / model_id / m[name]).is_file() for name in ("main_file", "mmproj_file")):
+            raise RuntimeError("模型已下载")
+        _download_state.update(state="downloading", model_id=model_id, error=None, total_bytes=0,
+                               files_done_bytes=0, current_file_bytes=0, _last_bytes=0, _last_t=0.0, speed_bps=0.0)
+        try:
+            threading.Thread(target=_download_thread, args=(model_id,), daemon=True, name=f"dl-{model_id}").start()
+        except Exception as e:
+            _download_state.update(state="error", error=str(e))
+            raise
     return {"state": "downloading", "model_id": model_id}
 
 

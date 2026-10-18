@@ -1,0 +1,17 @@
+const assert=require('assert'),path=require('path');
+const {runtimeConfig}=require('../electron/runtime');
+const options={packaged:true,appRoot:'/App/Contents/Resources/app.asar',resources:'/App/Contents/Resources',userData:'/user/Library/Application Support/Media Manager',env:{}};
+const first=runtimeConfig(options),upgrade=runtimeConfig({...options,appRoot:'/NewApp/Contents/Resources/app.asar',resources:'/NewApp/Contents/Resources'});
+assert.equal(first.library,upgrade.library);
+assert.equal(first.command,'/App/Contents/Resources/backend/media-manager-backend');
+assert.equal(first.env.MEDIA_MANAGER_MODELS,'/user/Library/Application Support/Media Manager Models');
+assert(!first.env.HF_HUB_CACHE.startsWith(first.library));
+assert(!first.env.PATH.includes('/opt/homebrew'));
+const isolated=runtimeConfig({...options,env:{MEDIA_MANAGER_HOME:'/test/library'}});
+assert.equal(isolated.library,'/test/library');
+const external=runtimeConfig({...options,modelPaths:{modelsDir:'/external/Models',hfHome:'/external/HuggingFace'}});
+const externalUpgrade=runtimeConfig({...options,appRoot:'/NewApp/app.asar',modelPaths:{modelsDir:'/external/Models',hfHome:'/external/HuggingFace'}});
+assert.equal(external.env.MEDIA_MANAGER_MODELS,'/external/Models');
+assert.equal(external.env.HF_HUB_CACHE,'/external/HuggingFace/hub');
+assert.equal(external.env.MEDIA_MANAGER_MODELS,externalUpgrade.env.MEDIA_MANAGER_MODELS);
+console.log('PASS desktop runtime: stable data paths across app replacement; bundled backend/tools; independent model/cache paths; isolated overrides');

@@ -3,6 +3,7 @@ from flask import Blueprint, request, jsonify
 from loguru import logger
 
 from ..db import get_db
+from .analysis import refresh_media_fts
 
 bp = Blueprint("tags", __name__)
 
@@ -35,8 +36,11 @@ def create_tag():
 @bp.route("/<int:tag_id>", methods=["DELETE"])
 def delete_tag(tag_id):
     db = get_db()
+    affected = [r[0] for r in db.execute("SELECT media_id FROM media_tags WHERE tag_id=?", (tag_id,))]
     db.execute("DELETE FROM media_tags WHERE tag_id = ?", (tag_id,))
     db.execute("DELETE FROM tags WHERE id = ?", (tag_id,))
+    for media_id in affected:
+        refresh_media_fts(db, media_id)
     db.commit()
     return jsonify({"ok": True})
 
@@ -61,5 +65,6 @@ def assign_tags():
         else:
             tag_id = row["id"]
         db.execute("INSERT OR IGNORE INTO media_tags (media_id, tag_id) VALUES (?, ?)", (media_id, tag_id))
+    refresh_media_fts(db, media_id)
     db.commit()
     return jsonify({"ok": True})

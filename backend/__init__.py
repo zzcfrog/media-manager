@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request
 from werkzeug.exceptions import HTTPException
-from loguru import logger
+from loguru import logger as app_logger
 
 from .config import DB_PATH, DATA_DIR, THUMB_DIR
 from .db import init_db, get_setting
@@ -47,7 +47,7 @@ def create_app() -> Flask:
         asr_engine_name = get_setting(db, "asr_engine", "whisper")
         needs_asr = get_setting(db, "video_engine", "cloud") == "local" or \
             get_setting(db, "use_multimodal", "true") != "true"
-        if needs_asr and asr_engine_name in available_engines():
+        if needs_asr and not __import__("os").environ.get("MEDIA_MANAGER_SKIP_PRELOAD") and asr_engine_name in available_engines():
             asr_model_name = get_setting(db, "asr_model", "large-v3")
             preload_all(asr_engine_name, asr_model_name)
 
@@ -63,7 +63,7 @@ def create_app() -> Flask:
 
     @app.errorhandler(Exception)
     def handle_unexpected_error(exc):
-        logger.exception("Unhandled exception")
+        app_logger.exception("Unhandled exception")
         if request.path.startswith("/api/") or request.path.startswith("/media/"):
             return jsonify({"error": "服务器内部错误"}), 500
         return jsonify({"error": "服务器内部错误"}), 500

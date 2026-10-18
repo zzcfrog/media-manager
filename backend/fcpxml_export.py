@@ -180,6 +180,9 @@ def build_fcpxml(pid, name):
         clips.append((seen_media[media_id], m.get("file_name") or os.path.basename(path),
                       offset_s, src_s, dur))
 
+    if videos and not clips:
+        raise ValueError("所有视频素材均离线或缺失，无法导出时间线。请先连接素材磁盘。")
+
     # ── 组装 FCPXML ──
     rid = 1
     lines = ['<?xml version="1.0" encoding="UTF-8"?>', '<!DOCTYPE fcpxml>', '<fcpxml version="1.10">']

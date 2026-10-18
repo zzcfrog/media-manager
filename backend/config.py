@@ -9,16 +9,19 @@ os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
 # Paths and file-extension constants used across the backend.
 BASE_DIR = Path(__file__).parent.parent
 
-# User data directory: use ~/.media-manager/ when packaged, local data/ in dev
+# Packaged entry points share one persistent library outside the application.
 if os.environ.get("MEDIA_MANAGER_HOME"):
     DATA_DIR = Path(os.environ["MEDIA_MANAGER_HOME"])
 elif getattr(sys, "frozen", False):
-    DATA_DIR = Path.home() / ".media-manager"
+    DATA_DIR = Path.home() / "Library" / "Application Support" / "Media Manager" / "library"
 else:
     DATA_DIR = BASE_DIR / "data"
 THUMB_DIR = DATA_DIR / "thumbnails"
 DB_PATH = DATA_DIR / "media.db"
 LOG_DIR = DATA_DIR / "logs"
+RESOURCE_DIR = Path(os.environ.get("MEDIA_MANAGER_RESOURCES", BASE_DIR / "electron" / "resources"))
+MODELS_ROOT = Path(os.environ.get("MEDIA_MANAGER_MODELS", DATA_DIR / "models" if getattr(sys, "frozen", False) else BASE_DIR / "backend" / "models"))
+TEMP_DIR = DATA_DIR / "temp_video"
 
 VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v", ".flv", ".wmv", ".3gp", ".mts", ".m2ts"}
 IMAGE_EXTS = {

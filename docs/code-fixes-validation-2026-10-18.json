@@ -1,0 +1,174 @@
+{
+  "date": "2026-10-18",
+  "base_commit": "6b3af3ee9b4a20281a0869647f99896ba52079ce",
+  "status": "implemented_and_isolated_regressions_passed",
+  "findings_addressed": [
+    "R01",
+    "R02",
+    "R03",
+    "R04",
+    "R05",
+    "R06",
+    "R07",
+    "R08",
+    "R09",
+    "R10",
+    "R11",
+    "R12",
+    "R13",
+    "R14",
+    "R15",
+    "R16",
+    "R17",
+    "R18",
+    "R19",
+    "R20",
+    "R21",
+    "R22",
+    "R23",
+    "R24",
+    "R25",
+    "R26",
+    "R27",
+    "R28",
+    "R29",
+    "R30",
+    "R31",
+    "R32",
+    "R33",
+    "R34",
+    "R35",
+    "R36",
+    "R37",
+    "R38",
+    "R39",
+    "R40",
+    "R41",
+    "R42",
+    "R43",
+    "R44",
+    "R45",
+    "R46"
+  ],
+  "python": {
+    "tests": 42,
+    "failures": 0,
+    "environment": "clean requirements.txt install; Python 3.12.9"
+  },
+  "node_components": {
+    "tests": 12,
+    "failures": 0
+  },
+  "existing_filter_contract": {
+    "checks": 54,
+    "failures": 0
+  },
+  "browser": {
+    "scenarios": 15,
+    "page_errors": 0,
+    "results": [
+      {
+        "passed": [
+          "R45 menu fits viewport",
+          "R46 load failure is visible with no stale cards",
+          "R44 thumbnail has terminal fallback",
+          "R15 paired serialized save persists newest edit",
+          "R30 structural undo restores tracks and plan",
+          "R31 transcoded AVI seeks to source position",
+          "R40 unchanged blur preserves ASR/subtitle"
+        ],
+        "errors": []
+      },
+      {
+        "passed": [
+          "R29 delayed metadata cannot replace current media",
+          "R37 cancel retains draft selection",
+          "R38 failed apply displays error",
+          "R39 closed wizard cannot apply or navigate"
+        ],
+        "errors": []
+      },
+      {
+        "passed": [
+          "R08 stale filter response ignored",
+          "R06 dragged clip survives mindmap edit and persistence",
+          "R16 failed mindmap write preserves saved plan and tracks",
+          "R05 source snapshot remains visible and playable without old segment id"
+        ],
+        "errors": []
+      }
+    ]
+  },
+  "dependency_imports": "passed; no inference or AI request",
+  "pip_check": "passed",
+  "dependency_versions": {
+    "Flask": "3.1.3",
+    "openai": "3.35.0",
+    "httpx": "0.28.1",
+    "numpy": "2.5.4",
+    "requests": "2.34.2",
+    "torchvision": "0.29.1",
+    "jieba": "0.42.1",
+    "pillow-heif": "1.8.1"
+  },
+  "syntax_checks": "passed backend, frontend and inline application script",
+  "git_diff_check": "passed",
+  "real_data_baseline": {
+    "data/media.db": {
+      "size": 73740288,
+      "mtime_ns": 1790473982121244624,
+      "unchanged": true
+    },
+    "data/media.db.bak-music": {
+      "size": 73216000,
+      "mtime_ns": 1787058832915674425,
+      "unchanged": true
+    }
+  },
+  "unverified": [
+    "real paid AI calls",
+    "real local model inference and full model downloads",
+    "all media codecs",
+    "external NLE import",
+    "Electron release packaging",
+    "cross-client editing conflicts"
+  ],
+  "source_hashes": {
+    "backend/analyzer.py": "d523263ad68019f864d0ce03ec9d35f8076c54e0aa2ce5d113b48a618f16969a",
+    "backend/asr/engines/whisper.py": "f2ba97fe293aa0ea7eac79d0d128d7497f7edcb1a27cac526693a5961382e4f1",
+    "backend/blueprints/analysis.py": "1a802008bbe24311184a02f800ab506bbceef4f045fcbe349761f09a7b88b362",
+    "backend/blueprints/creative.py": "23eced20bdc7beec9827f84333fc97d22fe64b8c6bd4257712559d4bbea12aae",
+    "backend/blueprints/library.py": "476df6b329a388e829908389794b1d0cb41057c77f4ae980943c8d6b3e68a921",
+    "backend/blueprints/serve.py": "59d6153ffbb420af4fa8b4ee7c90e46e4819b694419faf8e652fa97bb1a51f78",
+    "backend/blueprints/tags.py": "6a113006261e91334995a671accacd607e37bb7a0ee878da0b8a21817b00d9f1",
+    "backend/blueprints/workbench.py": "d29f67fe16c5aa6c6a217cea2532f27925c994008b7a5ae367692e965bdeb6f0",
+    "backend/compressor.py": "378d35ec68b77388c6761dae2a11723b91dac546f5faf4eedcf6c6a962cdf656",
+    "backend/db.py": "311db7060332a2f1c30d2f1b8aa73d05e19c4db7b34acc44023159708c0a07d4",
+    "backend/fcpxml_export.py": "17bb22d713ae18311c8d11b9438e5e2a1b5bac7e8acd07512d0a3a3d98f49f98",
+    "backend/local_vlm.py": "e33df3009f351ae0ae3efd844eee03473974da00da2b78f7e5285b1ff7fed4ee",
+    "backend/services/importer.py": "1146af70e42f0e50f64cd914ee5a102fe48b2d24444c95f1d20c0d363b20bc5f",
+    "backend/services/xmp_writer.py": "7a399a55efe80765d67a06c07d7e6010348c590589bc568a64ddb6f4584573d7",
+    "frontend/index.html": "eb1521397fb3a0e2d126aed987a0289747e6bfef2e05301e77b04304e273538a",
+    "frontend/js/api.js": "1e2e33afa940b84941153f302f521da301666d1f8029489d2ac858e6fcbfd0e4",
+    "frontend/js/creative-wizard.js": "8f7d64a9dfc342898cf9b7eaa20d5b497cba6be106990713bd798fcdc74df616",
+    "frontend/js/detail.js": "e03d87bc0e291aca7150a6f4f80722dd0717751e82ec0da821df7e79bcc16b08",
+    "frontend/js/gallery.js": "74d0278dd02e3d104614bcc3942218149918a28f458e893ca0167b2a626fe16f",
+    "frontend/js/i18n.js": "e6a7bd4eeeb1f034ab54e7f3155998d1838d6e358a5682e0f0d6ae70df2d2566",
+    "frontend/js/mindmap.js": "9a88e04a442510aea9cdd4379057a1b9dae18e22c2ac2a6bc9fd82d05e86e07f",
+    "frontend/js/workbench.js": "f4426981f56f7e59a5d7b1e66582ffea6253e56ce8b3051844bab6256c212c0a",
+    "requirements.txt": "c4afdb1396779b03c3a4e29adcc2af3bad66dda5c38ef1f7eca69929d20850d5"
+  },
+  "external_actions": {
+    "real_data_writes": false,
+    "real_model_changes": false,
+    "commit": false,
+    "push": false,
+    "deployment": false
+  },
+  "cleanup": {
+    "synthetic_browser_fixture_stopped": true,
+    "synthetic_media_databases_and_caches_removed": true,
+    "temporary_virtualenvs_removed": true,
+    "regression_scripts_retained_in_repository": true
+  }
+}

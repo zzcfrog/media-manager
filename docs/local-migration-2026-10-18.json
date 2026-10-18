@@ -1,0 +1,72 @@
+{
+  "final_mode": "external_models",
+  "files": 11274,
+  "logical_bytes": 337731518,
+  "portable_export_files": 22286,
+  "portable_export_bytes": 1851238262,
+  "database": {
+    "tables": {
+      "collection_items": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "collections": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "dup_exclusions": {
+        "rows": 41,
+        "sha256": "9a01326159bf268afb4f8a7b1cd3edb4ad2e757ac46648cc5fc9536e4024e53d"
+      },
+      "media": {
+        "rows": 9104,
+        "sha256": "b14e5999a3d84cc07096c1766d6431ef847f39d9622f1aaf0ae14e0a28c8e001"
+      },
+      "media_fts": {
+        "rows": 9103,
+        "sha256": "465bd72610b9e1ea276516356497b02696443675d18074587607a1488d2fed96"
+      },
+      "media_segment": {
+        "rows": 4322,
+        "sha256": "1ff68ddde88602c646789f168430f5780bfc4861de367cf9fc414dbed53d2440"
+      },
+      "media_tags": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "music_segment": {
+        "rows": 1,
+        "sha256": "ffb35dc4d5e896c323dd03a6fa7c7f14a8df216b7f2b0e412eb2e68f5dab07fb"
+      },
+      "project_media": {
+        "rows": 188,
+        "sha256": "921f047866b0b1840e62a79e5ac9dde7c37d2c0c0a5448c8c86403f517764471"
+      },
+      "project_tracks": {
+        "rows": 607,
+        "sha256": "4a331399c04b93d8916e38ddf19cb9f35d3adf40704666b34177cf16ee3747b5"
+      },
+      "projects": {
+        "rows": 2,
+        "sha256": "2df5b1992489498e1338c0392c8825847a60744cf55d6e87d13be399eb6305f3"
+      },
+      "settings": {
+        "rows": 28,
+        "sha256": "b61635287fcd7592fbf6843fb7375e9b7bb39bbb09812915e522bfa9227ebb5d"
+      },
+      "tags": {
+        "rows": 2,
+        "sha256": "49bac70e094e8f108c0e45635859712a6e4ab807a6ec235ef55cc85a9794154a"
+      }
+    }
+  },
+  "original_source_retained": true,
+  "models_copied": false,
+  "models_directory": "/Users/zack/models",
+  "whisper_cache": "/Users/zack/models/huggingface",
+  "original_media_paths_retained": true,
+  "offline_source_media_count": 9104,
+  "restore_all_tables_equal_original": true,
+  "library": "/Users/zack/Library/Application Support/Media Manager/library",
+  "model_relocation_report": "docs/model-relocation-2026-10-18.json"
+}

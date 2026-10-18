@@ -10,7 +10,7 @@ from ..db import get_db, get_setting
 from ..compressor import compress_video, compress_image
 from ..config import HEIF_EXTS, ANALYSIS_API_CONCURRENCY, ANALYSIS_THREAD_POOL_SIZE
 from ..analyzer import (analyze_video, analyze_image, analyze_video_frames, CODING_BASE_URL,
-                        analyze_music, probe_audio_duration, music_taxonomy_labels)
+                        analyze_music, probe_audio_duration, music_taxonomy_labels, validate_analysis_segments)
 from ..asr import get_engine as get_asr_engine, preload_all, reload_engine
 from .. import local_vlm
 from ..emotion_labels import dominant_mood, aggregate_emotions
@@ -23,6 +23,17 @@ _active_progress = {}  # media_id → progress dict (registered by thread, clean
 
 
 _SEGMENT_COLS = "id, media_id, time_start, time_end, visual, asr, subtitle, dominant_colors, main_subjects, shot_type, focal_length, camera_angle, camera_movement, perspective, scene_type, mood, lighting, weather, color_tone, tone, dof, style, composition, highlights, emotions, seq"
+
+
+def _claim_analysis(db, media_id, skip_done=False):
+    cursor = db.execute(
+        "UPDATE media SET analysis_status='processing' WHERE id=? "
+        "AND COALESCE(analysis_status,'none') != 'processing' "
+        "AND (?=0 OR COALESCE(analysis_status,'none') != 'done')",
+        (media_id, int(skip_done)),
+    )
+    db.commit()
+    return cursor.rowcount == 1
 
 
 def _cleanup_temp(path):
@@ -115,10 +126,12 @@ def delete_analysis(media_id):
     media = db.execute("SELECT id FROM media WHERE id = ?", (media_id,)).fetchone()
     if not media:
         return jsonify({"error": "Not found"}), 404
+    _snapshot_project_sources(db, media_id, set())
     db.execute("DELETE FROM media_segment WHERE media_id = ?", (media_id,))
     db.execute("DELETE FROM music_segment WHERE media_id = ?", (media_id,))
     db.execute("DELETE FROM media_fts WHERE media_id = ?", (media_id,))
     db.execute("UPDATE media SET analysis_status = 'none', analysis_model = NULL, analysis_date = NULL, music_summary = NULL WHERE id = ?", (media_id,))
+    refresh_media_fts(db, media_id)
     db.commit()
     return jsonify({"ok": True})
 
@@ -127,10 +140,12 @@ def delete_analysis(media_id):
 def start_analysis(media_id):
     logger.info("API start_analysis: media_id={}", media_id)
     db = get_db()
-    media = db.execute("SELECT id, file_path, media_type FROM media WHERE id = ?", (media_id,)).fetchone()
+    media = db.execute("SELECT id, file_path, media_type, analysis_status FROM media WHERE id = ?", (media_id,)).fetchone()
     if not media:
         return jsonify({"error": "Not found"}), 404
 
+    if media["analysis_status"] == "processing":
+        return jsonify({"error": "该素材正在分析中"}), 409
     app = current_app._get_current_object()
 
     if media["media_type"] == "video":
@@ -168,8 +183,10 @@ def start_batch_analysis():
             continue
 
         file_path = media["file_path"]
-        db.execute("UPDATE media SET analysis_status = 'processing' WHERE id = ?", (media_id,))
-        db.commit()
+        if media["media_type"] not in ("video", "image", "audio"):
+            continue
+        if not _claim_analysis(db, media_id, skip_done):
+            continue
         progress = {"step": "queued", "substep": "uploading", "chars": 0}
 
         if media["media_type"] == "video":
@@ -194,7 +211,9 @@ def start_batch_analysis():
             image_model = get_setting(db, "image_model", "glm-4.6v")
             image_resolution = get_setting(db, "image_resolution", "1920")
             _analysis_pool.submit(_process_image, media_id, file_path, image_api_key, image_model,
-                        image_resolution, app, progress)
+                        image_resolution, app, progress,
+                        get_setting(db, "image_engine", "cloud"),
+                        get_setting(db, "local_model", "qwen3-vl-8b"))
         elif media["media_type"] == "audio":
             m_cfg = _music_cfg(db)
             progress["engine"] = m_cfg["engine"]
@@ -537,30 +556,33 @@ def _music_fts_tags(segs: list[dict]) -> str:
 
 def save_music_segments(media_id: int, segs: list[dict], model: str, summary: dict) -> None:
     db = get_db()
-    db.execute("DELETE FROM music_segment WHERE media_id = ?", (media_id,))
-    for i, s in enumerate(segs):
+    with db:
+        db.execute("UPDATE media SET id=id WHERE id=?", (media_id,))
+        if not db.execute("SELECT id FROM media WHERE id=?", (media_id,)).fetchone():
+            raise ValueError("素材已被移除")
+        db.execute("DELETE FROM music_segment WHERE media_id = ?", (media_id,))
+        for i, s in enumerate(segs):
+            db.execute(
+                "INSERT INTO music_segment (media_id, time_start, time_end, mood_json, genre_json, "
+                "instrument_json, theme_json, arousal, valence, vocals, vocals_language, watermark, watermark_text, seq) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (media_id, s["time_start"], s["time_end"],
+                 json.dumps(s.get("mood", []), ensure_ascii=False),
+                 json.dumps(s.get("genre", []), ensure_ascii=False),
+                 json.dumps(s.get("instrument", []), ensure_ascii=False),
+                 json.dumps(s.get("theme", []), ensure_ascii=False),
+                 s.get("arousal"), s.get("valence"),
+                 s.get("vocals", ""), s.get("vocals_language", ""),
+                 s.get("watermark", "None"), s.get("watermark_text", ""), i),
+            )
         db.execute(
-            "INSERT INTO music_segment (media_id, time_start, time_end, mood_json, genre_json, "
-            "instrument_json, theme_json, arousal, valence, vocals, vocals_language, watermark, watermark_text, seq) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (media_id, s["time_start"], s["time_end"],
-             json.dumps(s.get("mood", []), ensure_ascii=False),
-             json.dumps(s.get("genre", []), ensure_ascii=False),
-             json.dumps(s.get("instrument", []), ensure_ascii=False),
-             json.dumps(s.get("theme", []), ensure_ascii=False),
-             s.get("arousal"), s.get("valence"),
-             s.get("vocals", ""), s.get("vocals_language", ""),
-             s.get("watermark", "None"), s.get("watermark_text", ""), i),
+            "UPDATE media SET analysis_status = 'done', analysis_model = ?, analysis_date = datetime('now'), "
+            "music_summary = ?, updated_at = datetime('now') WHERE id = ?",
+            (model, json.dumps(summary, ensure_ascii=False), media_id),
         )
-    db.execute(
-        "UPDATE media SET analysis_status = 'done', analysis_model = ?, analysis_date = datetime('now'), "
-        "music_summary = ?, updated_at = datetime('now') WHERE id = ?",
-        (model, json.dumps(summary, ensure_ascii=False), media_id),
-    )
-    _refresh_fts(db, media_id, segs, extra_tags=_music_fts_tags(segs))
-    db.commit()
-    logger.info("music segments saved: media_id={} segments={} model={}", media_id, len(segs), model)
-
+        _refresh_fts(db, media_id, segs, extra_tags=_music_fts_tags(segs))
+        db.commit()
+        logger.info("music segments saved: media_id={} segments={} model={}", media_id, len(segs), model)
 
 def _music_seg_to_dict(row) -> dict:
     def _arr(v):
@@ -649,8 +671,8 @@ def _process_music(media_id, file_path, app, progress, engine="local",
 def _start_music_analysis(media_id, media, app):
     db = get_db()
     cfg = _music_cfg(db)
-    db.execute("UPDATE media SET analysis_status = 'processing' WHERE id = ?", (media_id,))
-    db.commit()
+    if not _claim_analysis(db, media_id):
+        return jsonify({"error": "该素材正在分析中"}), 409
     file_path = media["file_path"]
 
     def generate():
@@ -714,8 +736,8 @@ def _start_image_analysis(media_id, media, app):
     image_resolution = get_setting(db, "image_resolution", "1920")
     file_path = media["file_path"]
 
-    db.execute("UPDATE media SET analysis_status = 'processing' WHERE id = ?", (media_id,))
-    db.commit()
+    if not _claim_analysis(db, media_id):
+        return jsonify({"error": "该素材正在分析中"}), 409
 
     def generate():
         progress = {"step": "queued", "substep": "uploading", "chars": 0}
@@ -794,6 +816,8 @@ def _start_video_analysis(media_id, media, app):
         use_multimodal = False  # 本地引擎帧无音频，强制独立 whisper ASR
     hw_accel = get_setting(db, "hw_accel", "false") == "true"
     file_path = media["file_path"]
+    if not _claim_analysis(db, media_id):
+        return jsonify({"error": "该素材正在分析中"}), 409
 
     def generate():
         progress = {"step": "queued", "compress_pct": 0,
@@ -993,71 +1017,125 @@ def _ts_to_seconds(ts: str) -> float:
 
 
 def _fix_segment_overlaps(segments):
-    """Fix overlapping segments by cascading start times.
-
-    If a segment's start time is earlier than the previous segment's end time,
-    set it to the previous segment's end time. Ensures no gaps and no overlaps.
-    All subsequent segments cascade forward.
-    """
+    """Trim partial overlaps and discard ranges entirely contained in an earlier one."""
     if len(segments) <= 1:
         return
-    # Sort by start time
     segments.sort(key=lambda s: _ts_to_seconds(s.get("time_start", "")))
-    for i in range(1, len(segments)):
-        prev_end = _ts_to_seconds(segments[i - 1].get("time_end", ""))
-        cur_start = _ts_to_seconds(segments[i].get("time_start", ""))
-        if cur_start < prev_end:
-            h = int(prev_end // 3600)
-            m = int((prev_end % 3600) // 60)
-            s = prev_end % 60
-            segments[i]["time_start"] = f"{h:02d}:{m:02d}:{s:05.2f}"
+    kept = []
+    for seg in segments:
+        start = _ts_to_seconds(seg.get("time_start", ""))
+        end = _ts_to_seconds(seg.get("time_end", ""))
+        previous_end = _ts_to_seconds(kept[-1]["time_end"]) if kept else 0
+        start = max(start, previous_end)
+        if end <= start:
+            continue
+        seg["time_start"] = f"{int(start // 3600):02d}:{int(start % 3600 // 60):02d}:{start % 60:05.2f}"
+        kept.append(seg)
+    segments[:] = kept
+
+
+def _snapshot_project_sources(db, media_id, retained_ids):
+    """Keep immutable source ranges when a used analysis segment is replaced."""
+    old = {r["id"]: _segment_to_dict(r) for r in db.execute(
+        f"SELECT {_SEGMENT_COLS} FROM media_segment WHERE media_id=?", (media_id,))}
+    if not old:
+        return
+    for row in db.execute("SELECT id,ai_plan FROM projects WHERE ai_plan IS NOT NULL").fetchall():
+        plan = json.loads(row["ai_plan"])
+        changed = False
+        for act in plan.get("acts", []):
+            for narrative in act.get("narratives", []):
+                for shot in narrative.get("shots", []):
+                    source = old.get(shot.get("segment_id"))
+                    if source:
+                        shot.setdefault("source", source)
+                        shot.setdefault("shot_id", f"segment-{source['id']}")
+                        if source["id"] not in retained_ids:
+                            shot["segment_id"] = None
+                        changed = True
+        if changed:
+            db.execute("UPDATE projects SET ai_plan=? WHERE id=?", (json.dumps(plan, ensure_ascii=False), row["id"]))
+    for row in db.execute("SELECT id,segment_id,metadata FROM project_tracks WHERE segment_id IN (" +
+                          ",".join("?" for _ in old) + ")", list(old)).fetchall():
+        source = old[row["segment_id"]]
+        meta = json.loads(row["metadata"] or "{}")
+        meta.setdefault("srcMediaId", media_id)
+        meta.setdefault("srcStart", source["time_start"])
+        meta.setdefault("srcEnd", source["time_end"])
+        meta.setdefault("shot_id", f"segment-{source['id']}")
+        db.execute("UPDATE project_tracks SET metadata=? WHERE id=?", (json.dumps(meta, ensure_ascii=False), row["id"]))
 
 
 def save_segments(media_id, segments, model=""):
-    db = get_db()
-    db.execute("DELETE FROM media_segment WHERE media_id = ?", (media_id,))
-
+    validate_analysis_segments(segments)
     _fix_segment_overlaps(segments)
+    if not segments:
+        raise ValueError("分析未返回有效时间片段")
+    db = get_db()
+    with db:
+        # The write lock covers existence checking and all result replacement.
+        db.execute("UPDATE media SET id=id WHERE id=?", (media_id,))
+        if not db.execute("SELECT id FROM media WHERE id=?", (media_id,)).fetchone():
+            raise ValueError("素材已被移除")
+        previous = {(_normalize_timestamp(r["time_start"]), _normalize_timestamp(r["time_end"])): r["id"]
+                    for r in db.execute("SELECT id,time_start,time_end FROM media_segment WHERE media_id=?", (media_id,))}
+        ranges = {(_normalize_timestamp(seg.get("time_start", "")), _normalize_timestamp(seg.get("time_end", ""))) for seg in segments}
+        retained = {key: sid for key, sid in previous.items() if key in ranges}
+        _snapshot_project_sources(db, media_id, set(retained.values()))
+        keep = list(retained.values())
+        if keep:
+            db.execute("DELETE FROM media_segment WHERE media_id=? AND id NOT IN (" + ",".join("?" for _ in keep) + ")", [media_id] + keep)
+        else:
+            db.execute("DELETE FROM media_segment WHERE media_id=?", (media_id,))
 
-    for i, seg in enumerate(segments):
+        columns = ['media_id', 'time_start', 'time_end', 'visual', 'asr', 'subtitle', 'dominant_colors', 'main_subjects', 'shot_type', 'focal_length', 'camera_angle', 'camera_movement', 'perspective', 'scene_type', 'mood', 'lighting', 'weather', 'color_tone', 'tone', 'dof', 'style', 'composition', 'highlights', 'emotions', 'seq']
+        for i, seg in enumerate(segments):
+            db.execute(
+                "INSERT INTO media_segment (id," + ",".join(columns) + ") VALUES (" + ",".join("?" for _ in range(len(columns)+1)) + ") "
+                "ON CONFLICT(id) DO UPDATE SET " + ",".join(c + "=excluded." + c for c in columns),
+                (
+                    retained.get((_normalize_timestamp(seg.get("time_start", "")), _normalize_timestamp(seg.get("time_end", "")))),
+                    media_id,
+                    _normalize_timestamp(seg.get("time_start", "")),
+                    _normalize_timestamp(seg.get("time_end", "")),
+                    seg.get("visual", ""),
+                    seg.get("asr", ""),
+                    seg.get("subtitle", ""),
+                    json.dumps(seg.get("dominant_colors", []), ensure_ascii=False),
+                    json.dumps(seg.get("main_subjects", []), ensure_ascii=False),
+                    seg.get("shot_type", ""),
+                    seg.get("focal_length", ""),
+                    seg.get("camera_angle", ""),
+                    seg.get("camera_movement", ""),
+                    seg.get("perspective", ""),
+                    seg.get("scene_type", ""),
+                    dominant_mood(seg.get("emotions")) or seg.get("mood", ""),
+                    seg.get("lighting", ""),
+                    seg.get("weather", ""),
+                    seg.get("color_tone", ""),
+                    seg.get("tone", ""),
+                    seg.get("dof", ""),
+                    seg.get("style", ""),
+                    seg.get("composition", ""),
+                    json.dumps(seg.get("highlights", []), ensure_ascii=False) if seg.get("highlights") else "",
+                    json.dumps(seg.get("emotions", []), ensure_ascii=False) if seg.get("emotions") else "",
+                    i,
+                ),
+            )
+
         db.execute(
-            "INSERT INTO media_segment (media_id, time_start, time_end, visual, asr, subtitle, dominant_colors, main_subjects, shot_type, focal_length, camera_angle, camera_movement, perspective, scene_type, mood, lighting, weather, color_tone, tone, dof, style, composition, highlights, emotions, seq) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                media_id,
-                _normalize_timestamp(seg.get("time_start", "")),
-                _normalize_timestamp(seg.get("time_end", "")),
-                seg.get("visual", ""),
-                seg.get("asr", ""),
-                seg.get("subtitle", ""),
-                json.dumps(seg.get("dominant_colors", []), ensure_ascii=False),
-                json.dumps(seg.get("main_subjects", []), ensure_ascii=False),
-                seg.get("shot_type", ""),
-                seg.get("focal_length", ""),
-                seg.get("camera_angle", ""),
-                seg.get("camera_movement", ""),
-                seg.get("perspective", ""),
-                seg.get("scene_type", ""),
-                dominant_mood(seg.get("emotions")) or seg.get("mood", ""),
-                seg.get("lighting", ""),
-                seg.get("weather", ""),
-                seg.get("color_tone", ""),
-                seg.get("tone", ""),
-                seg.get("dof", ""),
-                seg.get("style", ""),
-                seg.get("composition", ""),
-                json.dumps(seg.get("highlights", []), ensure_ascii=False) if seg.get("highlights") else "",
-                json.dumps(seg.get("emotions", []), ensure_ascii=False) if seg.get("emotions") else "",
-                i,
-            ),
+            "UPDATE media SET analysis_status = 'done', analysis_model = ?, analysis_date = datetime('now'), updated_at = datetime('now') WHERE id = ?",
+            (model, media_id),
         )
+        _refresh_fts(db, media_id, segments)
+        db.commit()
 
-    db.execute(
-        "UPDATE media SET analysis_status = 'done', analysis_model = ?, analysis_date = datetime('now'), updated_at = datetime('now') WHERE id = ?",
-        (model, media_id),
-    )
-    _refresh_fts(db, media_id, segments)
-    db.commit()
+def refresh_media_fts(db, media_id):
+    segments = [_segment_to_dict(r) for r in db.execute(
+        f"SELECT {_SEGMENT_COLS} FROM media_segment WHERE media_id=? ORDER BY seq,id", (media_id,))]
+    music = [_music_seg_to_dict(r) for r in db.execute(
+        "SELECT * FROM music_segment WHERE media_id=? ORDER BY seq,id", (media_id,))]
+    _refresh_fts(db, media_id, segments, extra_tags=_music_fts_tags(music) if music else "")
 
 
 def _refresh_fts(db, media_id, segments, extra_tags: str = ""):
@@ -1076,7 +1154,9 @@ def _refresh_fts(db, media_id, segments, extra_tags: str = ""):
         for c in seg.get("dominant_colors", []):
             colors.add(c)
     row = db.execute("SELECT file_name FROM media WHERE id = ?", (media_id,)).fetchone()
-    file_name = row["file_name"] if row else ""
+    if not row:
+        return
+    file_name = row["file_name"]
     tag_rows = db.execute(
         "SELECT t.name FROM tags t JOIN media_tags mt ON t.id = mt.tag_id WHERE mt.media_id = ?",
         (media_id,),

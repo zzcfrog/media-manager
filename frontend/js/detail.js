@@ -291,8 +291,8 @@ const DetailPage = {
                 </div>
               </div>
               <div v-else class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'visual', e.target.innerText)" v-text="seg.visual"></div>
-              <div v-if="seg.asr && seg.asr!=='无'" class="seg-text-line seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'asr', e.target.innerText)"><span class="prefix">{{ t('d.dialog_asr') }}</span><span v-text="seg.asr"></span></div>
-              <div v-if="seg.subtitle && seg.subtitle!=='无'" class="seg-text-line seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'subtitle', e.target.innerText)"><span class="prefix">{{ t('d.dialog_subtitle') }}</span><span v-text="seg.subtitle"></span></div>
+              <div v-if="seg.asr && seg.asr!=='无'" class="seg-text-line"><span class="prefix">{{ t('d.dialog_asr') }}</span><span class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'asr', e.target.innerText)" v-text="seg.asr"></span></div>
+              <div v-if="seg.subtitle && seg.subtitle!=='无'" class="seg-text-line"><span class="prefix">{{ t('d.dialog_subtitle') }}</span><span class="seg-editable" contenteditable @click.stop @blur="e => saveSegField(seg, 'subtitle', e.target.innerText)" v-text="seg.subtitle"></span></div>
               <div v-if="dimRowCam(seg)" class="dim-row">
                 <span style="font-size:12px">🎥</span>
                 <template v-for="f in camFields" :key="f.key"><span v-if="seg[f.key]" class="dim-pair"><span class="dim-label">{{ t('d.dim.' + f.key) }}</span><span class="dim-value seg-editable" :class="f.cls" contenteditable @click.stop @blur="e => saveSegField(seg, f.key, e.target.innerText.trim())" v-text="seg[f.key]"></span></span></template>

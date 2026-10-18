@@ -256,17 +256,24 @@ def _migrate(db):
     row = db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='media'").fetchone()
     if row and "'audio'" not in row[0]:
         import re
-        import shutil
         from pathlib import Path
-        # 迁移前整库备份（WAL 先 checkpoint 确保主文件完整）
+        # SQLite backup includes committed WAL pages even while another reader is active.
+        # A failed backup must stop this destructive rebuild.
+        import sqlite3
+        import uuid
         db.commit()
-        db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-        db.commit()
+        src = Path(current_app.config["DATABASE"])
+        backup_path = src.with_suffix(".db.bak-music")
+        if backup_path.exists():
+            backup_path = src.with_suffix(f".db.bak-music-{uuid.uuid4().hex}")
+        from contextlib import closing
+        temporary = backup_path.with_name(backup_path.name + ".tmp-" + uuid.uuid4().hex)
         try:
-            src = Path(current_app.config["DATABASE"])
-            shutil.copy(src, src.with_suffix(".db.bak-music"))
-        except Exception as e:
-            logger.warning("media rebuild backup failed (continuing): {}", e)
+            with closing(sqlite3.connect(temporary)) as backup:
+                db.backup(backup)
+            temporary.replace(backup_path)
+        finally:
+            temporary.unlink(missing_ok=True)
         db.execute("PRAGMA foreign_keys=OFF")  # 否则 DROP media 级联清空子表
         m = re.search(r"(CREATE TABLE IF NOT EXISTS media \(.*?\n\))", _SCHEMA, re.S)
         db.execute("DROP TABLE IF EXISTS media_new")
@@ -296,7 +303,7 @@ def _migrate(db):
             db.execute(idx_sql)
         db.execute("PRAGMA foreign_keys=ON")
         db.commit()
-        logger.info("media table rebuilt: media_type CHECK + music columns (backup: .db.bak-music)")
+        logger.info("media table rebuilt: media_type CHECK + music columns (backup: {})", backup_path)
 
     # dialogue → asr: rename column + rebuild FTS
     seg_cols = {r[1] for r in db.execute("PRAGMA table_info(media_segment)").fetchall()}
@@ -310,21 +317,9 @@ def _migrate(db):
             "media_id UNINDEXED, file_name, visual, asr, subtitle, subjects, colors, tags,"
             "tokenize='unicode61')"
         )
-        rows = db.execute(
-            "SELECT s.media_id, m.file_name, s.visual, s.asr, s.subtitle, s.dominant_colors, s.main_subjects "
-            "FROM media_segment s JOIN media m ON m.id = s.media_id"
-        ).fetchall()
-        for r in rows:
-            tags = db.execute(
-                "SELECT t.name FROM tags t JOIN media_tags mt ON t.id = mt.tag_id WHERE mt.media_id = ?",
-                (r["media_id"],),
-            ).fetchall()
-            tags_str = " ".join(t["name"] for t in tags)
-            db.execute(
-                "INSERT INTO media_fts (media_id, file_name, visual, asr, subtitle, subjects, colors, tags) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (r["media_id"], r["file_name"], r["visual"], r["asr"], r["subtitle"], r["main_subjects"], r["dominant_colors"], tags_str),
-            )
+        from .blueprints.analysis import refresh_media_fts
+        for row in db.execute("SELECT id FROM media").fetchall():
+            refresh_media_fts(db, row["id"])
 
     # Convert segment time format from MM:SS.ss to HH:MM:SS.ss
     if get_setting(db, "time_format_hms") != "1":

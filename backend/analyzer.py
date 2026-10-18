@@ -539,6 +539,20 @@ def sanitize_music_segment(obj: dict | None, start: float, end: float) -> dict |
     return out
 
 
+def validate_analysis_segments(segments):
+    if not isinstance(segments, list) or not segments:
+        raise ValueError("分析结果必须是非空片段列表")
+    for seg in segments:
+        if not isinstance(seg, dict) or not any(
+            isinstance(seg.get(key), str) and seg[key].strip()
+            for key in ("visual", "asr", "subtitle")
+        ):
+            raise ValueError("分析片段缺少有效的画面、语音或字幕内容")
+        for key in ("dominant_colors", "main_subjects", "highlights", "emotions"):
+            if key in seg and not isinstance(seg[key], list):
+                raise ValueError(f"分析字段 {key} 必须是列表")
+
+
 def _parse_response(content: str) -> list[dict]:
     content = content.strip()
     if content.startswith("```"):
@@ -551,12 +565,13 @@ def _parse_response(content: str) -> list[dict]:
     try:
         result = json.loads(content)
         if isinstance(result, list):
+            validate_analysis_segments(result)
             logger.info("Video analysis result: {} segments, {}", len(result), json.dumps(result, ensure_ascii=False)[:2000])
             return result
         raise ValueError("Response is not a JSON array")
     except json.JSONDecodeError:
         logger.warning("Failed to parse JSON from response")
-        return [{"raw_response": content}]
+        raise ValueError("模型返回了无效 JSON，已保留原分析") from None
 
 
 def analyze_image(image_path: str | Path, api_key: str, model: str = "glm-4.6v",
@@ -626,9 +641,10 @@ def _parse_image_response(content: str) -> dict:
     try:
         result = json.loads(content)
         if isinstance(result, dict):
+            validate_analysis_segments([result])
             logger.info("Image analysis result: {}", json.dumps(result, ensure_ascii=False))
             return result
         raise ValueError("Response is not a JSON object")
     except json.JSONDecodeError:
         logger.warning("Failed to parse JSON from response")
-        return {"raw_response": content}
+        raise ValueError("模型返回了无效 JSON，已保留原分析") from None

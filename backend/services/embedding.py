@@ -8,10 +8,10 @@ import numpy as np
 import onnxruntime as ort
 from PIL import Image
 from torchvision import transforms
-from ..config import RAW_EXTS
+from ..config import RAW_EXTS, MODELS_ROOT
 
 _ort_session = None
-_MODEL_PATH = Path(__file__).parent.parent / "models" / "resnet50.onnx"
+_MODEL_PATH = MODELS_ROOT / "resnet50.onnx"
 _FFMPEG_TIMEOUT = 60
 
 _TRANSFORM = transforms.Compose([

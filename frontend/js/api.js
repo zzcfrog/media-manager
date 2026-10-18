@@ -176,7 +176,7 @@ scanPaths(paths) {
   deleteProject(id) { return this._fetch(`/api/workbench/${id}`, { method: "DELETE" }); },
   getProjectSegments(id) { return this._fetch(`/api/workbench/${id}/segments`); },
   getProjectTracks(id) { return this._fetch(`/api/workbench/${id}/tracks`); },
-  updateProjectTracks(id, tracks) { return this._fetch(`/api/workbench/${id}/tracks`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tracks }) }); },
+  updateProjectTracks(id, tracks, plan) { return this._fetch(`/api/workbench/${id}/tracks`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tracks, ...(plan !== undefined ? { plan: typeof plan === "string" ? JSON.parse(plan) : plan } : {}) }) }); },
   updateProjectMedia(id, mediaIds) { return this._fetch(`/api/workbench/${id}/media`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ media_ids: mediaIds }) }); },
 
   // -- Creative --

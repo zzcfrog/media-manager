@@ -1,0 +1,43 @@
+const {chromium}=require('playwright'),fs=require('fs'),assert=require('assert');
+const fixture=JSON.parse(fs.readFileSync(process.env.VIDEO_ANALYZER_TEST_FIXTURE || '/tmp/video-analyzer-fix-browser.json','utf8'));
+const base=fixture.url;
+(async()=>{
+ const browser=await chromium.launch({headless:false});const page=await browser.newPage({viewport:{width:1000,height:650}});page.setDefaultTimeout(12000);
+ const errors=[],passed=[];page.on('pageerror',e=>errors.push(e.message));
+ const projectURL=base+'/api/workbench/'+fixture.project_id;
+ const project=async()=>(await(await page.request.get(projectURL)).json()).data;
+ const tracks=async()=>(await(await page.request.get(projectURL+'/tracks')).json()).data;
+ try{
+  await page.request.post(base+'/api/creative/'+fixture.project_id+'/apply',{data:{plan:{acts:[{act_id:'a1',title:'Synthetic act',narratives:[{narrative_id:'n1',text:'Synthetic narrative',shots:[{segment_id:fixture.segment_ids[0]}]},{narrative_id:'n2',text:'Second narrative',shots:[{segment_id:fixture.segment_ids[1]}]}]}]}}});
+  await page.goto(base+'/#/gallery');await page.locator('.media-card').nth(4).waitFor();
+  const boxes=await page.locator('.media-card').evaluateAll(els=>els.map(e=>{const b=e.getBoundingClientRect();return{x:b.x,y:b.y,width:b.width,height:b.height}}));
+  const right=boxes.sort((a,b)=>b.x+b.width-a.x-a.width)[0];
+  await page.mouse.click(right.x+right.width-3,right.y+right.height-8,{button:'right'});
+  const menu=page.locator('.ctx-menu-popup');await menu.waitFor();await page.waitForFunction(()=>{const e=document.querySelector('.ctx-menu-popup');const r=e?.getBoundingClientRect();return r&&r.right<=innerWidth&&r.bottom<=innerHeight});
+  passed.push('R45 menu fits viewport');await page.reload();await page.locator('.media-card').nth(4).waitFor();
+  const video=page.locator('.filter-bar button').filter({has:page.getByText('smart_display',{exact:true})});const image=page.locator('.filter-bar button').filter({has:page.getByText('image',{exact:true})});
+  await video.click();await page.locator('.media-card').nth(2).waitFor({state:'hidden'});
+  await page.route('**/api/library/**',async route=>{const u=new URL(route.request().url());if(u.pathname==='/api/library/'&&u.searchParams.get('media_type')==='image')await route.fulfill({status:500,contentType:'application/json',body:'{"error":"fixture"}'});else await route.continue()});
+  await image.click();await page.getByRole('status').filter({hasText:'素材加载失败'}).waitFor();assert.equal(await page.locator('.media-card').count(),0);passed.push('R46 load failure is visible with no stale cards');
+  await page.unroute('**/api/library/**');await page.getByRole('button',{name:'重试',exact:true}).click();await page.locator('.media-card').getByText('A.jpg',{exact:true}).waitFor();assert.equal(await page.locator('.media-card').count(),3);
+  await page.evaluate(()=>localStorage.clear());await page.goto(base+'/#/gallery');await page.reload();await page.locator('.media-card').nth(4).waitFor();
+  let badRequests=0;await page.route('**/media/thumbnail/'+fixture.media_id,route=>{badRequests++;return route.fulfill({status:404,body:'missing'})});
+  await page.reload();const card=page.locator('.media-card[data-id="'+fixture.media_id+'"]');await card.locator('img[src="/static/img/no-thumb.svg"]').waitFor();assert.equal(badRequests,1);passed.push('R44 thumbnail has terminal fallback');await page.unroute('**/media/thumbnail/'+fixture.media_id);
+  await page.setViewportSize({width:1600,height:1100});await page.goto(base+'/#/workbench/'+fixture.project_id);await page.locator('.wb-track-video').first().waitFor();
+  let release,captured;const gate=new Promise(r=>release=r),pending=new Promise(r=>captured=r);let writes=0;
+  await page.route(projectURL+'/tracks',async route=>{if(route.request().method()==='PUT'){writes++;if(route.request().postData().includes('Older edit A')){captured();await gate;}}await route.continue()});
+  const rename=async name=>{await page.locator('.wb-frame-theme .wb-frame-label span').first().dblclick();const input=page.locator('.wb-frame-label-input');await input.fill(name);await input.press('Enter');};
+  await rename('Older edit A');await pending;await rename('Newer edit B');assert.equal(writes,1);
+  const latest=page.waitForResponse(r=>r.url()===projectURL+'/tracks'&&r.request().method()==='PUT'&&r.request().postData().includes('Newer edit B'));release();await latest;
+  assert.equal(JSON.parse((await project()).ai_plan).acts[0].title,'Newer edit B');assert.equal((await tracks()).find(t=>t.track_type==='theme').content,'Newer edit B');passed.push('R15 paired serialized save persists newest edit');await page.unroute(projectURL+'/tracks');
+  await page.reload();await page.locator('.wb-frame-theme .wb-frame-label span').filter({hasText:'Newer edit B'}).waitFor();
+  await page.locator('.wb-frame-theme .wb-frame-label').first().click();await page.keyboard.press('Delete');const deleted=page.waitForResponse(r=>r.url().endsWith('/apply')&&r.request().method()==='POST');await page.locator('.q-dialog').getByRole('button',{name:'删除',exact:true}).click();await deleted;await page.locator('.wb-track-video').first().waitFor({state:'hidden'});
+  const restored=page.waitForResponse(r=>r.url()===projectURL+'/tracks'&&r.request().method()==='PUT');await page.locator('.wb-container button').filter({has:page.getByText('undo',{exact:true})}).click();await restored;assert.equal(JSON.parse((await project()).ai_plan).acts.length,1);assert.equal((await tracks()).filter(t=>t.track_type==='video').length,2);passed.push('R30 structural undo restores tracks and plan');
+  const aviCard=page.locator('.wb-mat-card').filter({has:page.locator('.wb-mat-name').filter({hasText:'Seekable.avi'})});await aviCard.click();await page.waitForFunction(mid=>{const v=document.querySelector('.wb-video-wrap video');return v&&v.readyState>=2&&v.currentSrc.endsWith('/media/video/'+mid)},fixture.avi_id);
+  await page.locator('.wb-video-wrap video').first().evaluate(v=>{v.currentTime=6});await page.waitForFunction(()=>{const v=document.querySelector('.wb-video-wrap video');return v&&!v.seeking&&v.currentTime>=5.9&&v.seekable.length>0});passed.push('R31 transcoded AVI seeks to source position');
+  let patches=0;page.on('request',r=>{if(r.method()==='PATCH'&&r.url().includes('/segments/'))patches++});await page.goto(base+'/#/detail/'+fixture.media_id);const segment=page.locator('.segment').first();const editable=segment.locator('.seg-text-line .seg-editable[contenteditable]');await editable.nth(1).waitFor();
+  for(let i=0;i<2;i++){await editable.nth(0).click();await segment.locator('.seg-dur').click();}await editable.nth(1).click();await segment.locator('.seg-dur').click();
+  const seg=(await(await page.request.get(base+'/api/analysis/'+fixture.media_id)).json()).segments[0];assert.equal(seg.asr,'hello');assert.equal(seg.subtitle,'caption');assert.equal(patches,0);passed.push('R40 unchanged blur preserves ASR/subtitle');
+  assert.deepEqual(errors,[]);console.log(JSON.stringify({passed,errors},null,2));fs.writeFileSync('/tmp/video-analyzer-browser-results.json',JSON.stringify({passed,errors},null,2));await page.screenshot({path:'/tmp/video-analyzer-fixes.png'});
+ }finally{await browser.close()}
+})().catch(e=>{console.error(e);process.exitCode=1});

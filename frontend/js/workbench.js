@@ -872,6 +872,8 @@ const WorkbenchPage = {
   },
 
   beforeUnmount() {
+    this._mediaGeneration = (this._mediaGeneration || 0) + 1;
+    this._waveGeneration = (this._waveGeneration || 0) + 1;
     this.stopSegTrack();
     this.stopWbWaveformAnim();
     this.stopWbScopes();
@@ -886,6 +888,8 @@ const WorkbenchPage = {
   watch: {
     projectId() { this.load(); },
     selectedMedia(m) {
+      const generation = this._mediaGeneration = (this._mediaGeneration || 0) + 1;
+      this._waveGeneration = (this._waveGeneration || 0) + 1;
       this.activeSegIndex = -1;
       this.mediaDetail = null;
       this.wbPlaying = false;
@@ -900,7 +904,9 @@ const WorkbenchPage = {
       this.$nextTick(() => { if (savedSeek) this._pendingTlSeek = savedSeek; });
       this.previewLoading = this.selectedMedia?.media_type === 'image';
       if (m) {
-        API.getMedia(m.id).then(res => { this.mediaDetail = res; }).catch(() => {});
+        API.getMedia(m.id).then(res => {
+          if (this._mediaGeneration === generation && this.selectedMedia?.id === m.id) this.mediaDetail = res;
+        }).catch(() => {});
       }
     },
     matCols(val) { localStorage.setItem('wb_matCols', val); },
@@ -969,35 +975,44 @@ const WorkbenchPage = {
       document.addEventListener('mouseup', onUp);
     },
     onMindMapShotClick(shot) {
-      if (!shot || !shot.segment_id) return;
-      const videoTrack = this.tracks.find(tr =>
-        tr.track_type === 'video' && tr.segment_id === shot.segment_id
-      );
+      if (!shot) return;
+      const videoTrack = this.tracks.find(tr => {
+        if (tr.track_type !== 'video') return false;
+        if (shot.segment_id && tr.segment_id === shot.segment_id) return true;
+        try { return shot.shot_id && JSON.parse(tr.metadata || '{}').shot_id === shot.shot_id; }
+        catch(e) { return false; }
+      });
       if (videoTrack) {
         this.timelinePlayMode = true;
         this.playheadTime = this._timeToSec(videoTrack.time_start);
         this.seekToPlayhead(false);
       }
     },
-    async onPlanChanged() {
-      if (!this.project || !this.mindMapData) return;
-      // Snapshot pre-edit tracks so mindmap edits (drag/rename/delete) are undoable.
-      // _trackSnapshot must run BEFORE loadTracks replaces tracks with the post-apply set.
+    _queueProjectWrite(write) {
+      const next = (this._saveChain || Promise.resolve()).catch(() => {}).then(write);
+      this._saveChain = next;
+      return next;
+    },
+    async onPlanChanged(planOverride = null) {
+      if (!this.project || !(planOverride || this.mindMapData)) return;
       this._trackSnapshot();
+      const pid = this.project.id;
+      const previous = this.project.ai_plan;
+      const planStr = JSON.stringify(planOverride || this.mindMapData);
       try {
-        const planStr = JSON.stringify(this.mindMapData);
-        await fetch(`/api/creative/${this.project.id}/plan`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: planStr,
+        await this._queueProjectWrite(async () => {
+          const response = await fetch(`/api/creative/${pid}/apply`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plan: JSON.parse(planStr) }),
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          if (this.project?.id !== pid) return;
+          this.project.ai_plan = planStr;
+          await this.loadTracks();
         });
-        // Update local ai_plan so mindMapData computed doesn't revert to old data
-        this.project.ai_plan = planStr;
-        const applyRes = await fetch(`/api/creative/${this.project.id}/apply`, { method: 'POST' });
-        if (!applyRes.ok) throw new Error('apply failed');
-        await this.loadTracks();
       } catch(e) {
-        console.error('mindmap save failed:', e);
+        if (this.project?.id === pid) this.project = { ...this.project, ai_plan: previous };
+        Quasar.Notify.create({ type: 'negative', message: t('wb.track_save_fail') });
       }
     },
     zoomToFit() {
@@ -1148,24 +1163,23 @@ const WorkbenchPage = {
     // which would re-derive the plan from tracks and could lose restored structure.
     async _persistSnapshot() {
       if (!this.projectId) return;
+      const pid = this.projectId;
       const payload = this.tracks.map(t => { const o = { ...t }; delete o._segment; return o; });
+      const plan = this.project?.ai_plan;
       try {
-        await API.updateProjectTracks(this.projectId, payload);
-        if (this.project?.ai_plan != null) {
-          await fetch(`/api/creative/${this.project.id}/plan`, {
-            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: this.project.ai_plan,
-          });
-        }
-      } catch (e) { console.error('persistSnapshot failed:', e); }
+        await this._queueProjectWrite(() => API.updateProjectTracks(pid, payload, plan));
+      } catch (e) { Quasar.Notify.create({ type: 'negative', message: t('wb.track_save_fail') }); }
     },
     // Re-attach the runtime-only _segment reference on each track item. Needed
     // after tracks are replaced wholesale (load, undo/redo) so video blocks keep
     // their thumbnails/labels instead of showing '?'.
     _hydrateSegments() {
       for (const tr of this.tracks) {
-        tr._segment = tr.segment_id
-          ? (this.segments.find(s => s.id === tr.segment_id) || null)
-          : null;
+        tr._segment = this.segments.find(s => s.id === tr.segment_id) || null;
+        if (!tr._segment) {
+          let meta = {}; try { meta = JSON.parse(tr.metadata || '{}'); } catch(e) {}
+          if (meta.srcMediaId) tr._segment = { media_id: meta.srcMediaId, time_start: meta.srcStart, time_end: meta.srcEnd };
+        }
       }
     },
     _resetUndoStacks() {
@@ -1238,7 +1252,7 @@ const WorkbenchPage = {
         const d = this._timeToSec(shot.src_end) - this._timeToSec(shot.src_start);
         if (d > 0) return d;
       }
-      const seg = this.segments.find(s => s.id === shot.segment_id);
+      const seg = this.segments.find(s => s.id === shot.segment_id) || shot.source;
       if (seg) {
         const d = this._timeToSec(seg.time_end) - this._timeToSec(seg.time_start);
         if (d > 0) return d;
@@ -1252,28 +1266,49 @@ const WorkbenchPage = {
     // .act_id/.narrative_id is rewritten to match. Synchronous — returns the new
     // plan string (or null) so the caller persists it AFTER saving tracks.
     _syncTracksToPlan() {
-      if (!this.mindMapData || !this.project) return null;
-      const plan = JSON.parse(JSON.stringify(this.mindMapData));
-      if (!plan.acts || !plan.acts.length) return null;
+      if (!this.project) return null;
+      const plan = JSON.parse(JSON.stringify(this.mindMapData || { acts: [] }));
+      const videos = this.tracks.filter(t => t.track_type === 'video');
+      if (!plan.acts?.length && videos.length) {
+        plan.acts = [{ act_id: 'timeline-act', title: '', narratives: [
+          { narrative_id: 'timeline-narrative', text: '', shots: [] },
+        ] }];
+      }
+      if (!plan.acts?.length) return JSON.stringify(plan);
 
       // Global shot lookup (preserves shot props when a shot moves between narratives)
       const shotMap = {};
       for (const act of plan.acts) {
         for (const nar of (act.narratives || [])) {
           for (const shot of (nar.shots || [])) {
-            if (shot.segment_id) shotMap[shot.segment_id] = shot;
+            shotMap[shot.shot_id || shot.segment_id] = shot;
           }
         }
       }
 
       // Actual per-segment video durations (from track metadata — reflects resizes)
-      const videos = this.tracks.filter(t => t.track_type === 'video' && t.segment_id);
 
       // 非拖动 video：用 metadata.narrative_id/act_id（上次 sync 写入，准确）。
       // 拖动 video：用高亮目标的 plan narrative_id 覆盖。
-      const vAssign = videos.map(vt => {
+      const vAssign = videos.map((vt, index) => {
         let m = {}; try { m = JSON.parse(vt.metadata || '{}'); } catch(e) {}
-        return { vt, narId: m.narrative_id || null, actId: m.act_id || null };
+        const start = this._timeToSec(vt.time_start);
+        let offset = 0, owner = null;
+        for (const act of plan.acts) for (const nar of (act.narratives || [])) {
+          const end = offset + (nar.shots || []).reduce((sum, shot) => sum + this._shotDur(shot), 0);
+          if (!owner && start < end) owner = { act, nar };
+          offset = end;
+        }
+        if (!owner) {
+          const act = plan.acts[plan.acts.length - 1];
+          if (!act.narratives?.length) act.narratives = [{ narrative_id: 'timeline-narrative', text: '', shots: [] }];
+          owner = { act, nar: act.narratives[act.narratives.length - 1] };
+        }
+        if (!m.shot_id) m.shot_id = `clip-${Date.now()}-${index}`;
+        vt.metadata = JSON.stringify(m);
+        const existing = plan.acts.find(a => a.act_id === m.act_id)?.narratives?.some(n => n.narrative_id === m.narrative_id);
+        return { vt, narId: existing ? m.narrative_id : owner.nar.narrative_id,
+                 actId: existing ? m.act_id : owner.act.act_id };
       });
       if (this._lastDraggedVid && this._dragTargetNarPlanId) {
         const di = vAssign.findIndex(va => va.vt === this._lastDraggedVid);
@@ -1319,10 +1354,12 @@ const WorkbenchPage = {
           const grp = groups[keyOf(act.act_id, nar.narrative_id)];
           if (!grp || !grp.vids.length) continue;
           const newShots = grp.vids.map(vt => {
-            const old = shotMap[vt.segment_id] || {};
             let meta = {};
             try { meta = JSON.parse(vt.metadata || '{}'); } catch(e) {}
-            const shot = { ...old, segment_id: vt.segment_id };
+            const old = shotMap[meta.shot_id] || shotMap[vt.segment_id] || {};
+            const shot = { ...old, segment_id: vt.segment_id || null, shot_id: meta.shot_id,
+              source: { ...(old.source || vt._segment || {}), media_id: meta.srcMediaId || vt._segment?.media_id,
+                        time_start: meta.srcStart, time_end: meta.srcEnd, asr: old.source?.asr || '' } };
             if (meta.srcStart) shot.src_start = meta.srcStart;
             if (meta.srcEnd) shot.src_end = meta.srcEnd;
             const emo = findAuxTrack('emotion', vt);
@@ -1351,7 +1388,6 @@ const WorkbenchPage = {
         if (themeT && themeT.content) newAct.title = themeT.content;
         newActs.push(newAct);
       }
-      if (!newActs.length) return null; // safety: never wipe the whole plan
 
       const planStr = JSON.stringify({ ...plan, acts: newActs });
       this.project.ai_plan = planStr;
@@ -1359,29 +1395,18 @@ const WorkbenchPage = {
     },
     async _trackSave() {
       if (!this.projectId) return;
+      const pid = this.projectId;
       this._normalizeVideoTrack();
-      let planStr = null;
-      try { planStr = this._syncTracksToPlan(); }
-      catch (e) { console.error('syncTracksToPlan failed:', e); }
+      const planStr = this._syncTracksToPlan();
       if (planStr && this.project) {
-        // 只重建 text/theme overlay 框（位置需随 plan 结构变），不做 apply 全量重建——
-        // apply 会从 plan 的 shot.narration/emotion 重新生成所有旁白/情绪块，
-        // 导致用户删掉的旁白被复活、拖拽时多出幻影旁白。
         this._rebuildFrameBlocks(planStr);
         this.project.ai_plan = planStr;
-        const payload = this.tracks.map(t => { const o = { ...t }; delete o._segment; return o; });
-        try {
-          await API.updateProjectTracks(this.projectId, payload);
-          await fetch(`/api/creative/${this.project.id}/plan`, {
-            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: planStr,
-          });
-        } catch(e) { console.error('trackSave failed:', e); }
-      } else {
-        // fallback：sync 没产出 plan（无 mindMapData），直接存 tracks
-        const payload = this.tracks.map(t => { const o = { ...t }; delete o._segment; return o; });
-        try { await API.updateProjectTracks(this.projectId, payload); }
-        catch (e) { Quasar.Notify.create({ message: t('wb.track_save_fail'), color: 'negative', position: 'top' }); }
       }
+      // Capture both halves before another edit can mutate the live objects.
+      const payload = this.tracks.map(t => { const o = { ...t }; delete o._segment; return JSON.parse(JSON.stringify(o)); });
+      try {
+        await this._queueProjectWrite(() => API.updateProjectTracks(pid, payload, planStr ?? undefined));
+      } catch(e) { Quasar.Notify.create({ type: 'negative', message: t('wb.track_save_fail') }); }
     },
     // 只重建 text/theme overlay 框（位置随 plan 结构），保留其他轨道（video/emotion/
     // narration/subtitle）不动——替代 apply 全量重建，避免旁白/情绪块被 plan 重新生成。
@@ -1396,7 +1421,7 @@ const WorkbenchPage = {
         for (const nar of (act.narratives || [])) {
           const narStart = position;
           for (const shot of (nar.shots || [])) {
-            const seg = this.segments.find(s => s.id === shot.segment_id);
+            const seg = this.segments.find(s => s.id === shot.segment_id) || shot.source;
             if (!seg) continue;
             const srcS = shot.src_start || seg.time_start;
             const srcE = shot.src_end || seg.time_end;
@@ -1602,8 +1627,7 @@ const WorkbenchPage = {
     // shortens by the deleted narrative's duration). Routing through _syncTracksToPlan instead
     // mis-derives boundaries because the deleted narrative's videos are already gone.
     async _cascadeDelete(anchor) {
-      // Snapshot happens inside onPlanChanged() below (before loadTracks); snapshotting
-      // here too would push the same pre-edit state twice and create a stuck undo step.
+      // onPlanChanged snapshots the unmodified tracks and plan before applying this copy.
       const plan = JSON.parse(JSON.stringify(this.mindMapData));
       const s = this._timeToSec(anchor.time_start);
       let removed = false;
@@ -1631,15 +1655,14 @@ const WorkbenchPage = {
       }
       this.trackSelectedItem = null;
       if (!removed) { this._trackSave(); return; }
-      this.project.ai_plan = JSON.stringify(plan);   // mindMapData recomputes from this
-      await this.onPlanChanged();                     // PUT plan + POST apply + loadTracks
+      await this.onPlanChanged(plan);
     },
     // Duration of a plan narrative, matching apply_plan's calc (src_start/src_end or segment
     // range; shots whose segment is missing are skipped just like apply; dur<=0 → 5s).
     _narrativeDuration(nar) {
       let total = 0;
       for (const shot of (nar.shots || [])) {
-        const seg = this.segments.find(sg => sg.id === shot.segment_id);
+        const seg = this.segments.find(sg => sg.id === shot.segment_id) || shot.source;
         if (!seg) continue;
         const srcS = shot.src_start || seg.time_start;
         const srcE = shot.src_end || seg.time_end;
@@ -2316,7 +2339,13 @@ const WorkbenchPage = {
           // 2. 取数据
           Quasar.Notify.create({ type: "info", position: "top", timeout: 2500, message: t("wb.export_fcpxml_exporting") });
           const res = await fetch(url);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.error || `HTTP ${res.status}`);
+          }
+          const warningCount = Number(res.headers.get('X-Export-Warning-Count'));
+          if (warningCount) Quasar.Notify.create({ type: 'warning', timeout: 10000,
+            message: t('wb.export_missing', { n: warningCount }) });
           const buf = new Uint8Array(await res.arrayBuffer());
           if (!buf.length) throw new Error("导出内容为空");
           // 3. 写文件：Electron 走主进程 Node fs；否则回退 showSaveFilePicker / blob 下载
@@ -2645,12 +2674,18 @@ const WorkbenchPage = {
       const player = this.$refs.wbPlayer;
       const canvas = this.$refs.wbWfCanvas;
       if (!player || !canvas) return;
+      const generation = this._waveGeneration = (this._waveGeneration || 0) + 1;
+      const source = player.src;
+      const isCurrent = () => this._waveGeneration === generation && this.$refs.wbPlayer === player && player.src === source;
+      let actx;
       try {
-        const resp = await fetch(player.src);
+        const resp = await fetch(source);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const buf = await resp.arrayBuffer();
-        const actx = new (window.AudioContext || window.webkitAudioContext)();
+        if (!isCurrent()) return;
+        actx = new (window.AudioContext || window.webkitAudioContext)();
         const audio = await actx.decodeAudioData(buf);
-        actx.close();
+        if (!isCurrent()) return;
         const data = audio.getChannelData(0);
         this._wbWfDuration = audio.duration;
         const rect = this.$refs.wbWaveformWrap.getBoundingClientRect();
@@ -2668,7 +2703,8 @@ const WorkbenchPage = {
         }
         this.resizeWbWaveformCanvas();
         this.drawWbWaveform();
-      } catch (e) { this._wbWfPeaks = null; }
+      } catch (e) { if (isCurrent()) this._wbWfPeaks = null; }
+      finally { if (actx) await actx.close(); }
     },
     resizeWbWaveformCanvas() {
       const canvas = this.$refs.wbWfCanvas;

@@ -1,0 +1,216 @@
+{
+  "validated_at": "2026-10-18T01:23:31.836696+00:00",
+  "version": "1.0.2",
+  "installed_application": "/Users/zack/Applications/Media Manager.app",
+  "artifacts": {
+    "Media-Manager-1.0.2-arm64.dmg": {
+      "bytes": 444901801,
+      "sha256": "db79b7382f05fac3335b0d917d0c20c57906e380694980e4554c0851b23a60d2"
+    },
+    "Media-Manager-1.0.2-arm64.zip": {
+      "bytes": 445858000,
+      "sha256": "45b8036fd10beb80f1c9a09ca198941eba41e01bbdb76395c929d6ec1639c9e9"
+    }
+  },
+  "data_migration": {
+    "final_mode": "external_models",
+    "files": 11274,
+    "logical_bytes": 337731518,
+    "portable_export_files": 22286,
+    "portable_export_bytes": 1851238262,
+    "database": {
+      "tables": {
+        "collection_items": {
+          "rows": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "collections": {
+          "rows": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "dup_exclusions": {
+          "rows": 41,
+          "sha256": "9a01326159bf268afb4f8a7b1cd3edb4ad2e757ac46648cc5fc9536e4024e53d"
+        },
+        "media": {
+          "rows": 9104,
+          "sha256": "b14e5999a3d84cc07096c1766d6431ef847f39d9622f1aaf0ae14e0a28c8e001"
+        },
+        "media_fts": {
+          "rows": 9103,
+          "sha256": "465bd72610b9e1ea276516356497b02696443675d18074587607a1488d2fed96"
+        },
+        "media_segment": {
+          "rows": 4322,
+          "sha256": "1ff68ddde88602c646789f168430f5780bfc4861de367cf9fc414dbed53d2440"
+        },
+        "media_tags": {
+          "rows": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "music_segment": {
+          "rows": 1,
+          "sha256": "ffb35dc4d5e896c323dd03a6fa7c7f14a8df216b7f2b0e412eb2e68f5dab07fb"
+        },
+        "project_media": {
+          "rows": 188,
+          "sha256": "921f047866b0b1840e62a79e5ac9dde7c37d2c0c0a5448c8c86403f517764471"
+        },
+        "project_tracks": {
+          "rows": 607,
+          "sha256": "4a331399c04b93d8916e38ddf19cb9f35d3adf40704666b34177cf16ee3747b5"
+        },
+        "projects": {
+          "rows": 2,
+          "sha256": "2df5b1992489498e1338c0392c8825847a60744cf55d6e87d13be399eb6305f3"
+        },
+        "settings": {
+          "rows": 28,
+          "sha256": "b61635287fcd7592fbf6843fb7375e9b7bb39bbb09812915e522bfa9227ebb5d"
+        },
+        "tags": {
+          "rows": 2,
+          "sha256": "49bac70e094e8f108c0e45635859712a6e4ab807a6ec235ef55cc85a9794154a"
+        }
+      }
+    },
+    "original_source_retained": true,
+    "models_copied": false,
+    "models_directory": "/Users/zack/program/python/video_analyzer/backend/models",
+    "whisper_cache": "/Users/zack/.cache/huggingface",
+    "original_media_paths_retained": true,
+    "offline_source_media_count": 9104,
+    "restore_all_tables_equal_original": true,
+    "library": "/Users/zack/Library/Application Support/Media Manager/library"
+  },
+  "verification": {
+    "python_tests": 49,
+    "frontend_component_checks": 12,
+    "desktop_runtime_path_checks": true,
+    "original_database_size_and_mtime_unchanged": true,
+    "original_and_live_all_tables_equal": true,
+    "real_upgrade_backups_equal_original": 2,
+    "full_data_only_restore_equal_original": true,
+    "legacy_backup_preserved": true,
+    "original_model_files_available": 8,
+    "live_library_contains_no_models": true,
+    "external_model_menu_and_profile_restore": true,
+    "offline_whisper_source_cache_loaded": true,
+    "no_paid_AI_requests": true,
+    "temporary_test_data_cleaned": true,
+    "backend_stopped_after_verification": true,
+    "packaged_guide_matches_external_model_mode": true
+  },
+  "installed_app": {
+    "ok": true,
+    "version": "1.0.2",
+    "defaultProfile": true,
+    "defaultLibrary": true,
+    "media": 9104,
+    "projects": 2,
+    "offlineWhisperLargeV3Loaded": true,
+    "pageErrors": [],
+    "noAIRequests": true
+  },
+  "upgrade_rehearsal": {
+    "all_tables_preserved": true,
+    "new_upgrade_backup_count": 1,
+    "upgrade_backup_matches_pre_upgrade_database": true,
+    "marker": {
+      "format_version": 1,
+      "app_version": "1.0.2"
+    },
+    "backup_metadata": {
+      "from_version": "1.0.1",
+      "to_version": "1.0.2",
+      "database": {
+        "tables": {
+          "collection_items": {
+            "rows": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "collections": {
+            "rows": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "dup_exclusions": {
+            "rows": 41,
+            "sha256": "9a01326159bf268afb4f8a7b1cd3edb4ad2e757ac46648cc5fc9536e4024e53d"
+          },
+          "media": {
+            "rows": 9106,
+            "sha256": "30cd9ad2b2a228e22660073e09170f72a3ac6b035aafa6ce8e17c7d7e74531e2"
+          },
+          "media_fts": {
+            "rows": 9105,
+            "sha256": "64a8a47a5c317df33e21aa89b6ea50a0e3272af7f932138dff929dd251bfb3b2"
+          },
+          "media_segment": {
+            "rows": 4322,
+            "sha256": "1ff68ddde88602c646789f168430f5780bfc4861de367cf9fc414dbed53d2440"
+          },
+          "media_tags": {
+            "rows": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "music_segment": {
+            "rows": 1,
+            "sha256": "ffb35dc4d5e896c323dd03a6fa7c7f14a8df216b7f2b0e412eb2e68f5dab07fb"
+          },
+          "project_media": {
+            "rows": 190,
+            "sha256": "a1b2037c27a9cde48fb06a448655f7076db6572aacfb73eee7f539a31964e7f1"
+          },
+          "project_tracks": {
+            "rows": 608,
+            "sha256": "b78feaf2343edffad3995a9a5553cfc14ade515cbaea1e4e1a7fb6a6488d6c5f"
+          },
+          "projects": {
+            "rows": 3,
+            "sha256": "04c1a05bdc63e935aa3d18dcd8b96c4bfe3ce5704213c752db1651d6a0e4dbc4"
+          },
+          "settings": {
+            "rows": 29,
+            "sha256": "f146a9262e158e02c4a58500d34213600c223cadc0ad7f5e15ba68de4f543d91"
+          },
+          "tags": {
+            "rows": 2,
+            "sha256": "49bac70e094e8f108c0e45635859712a6e4ab807a6ec235ef55cc85a9794154a"
+          }
+        }
+      }
+    },
+    "resnet_embedding_bytes": 8192
+  },
+  "native_menu": {
+    "ok": true,
+    "checks": [
+      "native menu selects and persists an external model directory",
+      "native menu pauses and restarts backend",
+      "frozen CLI exports and verifies database, model fixture and Chromium profile",
+      "profile excludes library recursion",
+      "original fixture notes preserved"
+    ],
+    "exportedFiles": 8
+  },
+  "installer": {
+    "version": "1.0.2",
+    "dmg_verified": true,
+    "dmg_readonly_mounted_and_signed_app_verified": true,
+    "dmg_app_matches_build": true,
+    "zip_crc_verified": true,
+    "zip_entries": 5330,
+    "private_database_or_gguf_in_installer": false,
+    "external_app_symlinks": 0,
+    "macos_minimum": "26.0",
+    "architecture": "arm64",
+    "signature": "ad-hoc; not notarized"
+  },
+  "limitations": [
+    "Original source media remains offline at original paths, as requested.",
+    "Models and Whisper cache are external references and are not included in the data export.",
+    "Manual application replacement upgrades; no hosted automatic updater.",
+    "Ad-hoc local signature; no Apple notarization.",
+    "Paid cloud AI and full VLM inference were not exercised."
+  ]
+}

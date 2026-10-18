@@ -90,7 +90,7 @@ const MindMap = {
                  @mouseenter="showShotDetail(shot, act, nar, $event)"
                  @mouseleave="scheduleHideDetail"
                  @click="$emit('shot-click', shot)">
-              <img v-if="getThumbUrl(shot.segment_id)" :src="getThumbUrl(shot.segment_id)"
+              <img v-if="getThumbUrl(shot)" :src="getThumbUrl(shot)"
                    class="mm-shot-img" loading="lazy" @error="$event.target.style.display='none'" />
               <div v-else class="mm-shot-img mm-shot-img-placeholder">
                 <q-icon name="videocam" size="16px" color="grey-6"></q-icon>
@@ -282,7 +282,7 @@ const MindMap = {
       for (const act of this.plan.acts) {
         for (const nar of (act.narratives || [])) {
           for (const shot of (nar.shots || [])) {
-            const seg = this.segments.find(s => s.id === shot.segment_id);
+            const seg = this.segments.find(s => s.id === shot.segment_id) || shot.source;
             let dur;
             if (shot.src_start != null && shot.src_end != null) {
               dur = this._parseTimeToSec(shot.src_end) - this._parseTimeToSec(shot.src_start);
@@ -292,7 +292,7 @@ const MindMap = {
               dur = 0;
             }
             dur = Math.max(0, dur);
-            const key = `${act.act_id}-${nar.narrative_id}-${shot.segment_id}-${acc.toFixed(2)}`;
+            const key = `${act.act_id}-${nar.narrative_id}-${shot.shot_id || shot.segment_id}-${acc.toFixed(2)}`;
             info[key] = { timelineStart: acc, duration: dur };
             acc += dur;
           }
@@ -305,9 +305,9 @@ const MindMap = {
     dimRowScene(d) { return this.sceneFields.some(f => d && d[f.key]); },
     dimRowStyle(d) { return this.styleFields.some(f => d && d[f.key]); },
 
-    getThumbUrl(segmentId) {
-      if (!segmentId) return null;
-      const seg = this.segments.find(s => s.id === segmentId);
+    getThumbUrl(shot) {
+      if (!shot) return null;
+      const seg = this.segments.find(s => s.id === shot.segment_id) || shot.source;
       return seg ? `/media/thumbnail/${seg.media_id}` : null;
     },
 
@@ -340,12 +340,12 @@ const MindMap = {
     },
 
     getShotDetail(shot, act, nar) {
-      if (!shot || !shot.segment_id) return null;
-      const seg = this.segments.find(s => s.id === shot.segment_id);
+      if (!shot) return null;
+      const seg = this.segments.find(s => s.id === shot.segment_id) || shot.source;
       if (!seg) return null;
 
       // Timeline info
-      const tlKey = `${act.act_id}-${nar.narrative_id}-${shot.segment_id}`;
+      const tlKey = `${act.act_id}-${nar.narrative_id}-${shot.shot_id || shot.segment_id}`;
       let tlInfo = null;
       // Find by prefix match (key includes accumulated time suffix)
       for (const k in this.timelineInfoMap) {
@@ -397,7 +397,7 @@ const MindMap = {
     getNarrativeDuration(nar) {
       let total = 0;
       for (const shot of (nar.shots || [])) {
-        const seg = this.segments.find(s => s.id === shot.segment_id);
+        const seg = this.segments.find(s => s.id === shot.segment_id) || shot.source;
         if (shot.src_start != null && shot.src_end != null) {
           total += this._parseTimeToSec(shot.src_end) - this._parseTimeToSec(shot.src_start);
         } else if (seg) {
@@ -658,7 +658,7 @@ const MindMap = {
         let thumbUrl = "";
         if (this.dragState && this.dragState.type === "shot") {
           const shot = this.plan.acts[this.dragState.actIdx]?.narratives[this.dragState.narIdx]?.shots[this.dragState.shotIdx];
-          if (shot) thumbUrl = this.getThumbUrl(shot.segment_id) || "";
+          if (shot) thumbUrl = this.getThumbUrl(shot) || "";
         }
 
         let hintLeft, hintTop;

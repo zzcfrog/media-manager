@@ -160,6 +160,12 @@ Media Manager 用 AI 帮你自动完成这些。导入素材 → 一键分析 �
 
 ## 快速开始
 
+### macOS 本地安装包
+
+Apple Silicon 本地包位于 `dist/Media-Manager-1.0.2-arm64.dmg`。程序自带运行环境，资料库保存在 `~/Library/Application Support/Media Manager/library`，模型从独立外部目录加载；替换应用升级不会替换资料库或模型，版本变更前会自动建立数据库快照。
+
+完整迁移副本位于 `dist/Media-Manager-Data-2026-10-18`。安装、备份、恢复及离线原素材的处理方式见 [升级与数据迁移](docs/UPGRADE-AND-DATA.md)。以下为源码开发方式。
+
 ### 环境要求
 
 - Python 3.12+
@@ -181,6 +187,8 @@ python run.py
 ```
 
 浏览器自动打开 `http://127.0.0.1:6622`。
+
+回归验证见 [测试说明](tests/README.md)，本轮数据保护、工程保存及异步状态变更见 [修复记录](docs/code-fixes-2026-10-18.md)。
 
 也可以通过 Electron 启动桌面端：
 

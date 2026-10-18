@@ -1,6 +1,7 @@
 import json
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 from loguru import logger
@@ -31,12 +32,10 @@ def _read_xmp_fields(xp: Path) -> dict:
     return {}
 
 
-def write_xmp(filepath: Path, rating: int = 0, tags: list[str] | None = None,
+def _write_xmp(filepath: Path, xp: Path, rating: int = 0, tags: list[str] | None = None,
                description: str = "", color_label: str | None = None) -> bool:
     if not shutil.which("exiftool"):
         raise RuntimeError("exiftool not found")
-
-    xp = xmp_path(filepath)
 
     if not xp.exists():
         r = subprocess.run(
@@ -71,13 +70,7 @@ def write_xmp(filepath: Path, rating: int = 0, tags: list[str] | None = None,
     else:
         merged_desc = existing_desc
 
-    # Clear old tags, then write merged
-    subprocess.run(
-        ["exiftool", "-overwrite_original", "-XMP-dc:Subject=", str(xp)],
-        capture_output=True, text=True, timeout=15,
-    )
-
-    cmd = ["exiftool", "-overwrite_original"]
+    cmd = ["exiftool", "-overwrite_original", "-XMP-dc:Subject="]
 
     if rating and rating > 0:
         cmd.append(f"-xmp:Rating={rating}")
@@ -103,3 +96,17 @@ def write_xmp(filepath: Path, rating: int = 0, tags: list[str] | None = None,
 
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
     return r.returncode == 0
+
+
+def write_xmp(filepath: Path, rating: int = 0, tags: list[str] | None = None,
+              description: str = "", color_label: str | None = None) -> bool:
+    target = xmp_path(filepath)
+    # Keep the original sidecar intact until the entire write succeeds.
+    with tempfile.TemporaryDirectory(prefix=".media-xmp-", dir=target.parent) as directory:
+        working = Path(directory) / target.name
+        if target.exists():
+            shutil.copy2(target, working)
+        if not _write_xmp(filepath, working, rating, tags, description, color_label):
+            return False
+        working.replace(target)
+    return True

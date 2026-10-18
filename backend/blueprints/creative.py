@@ -1,6 +1,7 @@
 """AI Creative Guide — creative brief management and AI generation."""
 
 import json
+import uuid
 from flask import Blueprint, jsonify, request
 from loguru import logger
 from ..db import get_db, get_setting
@@ -398,7 +399,7 @@ def generate_plan(pid):
                 yield f"event: error\ndata: {json.dumps({'error': progress['error']})}\n\n"
                 break
 
-            if progress.get("done") and progress.get("result"):
+            if progress.get("done"):
                 yield f"event: done\ndata: {json.dumps({'plan': progress['result']})}\n\n"
                 break
 
@@ -438,7 +439,8 @@ def apply_plan(pid):
     if not proj:
         return jsonify({"error": "Not found"}), 404
 
-    ai_plan = proj["ai_plan"]
+    body = request.get_json(silent=True) or {}
+    ai_plan = body.get("plan", proj["ai_plan"])
     if not ai_plan:
         return jsonify({"error": "No AI plan generated"}), 400
     if isinstance(ai_plan, str):
@@ -463,9 +465,10 @@ def apply_plan(pid):
             nar_start = position
 
             for shot in narrative.get("shots", []):
+                shot.setdefault("shot_id", uuid.uuid4().hex)
                 seg_id = shot.get("segment_id")
-                seg = seg_map.get(seg_id)
-                if not seg:
+                seg = seg_map.get(seg_id) or shot.get("source")
+                if not seg or not db.execute("SELECT 1 FROM project_media WHERE project_id=? AND media_id=?", (pid, seg.get("media_id"))).fetchone():
                     continue
 
                 # Use src_start/src_end if provided (sub-clip), otherwise full segment
@@ -492,6 +495,7 @@ def apply_plan(pid):
                         "purpose": shot.get("purpose", ""),
                         "act_id": act.get("act_id", ""),
                         "narrative_id": narrative.get("narrative_id", ""),
+                        "shot_id": shot.get("shot_id", ""),
                         "srcMediaId": seg["media_id"],
                         "srcStart": src_start,
                         "srcEnd": src_end,
@@ -575,7 +579,8 @@ def apply_plan(pid):
                     tr.get("metadata", "{}"),
                 ),
             )
-        db.execute("UPDATE projects SET updated_at = datetime('now') WHERE id = ?", (pid,))
+        db.execute("UPDATE projects SET ai_plan=?, updated_at=datetime('now') WHERE id=?",
+                   (json.dumps(ai_plan, ensure_ascii=False), pid))
         db.commit()
     except Exception:
         db.rollback()
@@ -934,11 +939,18 @@ def _parse_creative_response(text):
 
 
 def _validate_plan(plan, valid_segment_ids):
-    """Validate segment references in the plan. Removes invalid shots."""
-    for act in plan.get("acts", []):
-        valid_shots = []
-        for shot in act.get("shots", []):
-            sid = shot.get("segment_id")
-            if sid in valid_segment_ids:
-                valid_shots.append(shot)
-        act["shots"] = valid_shots
+    """Validate the current acts → narratives → shots schema before persisting."""
+    if not isinstance(plan, dict) or not isinstance(plan.get("acts"), list) or not plan["acts"]:
+        raise ValueError("AI 返回的方案缺少有效幕结构")
+    count = 0
+    for act in plan["acts"]:
+        if not isinstance(act, dict) or not isinstance(act.get("narratives"), list):
+            raise ValueError("AI 返回的方案缺少叙事结构")
+        for narrative in act["narratives"]:
+            if not isinstance(narrative, dict) or not isinstance(narrative.get("shots"), list):
+                raise ValueError("AI 返回的方案缺少镜头列表")
+            narrative["shots"] = [shot for shot in narrative["shots"]
+                                  if isinstance(shot, dict) and shot.get("segment_id") in valid_segment_ids]
+            count += len(narrative["shots"])
+    if not count:
+        raise ValueError("AI 返回的方案没有可用镜头，已保留原方案")

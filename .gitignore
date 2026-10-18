@@ -11,7 +11,7 @@ temp_video/
 node_modules/
 dist/
 electron/dist/
-backend/models/
+backend/models
 electron/resources/bin/
 docs/todo.md
 test-results/
@@ -19,3 +19,7 @@ playwright-report/
 playwright/.cache/
 .playwright-mcp/
 scripts/
+
+.build-venv/
+build/
+.DS_Store

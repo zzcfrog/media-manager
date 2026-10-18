@@ -1,12 +1,12 @@
 import re
 import subprocess
 import shutil
-from datetime import datetime
+from uuid import uuid4
 from pathlib import Path
 
 from loguru import logger
 from PIL import Image
-from .config import RAW_EXTS, HEIF_EXTS
+from .config import RAW_EXTS, HEIF_EXTS, TEMP_DIR
 
 # Video/image compression for analysis: reduces media before sending to VLM.
 
@@ -17,7 +17,7 @@ def check_ffmpeg() -> None:
 
 
 def cleanup_temp() -> None:
-    temp_dir = Path("temp_video")
+    temp_dir = TEMP_DIR
     if not temp_dir.exists():
         return
     for f in temp_dir.iterdir():
@@ -94,9 +94,9 @@ def compress_video(input_path: str | Path, resolution: str = "480", fps: str = "
     if not input_path.exists():
         raise FileNotFoundError(f"Video file not found: {input_path}")
 
-    suffix = datetime.now().strftime("%Y%m%d%H%M%S")
-    temp_dir = Path("temp_video")
-    temp_dir.mkdir(exist_ok=True)
+    suffix = uuid4().hex
+    temp_dir = TEMP_DIR
+    temp_dir.mkdir(parents=True, exist_ok=True)
     output_path = temp_dir / f"{input_path.stem}_{suffix}.mp4"
 
     check_ffmpeg()
@@ -184,9 +184,9 @@ def compress_image(input_path: str | Path, max_long_edge: int = 1920) -> tuple[P
     else:
         new_w, new_h = w, h
 
-    suffix = datetime.now().strftime("%Y%m%d%H%M%S")
-    temp_dir = Path("temp_video")
-    temp_dir.mkdir(exist_ok=True)
+    suffix = uuid4().hex
+    temp_dir = TEMP_DIR
+    temp_dir.mkdir(parents=True, exist_ok=True)
     output_path = temp_dir / f"{input_path.stem}_{suffix}.jpg"
 
     img.save(output_path, "JPEG", quality=85)

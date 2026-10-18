@@ -558,7 +558,8 @@ const GalleryPage = {
       </div>
       <div v-if="!items.length && !loading" class="empty">
         <q-icon name="folder_open" size="40px" color="grey-7"></q-icon>
-        <p>{{ t('g.empty') }}</p>
+        <p role="status">{{ loadError ? t('g.load_failed') : t('g.empty') }}</p>
+        <q-btn v-if="loadError" flat :label="t('g.retry')" @click="load"></q-btn>
       </div>
       <div ref="sentinel" style="height:1px;width:100%"></div>
       <div v-if="loadingMore" class="load-more-spinner">
@@ -595,7 +596,7 @@ const GalleryPage = {
       </template>
     </q-toolbar>
     <!-- Context menu: view detail, remove, find similar -->
-    <div v-if="ctxMenu.show" class="ctx-menu-popup" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }">
+    <div v-if="ctxMenu.show" ref="ctxPopup" class="ctx-menu-popup" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }">
       <q-list dense style="min-width:200px;border-radius:8px;overflow:hidden">
         <q-item clickable @click="ctxMenu.show = false; openDetail(selArr[0])" :disable="selArr.length > 1" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="visibility" size="14px" color="grey-6"></q-icon></q-item-section>
@@ -900,7 +901,7 @@ const GalleryPage = {
   // -- Data: state, filters, sort/group options --
   data() {
     return {
-      items: [], total: 0, page: 1, perPage: 60, loading: false, loadingMore: false, allLoaded: false, viewMode: "grid", searchText: "",
+      items: [], loadError: '', total: 0, page: 1, perPage: 60, loading: false, loadingMore: false, allLoaded: false, viewMode: "grid", searchText: "",
       sortBy: "imported_at", sortOrder: "desc", gridScale: 1, masonryCols: 5, justifiedRowH: 220,
       selArr: [], _allSelected: false, lasso: null, lastClickIdx: -1,
       ctxMenu: { show: false, item: null, x: 0, y: 0 },
@@ -1175,14 +1176,15 @@ const GalleryPage = {
       return true;
     },
     thumbSrc(m) {
-      if (!this.useCoverFor(m)) return API.thumbUrl(m.id);
       const fb = this._coverFallback.get(m.id);
+      if (fb === 'none') return '/static/img/no-thumb.svg';
+      if (!this.useCoverFor(m)) return API.thumbUrl(m.id);
       if (fb === 'waveform') return API.thumbUrl(m.id);
       if (fb === 'none') return '/static/img/no-thumb.svg';
       return API.coverUrl(m.id);
     },
     thumbStage(m) {
-      if (!this.useCoverFor(m)) return 'waveform';
+      if (!this.useCoverFor(m)) return this._coverFallback.get(m.id) || 'waveform';
       return this._coverFallback.get(m.id) || 'cover';
     },
     onImgLoad(e) {
@@ -1397,46 +1399,63 @@ const GalleryPage = {
     },
     // Load first page, reset selection
     async load() {
+      const generation = this._loadGeneration = (this._loadGeneration || 0) + 1;
       this._allSelected = false;
       if (this._saveFilters) this._saveFilters();
       if (!this.$root.pickerMode) this.selArr = [];
       this.page = 1;
       this.allLoaded = false;
       this.loading = true;
+      this.loadingMore = false;
+      this.loadError = '';
       try {
         const res = await API.getLibrary(this._buildParams(1));
+        if (generation !== this._loadGeneration) return;
         const data = res.data || [];
         this.total = res.pagination?.total || 0;
-        if (data.length < this.perPage) this.allLoaded = true;
+        this.allLoaded = data.length < this.perPage;
         this.items = data;
         if (!this.$root.pickerMode) this.$root.galleryItems = data;
-        // 加载成功后补拉 facets（已加载则 no-op；曾失败(null)时借本次机会重试，避免下拉全部禁用）
         this._loadFacets(this.filters.media_type);
       } catch(e) {
-        console.error("gallery load error:", e);
-        this.allLoaded = true; // 加载失败即止，避免 _checkFill 无限重试拖垮服务
+        if (generation !== this._loadGeneration) return;
+        this.items = [];
+        this.total = 0;
+        if (!this.$root.pickerMode) this.$root.galleryItems = [];
+        this.loadError = 'load';
+        this.allLoaded = true;
+      } finally {
+        if (generation === this._loadGeneration) {
+          this.loading = false;
+          this.$nextTick(() => requestAnimationFrame(() => this._checkFill()));
+        }
       }
-      this.loading = false;
-      this.$nextTick(() => requestAnimationFrame(() => this._checkFill()));
     },
-    // Infinite scroll: load next page
     async loadMore() {
-      if (this.loadingMore || this.allLoaded) return;
+      if (this.loading || this.loadingMore || this.allLoaded) return;
+      const generation = this._loadGeneration;
+      const page = this.page + 1;
       this.loadingMore = true;
-      this.page++;
       try {
-        const res = await API.getLibrary(this._buildParams(this.page));
-        const data = res.data || [];        this.items = this.items.concat(data);
+        const res = await API.getLibrary(this._buildParams(page));
+        if (generation !== this._loadGeneration) return;
+        const data = res.data || [];
+        this.page = page;
+        this.items = this.items.concat(data);
         if (!this.$root.pickerMode) this.$root.galleryItems = this.items;
         this.total = res.pagination?.total || 0;
-        if (data.length < this.perPage) this.allLoaded = true;
+        this.allLoaded = data.length < this.perPage;
       } catch(e) {
-        console.error("gallery loadMore error:", e);
-        this.page--;
-        this.allLoaded = true; // 加载失败即止，避免 _checkFill 无限重试拖垮服务
+        if (generation !== this._loadGeneration) return;
+        this.loadError = 'page';
+        this.allLoaded = true;
+        Quasar.Notify.create({ type: 'negative', message: this.t('g.load_failed') });
+      } finally {
+        if (generation === this._loadGeneration) {
+          this.loadingMore = false;
+          this.$nextTick(() => requestAnimationFrame(() => this._checkFill()));
+        }
       }
-      this.loadingMore = false;
-      this.$nextTick(() => requestAnimationFrame(() => this._checkFill()));
     },
     // If content doesn't fill the scroll container, keep loading
     _checkFill() {
@@ -1600,6 +1619,13 @@ const GalleryPage = {
       this.ctxMenu.x = e.clientX;
       this.ctxMenu.y = e.clientY;
       this.ctxMenu.show = true;
+      this.$nextTick(() => {
+        const popup = this.$refs.ctxPopup;
+        if (!popup || !this.ctxMenu.show) return;
+        const rect = popup.getBoundingClientRect();
+        this.ctxMenu.x = Math.max(4, Math.min(e.clientX, window.innerWidth - rect.width - 4));
+        this.ctxMenu.y = Math.max(4, Math.min(e.clientY, window.innerHeight - rect.height - 4));
+      });
     },
     closeCtx(e) {
       if (!this.ctxMenu.show) return;

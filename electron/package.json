@@ -1,17 +1,85 @@
 {
-  "name": "Media Manager",
+  "name": "media-manager",
   "productName": "Media Manager",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "main": "main.js",
   "scripts": {
     "start": "ELECTRON_RUN_AS_NODE= electron .",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node ../tests/desktop-runtime.cjs",
+    "build:mac": "electron-builder --mac dmg zip --arm64"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "Private local media library and AI analysis desktop application",
   "devDependencies": {
-    "electron": "^35.7.5"
+    "electron": "^35.7.5",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.zack.media-manager",
+    "productName": "Media Manager",
+    "asar": true,
+    "files": [
+      "main.js",
+      "runtime.js",
+      "preload.js",
+      "package.json",
+      "icon.icns",
+      "dock-icon.png"
+    ],
+    "directories": {
+      "output": "../dist",
+      "buildResources": "."
+    },
+    "extraResources": [
+      {
+        "from": "../build/runtime/backend",
+        "to": "backend"
+      },
+      {
+        "from": "../build/tools",
+        "to": "tools"
+      },
+      {
+        "from": "resources/bin/darwin-arm64",
+        "to": "bin/darwin-arm64"
+      },
+      {
+        "from": "../docs/UPGRADE-AND-DATA.md",
+        "to": "UPGRADE-AND-DATA.md"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.video",
+      "minimumSystemVersion": "26.0",
+      "icon": "icon.icns",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "signIgnore": ["Contents/Resources/tools/exiftool/"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "entitlements": "../packaging/backend-entitlements.plist",
+      "entitlementsInherit": "../packaging/backend-entitlements.plist"
+    },
+    "artifactName": "Media-Manager-${version}-${arch}.${ext}",
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 200,
+          "type": "file"
+        },
+        {
+          "x": 410,
+          "y": 200,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "electronDist": "node_modules/electron/dist"
   }
 }

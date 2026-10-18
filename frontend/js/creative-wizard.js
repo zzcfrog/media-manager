@@ -369,6 +369,7 @@ const CreativeWizard = {
 
   watch: {
     show(v) {
+      this._generation = (this._generation || 0) + 1;
       if (v) {
         this.generating = false;
         this.genProgress = 0;
@@ -420,7 +421,7 @@ const CreativeWizard = {
         this.$root.loadProjectList();
         location.hash = "#/workbench/" + pid;
       } catch (e) {
-        Quasar.Notify.create({ type: "negative", message: e.message || this.t('cg.gen_fail') });
+        if (isCurrent()) Quasar.Notify.create({ type: "negative", message: e.message || this.t('cg.gen_fail') });
       }
     },
 
@@ -454,6 +455,8 @@ const CreativeWizard = {
       root.pickerExcludeIds = [];
       root.pickerProjectId = null;
       root._pickerCallback = (ids) => {
+        this.pickerOpen = false;
+        if (ids === null) return;
         this.selectedMediaIds = [...ids];
         this.pickerOpen = false;
         this.loadSelectedInfo(ids);
@@ -483,6 +486,8 @@ const CreativeWizard = {
 
     async startGenerate() {
       if (!this.selectedMediaIds.length && !this.editProjectId) return;
+      const generation = this._generation = (this._generation || 0) + 1;
+      const isCurrent = () => this.show && this._generation === generation;
       this.generating = true;
       this.genProgress = 0;
       this.genShots = 0;
@@ -505,12 +510,15 @@ const CreativeWizard = {
 
         // Call generate (SSE)
         const resp = await API.generateCreativePlan(pid);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        if (!isCurrent()) return;
         const reader = resp.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
 
         while (true) {
           const { done, value } = await reader.read();
+          if (!isCurrent()) { await reader.cancel(); return; }
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
 
@@ -523,8 +531,9 @@ const CreativeWizard = {
               continue;
             }
             if (line.startsWith("data: ")) {
-              try {
-                const data = JSON.parse(line.slice(6));
+              let data;
+              try { data = JSON.parse(line.slice(6)); } catch (e) { continue; }
+              {
                 if (data.percent !== undefined) this.genProgress = data.percent;
                 if (data.shots !== undefined) this.genShots = data.shots;
                 if (data.step) this.genCurrentStep = data.step;
@@ -537,6 +546,7 @@ const CreativeWizard = {
                   // Plan received — apply to tracks
                   this.genProgress = 95;
                   await API.applyCreativePlan(pid);
+                  if (!isCurrent()) return;
                   this.genProgress = 100;
                   this.generating = false;
                   this.$emit("done", pid);
@@ -544,14 +554,14 @@ const CreativeWizard = {
                   location.hash = "#/workbench/" + pid;
                   return;
                 }
-              } catch (e) {}
+              }
             }
           }
         }
       } catch (e) {
         Quasar.Notify.create({ type: "negative", message: e.message || this.t('cg.gen_fail') });
       } finally {
-        this.generating = false;
+        if (this._generation === generation) this.generating = false;
       }
     },
 
