@@ -1,0 +1,737 @@
+{
+  "date": "2026-10-23",
+  "status": "research_complete_not_implemented",
+  "scope": "Research, read-only production inventory and metadata sampling; disposable synthetic write tests only.",
+  "synthetic_probe": {
+    "date": "2026-10-23",
+    "research_only": true,
+    "environment": {
+      "storage": "local APFS SSD; not external disk",
+      "exiftool": "13.55",
+      "ffmpeg": "ffmpeg version 7.1.1 Copyright (c) 2000-2025 the FFmpeg developers"
+    },
+    "functional": [
+      {
+        "file": "base.mp4",
+        "hours": 8,
+        "seconds": 0.00022566737607121468,
+        "written_bytes": 20,
+        "fields": 5,
+        "patches": [
+          [
+            48537,
+            4
+          ],
+          [
+            48653,
+            4
+          ],
+          [
+            48789,
+            4
+          ],
+          [
+            49318,
+            4
+          ],
+          [
+            49454,
+            4
+          ]
+        ],
+        "actual_changed_bytes": 10,
+        "all_other_bytes_unchanged": true,
+        "mdat_hashes_unchanged": true,
+        "decoded_audio_video_unchanged": true,
+        "exiftool_readback": {
+          "QuickTime:CreateDate": "2024:01:02 11:04:05",
+          "Track1:TrackCreateDate": "2024:01:02 11:04:05",
+          "Track2:TrackCreateDate": "2024:01:02 11:04:05",
+          "Track1:MediaCreateDate": "2024:01:02 11:04:05",
+          "Track2:MediaCreateDate": "2024:01:02 11:04:05"
+        }
+      },
+      {
+        "file": "base.mov",
+        "hours": -24,
+        "seconds": 0.00022012507542967796,
+        "written_bytes": 20,
+        "fields": 5,
+        "patches": [
+          [
+            48525,
+            4
+          ],
+          [
+            48641,
+            4
+          ],
+          [
+            48777,
+            4
+          ],
+          [
+            49330,
+            4
+          ],
+          [
+            49466,
+            4
+          ]
+        ],
+        "actual_changed_bytes": 15,
+        "all_other_bytes_unchanged": true,
+        "mdat_hashes_unchanged": true,
+        "decoded_audio_video_unchanged": true,
+        "exiftool_readback": {
+          "QuickTime:CreateDate": "2024:01:01 03:04:05",
+          "Track1:TrackCreateDate": "2024:01:01 03:04:05",
+          "Track2:TrackCreateDate": "2024:01:01 03:04:05",
+          "Track1:MediaCreateDate": "2024:01:01 03:04:05",
+          "Track2:MediaCreateDate": "2024:01:01 03:04:05"
+        }
+      },
+      {
+        "file": "fast.mp4",
+        "hours": 24,
+        "seconds": 0.0005882917903363705,
+        "written_bytes": 20,
+        "fields": 5,
+        "patches": [
+          [
+            52,
+            4
+          ],
+          [
+            168,
+            4
+          ],
+          [
+            304,
+            4
+          ],
+          [
+            833,
+            4
+          ],
+          [
+            969,
+            4
+          ]
+        ],
+        "actual_changed_bytes": 15,
+        "all_other_bytes_unchanged": true,
+        "mdat_hashes_unchanged": true,
+        "decoded_audio_video_unchanged": true,
+        "exiftool_readback": {
+          "QuickTime:CreateDate": "2024:01:03 03:04:05",
+          "Track1:TrackCreateDate": "2024:01:03 03:04:05",
+          "Track2:TrackCreateDate": "2024:01:03 03:04:05",
+          "Track1:MediaCreateDate": "2024:01:03 03:04:05",
+          "Track2:MediaCreateDate": "2024:01:03 03:04:05"
+        }
+      },
+      {
+        "file": "version1.mov",
+        "hours": -8,
+        "seconds": 0.0005564577877521515,
+        "written_bytes": 40,
+        "fields": 5,
+        "patches": [
+          [
+            48525,
+            8
+          ],
+          [
+            48653,
+            8
+          ],
+          [
+            48801,
+            8
+          ],
+          [
+            49366,
+            8
+          ],
+          [
+            49514,
+            8
+          ]
+        ],
+        "actual_changed_bytes": 15,
+        "all_other_bytes_unchanged": true,
+        "mdat_hashes_unchanged": true,
+        "decoded_audio_video_unchanged": true,
+        "exiftool_readback": {
+          "QuickTime:CreateDate": "2024:01:01 19:04:05",
+          "Track1:TrackCreateDate": "2024:01:01 19:04:05",
+          "Track2:TrackCreateDate": "2024:01:01 19:04:05",
+          "Track1:MediaCreateDate": "2024:01:01 19:04:05",
+          "Track2:MediaCreateDate": "2024:01:01 19:04:05"
+        }
+      }
+    ],
+    "rejections": [
+      {
+        "case": "zero",
+        "reason": "unknown/zero timestamp",
+        "unmodified": true
+      },
+      {
+        "case": "underflow",
+        "reason": "timestamp overflow",
+        "unmodified": true
+      },
+      {
+        "case": "overflow",
+        "reason": "timestamp overflow",
+        "unmodified": true
+      },
+      {
+        "case": "bad-version",
+        "reason": "unsupported version",
+        "unmodified": true
+      },
+      {
+        "case": "fragmented",
+        "reason": "fragmented movie",
+        "unmodified": true
+      },
+      {
+        "case": "truncated",
+        "reason": "box out of bounds",
+        "unmodified": true
+      }
+    ],
+    "benchmark": [
+      {
+        "extra_sparse_mdat_mib": 64,
+        "seconds": {
+          "exiftool_current": [
+            0.19228287506848574,
+            0.1812720000743866,
+            0.17357345903292298
+          ],
+          "exiftool_in_place": [
+            0.21315108332782984,
+            0.22178041702136397,
+            0.21472724992781878
+          ],
+          "fixed_header_patch": [
+            0.00020674988627433777,
+            0.00020979112014174461,
+            0.00020279176533222198
+          ]
+        },
+        "median_seconds": {
+          "exiftool_current": 0.1812720000743866,
+          "exiftool_in_place": 0.21472724992781878,
+          "fixed_header_patch": 0.00020674988627433777
+        },
+        "verification": {
+          "exiftool_current": {
+            "same_inode": false,
+            "same_size": true,
+            "logical_file_bytes": 67159148,
+            "written_bytes_by_probe": null,
+            "all_mdat_sha256_equal": true
+          },
+          "exiftool_in_place": {
+            "same_inode": true,
+            "same_size": true,
+            "logical_file_bytes": 67159148,
+            "written_bytes_by_probe": null,
+            "all_mdat_sha256_equal": true
+          },
+          "fixed_header_patch": {
+            "same_inode": true,
+            "same_size": true,
+            "logical_file_bytes": 67159148,
+            "written_bytes_by_probe": 20,
+            "all_mdat_sha256_equal": true
+          }
+        }
+      },
+      {
+        "extra_sparse_mdat_mib": 512,
+        "seconds": {
+          "exiftool_current": [
+            0.5165742081589997,
+            0.4674899997189641,
+            0.4673263751901686
+          ],
+          "exiftool_in_place": [
+            0.793312749825418,
+            0.7097316249273717,
+            0.8752785827964544
+          ],
+          "fixed_header_patch": [
+            0.000585959292948246,
+            0.0005417503416538239,
+            0.00023070815950632095
+          ]
+        },
+        "median_seconds": {
+          "exiftool_current": 0.4674899997189641,
+          "exiftool_in_place": 0.793312749825418,
+          "fixed_header_patch": 0.0005417503416538239
+        },
+        "verification": {
+          "exiftool_current": {
+            "same_inode": false,
+            "same_size": true,
+            "logical_file_bytes": 536921196,
+            "written_bytes_by_probe": null,
+            "all_mdat_sha256_equal": true
+          },
+          "exiftool_in_place": {
+            "same_inode": true,
+            "same_size": true,
+            "logical_file_bytes": 536921196,
+            "written_bytes_by_probe": null,
+            "all_mdat_sha256_equal": true
+          },
+          "fixed_header_patch": {
+            "same_inode": true,
+            "same_size": true,
+            "logical_file_bytes": 536921196,
+            "written_bytes_by_probe": 20,
+            "all_mdat_sha256_equal": true
+          }
+        }
+      }
+    ],
+    "semantic_checks": {
+      "headers_only_leave_xmp_and_keys_stale": {
+        "before": {
+          "QuickTime:CreateDate": "2024:01:02 03:04:05",
+          "XMP-xmp:CreateDate": "2024:01:02 03:04:05",
+          "Track1:TrackCreateDate": "2024:01:02 03:04:05",
+          "Track2:TrackCreateDate": "2024:01:02 03:04:05",
+          "Track1:MediaCreateDate": "2024:01:02 03:04:05",
+          "Track2:MediaCreateDate": "2024:01:02 03:04:05",
+          "XMP-exif:DateTimeOriginal": "2024:01:02 03:04:05",
+          "Keys:CreationDate": "2024:01:02 11:04:05+08:00"
+        },
+        "after": {
+          "QuickTime:CreateDate": "2024:01:02 11:04:05",
+          "XMP-xmp:CreateDate": "2024:01:02 03:04:05",
+          "Track1:TrackCreateDate": "2024:01:02 11:04:05",
+          "Track2:TrackCreateDate": "2024:01:02 11:04:05",
+          "Track1:MediaCreateDate": "2024:01:02 11:04:05",
+          "Track2:MediaCreateDate": "2024:01:02 11:04:05",
+          "XMP-exif:DateTimeOriginal": "2024:01:02 03:04:05",
+          "Keys:CreationDate": "2024:01:02 11:04:05+08:00"
+        }
+      },
+      "current_command_leaves_keys_stale": {
+        "before": {
+          "QuickTime:CreateDate": "2024:01:02 03:04:05",
+          "Track1:TrackCreateDate": "2024:01:02 03:04:05",
+          "Track2:TrackCreateDate": "2024:01:02 03:04:05",
+          "Track1:MediaCreateDate": "2024:01:02 03:04:05",
+          "Track2:MediaCreateDate": "2024:01:02 03:04:05",
+          "Keys:CreationDate": "2024:01:02 11:04:05+08:00"
+        },
+        "after": {
+          "QuickTime:CreateDate": "2024:01:02 11:04:05",
+          "Track1:TrackCreateDate": "2024:01:02 11:04:05",
+          "Track2:TrackCreateDate": "2024:01:02 11:04:05",
+          "Track1:MediaCreateDate": "2024:01:02 11:04:05",
+          "Track2:MediaCreateDate": "2024:01:02 11:04:05",
+          "Keys:CreationDate": "2024:01:02 11:04:05+08:00"
+        }
+      }
+    }
+  },
+  "nikon_probe": {
+    "synthetic_fixture": true,
+    "before": {
+      "QuickTime:CreateDate": "2024:01:02 03:04:05",
+      "Nikon:CreateDate": "2024:01:02 03:04:05",
+      "Nikon:DateTimeOriginal": "2024:01:02 03:04:05",
+      "Track1:TrackCreateDate": "2024:01:02 03:04:05",
+      "Track2:TrackCreateDate": "2024:01:02 03:04:05",
+      "Track1:MediaCreateDate": "2024:01:02 03:04:05",
+      "Track2:MediaCreateDate": "2024:01:02 03:04:05"
+    },
+    "after_current_app_command": {
+      "QuickTime:CreateDate": "2024:01:02 11:04:05",
+      "Nikon:CreateDate": "2024:01:02 03:04:05",
+      "Nikon:DateTimeOriginal": "2024:01:02 03:04:05",
+      "Track1:TrackCreateDate": "2024:01:02 11:04:05",
+      "Track2:TrackCreateDate": "2024:01:02 11:04:05",
+      "Track1:MediaCreateDate": "2024:01:02 11:04:05",
+      "Track2:MediaCreateDate": "2024:01:02 11:04:05"
+    },
+    "current_importer_selected_date": "2024:01:02 03:04:05",
+    "nikon_fields_unchanged": true,
+    "selected_date_still_original": true
+  },
+  "journal_probe": {
+    "research_only": true,
+    "logical_file_extra_mdat_mib": 512,
+    "journal_and_F_FULLFSYNC_seconds": [
+      0.010129165835678577,
+      0.011288749985396862,
+      0.009430207777768373
+    ],
+    "median_seconds": 0.010129165835678577,
+    "journal_stored_before_target_writes": true,
+    "written_target_bytes": 20,
+    "simulated_interruption_after_writes": 2,
+    "states_detected_after_reopen": [
+      "new",
+      "new",
+      "old",
+      "old",
+      "old"
+    ],
+    "recovery_writes_performed": false,
+    "power_loss_or_unplug_tested": false,
+    "full_metadata_readback_and_db_commit_included_in_timings": false
+  },
+  "production_inventory": {
+    "formats": {
+      ".mp4": {
+        "files": 1311,
+        "bytes": 1006975300259
+      },
+      ".mov": {
+        "files": 433,
+        "bytes": 242274717480
+      },
+      ".nef": {
+        "files": 2677,
+        "bytes": 134900007711
+      },
+      ".jpg": {
+        "files": 4294,
+        "bytes": 50701026201
+      },
+      ".tif": {
+        "files": 67,
+        "bytes": 44533493098
+      },
+      ".hif": {
+        "files": 1857,
+        "bytes": 10390536737
+      },
+      ".dng": {
+        "files": 127,
+        "bytes": 7688217974
+      },
+      ".mts": {
+        "files": 1,
+        "bytes": 142245888
+      },
+      ".jpeg": {
+        "files": 20,
+        "bytes": 59845140
+      },
+      ".arw": {
+        "files": 1,
+        "bytes": 21275648
+      },
+      ".png": {
+        "files": 2,
+        "bytes": 2211355
+      }
+    },
+    "video_cameras": {
+      "DJI OsmoPocket4P": 593,
+      "NIKON Z 8": 433,
+      "DJI OsmoPocket3": 404,
+      "DJI Mini4 Pro": 138,
+      "unknown": 112,
+      "DJI Osmo Nano": 64
+    },
+    "sampling": {
+      "candidates_checked": 19,
+      "online_readonly_samples": [
+        {
+          "extension": ".mp4",
+          "camera": null,
+          "date_tag_names": [
+            "QuickTime:CreateDate",
+            "Track1:TrackCreateDate",
+            "Track2:TrackCreateDate",
+            "Track3:TrackCreateDate",
+            "Track1:MediaCreateDate",
+            "Track2:MediaCreateDate",
+            "Track3:MediaCreateDate",
+            "QuickTime:MovieHeaderVersion",
+            "Track1:TrackHeaderVersion",
+            "Track2:TrackHeaderVersion",
+            "Track3:TrackHeaderVersion",
+            "Track1:MediaHeaderVersion",
+            "Track2:MediaHeaderVersion",
+            "Track3:MediaHeaderVersion"
+          ],
+          "versions": {
+            "QuickTime:MovieHeaderVersion": 0,
+            "Track1:TrackHeaderVersion": 0,
+            "Track2:TrackHeaderVersion": 0,
+            "Track3:TrackHeaderVersion": 0,
+            "Track1:MediaHeaderVersion": 0,
+            "Track2:MediaHeaderVersion": 0,
+            "Track3:MediaHeaderVersion": 0
+          }
+        },
+        {
+          "extension": ".mp4",
+          "camera": "DJI OsmoPocket3",
+          "date_tag_names": [
+            "QuickTime:CreateDate",
+            "Track1:TrackCreateDate",
+            "Track2:TrackCreateDate",
+            "Track3:TrackCreateDate",
+            "Track4:TrackCreateDate",
+            "Track5:TrackCreateDate",
+            "Track1:MediaCreateDate",
+            "Track2:MediaCreateDate",
+            "Track3:MediaCreateDate",
+            "Track4:MediaCreateDate",
+            "Track5:MediaCreateDate",
+            "QuickTime:MovieHeaderVersion",
+            "Track1:TrackHeaderVersion",
+            "Track2:TrackHeaderVersion",
+            "Track3:TrackHeaderVersion",
+            "Track4:TrackHeaderVersion",
+            "Track5:TrackHeaderVersion",
+            "Track1:MediaHeaderVersion",
+            "Track2:MediaHeaderVersion",
+            "Track3:MediaHeaderVersion",
+            "Track4:MediaHeaderVersion",
+            "Track5:MediaHeaderVersion"
+          ],
+          "versions": {
+            "QuickTime:MovieHeaderVersion": 0,
+            "Track1:TrackHeaderVersion": 0,
+            "Track2:TrackHeaderVersion": 0,
+            "Track3:TrackHeaderVersion": 0,
+            "Track4:TrackHeaderVersion": 0,
+            "Track5:TrackHeaderVersion": 0,
+            "Track1:MediaHeaderVersion": 0,
+            "Track2:MediaHeaderVersion": 0,
+            "Track3:MediaHeaderVersion": 0,
+            "Track4:MediaHeaderVersion": 0,
+            "Track5:MediaHeaderVersion": 0
+          }
+        },
+        {
+          "extension": ".mov",
+          "camera": "NIKON Z 8",
+          "date_tag_names": [
+            "QuickTime:CreateDate",
+            "Nikon:CreateDate",
+            "Track1:TrackCreateDate",
+            "Track2:TrackCreateDate",
+            "Track1:MediaCreateDate",
+            "Track2:MediaCreateDate",
+            "Nikon:DateTimeOriginal",
+            "QuickTime:MovieHeaderVersion",
+            "Track1:TrackHeaderVersion",
+            "Track2:TrackHeaderVersion",
+            "Track1:MediaHeaderVersion",
+            "Track2:MediaHeaderVersion"
+          ],
+          "versions": {
+            "QuickTime:MovieHeaderVersion": 0,
+            "Track1:TrackHeaderVersion": 0,
+            "Track2:TrackHeaderVersion": 0,
+            "Track1:MediaHeaderVersion": 0,
+            "Track2:MediaHeaderVersion": 0
+          }
+        },
+        {
+          "extension": ".mov",
+          "camera": "NIKON Z 8",
+          "date_tag_names": [
+            "QuickTime:CreateDate",
+            "Nikon:CreateDate",
+            "Track1:TrackCreateDate",
+            "Track2:TrackCreateDate",
+            "Track1:MediaCreateDate",
+            "Track2:MediaCreateDate",
+            "Nikon:DateTimeOriginal",
+            "QuickTime:MovieHeaderVersion",
+            "Track1:TrackHeaderVersion",
+            "Track2:TrackHeaderVersion",
+            "Track1:MediaHeaderVersion",
+            "Track2:MediaHeaderVersion"
+          ],
+          "versions": {
+            "QuickTime:MovieHeaderVersion": 0,
+            "Track1:TrackHeaderVersion": 0,
+            "Track2:TrackHeaderVersion": 0,
+            "Track1:MediaHeaderVersion": 0,
+            "Track2:MediaHeaderVersion": 0
+          }
+        },
+        {
+          "extension": ".mov",
+          "camera": "NIKON Z 8",
+          "date_tag_names": [
+            "QuickTime:CreateDate",
+            "Nikon:CreateDate",
+            "Track1:TrackCreateDate",
+            "Track2:TrackCreateDate",
+            "Track1:MediaCreateDate",
+            "Track2:MediaCreateDate",
+            "Nikon:DateTimeOriginal",
+            "QuickTime:MovieHeaderVersion",
+            "Track1:TrackHeaderVersion",
+            "Track2:TrackHeaderVersion",
+            "Track1:MediaHeaderVersion",
+            "Track2:MediaHeaderVersion"
+          ],
+          "versions": {
+            "QuickTime:MovieHeaderVersion": 0,
+            "Track1:TrackHeaderVersion": 0,
+            "Track2:TrackHeaderVersion": 0,
+            "Track1:MediaHeaderVersion": 0,
+            "Track2:MediaHeaderVersion": 0
+          }
+        },
+        {
+          "extension": ".mov",
+          "camera": "NIKON Z 8",
+          "date_tag_names": [
+            "QuickTime:CreateDate",
+            "Nikon:CreateDate",
+            "Track1:TrackCreateDate",
+            "Track2:TrackCreateDate",
+            "Track1:MediaCreateDate",
+            "Track2:MediaCreateDate",
+            "Nikon:DateTimeOriginal",
+            "QuickTime:MovieHeaderVersion",
+            "Track1:TrackHeaderVersion",
+            "Track2:TrackHeaderVersion",
+            "Track1:MediaHeaderVersion",
+            "Track2:MediaHeaderVersion"
+          ],
+          "versions": {
+            "QuickTime:MovieHeaderVersion": 0,
+            "Track1:TrackHeaderVersion": 0,
+            "Track2:TrackHeaderVersion": 0,
+            "Track1:MediaHeaderVersion": 0,
+            "Track2:MediaHeaderVersion": 0
+          }
+        },
+        {
+          "extension": ".mov",
+          "camera": "NIKON Z 8",
+          "date_tag_names": [
+            "QuickTime:CreateDate",
+            "Nikon:CreateDate",
+            "Track1:TrackCreateDate",
+            "Track2:TrackCreateDate",
+            "Track1:MediaCreateDate",
+            "Track2:MediaCreateDate",
+            "Nikon:DateTimeOriginal",
+            "QuickTime:MovieHeaderVersion",
+            "Track1:TrackHeaderVersion",
+            "Track2:TrackHeaderVersion",
+            "Track1:MediaHeaderVersion",
+            "Track2:MediaHeaderVersion"
+          ],
+          "versions": {
+            "QuickTime:MovieHeaderVersion": 0,
+            "Track1:TrackHeaderVersion": 0,
+            "Track2:TrackHeaderVersion": 0,
+            "Track1:MediaHeaderVersion": 0,
+            "Track2:MediaHeaderVersion": 0
+          }
+        },
+        {
+          "extension": ".mov",
+          "camera": "NIKON Z 8",
+          "date_tag_names": [
+            "QuickTime:CreateDate",
+            "Nikon:CreateDate",
+            "Track1:TrackCreateDate",
+            "Track2:TrackCreateDate",
+            "Track1:MediaCreateDate",
+            "Track2:MediaCreateDate",
+            "Nikon:DateTimeOriginal",
+            "QuickTime:MovieHeaderVersion",
+            "Track1:TrackHeaderVersion",
+            "Track2:TrackHeaderVersion",
+            "Track1:MediaHeaderVersion",
+            "Track2:MediaHeaderVersion"
+          ],
+          "versions": {
+            "QuickTime:MovieHeaderVersion": 0,
+            "Track1:TrackHeaderVersion": 0,
+            "Track2:TrackHeaderVersion": 0,
+            "Track1:MediaHeaderVersion": 0,
+            "Track2:MediaHeaderVersion": 0
+          }
+        }
+      ]
+    }
+  },
+  "source_volumes": [
+    {
+      "mounted": true,
+      "filesystem": "exfat",
+      "filesystem_name": "ExFAT",
+      "read_only_volume": null,
+      "protocol": "USB"
+    },
+    {
+      "mounted": true,
+      "filesystem": "exfat",
+      "filesystem_name": "ExFAT",
+      "read_only_volume": null,
+      "protocol": "USB"
+    }
+  ],
+  "reference_scripts_sha256": {
+    "probe.py": "ee99f919e16c3311e8439e0d32ce940102eb32c5d77be37049640e5a8726a623",
+    "nikon_probe.py": "4e0371a00f39dfb7b3ef6edca680f6d149656cc64f0372742ede7683b4b6f46f",
+    "journal_probe.py": "a5278634a4823ebe5c9473f5f690f352f796b33e946ff31d77ee65bfaa723140"
+  },
+  "safety": {
+    "business_code_modified": false,
+    "production_database_written": false,
+    "real_media_written": false,
+    "model_or_existing_backup_modified": false,
+    "installed_application_replaced": false,
+    "paid_ai_calls": false,
+    "scratch_cleaned": true
+  },
+  "limitations": [
+    "Synthetic APFS SSD benchmark with sparse extra mdat; not a camera-video or external-disk benchmark.",
+    "Raw byte patch timings exclude journal, metadata subprocess readback and database operations.",
+    "Journal timings include F_FULLFSYNC but not metadata subprocess readback or database operations.",
+    "No power loss, physical USB disconnect, exFAT write test, full camera format or application interoperability validation.",
+    "The 8 online real-media samples are a small biased sample and do not establish eligibility for all MOV/MP4 files.",
+    "GPAC MP4Box, JCodec and Bento4 evaluated from official documentation only; not installed or benchmarked."
+  ],
+  "reproduction": {
+    "reference_scripts_syntax": "passed",
+    "source_directory_execution_guard": "3/3 rejected before fixture writes",
+    "fresh_temporary_directory_run": "passed",
+    "functional_cases": 4,
+    "prewrite_rejections": 6,
+    "nikon_stale_date_reproduced": true,
+    "partial_write_detected": true,
+    "journal_median_seconds_second_run": 0.010389083996415138
+  },
+  "primary_sources": [
+    "https://exiftool.sourceforge.net/faq.html#Q31",
+    "https://exiftool.sourceforge.net/exiftool_pod.html#overwrite_original_in_place",
+    "https://exiftool.sourceforge.net/TagNames/QuickTime.html",
+    "https://exiftool.sourceforge.net/TagNames/Nikon.html#NCTG",
+    "https://wiki.gpac.io/Howtos/mp4box-inplace/",
+    "https://wiki.gpac.io/MP4Box/mp4box-gen-opts/",
+    "https://ffmpeg.org/ffmpeg.html#Streamcopy",
+    "https://www.bento4.com/documentation/mp4edit/",
+    "https://www.jcodec.org/docs/working_with_mp4_metadata.html",
+    "https://github.com/apple-oss-distributions/xnu/blob/main/bsd/man/man2/clonefile.2",
+    "https://developer.apple.com/documentation/xcode/reducing-disk-writes"
+  ]
+}
