@@ -1,6 +1,8 @@
-# Media Manager
+# 映屿 · luminisle
 
 **AI 驱动的素材管理助手 — 让你专注于创作，而不是整理素材。**
+
+[品牌与图标维护](docs/BRANDING.md) · [升级与数据迁移](docs/UPGRADE-AND-DATA.md)
 
 你在剪辑时是不是也遇到过这些问题？
 
@@ -8,9 +10,11 @@
 - 在 Lightroom 里给每段素材手动标注运镜、内容、人物、对话……工作量巨大
 - 拍了一整天，真正开始剪辑前要花大量时间整理和筛选
 
-Media Manager 用 AI 帮你自动完成这些。导入素材 → 一键分析 → 每一段视频都被打上结构化标签，写入 XMP 侧车文件，直接在 Lightroom、达芬奇、剪映里搜索和筛选。
+映屿 · luminisle 用 AI 帮你自动完成这些。导入素材 → 一键分析 → 每一段视频都被打上结构化标签，写入 XMP 侧车文件，直接在 Lightroom、达芬奇、剪映里搜索和筛选。
 
-<p align="center"><img src="docs/screenshots/整体素材库.webp" width="100%" /></p>
+<p align="center"><img src="docs/screenshots/mac-native-library.png" width="100%" /></p>
+
+界面采用 macOS 桌面风格，包含系统外观跟随、素材检查器、统一预览和剪辑工作台；原有筛选、标注、分析、创作与导出入口保留。[界面变更与验证记录](docs/UI-NATIVE-2026-10-18.md)。新版截图使用独立演示资料库，下方部分功能演示图来自早期界面。
 
 ---
 
@@ -30,7 +34,7 @@ Media Manager 用 AI 帮你自动完成这些。导入素材 → 一键分析 �
 
 视频产出 13 个维度、图片产出 16 个维度的结构化标签，所有字段支持点击编辑。
 
-<p align="center"><img src="docs/screenshots/视频详情页.webp" width="100%" /></p>
+<p align="center"><img src="docs/screenshots/mac-native-detail.png" width="100%" /></p>
 
 ### 批量分析
 
@@ -162,9 +166,9 @@ Media Manager 用 AI 帮你自动完成这些。导入素材 → 一键分析 �
 
 ### macOS 本地安装包
 
-Apple Silicon 本地包位于 `dist/Media-Manager-1.0.2-arm64.dmg`。程序自带运行环境，资料库保存在 `~/Library/Application Support/Media Manager/library`，模型从独立外部目录加载；替换应用升级不会替换资料库或模型，版本变更前会自动建立数据库快照。
+项目展示名称已更新为 **映屿 · luminisle**，统一采用日光、岛屿与水纹图标。Apple Silicon 已安装的本地版本为 1.0.10，包含照片/视频导入提速、右键调整创建时间，以及四套亮暗外观主题和随主题变色的音频波形，安装位置为 `/Users/zack/Applications/映屿 · luminisle.app`。程序自带运行环境，资料库保存在 `~/Library/Application Support/Media Manager/library`，模型从独立外部目录加载；替换应用升级不会替换资料库或模型，版本变更前会自动建立数据库快照。
 
-完整迁移副本位于 `dist/Media-Manager-Data-2026-10-18`。安装、备份、恢复及离线原素材的处理方式见 [升级与数据迁移](docs/UPGRADE-AND-DATA.md)。以下为源码开发方式。
+本地更新完成验证后清理生成的 `dist` 和安装包；迁移副本通过应用的“资料库 → 导出完整迁移副本…”按需生成。安装、备份、恢复及离线原素材的处理方式见 [升级与数据迁移](docs/UPGRADE-AND-DATA.md)。以下为源码开发方式。
 
 ### 环境要求
 

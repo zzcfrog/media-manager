@@ -7,7 +7,7 @@ import sys
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Media Manager desktop runtime')
+    parser = argparse.ArgumentParser(description='映屿 · luminisle desktop runtime')
     sub = parser.add_subparsers(dest='command')
     migrate = sub.add_parser('migrate')
     migrate.add_argument('--source-data', required=True, type=Path)
@@ -46,7 +46,7 @@ def main():
         print(json.dumps({'ok':True,'runtime':sys.version.split()[0],'frozen':bool(getattr(sys,'frozen',False))}));return
 
     from backend.config import DATA_DIR
-    version = os.environ.get('MEDIA_MANAGER_VERSION', '1.0.2')
+    version = os.environ.get('MEDIA_MANAGER_VERSION', '1.0.10')
     DATA_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
     with library_lock(DATA_DIR):
         prepare_upgrade(DATA_DIR, version)  # Always before schema initialization or stale-task reset.
@@ -78,5 +78,5 @@ if __name__ == '__main__':
     try:
         main()
     except Exception as error:
-        print(f'Media Manager: {error}', file=sys.stderr)
+        print(f'映屿 · luminisle: {error}', file=sys.stderr)
         raise

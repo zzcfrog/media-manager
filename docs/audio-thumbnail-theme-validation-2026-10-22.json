@@ -1,0 +1,70 @@
+{
+  "appearances": [
+    {
+      "theme": "jade",
+      "mode": "light",
+      "waveformPixels": 1344,
+      "backgroundPixels": 18064
+    },
+    {
+      "theme": "jade",
+      "mode": "dark",
+      "waveformPixels": 1344,
+      "backgroundPixels": 18059
+    },
+    {
+      "theme": "paper",
+      "mode": "light",
+      "waveformPixels": 1344,
+      "backgroundPixels": 18099
+    },
+    {
+      "theme": "paper",
+      "mode": "dark",
+      "waveformPixels": 1344,
+      "backgroundPixels": 18078
+    },
+    {
+      "theme": "study",
+      "mode": "light",
+      "waveformPixels": 1344,
+      "backgroundPixels": 18092
+    },
+    {
+      "theme": "study",
+      "mode": "dark",
+      "waveformPixels": 1344,
+      "backgroundPixels": 18074
+    },
+    {
+      "theme": "porcelain",
+      "mode": "light",
+      "waveformPixels": 1344,
+      "backgroundPixels": 18108
+    },
+    {
+      "theme": "porcelain",
+      "mode": "dark",
+      "waveformPixels": 1344,
+      "backgroundPixels": 18054
+    }
+  ],
+  "galleryViews": 8,
+  "inspectorAndWorkbench": true,
+  "coversAndNonAudioUnfiltered": true,
+  "missingThumbnailFallback": true,
+  "errors": [],
+  "writes": [],
+  "failures": [],
+  "expected404": [
+    "/media/cover/6",
+    "/media/cover/6",
+    "/media/thumbnail/6"
+  ],
+  "realDataTouched": false,
+  "paidAI": false,
+  "date": "2026-10-22",
+  "delivery": "source only; not included in installed 1.0.8",
+  "frontend_regressions": "16/16 passed",
+  "syntax_and_diff_checks": "passed"
+}

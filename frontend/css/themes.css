@@ -1,0 +1,152 @@
+/* Paint only: workspace geometry, typography, hit targets and media are unchanged.
+   Miniature previews share these tokens with the live application. */
+.audio-waveform-thumb { filter: url(#audio-thumbnail-theme); }
+:root[data-appearance-theme], :root[data-appearance-theme] body.native-ui, .theme-preview-half {
+  --accent-dim: color-mix(in srgb, var(--accent) 14%, transparent);
+  --q-primary: var(--accent); --q-accent: var(--accent); --q-dark: var(--surface); --q-dark-page: var(--bg);
+  --selected-text: var(--on-accent); --control: var(--surface2); --control-hover: var(--surface3);
+  --chrome: var(--surface); --glass: var(--sidebar);
+  --glass-edge: color-mix(in srgb, var(--border2) 45%, transparent);
+  --glass-shade: transparent; --glass-light: rgba(255,255,255,.5);
+  --glass-shadow: 0 6px 20px rgba(16,45,40,.08), inset 0 1px 1px rgba(255,255,255,.65);
+  --panel-shadow: 0 16px 40px rgba(18,35,30,.16);
+  --material-filter: blur(18px) saturate(1.15);
+  --material-grain: linear-gradient(transparent, transparent);
+  --surface-sheen: linear-gradient(135deg, rgba(255,255,255,.18), transparent 60%);
+  --card-shadow: none;
+}
+:root[data-appearance-mode="dark"], :root[data-appearance-mode="dark"] body.native-ui, .theme-preview-half[data-mode="dark"] {
+  --glass-light: rgba(180,219,208,.055);
+  --glass-shadow: 0 6px 22px rgba(0,0,0,.16), inset 0 1px 1px rgba(200,232,224,.055);
+  --panel-shadow: 0 16px 40px rgba(0,0,0,.35);
+  --surface-sheen: linear-gradient(135deg, rgba(188,220,214,.035), transparent 60%);
+}
+:root[data-appearance-theme="jade"], :root[data-appearance-theme="jade"] body.native-ui, .theme-preview-half[data-theme="jade"] {
+  --bg: #f1f4ed; --surface: #f8faf4; --surface2: #e3ece3; --surface3: #d7e6db;
+  --border: #d2dfd5; --border2: #afc7b9; --text: #203e37; --text2: #4b665b; --text3: #596d62;
+  --accent: #246f60; --on-accent: #fffef6; --sidebar: rgba(220,235,223,.9);
+}
+:root[data-appearance-theme="jade"][data-appearance-mode="dark"], :root[data-appearance-theme="jade"][data-appearance-mode="dark"] body.native-ui, .theme-preview-half[data-theme="jade"][data-mode="dark"] {
+  --bg: #102a28; --surface: #173431; --surface2: #20433e; --surface3: #2b514a;
+  --border: #294940; --border2: #3e695d; --text: #ecf1e6; --text2: #b1c9bd; --text3: #98b6a8;
+  --accent: #8bceba; --on-accent: #123b31; --sidebar: rgba(22,53,48,.94);
+}
+:root[data-appearance-theme="paper"], :root[data-appearance-theme="paper"] body.native-ui, .theme-preview-half[data-theme="paper"] {
+  --bg: #f4f0e6; --surface: #faf7ef; --surface2: #ebe6da; --surface3: #e1dacb;
+  --border: #ded8ca; --border2: #bfb7a6; --text: #343832; --text2: #626357; --text3: #6f6c5e;
+  --accent: #a24232; --on-accent: #fff9ed; --sidebar: #edeadd;
+}
+:root[data-appearance-theme="paper"][data-appearance-mode="dark"], :root[data-appearance-theme="paper"][data-appearance-mode="dark"] body.native-ui, .theme-preview-half[data-theme="paper"][data-mode="dark"] {
+  --bg: #252722; --surface: #2d3029; --surface2: #393d33; --surface3: #464a3f;
+  --border: #44473b; --border2: #666957; --text: #eeeade; --text2: #c9c7b7; --text3: #adae9c;
+  --accent: #e6a18a; --on-accent: #48291e; --sidebar: #2b2e27;
+}
+:root[data-appearance-theme="study"], :root[data-appearance-theme="study"] body.native-ui, .theme-preview-half[data-theme="study"] {
+  --bg: #f4eddf; --surface: #fbf5e9; --surface2: #e9deca; --surface3: #ded0b5;
+  --border: #ddd0b9; --border2: #bbaa8b; --text: #403729; --text2: #6d5e47; --text3: #736248;
+  --accent: #606830; --on-accent: #fffae9; --sidebar: #eae0cb;
+}
+:root[data-appearance-theme="study"][data-appearance-mode="dark"], :root[data-appearance-theme="study"][data-appearance-mode="dark"] body.native-ui, .theme-preview-half[data-theme="study"][data-mode="dark"] {
+  --bg: #2a241e; --surface: #352d24; --surface2: #43392d; --surface3: #514633;
+  --border: #4c4030; --border2: #6d5b43; --text: #f1e6d0; --text2: #cdbda1; --text3: #b4a389;
+  --accent: #c3c68e; --on-accent: #33361b; --sidebar: #392f23;
+}
+:root[data-appearance-theme="porcelain"], :root[data-appearance-theme="porcelain"] body.native-ui, .theme-preview-half[data-theme="porcelain"] {
+  --bg: #edf3f8; --surface: #f8fbfe; --surface2: #e1eaf3; --surface3: #d4e1ee;
+  --border: #d2deea; --border2: #a9bed3; --text: #273d55; --text2: #536c82; --text3: #596f84;
+  --accent: #355fa0; --on-accent: #ffffff; --sidebar: rgba(226,237,247,.92);
+}
+:root[data-appearance-theme="porcelain"][data-appearance-mode="dark"], :root[data-appearance-theme="porcelain"][data-appearance-mode="dark"] body.native-ui, .theme-preview-half[data-theme="porcelain"][data-mode="dark"] {
+  --bg: #1d2a3b; --surface: #25354a; --surface2: #30445d; --surface3: #3b526e;
+  --border: #364b63; --border2: #516a87; --text: #e9f0fa; --text2: #b7c8dd; --text3: #9cb2cc;
+  --accent: #a5c7f7; --on-accent: #203e65; --sidebar: rgba(35,53,74,.94);
+}
+/* Material differences are confined to paint, never spacing or corner geometry. */
+:root[data-appearance-theme="paper"], :root[data-appearance-theme="paper"] body.native-ui, .theme-preview-half[data-theme="paper"] {
+  --glass-light: transparent; --glass-shadow: inset 0 0 0 1px var(--border); --material-filter: none;
+  --surface-sheen: linear-gradient(transparent, transparent);
+  --material-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.78' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23877e65' opacity='.07' filter='url(%23n)' d='M0 0h160v160H0z'/%3E%3C/svg%3E");
+  --card-shadow: inset 0 0 0 1px var(--border);
+}
+:root[data-appearance-theme="study"], :root[data-appearance-theme="study"] body.native-ui, .theme-preview-half[data-theme="study"] {
+  --glass-light: transparent; --material-filter: none;
+  --glass-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 8%, transparent), 0 2px 6px rgba(51,36,20,.09);
+  --material-grain: repeating-linear-gradient(0deg, rgba(130,106,64,.025) 0 1px, transparent 1px 3px), repeating-linear-gradient(90deg, rgba(130,106,64,.025) 0 1px, transparent 1px 4px);
+  --surface-sheen: linear-gradient(100deg, rgba(177,134,73,.025), transparent);
+  --card-shadow: inset 0 0 0 2px var(--surface2), 0 1px 3px rgba(40,27,14,.12);
+}
+:root[data-appearance-theme="porcelain"], :root[data-appearance-theme="porcelain"] body.native-ui, .theme-preview-half[data-theme="porcelain"] {
+  --surface-sheen: linear-gradient(160deg, rgba(174,205,238,.1), transparent 40%);
+}
+:root[data-appearance-theme] body.native-ui {
+  background: var(--surface-sheen), var(--bg); color-scheme: light;
+}
+:root[data-appearance-mode="dark"] body.native-ui { color-scheme: dark; }
+:root[data-appearance-theme] body.native-ui .app-page > :is(.library-workspace, .detail-workspace, .duplicates-workspace, .wb-container),
+:root[data-appearance-theme] body.native-ui :is(.media-inspector, .wb-material, .wb-preview-sidebar, .wb-tracks, .detail-sidebar, .dup-group, .q-dialog .q-card) {
+  background-image: var(--material-grain), var(--surface-sheen);
+}
+:root[data-appearance-theme] body.native-ui :is(.app-tools, .app-import, .sidebar-toggle, .app-sidebar, .q-menu, .ctx-menu-popup) {
+  background: var(--material-grain), radial-gradient(ellipse at 0 0, var(--glass-light), transparent 65%), var(--glass) !important;
+  backdrop-filter: var(--material-filter); -webkit-backdrop-filter: var(--material-filter);
+}
+:root[data-appearance-theme] body.native-ui :is(.media-card, .dup-card, .wb-mat-card) { box-shadow: var(--card-shadow); }
+:root[data-appearance-theme] body.native-ui .list-header { background: var(--bg); }
+:root[data-appearance-theme] body.native-ui input { color: var(--text) !important; -webkit-text-fill-color: var(--text) !important; }
+:root[data-appearance-theme] body.native-ui :is(input, textarea)::placeholder { color: var(--text3) !important; -webkit-text-fill-color: var(--text3) !important; }
+:root[data-appearance-theme] body.native-ui :is(.text-grey-4, .text-grey-5, .text-grey-6, .text-grey-7, .text-grey-8) { color: var(--text2) !important; }
+:root[data-appearance-theme] body.native-ui :is(.bg-primary, .filter-bar .q-btn-group .q-btn.bg-primary, .sidebar-action-btn, .wb-export, .mat-type-active, .seg-added-badge, .dup-badge, .wb-mat-badge) { color: var(--on-accent) !important; }
+:root[data-appearance-theme] body.native-ui .gallery-page::-webkit-scrollbar-thumb { background-color: var(--border2); }
+:root[data-appearance-theme] body.native-ui .folder-tree-icon { stroke: var(--accent); }
+:root[data-appearance-theme="paper"] body.native-ui .app-sidebar .sidebar-active-item,
+:root[data-appearance-theme="paper"] body.native-ui .app-sidebar .sidebar-active-item:hover {
+  background: var(--material-grain), var(--accent-dim) !important; color: var(--text) !important; box-shadow: inset 2px 0 var(--accent);
+}
+:root[data-appearance-theme="paper"] body.native-ui .app-sidebar .sidebar-active-item .q-icon { color: var(--accent) !important; }
+:root[data-appearance-theme="study"] body.native-ui .app-sidebar .sidebar-active-item { box-shadow: inset 3px 0 color-mix(in srgb, var(--on-accent) 50%, transparent); }
+
+/* New appearance controls; these dimensions never apply to existing workspaces. */
+body.native-ui .q-menu.appearance-menu { width: 440px; max-width: calc(100vw - 24px) !important; max-height: calc(100vh - 76px) !important; padding: 0; overflow-y: auto; }
+.appearance-menu-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px 4px; }
+.appearance-menu-header h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.appearance-picker { padding: 16px 18px 12px; color: var(--text); }
+.appearance-section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 12px; font-weight: 600; margin-bottom: 12px; }
+.appearance-section-heading small { font-size: 11px; font-weight: 400; color: var(--text2); }
+.appearance-theme-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.appearance-theme-card { position: relative; display: flex; flex-direction: column; gap: 9px; min-width: 0; padding: 7px 7px 9px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); font: inherit; cursor: pointer; text-align: center; }
+.appearance-theme-card:hover { background: var(--surface2); border-color: var(--border2); }
+.appearance-theme-card[aria-pressed="true"] { background: var(--accent-dim); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.appearance-theme-card:focus-visible, .appearance-modes button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.appearance-theme-name { font-size: 12px; line-height: 18px; }
+.appearance-theme-check { position: absolute; top: 12px; right: 12px; width: 19px; height: 19px; border-radius: 50%; font-size: 14px; background: var(--accent); color: var(--on-accent); box-shadow: 0 1px 5px rgba(0,0,0,.15); }
+.theme-preview { display: flex; height: 86px; overflow: hidden; border-radius: 6px; pointer-events: none; }
+.theme-preview-half { display: flex; flex-direction: column; width: 50%; min-width: 0; background: var(--material-grain), var(--bg); color: var(--text); }
+.theme-preview-title { height: 10px; display: flex; align-items: center; gap: 2px; padding-left: 4px; background: var(--surface); }
+.theme-preview-title i { width: 2px; height: 2px; border-radius: 50%; background: var(--text3); }
+.theme-preview-body { display: flex; flex: 1; min-height: 0; gap: 3px; padding: 2px; }
+.theme-preview-sidebar { width: 21%; padding: 6px 2px; background: var(--material-grain), var(--sidebar); border-radius: 3px; }
+.theme-preview-sidebar b, .theme-preview-sidebar i, .theme-preview-inspector i { display: block; height: 3px; margin-bottom: 5px; border-radius: 1px; background: var(--border2); }
+.theme-preview-sidebar b { height: 6px; background: var(--accent); }
+.theme-preview-workspace { flex: 1; min-width: 0; }
+.theme-preview-toolbar { display: block; height: 5px; margin: 3px 0 5px; border-radius: 2px; background: var(--surface3); }
+.theme-preview-media { display: grid; grid-template-columns: repeat(2, 1fr); gap: 3px; }
+.theme-preview-media i { display: block; height: 15px; border-radius: 2px; box-shadow: var(--card-shadow); background: linear-gradient(155deg, transparent 45%, #567b6a 46% 67%, #aec7ba 68%), linear-gradient(25deg, #789ba5 45%, #d8e7eb 46%); }
+.theme-preview-media i:nth-child(2n) { background: linear-gradient(140deg, transparent 40%, #4c6755 41% 60%, #8fa87a 61%), #d8c89b; }
+.theme-preview-media i:last-child { background: repeating-linear-gradient(90deg, transparent 0 2px, var(--accent) 2px 3px), var(--surface2); background-size: 100% 40%, auto; background-position: center; background-repeat: no-repeat; }
+.theme-preview-inspector { width: 18%; padding: 5px 2px; border-radius: 3px; background: var(--surface2); }
+.theme-preview-inspector b { display: block; height: 12px; margin-bottom: 6px; background: #8aaca6; border-radius: 2px; }
+.appearance-mode-section { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 18px; }
+.appearance-modes { display: flex; gap: 3px; padding: 3px; border-radius: 11px; background: var(--surface2); }
+.appearance-modes button { display: flex; align-items: center; justify-content: center; gap: 7px; flex: 1; min-width: 0; min-height: 36px; border: 0; border-radius: 8px; background: transparent; color: var(--text2); font: inherit; font-size: 12px; cursor: pointer; }
+.appearance-modes button:hover { color: var(--text); background: var(--surface3); }
+.appearance-modes button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--glass-shadow); }
+.appearance-modes .q-icon { font-size: 18px; }
+.appearance-save-hint { margin: 12px 0 0; font-size: 11px; text-align: right; color: var(--text3); }
+.settings-panel > .appearance-picker { padding: 0; }
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  :root[data-appearance-theme] body.native-ui { --glass: var(--surface); --glass-light: transparent; --material-filter: none; --material-grain: linear-gradient(transparent, transparent); --glass-edge: var(--border2); }
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  :root[data-appearance-theme] body.native-ui { --glass: var(--surface); --material-filter: none; }
+}

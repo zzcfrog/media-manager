@@ -667,8 +667,7 @@ def import_one():
 @bp.route("/import-batch", methods=["POST"])
 def import_batch():
     from flask import stream_with_context
-    from ..services.importer import _import_one
-    from pathlib import Path
+    from ..services.importer import import_batch as prepare_and_import
 
     data = request.get_json()
     paths = data.get("paths", [])
@@ -677,29 +676,15 @@ def import_batch():
 
     def generate():
         db = get_db()
-        imported = []
-        failed = []
-        done_count = 0
-
-        for p in paths:
-            done_count += 1
-            filepath = Path(p)
-            try:
-                result = _import_one(db, filepath)
-                if result:
-                    result.pop("embedding", None)
-                    imported.append(result)
-                    yield f"data: {json.dumps({'type': 'ok', 'data': result, 'done': done_count, 'total': len(paths)})}\n\n"
-                else:
-                    yield f"data: {json.dumps({'type': 'skip', 'done': done_count, 'total': len(paths)})}\n\n"
-            except Exception as e:
-                logger.exception("batch import failed: {} — {}", p, e)
-                failed.append({"file_path": p, "error": str(e)})
-                yield f"data: {json.dumps({'type': 'fail', 'file_path': p, 'error': str(e), 'done': done_count, 'total': len(paths)})}\n\n"
-
-        logger.info("batch import done: {} imported, {} failed", len(imported), len(failed))
-        db.commit()
-        yield f"data: {json.dumps({'type': 'done', 'imported': len(imported), 'failed': len(failed)})}\n\n"
+        imported = failed = 0
+        from contextlib import closing
+        with closing(prepare_and_import(db, paths)) as events:
+            for event in events:
+                imported += event["type"] == "ok"
+                failed += event["type"] == "fail"
+                yield f"data: {json.dumps(event)}\n\n"
+        logger.info("batch import done: {} imported, {} failed", imported, failed)
+        yield f"data: {json.dumps({'type': 'done', 'imported': imported, 'failed': failed})}\n\n"
 
     return Response(stream_with_context(generate()), mimetype="text/event-stream")
 
@@ -726,11 +711,12 @@ def reveal_file(media_id):
 
 @bp.route("/scan", methods=["POST"])
 def scan_paths():
-    from ..services.importer import scan_only, collect_encrypted
+    from ..services.importer import scan_only
     data = request.get_json()
     paths = data.get("paths", [])
-    result, skipped = scan_only(paths)
-    return jsonify({"data": result, "skipped": skipped, "encrypted": collect_encrypted(paths)})
+    encrypted = []
+    result, skipped = scan_only(paths, encrypted=encrypted)
+    return jsonify({"data": result, "skipped": skipped, "encrypted": encrypted})
 
 
 @bp.route("/backfill-embeddings", methods=["POST"])
@@ -1335,6 +1321,93 @@ def set_file_date_from_exif():
             yield _sse({"type": "progress", "done": done, "total": total, "updated": updated, "errors": errors, "skipped": skipped})
         logger.info("set-file-date-from-exif: ids={} updated={} skipped={} errors={}", len(ids), updated, skipped, errors)
         yield _sse({"type": "done", "updated": updated, "skipped": skipped, "errors": errors})
+
+    return Response(stream_with_context(generate()), mimetype="text/event-stream")
+
+
+@bp.route("/shift-creation-time", methods=["POST"])
+def shift_creation_time():
+    """只偏移文件系统创建时间；不写媒体元数据、修改时间或资料库日期。"""
+    import datetime as dt
+    import shutil
+    import stat
+    import subprocess
+    from flask import stream_with_context
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "Invalid request"}), 400
+    ids, hours = data.get("ids"), data.get("hours")
+    if not isinstance(ids, list) or not ids or any(type(mid) is not int or mid <= 0 for mid in ids):
+        return jsonify({"error": "Invalid ids"}), 400
+    if type(hours) is not int or not -24 <= hours <= 24:
+        return jsonify({"error": "hours must be an integer (-24..24)"}), 400
+    ids = list(dict.fromkeys(ids))
+    if hours == 0:
+        return Response(_sse({"type": "done", "updated": 0, "skipped": len(ids), "errors": 0, "hours": 0}),
+                        mimetype="text/event-stream")
+    tool = shutil.which("exiftool")
+    if not tool:
+        return jsonify({"error": "exiftool not found"}), 500
+    placeholders = ",".join("?" * len(ids))
+    rows = {r["id"]: r for r in get_db().execute(
+        f"SELECT id, file_path FROM media WHERE id IN ({placeholders})", ids
+    ).fetchall()}
+
+    def generate():
+        updated = skipped = errors = done = 0
+        for i in range(0, len(ids), _EXIFTOOL_CHUNK):
+            chunk = ids[i:i + _EXIFTOOL_CHUNK]
+            pending = []
+            argv = [tool]
+            for mid in chunk:
+                row = rows.get(mid)
+                if row is None or not row["file_path"]:
+                    skipped += 1
+                    continue
+                path = row["file_path"]
+                try:
+                    before = os.stat(path)
+                    if not stat.S_ISREG(before.st_mode):
+                        skipped += 1
+                        continue
+                    # st_ctime 是状态变更时间，不能用于替代不支持的创建时间。
+                    target = int(before.st_birthtime) + hours * 3600
+                    value = dt.datetime.fromtimestamp(target, dt.timezone.utc).strftime("%Y:%m:%d %H:%M:%SZ")
+                except FileNotFoundError:
+                    skipped += 1
+                    continue
+                except (OSError, AttributeError, ValueError, OverflowError):
+                    errors += 1
+                    continue
+                pending.append((path, before, target))
+                # 只写 FileCreateDate 这个系统字段，ExifTool 不会重写媒体内容。
+                argv += [f"-FileCreateDate={value}", path, "-execute"]
+            if pending:
+                try:
+                    subprocess.run(argv, capture_output=True, timeout=max(30, 5 * len(pending)),
+                                   env={**os.environ, "TZ": "UTC"})
+                except (OSError, subprocess.TimeoutExpired):
+                    # 超时也可能已完成部分文件；读回判定，不重试相对偏移。
+                    pass
+                for path, before, target in pending:
+                    try:
+                        after = os.stat(path)
+                        success = (abs(after.st_birthtime - target) < 1
+                                   and (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
+                                   == (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns))
+                    except (OSError, AttributeError):
+                        success = False
+                    if success:
+                        updated += 1
+                    else:
+                        errors += 1
+            done += len(chunk)
+            yield _sse({"type": "progress", "done": done, "total": len(ids),
+                        "updated": updated, "skipped": skipped, "errors": errors})
+        logger.info("shift-creation-time: ids={} hours={} updated={} skipped={} errors={}",
+                    len(ids), hours, updated, skipped, errors)
+        yield _sse({"type": "done", "updated": updated, "skipped": skipped, "errors": errors, "hours": hours})
 
     return Response(stream_with_context(generate()), mimetype="text/event-stream")
 

@@ -1,0 +1,97 @@
+{
+  "status": "complete",
+  "date": "2026-10-21",
+  "version": "1.0.7",
+  "previous_version": "1.0.6",
+  "installed_application": "/Users/zack/Applications/映屿 · luminisle.app",
+  "scope": "Accepted island logo, 映屿 · luminisle branding and dark/light native window appearance; existing source UI updates included.",
+  "package_validation": {
+    "version": "1.0.7",
+    "appId": "com.zack.media-manager",
+    "frontend_files_match": 31,
+    "private_database_or_gguf_embedded": false,
+    "signature": "ad-hoc; deep strict verification passed",
+    "upgrade_document_matches": true
+  },
+  "packaged_smoke": {
+    "version": "1.0.7",
+    "packaged": true,
+    "isolatedProfile": true,
+    "titleAndIcon": true,
+    "nativeThemes": [
+      "dark",
+      "light",
+      "system"
+    ],
+    "emptyLibraryAndSettings": true,
+    "errors": [],
+    "failed": [],
+    "writes": [],
+    "realDataTouched": false,
+    "paidAI": false
+  },
+  "installed_smoke": {
+    "runtime": {
+      "version": "1.0.7",
+      "name": "映屿 · luminisle",
+      "profile": "/Users/zack/Library/Application Support/Media Manager",
+      "resources": "/Users/zack/Applications/映屿 · luminisle.app/Contents/Resources",
+      "theme": "light"
+    },
+    "titleAndIcon": true,
+    "libraryVisible": true,
+    "themeMatches": true,
+    "errors": [],
+    "apiWrites": [],
+    "paidAI": false,
+    "modelPreloadSkippedDuringVerification": true
+  },
+  "normal_launch": {
+    "normal_launch": true,
+    "version": "1.0.7",
+    "installed_application": "/Users/zack/Applications/映屿 · luminisle.app",
+    "backend_from_installed_app": true
+  },
+  "data_preservation": {
+    "version": "1.0.7",
+    "all_tables_unchanged": true,
+    "media": 10960,
+    "projects": 2,
+    "model_config_unchanged": true,
+    "existing_backups_unchanged": true,
+    "upgrade_snapshots_verified": [
+      "20261021-220331-6d270387.db"
+    ],
+    "integrity": "ok"
+  },
+  "additional_checks": {
+    "frontend_regressions": "16/16 passed",
+    "desktop_runtime_paths": "passed",
+    "frozen_backend_self_test": "passed"
+  },
+  "limitations": [
+    "Local ad-hoc signature; no Developer ID notarization",
+    "Cloud AI and full inference were not retested",
+    "Automatic internet updating is not configured"
+  ],
+  "safety": "No database restore or rollback. Existing library, settings, models and earlier backups retained. No commit or push.",
+  "cleanup": {
+    "complete": true,
+    "removed_current_run_generated_directories": [
+      "dist",
+      "build/runtime",
+      "build/tools",
+      "build/pyinstaller",
+      "build/local-update-1.0.7"
+    ],
+    "old_application_moved_to_trash": "/Users/zack/.Trash/Media Manager-1.0.6-replaced-20261021.app",
+    "trash_emptied": false,
+    "installers_retained": false,
+    "retained": [
+      "Installed 1.0.7 application",
+      "Existing library, verified upgrade snapshot and earlier backups",
+      "External models",
+      "Source, build dependencies and prior evaluation evidence"
+    ]
+  }
+}

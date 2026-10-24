@@ -190,11 +190,6 @@ body:not(.body--dark) .q-dialog .q-card { box-shadow: 0 24px 80px rgba(255,255,2
 .drawer-toggle-btn { border: 1px solid var(--border2); background: var(--surface) !important; transition: border-color 0.2s, color 0.2s; }
 .drawer-toggle-btn:hover { border-color: var(--accent); color: var(--accent) !important; }
 
-/* Skin color picker dots */
-.skin-dot { width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: border-color 0.15s, transform 0.1s; }
-.skin-dot:hover { transform: scale(1.15); }
-.skin-dot.active { border-color: #fff; }
-
 /* Gallery footer */
 .gallery-footer { background: var(--surface); }
 .bg-menu-popup { background: #1c1c1c; }
@@ -525,7 +520,6 @@ body:not(.body--dark) .filter-bar .q-btn-group .q-btn.bg-primary { background: v
 body:not(.body--dark) .gallery-footer { background: #fff !important; }
 body:not(.body--dark) .bg-menu-popup { background: #fff !important; }
 body:not(.body--dark) .bg-menu-popup .text-caption { color: #666 !important; }
-body:not(.body--dark) .skin-dot.active { border-color: #333; }
 body:not(.body--dark) .fav-badge { filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3)); }
 
 /* Restore exclusion dialog - small pair thumbnails with hover enlarge */

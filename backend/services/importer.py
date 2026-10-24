@@ -1,10 +1,13 @@
 import json
+import io
 import os
 import shutil
 import subprocess
 import uuid
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from time import perf_counter
 
 from loguru import logger
 
@@ -17,6 +20,8 @@ from ..db import get_db
 PROBE_TIMEOUT = 60
 EXIFTOOL_TIMEOUT = 30
 FFMPEG_TIMEOUT = 60
+IMPORT_WORKERS = 2
+IMPORT_BATCH_SIZE = 16
 
 
 def _delete_media_records(db, ids: list[int], thumb_paths: list[str | None] = None):
@@ -41,20 +46,36 @@ def _delete_media_records(db, ids: list[int], thumb_paths: list[str | None] = No
 
 def cleanup_thumbnails(names):
     for name in set(names):
+        if not name:
+            continue
         try:
             (THUMB_DIR / name).unlink(missing_ok=True)
         except OSError as e:
             logger.warning("缓存清理失败 {}: {}", name, e)
 
 
-def _collect_files(paths: list[str], strict: bool = False) -> list[Path]:
+def _collect_files(paths: list[str], strict: bool = False, encrypted=None) -> list[Path]:
     files = []
-    for p in paths:
+    seen = set()
+    supported = VIDEO_EXTS | IMAGE_EXTS | AUDIO_EXTS
+    if encrypted is not None:
+        supported = supported | ENCRYPTED_AUDIO_EXTS
+
+    def add_file(path):
+        if path in seen:
+            return
+        seen.add(path)
+        if path.suffix.lower() in ENCRYPTED_AUDIO_EXTS:
+            encrypted.append({"file_name": path.name, "file_path": str(path)})
+        else:
+            files.append(path)
+
+    for p in dict.fromkeys(paths):
         path = Path(p)
         if path.is_file() and path.name.startswith("._"):
             continue
-        if path.is_file() and path.suffix.lower() in (VIDEO_EXTS | IMAGE_EXTS | AUDIO_EXTS):
-            files.append(path)
+        if path.is_file() and path.suffix.lower() in supported:
+            add_file(path)
         elif path.is_dir():
             def scan_error(error):
                 if strict:
@@ -62,24 +83,12 @@ def _collect_files(paths: list[str], strict: bool = False) -> list[Path]:
             for directory, _, names in os.walk(path, onerror=scan_error):
                 for name in names:
                     f = Path(directory) / name
-                    if not name.startswith("._") and f.suffix.lower() in (VIDEO_EXTS | IMAGE_EXTS | AUDIO_EXTS):
+                    if not name.startswith("._") and f.suffix.lower() in supported:
                         if strict:
                             f.stat()  # Disappearance/unreadable entries must not look like a successful empty scan.
                         if f.is_file():
-                            files.append(f)
+                            add_file(f)
     return files
-
-
-def collect_encrypted(paths: list[str]) -> list[dict]:
-    """收集加密音频文件（ncm 等），供导入汇总提示「N 个加密格式已跳过」。"""
-    out = []
-    for p in paths:
-        path = Path(p)
-        cand = [path] if path.is_file() else (path.rglob("*") if path.is_dir() else [])
-        for f in cand:
-            if f.is_file() and not f.name.startswith("._") and f.suffix.lower() in ENCRYPTED_AUDIO_EXTS:
-                out.append({"file_name": f.name, "file_path": str(f)})
-    return out
 
 
 def _scan_media_type(ext: str) -> str:
@@ -90,8 +99,8 @@ def _scan_media_type(ext: str) -> str:
     return "image"
 
 
-def scan_only(paths: list[str]) -> list[dict]:
-    files = _collect_files(paths)
+def scan_only(paths: list[str], encrypted=None) -> list[dict]:
+    files = _collect_files(paths, encrypted=encrypted)
     db = get_db()
     results = []
     skipped = []
@@ -124,28 +133,16 @@ def import_single_file(file_path: str) -> dict | None:
         raise
 
 
-def _import_one(db, filepath: Path, force_update: bool = False) -> dict | None:
-    ext = filepath.suffix.lower()
-
+def _prepare_import(filepath: Path, exif_tags=None) -> dict:
+    """Prepare media on a worker; never access a Flask context or database here."""
+    start = perf_counter()
     stat = filepath.stat()
-    existing = db.execute(
-        "SELECT * FROM media WHERE file_path = ?",
-        (str(filepath),),
-    ).fetchone()
-
-    if existing:
-        if not force_update:
-            return None
-        # Skip if file hasn't changed (same size and mtime)
-        if existing["file_size"] == stat.st_size and existing["file_mtime"] == stat.st_mtime:
-            return None
-        # Probe and prepare replacements before changing the existing record.
-
+    ext = filepath.suffix.lower()
     if ext in AUDIO_EXTS:
         media_type, meta = "audio", _probe_audio(filepath)
     elif ext in AUDIO_LIKE_VIDEO_EXTS:
         # .mp4/.m4v 可能是纯音频轨（如「xxx_音频.mp4」）：按流判定归属，probe 不新增子进程
-        meta = _probe(filepath, "video")
+        meta = _probe(filepath, "video", exif_tags=exif_tags)
         has_video = meta.pop("_has_video", True)
         has_audio = meta.pop("_has_audio", False)
         if not has_video and has_audio:
@@ -158,40 +155,87 @@ def _import_one(db, filepath: Path, force_update: bool = False) -> dict | None:
             media_type = "video"
     elif ext in VIDEO_EXTS:
         media_type = "video"
-        meta = _probe(filepath, media_type)
+        meta = _probe(filepath, media_type, exif_tags=exif_tags)
     else:
         media_type = "image"
-        meta = _probe_image(filepath)
+        meta = _probe_image(filepath, exif_tags=exif_tags)
 
-    thumb = _generate_thumbnail(filepath, media_type)
-    if thumb:
+    probed = perf_counter()
+    image = None
+    try:
+        # Reuse JPEG pixels without changing the existing embedding's orientation
+        # or preprocessing. RAW embeddings still use the full RAW decode.
+        if ext in (".jpg", ".jpeg"):
+            try:
+                from PIL import Image
+                image = Image.open(filepath)
+                image.load()
+            except Exception:
+                if image is not None:
+                    image.close()
+                image = None
+        thumb = _generate_thumbnail(filepath, media_type, image=image,
+                                    orientation=meta.pop("_orientation", None))
         meta["thumbnail_path"] = thumb
+        if media_type == "audio":
+            meta["cover_art_path"] = _extract_cover_art(filepath)
+        previewed = perf_counter()
+        meta["embedding"] = None
+        if media_type == "image":
+            try:
+                from .embedding import compute_embedding
+                meta["embedding"] = compute_embedding(filepath, "image", image=image)
+            except Exception:
+                pass
+        meta.update(file_path=str(filepath), file_name=filepath.name, media_type=media_type,
+                    file_size=stat.st_size, file_mtime=stat.st_mtime,
+                    has_xmp=int(media_type == "image" and filepath.with_suffix(".xmp").exists()))
+        logger.debug("import prepare ext={} probe={:.3f}s preview={:.3f}s embedding={:.3f}s",
+                     ext, probed - start, previewed - probed, perf_counter() - previewed)
+        return meta
+    except BaseException:
+        cleanup_thumbnails([meta.get("thumbnail_path"), meta.get("cover_art_path")])
+        raise
+    finally:
+        if image is not None:
+            image.close()
 
-    cover = None
-    if media_type == "audio":
-        cover = _extract_cover_art(filepath)
-        if cover:
-            meta["cover_art_path"] = cover
 
-    embedding = None
-    if media_type == "image":
-        try:
-            from .embedding import compute_embedding
-            embedding = compute_embedding(filepath, "image")
-        except Exception:
-            pass
+def _import_one(db, filepath: Path, force_update: bool = False, prepared=None) -> dict | None:
+    """Commit one prepared item on the caller's database thread."""
+    saved = False
+    generated = []
+    if prepared is not None:
+        generated = [prepared.get("thumbnail_path"), prepared.get("cover_art_path")]
+    try:
+        stat = filepath.stat()
+        existing = db.execute("SELECT * FROM media WHERE file_path = ?", (str(filepath),)).fetchone()
+        if existing and (not force_update or (existing["file_size"] == stat.st_size
+                                             and existing["file_mtime"] == stat.st_mtime)):
+            return None
+        if prepared is None:
+            prepared = _prepare_import(filepath)
+            generated = [prepared.get("thumbnail_path"), prepared.get("cover_art_path")]
+        # An unplugged or changed source must not be reported as a completed import.
+        stat = filepath.stat()
+        if prepared["file_size"] != stat.st_size or prepared["file_mtime"] != stat.st_mtime:
+            raise RuntimeError("Source changed during import; retry this file")
+        row = _save_import(db, prepared, existing)
+        saved = True
+        return row
+    finally:
+        if not saved:
+            cleanup_thumbnails(generated)
 
-    xmp_exists = 1 if media_type == "image" and filepath.with_suffix(".xmp").exists() else 0
 
+def _save_import(db, prepared, existing):
     columns = [
         "file_path", "file_name", "media_type", "file_size", "file_mtime", "duration", "width", "height", "fps",
         "video_codec", "video_profile", "bit_rate", "audio_codec", "audio_sample_rate", "audio_channels",
         "color_space", "color_range", "pix_fmt", "camera_make", "camera_model", "lens_model", "date_taken",
         "thumbnail_path", "cover_art_path", "has_xmp", "picture_control", "embedding", "music_title", "music_artist", "music_album",
     ]
-    values = {c: meta.get(c) for c in columns}
-    values.update(file_path=str(filepath), file_name=filepath.name, media_type=media_type,
-                  file_size=stat.st_size, file_mtime=stat.st_mtime, has_xmp=xmp_exists, embedding=embedding)
+    values = {c: prepared.get(c) for c in columns}
     if existing:
         for c in ("thumbnail_path", "cover_art_path"):
             if values[c] is None:
@@ -207,12 +251,10 @@ def _import_one(db, filepath: Path, force_update: bool = False) -> dict | None:
                                   ",".join("?" for _ in columns) + ")", [values[c] for c in columns]).lastrowid
         from ..blueprints.analysis import refresh_media_fts
         refresh_media_fts(db, media_id)
+        row = dict(db.execute("SELECT * FROM media WHERE id = ?", (media_id,)).fetchone())
         db.commit()
     except Exception:
         db.rollback()
-        for name in (thumb, cover):
-            if name and (not existing or name not in (existing["thumbnail_path"], existing["cover_art_path"])):
-                (THUMB_DIR / name).unlink(missing_ok=True)
         raise
     if existing:
         for c in ("thumbnail_path", "cover_art_path"):
@@ -222,12 +264,51 @@ def _import_one(db, filepath: Path, force_update: bool = False) -> dict | None:
                 except OSError:
                     logger.warning("旧缓存清理失败: {}", existing[c])
 
-    row = db.execute("SELECT * FROM media WHERE id = ?", (media_id,)).fetchone()
-    logger.info("imported: {} id={}", filepath.name, media_id)
-    return dict(row)
+    logger.info("imported: {} id={}", values["file_name"], media_id)
+    return row
 
 
-def _probe(filepath: Path, media_type: str) -> dict:
+def import_batch(db, paths):
+    """Bounded preparation, ordered commits and progress; discard uncommitted caches on disconnect."""
+    with ThreadPoolExecutor(max_workers=IMPORT_WORKERS, thread_name_prefix="media-import") as pool:
+        for offset in range(0, len(paths), IMPORT_BATCH_SIZE):
+            chunk = [Path(p) for p in paths[offset:offset + IMPORT_BATCH_SIZE]]
+            placeholders = ",".join("?" for _ in chunk)
+            known = {r[0] for r in db.execute(f"SELECT file_path FROM media WHERE file_path IN ({placeholders})",
+                                             [str(p) for p in chunk])}
+            pending = list(dict.fromkeys(p for p in chunk if str(p) not in known))
+            metadata = _run_exiftool_batch([p for p in pending if p.suffix.lower() in IMAGE_EXTS | VIDEO_EXTS])
+            futures = {p: pool.submit(_prepare_import, p, metadata.get(str(p))) for p in pending}
+            try:
+                for index, path in enumerate(chunk, offset + 1):
+                    event = {"done": index, "total": len(paths), "file_path": str(path)}
+                    future = futures.pop(path, None)
+                    try:
+                        result = _import_one(db, path, prepared=future.result()) if future else None
+                        if result:
+                            result.pop("embedding", None)
+                            event.update(type="ok", data=result)
+                        else:
+                            event.update(type="skip")
+                    except Exception as e:
+                        logger.exception("batch import failed: {} — {}", path, e)
+                        event.update(type="fail", error=str(e))
+                    yield event
+            finally:
+                # Running subprocesses finish within their timeouts. Do not write
+                # additional records after the client has stopped consuming SSE.
+                for future in futures.values():
+                    future.cancel()
+                for future in futures.values():
+                    if not future.cancelled():
+                        try:
+                            prepared = future.result()
+                            cleanup_thumbnails([prepared.get("thumbnail_path"), prepared.get("cover_art_path")])
+                        except Exception:
+                            pass
+
+
+def _probe(filepath: Path, media_type: str, exif_tags=None) -> dict:
     cmd = ["ffprobe", "-v", "quiet", "-print_format", "json",
            "-show_format", "-show_streams", str(filepath)]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=PROBE_TIMEOUT)
@@ -264,7 +345,7 @@ def _probe(filepath: Path, media_type: str) -> dict:
             or datetime.fromtimestamp(filepath.stat().st_mtime).isoformat()
         ),
     }
-    _exif_probe(filepath, meta)
+    _exif_probe(filepath, meta, exif_tags=exif_tags)
 
     # DJI D-Log M: detected from filename suffix _D (not in metadata)
     if not meta.get("picture_control") and meta.get("camera_make") == "DJI":
@@ -286,26 +367,31 @@ def _normalize_date(s: str) -> str:
 
 def _run_exiftool(filepath: Path) -> dict | None:
     """Run exiftool and return parsed tags dict, or None on failure."""
+    return _run_exiftool_batch([filepath]).get(str(filepath))
+
+
+def _run_exiftool_batch(paths) -> dict:
+    """One process for a small window of files; absent results retry individually."""
+    if not paths:
+        return {}
     if not shutil.which("exiftool"):
-        return None
+        return {}
     cmd = [
         "exiftool", "-json", "-a",
         "-Make", "-Model", "-CameraModelName", "-LensModel", "-Encoder",
         "-DateTimeOriginal", "-CreateDate",
-        "-ImageWidth", "-ImageHeight", "-Orientation", "-FileType", "-ColorSpace", "-Compression", "-BitsPerSample",
+        "-ImageWidth", "-ImageHeight", "-Orientation#", "-FileType", "-ColorSpace", "-Compression", "-BitsPerSample",
         "-PictureControlName",
-        str(filepath),
+        *[str(p) for p in paths],
     ]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=EXIFTOOL_TIMEOUT)
-        if result.returncode != 0:
-            return None
         data = json.loads(result.stdout)
         if data and isinstance(data, list):
-            return data[0]
+            return {item["SourceFile"]: item for item in data if "SourceFile" in item}
     except Exception:
         pass
-    return None
+    return {}
 
 
 def _apply_exif_tags(tags: dict, meta: dict):
@@ -339,6 +425,7 @@ def _apply_exif_tags(tags: dict, meta: dict):
             o = 1
         if o in (5, 6, 7, 8) and meta.get("width") and meta.get("height"):
             meta["width"], meta["height"] = meta["height"], meta["width"]
+        meta["_orientation"] = o
     if tags.get("FileType") and not meta.get("video_codec"):
         meta["video_codec"] = tags["FileType"]
     if tags.get("Compression") and not meta.get("video_profile"):
@@ -352,9 +439,9 @@ def _apply_exif_tags(tags: dict, meta: dict):
         meta["picture_control"] = tags["PictureControlName"].strip()
 
 
-def _exif_probe(filepath: Path, meta: dict):
+def _exif_probe(filepath: Path, meta: dict, exif_tags=None):
     """Enhance video metadata with exiftool (camera info fallback)."""
-    tags = _run_exiftool(filepath)
+    tags = exif_tags if exif_tags is not None else _run_exiftool(filepath)
     if tags:
         _apply_exif_tags(tags, meta)
 
@@ -411,7 +498,7 @@ def _probe_audio(filepath: Path) -> dict:
     return meta
 
 
-def _probe_image(filepath: Path) -> dict:
+def _probe_image(filepath: Path, exif_tags=None) -> dict:
     """Extract all image metadata via exiftool only."""
     meta = {
         "width": None, "height": None, "fps": None,
@@ -423,7 +510,7 @@ def _probe_image(filepath: Path) -> dict:
         "picture_control": None,
         "date_taken": _normalize_date(datetime.fromtimestamp(filepath.stat().st_mtime).isoformat()),
     }
-    tags = _run_exiftool(filepath)
+    tags = exif_tags if exif_tags is not None else _run_exiftool(filepath)
     if tags:
         _apply_exif_tags(tags, meta)
     return meta
@@ -434,7 +521,7 @@ def _get_exif_orientation(filepath: Path) -> int:
     if not shutil.which("exiftool"):
         return 1
     try:
-        cmd = ["exiftool", "-json", "-Orientation", str(filepath)]
+        cmd = ["exiftool", "-json", "-Orientation#", str(filepath)]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=EXIFTOOL_TIMEOUT)
         if result.returncode == 0:
             data = json.loads(result.stdout)
@@ -456,23 +543,41 @@ def _get_exif_orientation(filepath: Path) -> int:
 
 def _rotate_thumbnail(thumb_path: Path, orient: int):
     """Rotate an already-saved thumbnail JPEG according to EXIF orientation."""
-    if orient in (1, 2, 3, 4):
-        if orient == 3:
-            from PIL import Image
-            img = Image.open(thumb_path)
-            img = img.rotate(180, expand=True)
-            img.save(thumb_path, "JPEG", quality=85)
-    elif orient in (5, 6, 7, 8):
-        from PIL import Image
-        img = Image.open(thumb_path)
-        angle = 270 if orient in (5, 6) else 90
-        img = img.rotate(angle, expand=True)
-        img.save(thumb_path, "JPEG", quality=85)
+    if orient in range(2, 9):
+        from PIL import Image, ImageOps
+        with Image.open(thumb_path) as img:
+            img.getexif()[274] = orient
+            rotated = ImageOps.exif_transpose(img)
+            rotated.save(thumb_path, "JPEG", quality=85)
 
 
-def _generate_thumbnail(filepath: Path, media_type: str) -> str | None:
+def _generate_thumbnail(filepath: Path, media_type: str, image=None, orientation=None) -> str | None:
     thumb_name = f"{uuid.uuid4().hex}.jpg"
     thumb_path = THUMB_DIR / thumb_name
+    try:
+        result = _write_thumbnail(filepath, media_type, thumb_path, image, orientation)
+        if result:
+            return thumb_name
+    except BaseException:
+        thumb_path.unlink(missing_ok=True)
+        raise
+    thumb_path.unlink(missing_ok=True)
+    return None
+
+
+def _write_thumbnail(filepath, media_type, thumb_path, image, orientation):
+    thumb_name = thumb_path.name
+
+    # RAW often already contains a camera-rendered JPEG. Avoid a failed decoder
+    # and another orientation probe before trying that preview.
+    raw = filepath.suffix.lower() in RAW_EXTS
+    if raw and shutil.which("exiftool"):
+        try:
+            if _extract_exif_thumbnail(filepath, thumb_path, thumb_name):
+                _rotate_thumbnail(thumb_path, orientation if orientation is not None else _get_exif_orientation(filepath))
+                return thumb_name
+        except Exception:
+            thumb_path.unlink(missing_ok=True)
 
     if media_type == "video":
         if shutil.which("ffmpeg"):
@@ -503,20 +608,21 @@ def _generate_thumbnail(filepath: Path, media_type: str) -> str | None:
         # PIL: apply EXIF auto-rotation from camera
         try:
             from PIL import Image, ImageOps
-            img = Image.open(filepath)
-            img = ImageOps.exif_transpose(img)
+            from contextlib import nullcontext
+            with (nullcontext(image) if image is not None else Image.open(filepath)) as source:
+                img = ImageOps.exif_transpose(source)
             if img.mode != "RGB":
                 img = img.convert("RGB")
             w, h = img.size
             tw, th = 320, round(320 * h / w)
-            img = img.resize((tw, th), Image.LANCZOS)
+            img = img.resize((tw, max(1, th)), Image.LANCZOS, reducing_gap=3.0)
             img.save(thumb_path, "JPEG", quality=85)
             return thumb_name
         except Exception:
             pass
 
         # Get orientation for fallback paths
-        orient = _get_exif_orientation(filepath)
+        orient = orientation if orientation is not None else _get_exif_orientation(filepath)
 
         # Fallback: ffmpeg (raw pixels, rotate afterwards)
         if shutil.which("ffmpeg"):
@@ -529,8 +635,8 @@ def _generate_thumbnail(filepath: Path, media_type: str) -> str | None:
                 _rotate_thumbnail(thumb_path, orient)
                 return thumb_name
 
-        # Fallback: exiftool (RAW files)
-        if shutil.which("exiftool"):
+        # Embedded previews for other image formats (RAW was already tried above).
+        if not raw and shutil.which("exiftool"):
             try:
                 result = _extract_exif_thumbnail(filepath, thumb_path, thumb_name)
                 if result:
@@ -604,18 +710,18 @@ def _extract_exif_thumbnail(filepath: Path, thumb_path: Path, thumb_name: str) -
         cmd = ["exiftool", "-b", f"-{tag}", str(filepath)]
         result = subprocess.run(cmd, capture_output=True, timeout=EXIFTOOL_TIMEOUT)
         if result.returncode == 0 and len(result.stdout) > 100:
-            thumb_path.write_bytes(result.stdout)
-            if thumb_path.exists():
-                if shutil.which("ffmpeg"):
-                    tmp = thumb_path.with_suffix(".tmp.jpg")
-                    subprocess.run(
-                        ["ffmpeg", "-noautorotate", "-i", str(thumb_path),
-                         "-vf", "scale=320:-1", "-y", str(tmp)],
-                        capture_output=True, text=True, timeout=FFMPEG_TIMEOUT,
-                    )
-                    if tmp.exists():
-                        tmp.replace(thumb_path)
+            from PIL import Image
+            try:
+                with Image.open(io.BytesIO(result.stdout)) as img:
+                    # JPEG decoder downsampling is sufficient for a 320px preview.
+                    img.draft("RGB", (320, max(1, round(320 * img.height / img.width))))
+                    img = img.convert("RGB")
+                    img = img.resize((320, max(1, round(320 * img.height / img.width))),
+                                     Image.Resampling.LANCZOS, reducing_gap=3.0)
+                    img.save(thumb_path, "JPEG", quality=85)
                 return thumb_name
+            except (OSError, ValueError):
+                continue  # A damaged embedded preview must not prevent the other fallbacks.
     return None
 
 

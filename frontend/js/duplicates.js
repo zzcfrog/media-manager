@@ -1,6 +1,6 @@
 const DuplicatesPage = {
   template: `
-  <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative"
+  <div class="duplicates-workspace" style="flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative"
        @mousedown="startLasso" @contextmenu.prevent>
     <div class="filter-bar" @mousedown.stop>
       <q-btn flat dense icon="arrow_back" :label="t('dup.back')" color="grey-6" style="border-radius:6px;padding:3px 6px;font-size:13px" @click="goBack"></q-btn>

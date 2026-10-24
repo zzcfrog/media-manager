@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, nativeImage, Menu, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, nativeImage, nativeTheme, Menu, shell } = require("electron");
 const { spawn } = require("child_process");
 const path = require("path");
 const http = require("http");
@@ -6,7 +6,11 @@ const fs = require("fs");
 const crypto = require("crypto");
 const { runtimeConfig } = require("./runtime");
 
-app.setName("Media Manager");
+const APP_NAME = "映屿 · luminisle";
+app.setName(APP_NAME);
+// HTTP headers require an ASCII product token even when the display name is Chinese.
+app.userAgentFallback = app.userAgentFallback.replace(APP_NAME.replace(/\s/g, ""), "Luminisle");
+// Keep the existing profile and single-instance identity across the brand rename.
 app.setPath("userData", process.env.MEDIA_MANAGER_PROFILE || path.join(app.getPath("appData"), "Media Manager"));
 const hasLock = app.requestSingleInstanceLock();
 if (!hasLock) app.quit();
@@ -92,7 +96,7 @@ async function stopPython() {
 async function exportData() {
   const chosen = await dialog.showOpenDialog(win, { title: "选择迁移副本的保存位置", properties: ["openDirectory", "createDirectory"] });
   if (chosen.canceled) return;
-  const destination = path.join(chosen.filePaths[0], "Media-Manager-Data-" + new Date().toISOString().replace(/[:.]/g, "-"));
+  const destination = path.join(chosen.filePaths[0], "Luminisle-Data-" + new Date().toISOString().replace(/[:.]/g, "-"));
   try {
     const active = await getJSON("/api/desktop/activity");
     if (active.busy) throw new Error("仍有分析或模型下载任务，请等待任务结束再导出。");
@@ -137,7 +141,14 @@ function createWindow() {
     height: 900,
     minWidth: 1000,
     minHeight: 600,
-    title: "Media Manager",
+    title: APP_NAME,
+    ...(process.platform === "darwin" ? {
+      titleBarStyle: "hiddenInset",
+      trafficLightPosition: { x: 18, y: 20 },
+      vibrancy: "under-window",
+      visualEffectState: "followWindow",
+      backgroundColor: "#00000000",
+    } : {}),
     icon: path.join(__dirname, "icon.icns"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -163,8 +174,13 @@ app.on("ready", async () => {
   createMenu();
   if (process.platform === "darwin") {
     app.dock.setIcon(nativeImage.createFromPath(ICON));
-    app.setAboutPanelOptions({ applicationName: "Media Manager" });
+    app.setAboutPanelOptions({ applicationName: APP_NAME });
   }
+
+  ipcMain.handle("set-theme", (event, mode) => {
+    if (!["dark", "light", "auto"].includes(mode)) throw new Error("Invalid theme mode");
+    nativeTheme.themeSource = mode === "auto" ? "system" : mode;
+  });
 
   ipcMain.handle("select-files", async () => {
     const result = await dialog.showOpenDialog(win, {

@@ -1,0 +1,335 @@
+{
+  "validated_at": "2026-10-18T12:05:23.587321+00:00",
+  "scope": "Compact library header, aligned collapsed sidebar, shared folder selection and button geometry, fewer frame lines",
+  "browser": {
+    "passed": [
+      "No duplicate heading/count; filters begin at workspace top and inspector stays at far right",
+      "Folder hover/selection matches library navigation, with current folder in header",
+      "Collapsed library/favorites/duplicates/project/settings icons share one center line",
+      "Batch-analysis confirmation remains available in filter actions without running AI",
+      "Moved inspector control preserves keyboard activation and persisted state",
+      "Toolbar, filter, navigation and settings buttons use the same 10px corners",
+      "Main workspace, filters, inspector and footer omit redundant frame lines",
+      "Expanded layout fits 1000×600, 1280×800 and 1600×1000 in both themes",
+      "Favorites title and viewer/workbench controls remain consistent"
+    ],
+    "errors": [],
+    "writes": [],
+    "centers": [
+      {
+        "icon": "movie",
+        "x": 28.4375
+      },
+      {
+        "icon": "favorite_border",
+        "x": 28.4375
+      },
+      {
+        "icon": "content_copy",
+        "x": 28.4375
+      },
+      {
+        "icon": "dashboard",
+        "x": 28.4375
+      },
+      {
+        "icon": "settings",
+        "x": 28.4375
+      }
+    ],
+    "borders": [
+      {
+        "name": "library-workspace",
+        "top": "0px",
+        "left": "0px"
+      },
+      {
+        "name": "filter-bar",
+        "top": "0px",
+        "left": "0px"
+      },
+      {
+        "name": "media-inspector",
+        "top": "0px",
+        "left": "0px"
+      },
+      {
+        "name": "q-toolbar row no-wrap items-center gallery-footer",
+        "top": "0px",
+        "left": "0px"
+      }
+    ],
+    "realDataAccess": false,
+    "paidAI": false
+  },
+  "preservation": {
+    "event_and_model_bindings_unchanged": true,
+    "event_bindings": 430,
+    "v_model_bindings": 72
+  },
+  "frontend_regressions": {
+    "passed": 16,
+    "failed": 0
+  },
+  "python_regressions": {
+    "passed": 49,
+    "failed": 0
+  },
+  "desktop_runtime_paths": "passed",
+  "existing_browser_regressions": {
+    "passed": 15,
+    "failed": 0
+  },
+  "source_hashes": {
+    "frontend/index.html": "ffb4281fe25041527dd23472772fb5a2179cd2c126506b1cb7427c11702f049d",
+    "frontend/js/gallery.js": "a20cf012b5b64a166bdf544bd755683734a092ef8db4b5ef89f3730c2bd1e69a",
+    "frontend/css/native.css": "a4f911206d42dfd17fee6951609368fe72b6ad208cd49f1d756c444f84ad7aab",
+    "electron/package.json": "df364249a3763ea75e5d51d3d8c43eeab86154c27988d93293d9936c526f03a1",
+    "desktop_backend.py": "b49516e416fc134c5c613778208cc3c8a80b773fa264054330f31ca6445e51c4"
+  },
+  "screenshots": [
+    "docs/screenshots/mac-native-library.png",
+    "docs/screenshots/mac-native-sidebar-collapsed.png",
+    "docs/screenshots/mac-native-detail.png",
+    "docs/screenshots/mac-native-workbench.png"
+  ],
+  "real_data_writes_during_UI_tests": false,
+  "paid_AI_calls": false,
+  "delivery": "Installed 1.0.4, verified against live data, reopened normally; current-run installers and temporary resources removed",
+  "native_packaged": {
+    "passed": [
+      "No duplicate heading/count; filters begin at workspace top and inspector stays at far right",
+      "Folder hover/selection matches library navigation, with current folder in header",
+      "Collapsed library/favorites/duplicates/project/settings icons share one center line",
+      "Batch-analysis confirmation remains available in filter actions without running AI",
+      "Moved inspector control preserves keyboard activation and persisted state",
+      "Toolbar, filter, navigation and settings buttons use the same 10px corners",
+      "Main workspace, filters, inspector and footer omit redundant frame lines",
+      "Expanded layout fits 1000×600, 1280×800 and 1600×1000 in both themes",
+      "Favorites title and viewer/workbench controls remain consistent",
+      "Packaged 1.0.4 and native ZIP export work with isolated data"
+    ],
+    "errors": [],
+    "writes": [],
+    "centers": [
+      {
+        "icon": "movie",
+        "x": 28
+      },
+      {
+        "icon": "favorite_border",
+        "x": 28
+      },
+      {
+        "icon": "content_copy",
+        "x": 28
+      },
+      {
+        "icon": "dashboard",
+        "x": 28
+      },
+      {
+        "icon": "settings",
+        "x": 28
+      }
+    ],
+    "borders": [
+      {
+        "name": "library-workspace",
+        "top": "0px",
+        "left": "0px"
+      },
+      {
+        "name": "filter-bar",
+        "top": "0px",
+        "left": "0px"
+      },
+      {
+        "name": "media-inspector",
+        "top": "0px",
+        "left": "0px"
+      },
+      {
+        "name": "q-toolbar row no-wrap items-center gallery-footer",
+        "top": "0px",
+        "left": "0px"
+      }
+    ],
+    "runtime": {
+      "version": "1.0.4",
+      "packaged": true,
+      "profile": "/var/folders/c8/vyx6__614hs4kb2xs86z1vsh0000gn/T/video-analyzer-ui-polish-sjbjfsoj/native-profile",
+      "lights": {
+        "x": 18,
+        "y": 20
+      }
+    },
+    "realDataAccess": false,
+    "paidAI": false,
+    "upgrade_tables_preserved": true,
+    "upgrade_snapshot_matches": true,
+    "native_export_entries": [
+      "Synthetic project.fcpxml",
+      "Synthetic project.srt"
+    ],
+    "native_export_crc": "passed"
+  },
+  "package": {
+    "version": "1.0.4",
+    "frontend_files_matched_source": 31,
+    "no_private_database_config_or_gguf": true,
+    "no_external_app_symlinks": true,
+    "appId": "com.zack.media-manager",
+    "signature": "local ad-hoc; not notarized",
+    "artifacts": {
+      "Media-Manager-1.0.4-arm64.zip": {
+        "bytes": 445868053,
+        "sha256": "120c921d046a67122aefea7a170943c6aab3112fedba66d96c92f6c73bfe5231"
+      },
+      "Media-Manager-1.0.4-arm64.dmg": {
+        "bytes": 444900009,
+        "sha256": "d0686bd06e63fc69f1cb2cddc634a150d44cfbf0f15751d02d77ea874456eb9e"
+      }
+    },
+    "zip_crc": "passed",
+    "zip_entries": 5332
+  },
+  "local_update": {
+    "version": "1.0.4",
+    "from_version": "1.0.3",
+    "installed_application": "/Users/zack/Applications/Media Manager.app",
+    "signature_deep_strict": "passed for built, staged and installed app",
+    "dmg_checksum": "passed",
+    "production_smoke": {
+      "version": "1.0.4",
+      "application": "/Users/zack/Applications/Media Manager.app",
+      "runtime": {
+        "version": "1.0.4",
+        "packaged": true,
+        "profile": "/Users/zack/Library/Application Support/Media Manager",
+        "resources": "/Users/zack/Applications/Media Manager.app/Contents/Resources",
+        "lights": {
+          "x": 18,
+          "y": 20
+        }
+      },
+      "media": 9104,
+      "projects": 2,
+      "models": "/Users/zack/models",
+      "headerTitleVisible": true,
+      "noRedundantHeading": true,
+      "geometry": {
+        "topGap": 0,
+        "inspectorRightInset": 12
+      },
+      "collapsedIconCenterSpread": 0,
+      "pageErrors": [],
+      "apiWrites": [],
+      "modelPreloadSkippedDuringVerification": true,
+      "paidAI": false
+    },
+    "data_preservation": {
+      "version": "1.0.4",
+      "all_tables_preserved": true,
+      "tables": {
+        "collection_items": {
+          "rows": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "collections": {
+          "rows": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "dup_exclusions": {
+          "rows": 41,
+          "sha256": "9a01326159bf268afb4f8a7b1cd3edb4ad2e757ac46648cc5fc9536e4024e53d"
+        },
+        "media": {
+          "rows": 9104,
+          "sha256": "b14e5999a3d84cc07096c1766d6431ef847f39d9622f1aaf0ae14e0a28c8e001"
+        },
+        "media_fts": {
+          "rows": 9103,
+          "sha256": "465bd72610b9e1ea276516356497b02696443675d18074587607a1488d2fed96"
+        },
+        "media_segment": {
+          "rows": 4322,
+          "sha256": "1ff68ddde88602c646789f168430f5780bfc4861de367cf9fc414dbed53d2440"
+        },
+        "media_tags": {
+          "rows": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "music_segment": {
+          "rows": 1,
+          "sha256": "ffb35dc4d5e896c323dd03a6fa7c7f14a8df216b7f2b0e412eb2e68f5dab07fb"
+        },
+        "project_media": {
+          "rows": 188,
+          "sha256": "921f047866b0b1840e62a79e5ac9dde7c37d2c0c0a5448c8c86403f517764471"
+        },
+        "project_tracks": {
+          "rows": 607,
+          "sha256": "4a331399c04b93d8916e38ddf19cb9f35d3adf40704666b34177cf16ee3747b5"
+        },
+        "projects": {
+          "rows": 2,
+          "sha256": "2df5b1992489498e1338c0392c8825847a60744cf55d6e87d13be399eb6305f3"
+        },
+        "settings": {
+          "rows": 28,
+          "sha256": "b61635287fcd7592fbf6843fb7375e9b7bb39bbb09812915e522bfa9227ebb5d"
+        },
+        "tags": {
+          "rows": 2,
+          "sha256": "49bac70e094e8f108c0e45635859712a6e4ab807a6ec235ef55cc85a9794154a"
+        }
+      },
+      "protected_library_files_verified": 11270,
+      "previous_backups_preserved": 12,
+      "upgrade_snapshot": "/Users/zack/Library/Application Support/Media Manager/library/upgrade-backups/20261018-200213-0e6ef4dd.db",
+      "upgrade_snapshot_matches_before": true,
+      "external_model_metadata_and_links_unchanged": true,
+      "model_config_unchanged": true,
+      "source_materials_modified": false
+    },
+    "normal_launch": {
+      "version": "1.0.4",
+      "normal_launch": true,
+      "backend_pid": 34090
+    },
+    "model_verification": "Configuration SHA-256, external file sizes/mtime and symlink targets unchanged; weight contents were not rehashed.",
+    "cleanup": {
+      "complete": true,
+      "installers_retained": false,
+      "removed": [
+        "dist with DMG, ZIP, blockmaps, builder metadata and duplicate app",
+        "generated build/runtime, build/pyinstaller and build/tools",
+        "build/ui-polish temporary evidence consolidated in this JSON",
+        "synthetic media and fixture databases/servers",
+        "private pre-update data/profile copies and scratch scripts",
+        "previous application in temporary staging"
+      ],
+      "retained": [
+        "installed application",
+        "live library, existing backups and verified pre-upgrade snapshot",
+        "external models",
+        "source/dependency environments",
+        "unrelated earlier evaluation evidence and preview service"
+      ]
+    },
+    "auto_rollback_performed": false,
+    "after_cleanup": {
+      "normal_app_healthy": true,
+      "all_13_database_tables_unchanged": true,
+      "installed_css_matches_source": true,
+      "generated_build_and_installers_absent": true
+    }
+  },
+  "limitations": [
+    "Real cloud AI, full model inference and external NLE import were not retested.",
+    "Installer uses existing local ad-hoc signing; no Developer ID notarization."
+  ],
+  "git": "No commit or push.",
+  "completed_at": "2026-10-18T12:06:58.749521+00:00"
+}

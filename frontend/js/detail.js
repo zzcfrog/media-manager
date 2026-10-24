@@ -1,9 +1,13 @@
 const DetailPage = {
   template: `
-  <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
-    <q-toolbar style="border-bottom:1px solid var(--border);min-height:40px">
+  <div class="detail-workspace">
+    <q-toolbar class="detail-toolbar">
       <q-btn flat dense icon="arrow_back" :label="t('d.back')" color="grey-6" style="margin-right:6px;border-radius:6px;padding:3px 6px;font-size:13px" @click="goBack"></q-btn>
       <q-toolbar-title class="text-body2 text-weight-bold" style="font-size:13px">{{ media?.file_name || '' }}</q-toolbar-title>
+      <q-btn flat round dense icon="info_outline" :aria-label="t('d.file_info')" :aria-pressed="metadataExpanded"
+             :class="{'is-active': metadataExpanded}" @click="metadataExpanded = !metadataExpanded">
+        <q-tooltip :delay="600">{{ t('d.file_info') }}</q-tooltip>
+      </q-btn>
       <div class="filter-stars" style="margin-left:16px">
         <span v-for="n in 5" :key="n" class="star-btn" :class="{lit: media?.rating && n <= media.rating}" @click="setRating(media?.rating === n ? 0 : n)">★</span>
       </div>
@@ -18,10 +22,10 @@ const DetailPage = {
         <q-tooltip :delay="1000">{{ media?.has_xmp ? t('d.xmp_update') : t('d.xmp_write') }}</q-tooltip>
       </q-btn>
     </q-toolbar>
-    <div style="flex:1;display:flex;overflow:hidden">
+    <div class="detail-body">
       <div style="flex:1;display:flex;flex-direction:column;min-width:0">
         <div v-if="media?.media_type==='video'" style="flex:1;display:flex;flex-direction:column;min-height:0">
-          <div v-if="media" class="img-meta-bar">
+          <div v-if="media" v-show="metadataExpanded" class="img-meta-bar">
             <div class="img-meta-block">
               <div class="img-meta-title">{{ t('d.video') }}</div>
               <div style="display:flex;gap:14px;align-items:flex-start">
@@ -121,7 +125,7 @@ const DetailPage = {
           </div>
         </div>
         <div v-else-if="media?.media_type==='image'" style="flex:1;display:flex;flex-direction:column;min-height:0">
-          <div v-if="media" class="img-meta-bar">
+          <div v-if="media" v-show="metadataExpanded" class="img-meta-bar">
             <div class="img-meta-block">
               <div class="img-meta-title">{{ t('d.image') }}</div>
               <div class="meta-grid" style="gap:4px 14px">
@@ -168,7 +172,7 @@ const DetailPage = {
         </div>
         <!-- ═══ Audio (music) branch ═══ -->
         <div v-else-if="media?.media_type==='audio'" style="flex:1;display:flex;flex-direction:column;min-height:0">
-          <div class="img-meta-bar" style="flex-wrap:wrap;gap:6px 18px">
+          <div v-show="metadataExpanded" class="img-meta-bar" style="flex-wrap:wrap;gap:6px 18px">
             <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--text3)">
               <span class="meta-label">{{ t('d.music_track') }}</span><span style="color:var(--text2);min-width:120px">{{ media.music_title || media.file_name }}</span>
               <template v-if="media.music_artist"><span class="meta-label">{{ t('d.music_artist') }}</span><span style="color:var(--text2)">{{ media.music_artist }}</span></template>
@@ -239,6 +243,7 @@ const DetailPage = {
         </div>
       </div>
       <div class="detail-sidebar">
+        <div class="detail-inspector-title"><q-icon name="auto_awesome" size="16px"></q-icon>{{ t('ui.ai_analysis') }}</div>
         <!-- Analysis section -->
         <div v-if="analysis.status==='done' && analysis.segments?.length" style="border-top:1px solid var(--border);display:flex;flex-direction:column;flex:1;min-height:0">
           <div style="padding:10px 14px;font-size:12px;font-weight:600;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0">
@@ -427,6 +432,7 @@ const DetailPage = {
   data() {
     return {
       media: null, analysis: { status: "none", segments: [] },
+      metadataExpanded: false,
       imgLoading: false,
       imgZoom: 1,
       imgZooming: false,
@@ -1011,6 +1017,7 @@ const DetailPage = {
       this.deleteSegInfo = null;
     },
     async handleKey(e) {
+      if (e.target.closest('.appearance-picker, .appearance-menu')) return;
       if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable) return;
       const key = e.key;
       // Arrow left/right - prev/next

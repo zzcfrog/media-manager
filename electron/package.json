@@ -1,24 +1,25 @@
 {
   "name": "media-manager",
-  "productName": "Media Manager",
-  "version": "1.0.2",
+  "productName": "映屿 · luminisle",
+  "version": "1.0.10",
   "main": "main.js",
   "scripts": {
     "start": "ELECTRON_RUN_AS_NODE= electron .",
     "test": "node ../tests/desktop-runtime.cjs",
-    "build:mac": "electron-builder --mac dmg zip --arm64"
+    "build:icons": "python3 ../packaging/build_icons.py",
+    "build:mac": "npm run build:icons && electron-builder --mac dmg zip --arm64"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "Private local media library and AI analysis desktop application",
+  "description": "映屿 · luminisle — 私人影像与声音资料库",
   "devDependencies": {
     "electron": "^35.7.5",
     "electron-builder": "^26.15.3"
   },
   "build": {
     "appId": "com.zack.media-manager",
-    "productName": "Media Manager",
+    "productName": "映屿 · luminisle",
     "asar": true,
     "files": [
       "main.js",
@@ -56,7 +57,9 @@
       "icon": "icon.icns",
       "identity": "-",
       "hardenedRuntime": false,
-      "signIgnore": ["Contents/Resources/tools/exiftool/"],
+      "signIgnore": [
+        "Contents/Resources/tools/exiftool/"
+      ],
       "target": [
         "dmg",
         "zip"
@@ -64,7 +67,7 @@
       "entitlements": "../packaging/backend-entitlements.plist",
       "entitlementsInherit": "../packaging/backend-entitlements.plist"
     },
-    "artifactName": "Media-Manager-${version}-${arch}.${ext}",
+    "artifactName": "Luminisle-${version}-${arch}.${ext}",
     "dmg": {
       "contents": [
         {

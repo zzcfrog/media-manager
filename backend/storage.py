@@ -170,7 +170,7 @@ def library_lock(root):
         try:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            raise RuntimeError('资料库正在使用，请先退出 Media Manager') from None
+            raise RuntimeError('资料库正在使用，请先退出 映屿 · luminisle') from None
         try:
             yield
         finally:

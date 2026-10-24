@@ -1,0 +1,222 @@
+{
+  "completed_at": "2026-10-18T11:08:55.049063+00:00",
+  "status": "complete",
+  "version": "1.0.3",
+  "previous_version": "1.0.2",
+  "installed_application": "/Users/zack/Applications/Media Manager.app",
+  "release_scope": "Current macOS-style CSS / native vibrancy UI, inspector and prior verified interaction fixes; experimental refraction libraries remain evaluation-only.",
+  "build": {
+    "version": "1.0.3",
+    "frontend_files_matched_source": 31,
+    "private_database_config_or_gguf": [],
+    "bundled_dependency_onnx_only": [
+      "onnxruntime/datasets/logreg_iris.onnx",
+      "onnxruntime/datasets/mul_1.onnx",
+      "onnxruntime/datasets/sigmoid.onnx",
+      "faster_whisper/assets/silero_vad_v6.onnx"
+    ],
+    "external_symlinks": [],
+    "appId": "com.zack.media-manager",
+    "artifacts": {
+      "Media-Manager-1.0.3-arm64.dmg": {
+        "bytes": 444898262,
+        "sha256": "9a3bec3b2e942bda9a29ec942fada8a98662a37951945cbd5350058adc19cc5e"
+      },
+      "Media-Manager-1.0.3-arm64.zip": {
+        "bytes": 445868027,
+        "sha256": "f51e01a8df9c5366f9991c36b6d4fe53b064fd0aa35f5a6fd386933143b5b432"
+      }
+    },
+    "zip_crc_ok": true,
+    "zip_entries": 5332,
+    "signature": "local ad-hoc; not notarized"
+  },
+  "checks": {
+    "python_tests": {
+      "passed": 49,
+      "failed": 0
+    },
+    "frontend_checks": {
+      "passed": 16,
+      "failed": 0
+    },
+    "desktop_runtime_paths": "passed",
+    "source_and_lockfile_version": "1.0.3",
+    "frozen_backend_self_test": "passed",
+    "codesign_deep_strict": "passed for built, staged and installed app",
+    "dmg_checksum": "passed",
+    "packaged_smoke": {
+      "passed": [
+        "Packaged 1.0.3 starts bundled backend with native macOS chrome and isolated data",
+        "1.0.2 to 1.0.3 upgrade snapshot and all database tables preserve contents",
+        "Gallery view modes, empty search and reset work",
+        "All five settings tabs are accessible without saving",
+        "Bundled video, image zoom and audio previews work",
+        "Project timeline and native FCPXML/SRT ZIP export work",
+        "Minimum window size retains layout and settings actions"
+      ],
+      "errors": [],
+      "unexpectedWrites": [],
+      "failedRequests": [],
+      "mocked": [
+        "duplicate embedding backfill"
+      ],
+      "runtime": {
+        "version": "1.0.3",
+        "packaged": true,
+        "profile": "/var/folders/c8/vyx6__614hs4kb2xs86z1vsh0000gn/T/video-analyzer-update-1.0.3-6r_8_h78/synthetic-profile",
+        "buttonPosition": {
+          "x": 18,
+          "y": 20
+        },
+        "background": "#000000"
+      },
+      "exportEntries": [
+        "Synthetic project.fcpxml",
+        "Synthetic project.srt"
+      ],
+      "realDataAccess": false,
+      "paidAI": false
+    },
+    "read_only_real_database_rehearsal": {
+      "all_tables_preserved": true,
+      "upgrade_backup_matches": true
+    },
+    "installed_smoke": {
+      "version": "1.0.3",
+      "installedApplication": "/Users/zack/Applications/Media Manager.app",
+      "runtime": {
+        "version": "1.0.3",
+        "packaged": true,
+        "profile": "/Users/zack/Library/Application Support/Media Manager",
+        "resources": "/Users/zack/Applications/Media Manager.app/Contents/Resources",
+        "buttonPosition": {
+          "x": 18,
+          "y": 20
+        },
+        "library": "/Users/zack/Library/Application Support/Media Manager/library",
+        "models": "/Users/zack/models",
+        "hf": "/Users/zack/models/huggingface"
+      },
+      "media": 9104,
+      "projects": 2,
+      "nativeUI": true,
+      "settingsTabs": 5,
+      "pageErrors": [],
+      "apiWrites": [],
+      "realAIRequests": false,
+      "modelPreloadSkippedDuringVerification": true
+    },
+    "normal_launch": {
+      "normal_launch": true,
+      "version": "1.0.3",
+      "backend_pid": 9813
+    },
+    "after_cleanup": {
+      "normal_application_healthy": true,
+      "all_database_tables_still_equal": true,
+      "packaged_native_css_matches_source": true,
+      "dist_and_generated_build_artifacts_absent": true
+    }
+  },
+  "data_preservation": {
+    "version": "1.0.3",
+    "all_tables_preserved": true,
+    "tables": {
+      "collection_items": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "collections": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "dup_exclusions": {
+        "rows": 41,
+        "sha256": "9a01326159bf268afb4f8a7b1cd3edb4ad2e757ac46648cc5fc9536e4024e53d"
+      },
+      "media": {
+        "rows": 9104,
+        "sha256": "b14e5999a3d84cc07096c1766d6431ef847f39d9622f1aaf0ae14e0a28c8e001"
+      },
+      "media_fts": {
+        "rows": 9103,
+        "sha256": "465bd72610b9e1ea276516356497b02696443675d18074587607a1488d2fed96"
+      },
+      "media_segment": {
+        "rows": 4322,
+        "sha256": "1ff68ddde88602c646789f168430f5780bfc4861de367cf9fc414dbed53d2440"
+      },
+      "media_tags": {
+        "rows": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "music_segment": {
+        "rows": 1,
+        "sha256": "ffb35dc4d5e896c323dd03a6fa7c7f14a8df216b7f2b0e412eb2e68f5dab07fb"
+      },
+      "project_media": {
+        "rows": 188,
+        "sha256": "921f047866b0b1840e62a79e5ac9dde7c37d2c0c0a5448c8c86403f517764471"
+      },
+      "project_tracks": {
+        "rows": 607,
+        "sha256": "4a331399c04b93d8916e38ddf19cb9f35d3adf40704666b34177cf16ee3747b5"
+      },
+      "projects": {
+        "rows": 2,
+        "sha256": "2df5b1992489498e1338c0392c8825847a60744cf55d6e87d13be399eb6305f3"
+      },
+      "settings": {
+        "rows": 28,
+        "sha256": "b61635287fcd7592fbf6843fb7375e9b7bb39bbb09812915e522bfa9227ebb5d"
+      },
+      "tags": {
+        "rows": 2,
+        "sha256": "49bac70e094e8f108c0e45635859712a6e4ab807a6ec235ef55cc85a9794154a"
+      }
+    },
+    "protected_library_files_verified": 11270,
+    "existing_upgrade_backup_files_preserved": 8,
+    "upgrade_snapshot": "/Users/zack/Library/Application Support/Media Manager/library/upgrade-backups/20261018-190216-4950cce5.db",
+    "upgrade_snapshot_matches_before": true,
+    "external_model_files_and_links_unchanged": true,
+    "models_config_unchanged": true,
+    "marker": {
+      "format_version": 1,
+      "app_version": "1.0.3"
+    },
+    "no_source_materials_modified": true
+  },
+  "external_model_verification": "Unchanged configuration SHA-256, file sizes / modification times and symbolic-link targets; large weight contents were not rehashed.",
+  "privacy": "No credentials, real media names or settings values included in this record; temporary database/profile copies were private and are removed after successful verification.",
+  "limitations": [
+    "Local ad-hoc signature; no Apple Developer notarization",
+    "Cloud AI, full model inference and external NLE import were not retested; duplicate-page embedding backfill was mocked in synthetic smoke test",
+    "No hosted automatic updater; future versions replace the app while retaining the external library and model configuration"
+  ],
+  "safety": "No automatic rollback or database restore performed. Only the app was replaced; version startup created a new verified pre-upgrade snapshot.",
+  "git": "No commit or push performed",
+  "cleanup": {
+    "status": "complete",
+    "installers_retained": false,
+    "removed": [
+      "dist (DMG, ZIP, blockmaps, builder log, duplicate app)",
+      "build/runtime/backend",
+      "build/pyinstaller/backend",
+      "build/tools",
+      "build/local-update-1.0.3",
+      "previous app in temporary staging",
+      "private rehearsal / pre-update database and profile copies",
+      "synthetic fixture library / media",
+      "current-run scratch scripts"
+    ],
+    "retained": [
+      "installed 1.0.3 application",
+      "live library and verified upgrade snapshot",
+      "external models",
+      "source and dependency environments",
+      "unrelated prior evaluation evidence and existing preview service"
+    ]
+  }
+}

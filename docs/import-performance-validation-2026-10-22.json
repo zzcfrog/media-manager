@@ -1,0 +1,136 @@
+{
+  "date": "2026-10-22",
+  "status": "source verified; not packaged or installed",
+  "benchmark": {
+    "before": {
+      "kind": "synthetic SSD; warm model; no RAW or external-disk claim",
+      "inference": "local ResNet50 CPU",
+      "files": 16,
+      "source_sha256": {
+        "photo-00.jpg": "ac243d8badb109d4a3e2721a617e176a8f2b0d6b64eeb2261be0abb9c9b4d579",
+        "photo-01.jpg": "96dccdbe5ceb6b8018a2c12b3a35db9dba74afb2d448f6cd9328abd379833af3",
+        "photo-02.jpg": "3df74c309a7eb3d6e13a4f6ab0ccaafbe7dd8912e87ad62320b2e693d8f33ccb",
+        "photo-03.jpg": "284867ccd998e1a790394807751a9c619fbadfe6e1f59b62a652f21b4636c806",
+        "photo-04.jpg": "bb35be317f0898ae7e52b6637eeffcb81b606c7084286c827d76e7323cf44891",
+        "photo-05.jpg": "a6e5feda34cc8fdb2aa064aeab355281cc1b050f6d3f8c8ce485c24753fc7a0d",
+        "photo-06.jpg": "894061641fe7e9154b7ff285bfe837909870ae32946fe3f5e7046ad57c703623",
+        "photo-07.jpg": "eddb3b3d922d05fecaeeb6ece3d0911dd4c7305740fcf0ed57a18c06b3cc2c9b",
+        "photo-08.jpg": "82c6482f0fac9d182512e792cca1654e79633c265fa34a8c4edadb08c0ff5a9e",
+        "photo-09.jpg": "ffad3db2d231084ec60910443291764214abca2f75fa3970fe7848f5832c1f57",
+        "photo-10.jpg": "f2db2b3a703841dfe67bb20b4b08e92f1ec1eb0b00b1175e5248b375e4c70c41",
+        "photo-11.jpg": "6036d381826a036e2d275d903d1072af6843e8635c308214d6c3f63baf2c1266",
+        "video-00.mp4": "abbfbfcc44ee198852ec394933c3477fbf8e16623744dc561fb2fb6334986637",
+        "video-01.mp4": "abbfbfcc44ee198852ec394933c3477fbf8e16623744dc561fb2fb6334986637",
+        "video-02.mp4": "abbfbfcc44ee198852ec394933c3477fbf8e16623744dc561fb2fb6334986637",
+        "video-03.mp4": "abbfbfcc44ee198852ec394933c3477fbf8e16623744dc561fb2fb6334986637"
+      },
+      "rounds": [
+        {
+          "seconds": 13.468,
+          "first_item_seconds": 1.395,
+          "records_sha256": "b353bcf6abc615a8309d430fc2efa1d638973817d40f982fc796f452f191feac"
+        },
+        {
+          "seconds": 13.167,
+          "first_item_seconds": 1.04,
+          "records_sha256": "b353bcf6abc615a8309d430fc2efa1d638973817d40f982fc796f452f191feac"
+        },
+        {
+          "seconds": 13.124,
+          "first_item_seconds": 1.047,
+          "records_sha256": "b353bcf6abc615a8309d430fc2efa1d638973817d40f982fc796f452f191feac"
+        }
+      ],
+      "median_seconds": 13.167
+    },
+    "after": {
+      "kind": "synthetic SSD; warm model; no RAW or external-disk claim",
+      "inference": "local ResNet50 CPU",
+      "files": 16,
+      "source_sha256": {
+        "photo-00.jpg": "ac243d8badb109d4a3e2721a617e176a8f2b0d6b64eeb2261be0abb9c9b4d579",
+        "photo-01.jpg": "96dccdbe5ceb6b8018a2c12b3a35db9dba74afb2d448f6cd9328abd379833af3",
+        "photo-02.jpg": "3df74c309a7eb3d6e13a4f6ab0ccaafbe7dd8912e87ad62320b2e693d8f33ccb",
+        "photo-03.jpg": "284867ccd998e1a790394807751a9c619fbadfe6e1f59b62a652f21b4636c806",
+        "photo-04.jpg": "bb35be317f0898ae7e52b6637eeffcb81b606c7084286c827d76e7323cf44891",
+        "photo-05.jpg": "a6e5feda34cc8fdb2aa064aeab355281cc1b050f6d3f8c8ce485c24753fc7a0d",
+        "photo-06.jpg": "894061641fe7e9154b7ff285bfe837909870ae32946fe3f5e7046ad57c703623",
+        "photo-07.jpg": "eddb3b3d922d05fecaeeb6ece3d0911dd4c7305740fcf0ed57a18c06b3cc2c9b",
+        "photo-08.jpg": "82c6482f0fac9d182512e792cca1654e79633c265fa34a8c4edadb08c0ff5a9e",
+        "photo-09.jpg": "ffad3db2d231084ec60910443291764214abca2f75fa3970fe7848f5832c1f57",
+        "photo-10.jpg": "f2db2b3a703841dfe67bb20b4b08e92f1ec1eb0b00b1175e5248b375e4c70c41",
+        "photo-11.jpg": "6036d381826a036e2d275d903d1072af6843e8635c308214d6c3f63baf2c1266",
+        "video-00.mp4": "abbfbfcc44ee198852ec394933c3477fbf8e16623744dc561fb2fb6334986637",
+        "video-01.mp4": "abbfbfcc44ee198852ec394933c3477fbf8e16623744dc561fb2fb6334986637",
+        "video-02.mp4": "abbfbfcc44ee198852ec394933c3477fbf8e16623744dc561fb2fb6334986637",
+        "video-03.mp4": "abbfbfcc44ee198852ec394933c3477fbf8e16623744dc561fb2fb6334986637"
+      },
+      "rounds": [
+        {
+          "seconds": 5.114,
+          "first_item_seconds": 1.168,
+          "records_sha256": "b353bcf6abc615a8309d430fc2efa1d638973817d40f982fc796f452f191feac"
+        },
+        {
+          "seconds": 4.723,
+          "first_item_seconds": 0.863,
+          "records_sha256": "b353bcf6abc615a8309d430fc2efa1d638973817d40f982fc796f452f191feac"
+        },
+        {
+          "seconds": 4.649,
+          "first_item_seconds": 0.817,
+          "records_sha256": "b353bcf6abc615a8309d430fc2efa1d638973817d40f982fc796f452f191feac"
+        }
+      ],
+      "median_seconds": 4.723
+    },
+    "elapsed_reduction_percent": 64.13,
+    "throughput_ratio": 2.79,
+    "source_bytes_match": true,
+    "metadata_and_feature_bytes_match": true
+  },
+  "verification": {
+    "python_tests_passed": 61,
+    "new_import_tests_passed": 12,
+    "frontend_tests_passed": 16,
+    "desktop_runtime": "passed",
+    "browser": {
+      "checks": [
+        "real scan → two-worker video import → committed records and preview cards",
+        "completed preview opens actual media detail",
+        "repeat scan skips both previously imported sources",
+        "3,000 results virtualized, final card reachable and clickable; rendered cards=48",
+        "1,000px window retains the card grid without horizontal overflow",
+        "ongoing imports follow the newest row without rendering the full history",
+        "fragmented UTF-8, skips/failures counted in progress, interrupted stream does not claim completion",
+        "scan error retains the dialog and exposes retry guidance"
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "unexpectedConsoleErrors": [],
+      "httpErrors": []
+    },
+    "diff_check": "passed"
+  },
+  "isolation": {
+    "production_library_written": false,
+    "production_app_replaced": false,
+    "real_source_modified": false,
+    "database_schema_changed": false,
+    "paid_ai_called": false,
+    "test_service_stopped": true,
+    "temporary_test_data_removed": true
+  },
+  "limitations": [
+    "SSD synthetic JPEG/video benchmark, not an external-disk or real RAW benchmark",
+    "CoreML compiler temporary directory unavailable in sandbox; real local ResNet50 CPU used for benchmark",
+    "RAW preview, fallback and EXIF orientation covered by synthetic tests; real NEF color/performance not measured",
+    "No persistent background feature jobs in this iteration"
+  ],
+  "baseline_importer_sha256": "1146af70e42f0e50f64cd914ee5a102fe48b2d24444c95f1d20c0d363b20bc5f",
+  "versions": {
+    "platform": "macOS-26.7-arm64-arm-64bit",
+    "ffmpeg": "ffmpeg version 7.1.1 Copyright (c) 2000-2025 the FFmpeg developers",
+    "exiftool": "13.55"
+  }
+}

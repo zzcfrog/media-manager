@@ -1,0 +1,907 @@
+{
+  "validated_at": "2026-10-18T13:44:11.397632+00:00",
+  "scope": "Wider sidebar, tighter folder spacing and indentation, smaller neutral chevrons",
+  "changes": {
+    "expanded_sidebar_px": {
+      "before": 224,
+      "after": 256
+    },
+    "arrow_svg_px": {
+      "before": 16,
+      "after": 12
+    },
+    "arrow_hit_target_px": {
+      "width": 24,
+      "height": 28
+    },
+    "indentation_px": {
+      "before": 20,
+      "after": 16
+    },
+    "entry_gap_px": {
+      "before": 4,
+      "after": 0
+    },
+    "folder_horizontal_padding_px": {
+      "before": 9,
+      "after": 4
+    },
+    "icon_label_gap_px": {
+      "before": 8,
+      "after": 6
+    }
+  },
+  "browser": {
+    "passed": [
+      "Arrow click expands without selecting; folder click selects without expanding, with distinct open/closed icons",
+      "Hover and selected rounded backgrounds exclude the neutral disclosure target",
+      "Disclosure and folder have independent keyboard focus, Space and Enter actions without triggering gallery shortcuts",
+      "Theme changes recolor open and closed folder outlines while chevrons remain neutral",
+      "Folder context menu and picker selection/count fields retain their existing behavior",
+      "Dark/light layouts retain compact 16px indentation, aligned leaf icons/counts and long-name ellipsis at narrow widths; labels localize",
+      "Five-level folder names fit without colliding with right-aligned counts"
+    ],
+    "errors": [],
+    "consoleErrors": [],
+    "failedRequests": [],
+    "expectedCoverFallbacks": [],
+    "writes": [],
+    "realDataAccess": false,
+    "paidAI": false,
+    "minimumWindowRoutes": [
+      {
+        "route": "#/detail",
+        "geometry": {
+          "x": 256,
+          "width": 736,
+          "right": 992,
+          "bottom": 592,
+          "documentOverflow": false
+        }
+      },
+      {
+        "route": "#/workbench",
+        "geometry": {
+          "x": 256,
+          "width": 736,
+          "right": 992,
+          "bottom": 592,
+          "documentOverflow": false
+        }
+      }
+    ]
+  },
+  "layout_before": {
+    "phase": "before",
+    "measurements": [
+      {
+        "theme": "dark",
+        "width": 1000,
+        "height": 600,
+        "drawerStyle": "224px",
+        "tree": {
+          "x": 17,
+          "y": 160.1484375,
+          "width": 190,
+          "height": 179.671875,
+          "right": 207,
+          "bottom": 339.8203125
+        },
+        "arrow": {
+          "x": 21,
+          "y": 170.1484375,
+          "width": 16,
+          "height": 16,
+          "right": 37,
+          "bottom": 186.1484375
+        },
+        "target": {
+          "x": 17,
+          "y": 164.1484375,
+          "width": 24,
+          "height": 28,
+          "right": 41,
+          "bottom": 192.1484375
+        },
+        "arrowToIcon": 17,
+        "deepLabel": {
+          "x": 162,
+          "y": 307.8984375,
+          "width": 10.0078125,
+          "height": 19.5,
+          "right": 172.0078125,
+          "bottom": 327.3984375,
+          "scrollWidth": 52,
+          "clientWidth": 10
+        },
+        "count": {
+          "x": 180.0078125,
+          "y": 309.3984375,
+          "width": 17.9921875,
+          "height": 16.5,
+          "right": 198,
+          "bottom": 325.8984375
+        },
+        "documentOverflow": false,
+        "filter": {
+          "x": 224,
+          "y": 56,
+          "width": 768,
+          "height": 86.0078125,
+          "right": 992,
+          "bottom": 142.0078125
+        },
+        "actions": {
+          "x": 951.203125,
+          "y": 66,
+          "width": 28.796875,
+          "height": 30,
+          "right": 980,
+          "bottom": 96
+        },
+        "gallery": {
+          "x": 232,
+          "y": 142.0078125,
+          "width": 492,
+          "height": 407.9921875,
+          "right": 724,
+          "bottom": 550
+        },
+        "layoutViewportWidth": 1000
+      },
+      {
+        "theme": "dark",
+        "width": 1280,
+        "height": 800,
+        "drawerStyle": "224px",
+        "tree": {
+          "x": 17,
+          "y": 160.1484375,
+          "width": 190,
+          "height": 179.859375,
+          "right": 207,
+          "bottom": 340.0078125
+        },
+        "arrow": {
+          "x": 21,
+          "y": 170.1484375,
+          "width": 16,
+          "height": 16,
+          "right": 37,
+          "bottom": 186.1484375
+        },
+        "target": {
+          "x": 17,
+          "y": 164.1484375,
+          "width": 24,
+          "height": 28,
+          "right": 41,
+          "bottom": 192.1484375
+        },
+        "arrowToIcon": 17,
+        "deepLabel": {
+          "x": 162,
+          "y": 308.3984375,
+          "width": 10.0078125,
+          "height": 19.5,
+          "right": 172.0078125,
+          "bottom": 327.8984375,
+          "scrollWidth": 52,
+          "clientWidth": 10
+        },
+        "count": {
+          "x": 180.0078125,
+          "y": 309.8984375,
+          "width": 17.9921875,
+          "height": 16.5,
+          "right": 198,
+          "bottom": 326.3984375
+        },
+        "documentOverflow": false,
+        "filter": {
+          "x": 224,
+          "y": 56,
+          "width": 1048,
+          "height": 86.0078125,
+          "right": 1272,
+          "bottom": 142.0078125
+        },
+        "actions": {
+          "x": 1231.203125,
+          "y": 66,
+          "width": 28.796875,
+          "height": 30,
+          "right": 1260,
+          "bottom": 96
+        },
+        "gallery": {
+          "x": 232,
+          "y": 142.0078125,
+          "width": 736,
+          "height": 607.9921875,
+          "right": 968,
+          "bottom": 750
+        },
+        "layoutViewportWidth": 1280
+      },
+      {
+        "theme": "light",
+        "width": 1000,
+        "height": 600,
+        "drawerStyle": "224px",
+        "tree": {
+          "x": 17,
+          "y": 160.1484375,
+          "width": 190,
+          "height": 179.9921875,
+          "right": 207,
+          "bottom": 340.140625
+        },
+        "arrow": {
+          "x": 21,
+          "y": 170.1484375,
+          "width": 16,
+          "height": 16,
+          "right": 37,
+          "bottom": 186.1484375
+        },
+        "target": {
+          "x": 17,
+          "y": 164.1484375,
+          "width": 24,
+          "height": 28,
+          "right": 41,
+          "bottom": 192.1484375
+        },
+        "arrowToIcon": 17,
+        "deepLabel": {
+          "x": 162,
+          "y": 308.3984375,
+          "width": 10.0078125,
+          "height": 19.5,
+          "right": 172.0078125,
+          "bottom": 327.8984375,
+          "scrollWidth": 52,
+          "clientWidth": 10
+        },
+        "count": {
+          "x": 180.0078125,
+          "y": 309.8984375,
+          "width": 17.9921875,
+          "height": 16.5,
+          "right": 198,
+          "bottom": 326.3984375
+        },
+        "documentOverflow": false,
+        "filter": {
+          "x": 224,
+          "y": 56,
+          "width": 768,
+          "height": 86.0078125,
+          "right": 992,
+          "bottom": 142.0078125
+        },
+        "actions": {
+          "x": 951.203125,
+          "y": 66,
+          "width": 28.796875,
+          "height": 30,
+          "right": 980,
+          "bottom": 96
+        },
+        "gallery": {
+          "x": 232,
+          "y": 142.0078125,
+          "width": 492,
+          "height": 407.9921875,
+          "right": 724,
+          "bottom": 550
+        },
+        "layoutViewportWidth": 1000
+      },
+      {
+        "theme": "light",
+        "width": 1280,
+        "height": 800,
+        "drawerStyle": "224px",
+        "tree": {
+          "x": 17,
+          "y": 160.1484375,
+          "width": 190,
+          "height": 180,
+          "right": 207,
+          "bottom": 340.1484375
+        },
+        "arrow": {
+          "x": 21,
+          "y": 170.1484375,
+          "width": 16,
+          "height": 16,
+          "right": 37,
+          "bottom": 186.1484375
+        },
+        "target": {
+          "x": 17,
+          "y": 164.1484375,
+          "width": 24,
+          "height": 28,
+          "right": 41,
+          "bottom": 192.1484375
+        },
+        "arrowToIcon": 17,
+        "deepLabel": {
+          "x": 162,
+          "y": 308.3984375,
+          "width": 10.0078125,
+          "height": 19.5,
+          "right": 172.0078125,
+          "bottom": 327.8984375,
+          "scrollWidth": 52,
+          "clientWidth": 10
+        },
+        "count": {
+          "x": 180.0078125,
+          "y": 309.8984375,
+          "width": 17.9921875,
+          "height": 16.5,
+          "right": 198,
+          "bottom": 326.3984375
+        },
+        "documentOverflow": false,
+        "filter": {
+          "x": 224,
+          "y": 56,
+          "width": 1048,
+          "height": 86.0078125,
+          "right": 1272,
+          "bottom": 142.0078125
+        },
+        "actions": {
+          "x": 1231.203125,
+          "y": 66,
+          "width": 28.796875,
+          "height": 30,
+          "right": 1260,
+          "bottom": 96
+        },
+        "gallery": {
+          "x": 232,
+          "y": 142.0078125,
+          "width": 736,
+          "height": 607.9921875,
+          "right": 968,
+          "bottom": 750
+        },
+        "layoutViewportWidth": 1280
+      }
+    ],
+    "errors": [],
+    "failed": [],
+    "writes": [],
+    "realDataAccess": false,
+    "paidAI": false
+  },
+  "layout_after": {
+    "phase": "after",
+    "measurements": [
+      {
+        "theme": "dark",
+        "width": 1000,
+        "height": 600,
+        "drawerStyle": "256px",
+        "tree": {
+          "x": 17,
+          "y": 160.1484375,
+          "width": 222,
+          "height": 180,
+          "right": 239,
+          "bottom": 340.1484375
+        },
+        "arrow": {
+          "x": 23,
+          "y": 172.1484375,
+          "width": 12,
+          "height": 12,
+          "right": 35,
+          "bottom": 184.1484375
+        },
+        "target": {
+          "x": 17,
+          "y": 164.1484375,
+          "width": 24,
+          "height": 28,
+          "right": 41,
+          "bottom": 192.1484375
+        },
+        "arrowToIcon": 10,
+        "deepLabel": {
+          "x": 135,
+          "y": 308.3984375,
+          "width": 52,
+          "height": 19.5,
+          "right": 187,
+          "bottom": 327.8984375,
+          "scrollWidth": 52,
+          "clientWidth": 52
+        },
+        "count": {
+          "x": 217.0078125,
+          "y": 309.8984375,
+          "width": 17.9921875,
+          "height": 16.5,
+          "right": 235,
+          "bottom": 326.3984375
+        },
+        "documentOverflow": false,
+        "filter": {
+          "x": 256,
+          "y": 56,
+          "width": 736,
+          "height": 86.0078125,
+          "right": 992,
+          "bottom": 142.0078125
+        },
+        "actions": {
+          "x": 951.203125,
+          "y": 66,
+          "width": 28.796875,
+          "height": 30,
+          "right": 980,
+          "bottom": 96
+        },
+        "gallery": {
+          "x": 264,
+          "y": 142.0078125,
+          "width": 460,
+          "height": 407.9921875,
+          "right": 724,
+          "bottom": 550
+        },
+        "layoutViewportWidth": 1000
+      },
+      {
+        "theme": "dark",
+        "width": 1280,
+        "height": 800,
+        "drawerStyle": "256px",
+        "tree": {
+          "x": 17,
+          "y": 160.1484375,
+          "width": 222,
+          "height": 180,
+          "right": 239,
+          "bottom": 340.1484375
+        },
+        "arrow": {
+          "x": 23,
+          "y": 172.1484375,
+          "width": 12,
+          "height": 12,
+          "right": 35,
+          "bottom": 184.1484375
+        },
+        "target": {
+          "x": 17,
+          "y": 164.1484375,
+          "width": 24,
+          "height": 28,
+          "right": 41,
+          "bottom": 192.1484375
+        },
+        "arrowToIcon": 10,
+        "deepLabel": {
+          "x": 135,
+          "y": 308.3984375,
+          "width": 52,
+          "height": 19.5,
+          "right": 187,
+          "bottom": 327.8984375,
+          "scrollWidth": 52,
+          "clientWidth": 52
+        },
+        "count": {
+          "x": 217.0078125,
+          "y": 309.8984375,
+          "width": 17.9921875,
+          "height": 16.5,
+          "right": 235,
+          "bottom": 326.3984375
+        },
+        "documentOverflow": false,
+        "filter": {
+          "x": 256,
+          "y": 56,
+          "width": 1016,
+          "height": 86.0078125,
+          "right": 1272,
+          "bottom": 142.0078125
+        },
+        "actions": {
+          "x": 1231.203125,
+          "y": 66,
+          "width": 28.796875,
+          "height": 30,
+          "right": 1260,
+          "bottom": 96
+        },
+        "gallery": {
+          "x": 264,
+          "y": 142.0078125,
+          "width": 704,
+          "height": 607.9921875,
+          "right": 968,
+          "bottom": 750
+        },
+        "layoutViewportWidth": 1280
+      },
+      {
+        "theme": "light",
+        "width": 1000,
+        "height": 600,
+        "drawerStyle": "256px",
+        "tree": {
+          "x": 17,
+          "y": 160.1484375,
+          "width": 222,
+          "height": 180,
+          "right": 239,
+          "bottom": 340.1484375
+        },
+        "arrow": {
+          "x": 23,
+          "y": 172.1484375,
+          "width": 12,
+          "height": 12,
+          "right": 35,
+          "bottom": 184.1484375
+        },
+        "target": {
+          "x": 17,
+          "y": 164.1484375,
+          "width": 24,
+          "height": 28,
+          "right": 41,
+          "bottom": 192.1484375
+        },
+        "arrowToIcon": 10,
+        "deepLabel": {
+          "x": 135,
+          "y": 308.3984375,
+          "width": 52,
+          "height": 19.5,
+          "right": 187,
+          "bottom": 327.8984375,
+          "scrollWidth": 52,
+          "clientWidth": 52
+        },
+        "count": {
+          "x": 217.0078125,
+          "y": 309.8984375,
+          "width": 17.9921875,
+          "height": 16.5,
+          "right": 235,
+          "bottom": 326.3984375
+        },
+        "documentOverflow": false,
+        "filter": {
+          "x": 256,
+          "y": 56,
+          "width": 736,
+          "height": 86.0078125,
+          "right": 992,
+          "bottom": 142.0078125
+        },
+        "actions": {
+          "x": 951.203125,
+          "y": 66,
+          "width": 28.796875,
+          "height": 30,
+          "right": 980,
+          "bottom": 96
+        },
+        "gallery": {
+          "x": 264,
+          "y": 142.0078125,
+          "width": 460,
+          "height": 407.9921875,
+          "right": 724,
+          "bottom": 550
+        },
+        "layoutViewportWidth": 1000
+      },
+      {
+        "theme": "light",
+        "width": 1280,
+        "height": 800,
+        "drawerStyle": "256px",
+        "tree": {
+          "x": 17,
+          "y": 160.1484375,
+          "width": 222,
+          "height": 180,
+          "right": 239,
+          "bottom": 340.1484375
+        },
+        "arrow": {
+          "x": 23,
+          "y": 172.1484375,
+          "width": 12,
+          "height": 12,
+          "right": 35,
+          "bottom": 184.1484375
+        },
+        "target": {
+          "x": 17,
+          "y": 164.1484375,
+          "width": 24,
+          "height": 28,
+          "right": 41,
+          "bottom": 192.1484375
+        },
+        "arrowToIcon": 10,
+        "deepLabel": {
+          "x": 135,
+          "y": 308.3984375,
+          "width": 52,
+          "height": 19.5,
+          "right": 187,
+          "bottom": 327.8984375,
+          "scrollWidth": 52,
+          "clientWidth": 52
+        },
+        "count": {
+          "x": 217.0078125,
+          "y": 309.8984375,
+          "width": 17.9921875,
+          "height": 16.5,
+          "right": 235,
+          "bottom": 326.3984375
+        },
+        "documentOverflow": false,
+        "filter": {
+          "x": 256,
+          "y": 56,
+          "width": 1016,
+          "height": 86.0078125,
+          "right": 1272,
+          "bottom": 142.0078125
+        },
+        "actions": {
+          "x": 1231.203125,
+          "y": 66,
+          "width": 28.796875,
+          "height": 30,
+          "right": 1260,
+          "bottom": 96
+        },
+        "gallery": {
+          "x": 264,
+          "y": 142.0078125,
+          "width": 704,
+          "height": 607.9921875,
+          "right": 968,
+          "bottom": 750
+        },
+        "layoutViewportWidth": 1280
+      }
+    ],
+    "errors": [],
+    "failed": [],
+    "writes": [],
+    "realDataAccess": false,
+    "paidAI": false
+  },
+  "frontend_regressions": {
+    "passed": 16,
+    "failed": 0
+  },
+  "delivery": "Installed 1.0.6, verified against live data, reopened normally; current-run installers and temporary resources removed",
+  "git": "No commit or push.",
+  "limitations": [
+    "Cloud AI, full model inference and external NLE import not retested.",
+    "Installer uses local ad-hoc signing without Developer ID notarization."
+  ],
+  "python_regressions": {
+    "passed": 49,
+    "failed": 0
+  },
+  "desktop_runtime_paths": "passed",
+  "source_hashes": {
+    "frontend/index.html": "efe8a2aa8972720d1d9816dfcfc91027ee2b9681181b87dfe54cddab1c1ac34a",
+    "frontend/css/native.css": "97dd60b643eee0d1ed1fae9779fce5d3729cac8531921f109b3c657b87c03d6b",
+    "tests/folder-tree-regressions.cjs": "027e372a02d8ddfd4ec4b9b74b9a92f30da8ed7240ad6070f58db355fa750916",
+    "electron/package.json": "ca0b87cd2bf72f59a62eb765dadc69bd8c4a34e2dd3f062d5a513bf63f6df1e8",
+    "electron/package-lock.json": "5f480c5710dc32ddc0590b2980b825efb75c50c47186d87ac36b877669b9d410",
+    "desktop_backend.py": "4558570a91630a0de1d0882eb027e90a7217729d865795a423301ad7e7d98a01"
+  },
+  "native_packaged": {
+    "passed": [
+      "Arrow click expands without selecting; folder click selects without expanding, with distinct open/closed icons",
+      "Hover and selected rounded backgrounds exclude the neutral disclosure target",
+      "Disclosure and folder have independent keyboard focus, Space and Enter actions without triggering gallery shortcuts",
+      "Theme changes recolor open and closed folder outlines while chevrons remain neutral",
+      "Folder context menu and picker selection/count fields retain their existing behavior",
+      "Dark/light layouts retain compact 16px indentation, aligned leaf icons/counts and long-name ellipsis at narrow widths; labels localize",
+      "Five-level folder names fit without colliding with right-aligned counts"
+    ],
+    "errors": [],
+    "consoleErrors": [],
+    "failedRequests": [],
+    "expectedCoverFallbacks": [],
+    "writes": [],
+    "realDataAccess": false,
+    "paidAI": false,
+    "minimumWindowRoutes": [
+      {
+        "route": "#/detail",
+        "geometry": {
+          "x": 256,
+          "right": 992,
+          "bottom": 592,
+          "documentOverflow": false
+        }
+      },
+      {
+        "route": "#/workbench",
+        "geometry": {
+          "x": 256,
+          "right": 992,
+          "bottom": 592,
+          "documentOverflow": false
+        }
+      }
+    ],
+    "runtime": {
+      "version": "1.0.6",
+      "packaged": true,
+      "profile": "/var/folders/c8/vyx6__614hs4kb2xs86z1vsh0000gn/T/video-analyzer-folder-compact-h0qh6uqn/packaged-profile"
+    }
+  },
+  "package": {
+    "version": "1.0.6",
+    "frontend_files_matched_source": 31,
+    "signature_deep_strict": "passed; local ad-hoc",
+    "no_private_database_config_or_gguf": true,
+    "no_external_app_symlinks": true,
+    "dmg_checksum": "passed",
+    "zip_crc": "passed",
+    "artifacts": {
+      "Media-Manager-1.0.6-arm64.dmg": {
+        "bytes": 444908252,
+        "sha256": "6b5f2df9feb05a1f91f1f7987be2b5f3ffdd795be6f40dae0476d378daca475f"
+      },
+      "Media-Manager-1.0.6-arm64.zip": {
+        "bytes": 445869023,
+        "sha256": "936a629930d6de294aacf15e6bf065a6ce67ff1497ed27287a03503aba42aae0"
+      }
+    }
+  },
+  "synthetic_upgrade": {
+    "from_version": "1.0.5",
+    "to_version": "1.0.6",
+    "all_tables_preserved": true,
+    "snapshot_matches_before": true
+  },
+  "native_controls": {
+    "detail_video_visible_at_minimum_window": true,
+    "export_button_visible_at_minimum_window": true,
+    "export_confirmation_opened_then_cancelled": true,
+    "actual_export_created": false
+  },
+  "local_update": {
+    "version": "1.0.6",
+    "from_version": "1.0.5",
+    "installed_application": "/Users/zack/Applications/Media Manager.app",
+    "pre_update_copy_verified": true,
+    "signature_deep_strict": "passed for built, staged and installed app",
+    "production_smoke": {
+      "runtime": {
+        "version": "1.0.6",
+        "profile": "/Users/zack/Library/Application Support/Media Manager",
+        "packaged": true
+      },
+      "folderDisclosureIndependence": true,
+      "errors": [],
+      "writes": [],
+      "modelPreloadSkippedDuringVerification": true,
+      "paidAI": false
+    },
+    "data_preservation": {
+      "from_version": "1.0.5",
+      "version": "1.0.6",
+      "all_tables_preserved": true,
+      "tables": {
+        "collection_items": {
+          "rows": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "collections": {
+          "rows": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "dup_exclusions": {
+          "rows": 41,
+          "sha256": "9a01326159bf268afb4f8a7b1cd3edb4ad2e757ac46648cc5fc9536e4024e53d"
+        },
+        "media": {
+          "rows": 10960,
+          "sha256": "fa407592e0b0eee0b58cbdb2809ca290df120706251dd0b72eca093f21c6f7fd"
+        },
+        "media_fts": {
+          "rows": 10959,
+          "sha256": "3020fb6b23768f9518f80534f5bbb3145e569e1b0bff86fe62cc7bb3eb3cee32"
+        },
+        "media_segment": {
+          "rows": 4322,
+          "sha256": "1ff68ddde88602c646789f168430f5780bfc4861de367cf9fc414dbed53d2440"
+        },
+        "media_tags": {
+          "rows": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "music_segment": {
+          "rows": 1,
+          "sha256": "ffb35dc4d5e896c323dd03a6fa7c7f14a8df216b7f2b0e412eb2e68f5dab07fb"
+        },
+        "project_media": {
+          "rows": 188,
+          "sha256": "921f047866b0b1840e62a79e5ac9dde7c37d2c0c0a5448c8c86403f517764471"
+        },
+        "project_tracks": {
+          "rows": 607,
+          "sha256": "4a331399c04b93d8916e38ddf19cb9f35d3adf40704666b34177cf16ee3747b5"
+        },
+        "projects": {
+          "rows": 2,
+          "sha256": "2df5b1992489498e1338c0392c8825847a60744cf55d6e87d13be399eb6305f3"
+        },
+        "settings": {
+          "rows": 28,
+          "sha256": "b61635287fcd7592fbf6843fb7375e9b7bb39bbb09812915e522bfa9227ebb5d"
+        },
+        "tags": {
+          "rows": 2,
+          "sha256": "49bac70e094e8f108c0e45635859712a6e4ab807a6ec235ef55cc85a9794154a"
+        }
+      },
+      "protected_files_verified": 13143,
+      "existing_backup_files_preserved": 20,
+      "upgrade_snapshot": "/Users/zack/Library/Application Support/Media Manager/library/upgrade-backups/20261018-215251-ae89f01f.db",
+      "upgrade_snapshot_matches_before": true,
+      "model_metadata_and_links_unchanged": true,
+      "model_config_unchanged": true,
+      "source_materials_modified": false
+    },
+    "normal_launch": {
+      "version": "1.0.6",
+      "normal_launch": true,
+      "backend_pid": 86913
+    },
+    "model_verification": "Configuration SHA-256, external file sizes/mtime and symlink targets unchanged; model weight contents not rehashed.",
+    "auto_rollback_performed": false,
+    "cleanup": {
+      "complete": true,
+      "installers_retained": false,
+      "removed": [
+        "Current-run dist installers, blockmaps, metadata and duplicate app",
+        "Generated build/runtime, build/pyinstaller and build/tools",
+        "Current-run synthetic data, servers, profiles and scratch scripts",
+        "Verified temporary library/profile copy and previous 1.0.5 application"
+      ],
+      "retained": [
+        "Installed 1.0.6 application",
+        "Live library, existing backups and verified pre-upgrade database snapshot",
+        "External models and configuration",
+        "Source, dependency environments and earlier unrelated evidence/preview service"
+      ]
+    },
+    "after_cleanup": {
+      "normal_app_healthy": true,
+      "all_13_tables_unchanged": true,
+      "installed_frontend_matches_source": true,
+      "model_config_and_metadata_unchanged": true,
+      "generated_build_and_installers_absent": true
+    }
+  },
+  "completed_at": "2026-10-18T13:55:20.819223+00:00"
+}

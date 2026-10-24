@@ -2,6 +2,8 @@ const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
   isElectron: true,
+  platform: process.platform,
+  setTheme: (mode) => ipcRenderer.invoke("set-theme", mode),
   selectFiles: () => ipcRenderer.invoke("select-files"),
   selectDirectory: () => ipcRenderer.invoke("select-directory"),
   openInFinder: (path) => ipcRenderer.invoke("open-in-finder", path),

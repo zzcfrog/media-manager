@@ -10,6 +10,7 @@ const base=fixture.url;
  try{
   await page.request.post(base+'/api/creative/'+fixture.project_id+'/apply',{data:{plan:{acts:[{act_id:'a1',title:'Synthetic act',narratives:[{narrative_id:'n1',text:'Synthetic narrative',shots:[{segment_id:fixture.segment_ids[0]}]},{narrative_id:'n2',text:'Second narrative',shots:[{segment_id:fixture.segment_ids[1]}]}]}]}}});
   await page.goto(base+'/#/gallery');await page.locator('.media-card').nth(4).waitFor();
+  await page.evaluate(()=>document.fonts.ready);await page.waitForLoadState('networkidle');
   const boxes=await page.locator('.media-card').evaluateAll(els=>els.map(e=>{const b=e.getBoundingClientRect();return{x:b.x,y:b.y,width:b.width,height:b.height}}));
   const right=boxes.sort((a,b)=>b.x+b.width-a.x-a.width)[0];
   await page.mouse.click(right.x+right.width-3,right.y+right.height-8,{button:'right'});

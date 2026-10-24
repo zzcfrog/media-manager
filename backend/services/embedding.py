@@ -1,6 +1,7 @@
 import io
 import shutil
 import subprocess
+import threading
 from pathlib import Path
 
 from loguru import logger
@@ -11,6 +12,7 @@ from torchvision import transforms
 from ..config import RAW_EXTS, MODELS_ROOT
 
 _ort_session = None
+_session_lock = threading.Lock()
 _MODEL_PATH = MODELS_ROOT / "resnet50.onnx"
 _FFMPEG_TIMEOUT = 60
 
@@ -29,8 +31,10 @@ _UNUSUAL_MODES = ("I", "I;16", "I;16L", "I;16B", "CMYK", "YCbCr")
 def _get_session():
     global _ort_session
     if _ort_session is None:
-        providers = ["CoreMLExecutionProvider", "CPUExecutionProvider"]
-        _ort_session = ort.InferenceSession(str(_MODEL_PATH), providers=providers)
+        with _session_lock:
+            if _ort_session is None:
+                providers = ["CoreMLExecutionProvider", "CPUExecutionProvider"]
+                _ort_session = ort.InferenceSession(str(_MODEL_PATH), providers=providers)
     return _ort_session
 
 
@@ -76,12 +80,12 @@ def _load_image(filepath: Path, media_type: str, duration: float = None):
     return img
 
 
-def compute_embedding(filepath, media_type: str = "image", duration: float = None) -> bytes | None:
+def compute_embedding(filepath, media_type: str = "image", duration: float = None, image=None) -> bytes | None:
     """Extract ResNet50 feature vector (2048-d, L2-normalized) as bytes."""
     filepath = Path(filepath)
     if not filepath.exists():
         return None
-    img = _load_image(filepath, media_type, duration)
+    img = image if image is not None else _load_image(filepath, media_type, duration)
     if img is None:
         return None
     try:

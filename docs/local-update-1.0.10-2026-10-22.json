@@ -1,0 +1,139 @@
+{
+  "status": "complete",
+  "date": "2026-10-22",
+  "version": "1.0.10",
+  "previous_version": "1.0.9",
+  "installed_application": "/Users/zack/Applications/映屿 · luminisle.app",
+  "scope": "照片/视频导入提速；右键调整创建时间，支持 ±24 小时滑块及批量处理。",
+  "package_validation": {
+    "version": "1.0.10",
+    "appId": "com.zack.media-manager",
+    "frontend_files_match": 34,
+    "signature": "ad-hoc; deep strict verification passed",
+    "private_database_or_external_models_embedded": false,
+    "bundled_public_runtime_assets": [
+      "faster_whisper/assets/silero_vad_v6.onnx",
+      "onnxruntime/datasets/logreg_iris.onnx",
+      "onnxruntime/datasets/mul_1.onnx",
+      "onnxruntime/datasets/sigmoid.onnx"
+    ],
+    "upgrade_document_matches": true,
+    "artifacts": {
+      "Luminisle-1.0.10-arm64.zip": {
+        "bytes": 443233407,
+        "sha256": "cdce2d527695a5b4a32d8e24f050d3e3aa0f4b96c8e654cc395784bdf9e602f5"
+      },
+      "Luminisle-1.0.10-arm64.dmg": {
+        "bytes": 441672508,
+        "sha256": "4e737b05b57ab7f4f956644be3e87339c5363d7a6d62fcdecc854a2e03ccfb0a"
+      }
+    }
+  },
+  "packaged_smoke": {
+    "version": "1.0.10",
+    "isolated_library": true,
+    "packaged_imports": 3,
+    "reimport_skips": 3,
+    "real_external_resnet_image_features": true,
+    "creation_time_shifts": [
+      8,
+      -24
+    ],
+    "file_contents_mtime_inode_and_database_dates_preserved": true,
+    "new_frontend_served": true,
+    "paid_ai": false,
+    "real_media_modified": false
+  },
+  "installed_smoke": {
+    "normal_launch": true,
+    "health_version": "1.0.10",
+    "backend_from_installed_app": true,
+    "installed_signature_deep_strict_verified": true,
+    "native_ui_library_and_thumbnails_visible": true,
+    "native_ui_existing_projects_visible": true,
+    "creation_time_context_menu_visible": true,
+    "creation_time_dialog_range": [
+      -24,
+      24
+    ],
+    "zero_hours_apply_disabled": true,
+    "dialog_cancelled_without_applying": true,
+    "real_media_modified": false
+  },
+  "data_preservation": {
+    "all_tables_unchanged": true,
+    "tables_checked": 13,
+    "media": 10960,
+    "projects": 2,
+    "thumbnails_unchanged": true,
+    "model_config_unchanged": true,
+    "existing_backups_unchanged": true,
+    "upgrade_snapshots_verified": [
+      "upgrade-backups/20261022-191356-3a828ea0.db"
+    ],
+    "integrity": "ok"
+  },
+  "additional_checks": {
+    "python_tests": "70/70 passed",
+    "creation_time_frontend_tests": "8/8 passed",
+    "existing_frontend_regressions": "16/16 passed",
+    "desktop_runtime_paths": "passed",
+    "frozen_backend_self_test": {
+      "ok": true,
+      "runtime": "3.12.9",
+      "frozen": true
+    },
+    "source_feature_validation": "docs/creation-time-validation-2026-10-22.json",
+    "source_import_validation": "docs/import-performance-validation-2026-10-22.json",
+    "git_diff_check": "passed"
+  },
+  "limitations": [
+    "移动硬盘大批量和真实相机 RAW 性能未在本次升级中实测；合成数据收益不可直接外推。",
+    "生产资料库仅做读取和一致性核对；时间写入测试只作用于隔离合成素材。",
+    "本次没有重测云端 AI 或完整本地生成模型推理。",
+    "本地 ad-hoc 签名，没有 Developer ID 公证；未配置互联网自动更新。"
+  ],
+  "safety": "No data restore, rollback, source-media edits, paid AI calls, commit or push.",
+  "cleanup": {
+    "complete": true,
+    "build_preflight": {
+      "version": "1.0.10",
+      "paths": {
+        "dist": {
+          "existed_before_build": false
+        },
+        "build/runtime": {
+          "existed_before_build": false
+        },
+        "build/tools": {
+          "existed_before_build": false
+        },
+        "build/pyinstaller": {
+          "existed_before_build": false
+        },
+        "build/local-update-1.0.10": {
+          "existed_before_build": true
+        }
+      }
+    },
+    "scratch_directory_note": "build/local-update-1.0.10 was created by this task before recording the preflight.",
+    "old_application_moved_to_trash": "/Users/zack/.Trash/Luminisle-1.0.9-replaced-20261022-191348.app",
+    "trash_emptied": false,
+    "retained": [
+      "Installed application",
+      "Production library and all backups",
+      "External models",
+      "Source and build dependencies",
+      "Pre-existing build directories"
+    ],
+    "removed_current_run_generated_directories": [
+      "dist",
+      "build/runtime",
+      "build/tools",
+      "build/pyinstaller",
+      "build/local-update-1.0.10"
+    ],
+    "installers_retained": false,
+    "health_verified_after_cleanup": true
+  }
+}

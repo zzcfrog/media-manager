@@ -1,4 +1,12 @@
-# Media Manager 本地安装、升级与数据迁移
+# 映屿 · luminisle 本地安装、升级与数据迁移
+
+2026-10-22：1.0.10 优化照片/视频导入（小批次元数据读取、有界并发、RAW 内嵌预览与导入结果虚拟滚动），新增右键「调整创建时间」的 ±24 小时滑块及批量处理。创建时间调整仅写文件系统时间戳，不重写媒体内容；升级沿用现有资料库、标注、工程和外部模型路径。
+
+2026-10-22：1.0.9 修正音频波形缩略图的主题色同步，复用现有缩略图，不重新导入、解码或迁移素材；音频封面保持原色。
+
+2026-10-22：1.0.8 新增温润墨玉、宣纸水墨、暖木书房、月光瓷釉四套外观，每套支持亮色、暗色及跟随系统。仅改变色彩与材质，现有布局、资料库和外部模型路径保持兼容。
+
+2026-10-21：1.0.7 起，项目展示名称与图标更新为“映屿 · luminisle”，并修复深色界面与 macOS 窗口外观的同步。由旧名称的 1.0.6 升级时，继续读取现有资料；包标识 `com.zack.media-manager`、用户配置目录 `Media Manager`、资料库和外部模型路径保持兼容。
 
 本包适用于 macOS 26 或更新系统的 Apple Silicon Mac。程序自带 Python、依赖、ffmpeg/ffprobe、ExifTool 和 llama-server；本地模型和私人资料库独立保存。
 
@@ -28,9 +36,9 @@
 
 ## 安装和之后升级
 
-1. 打开 DMG，将 `Media Manager.app` 拖到“应用程序”或用户的 Applications 文件夹。
-2. 升级前退出旧版，再用新版替换 `.app`。
-3. 保持应用名称和数据目录不变。不要删除用户数据目录。
+1. 打开新版 DMG，将 `映屿 · luminisle.app` 放到“应用程序”或用户的 Applications 文件夹。
+2. 升级前退出旧版。首次从 `Media Manager.app` 改名升级时，Finder 不会按同名自动替换；先确认新版能读取原资料库，再移除旧应用文件或其 Dock 快捷方式。
+3. 展示名称可以更新，包标识和用户数据目录必须保持不变。不要删除用户数据目录；新版继续使用下文的 `Media Manager` 路径。
 4. 版本变更后的首次启动，在数据库初始化之前自动生成 `library/upgrade-backups` 快照。备份失败时停止启动，不继续迁移；现有备份不会被自动覆盖。
 5. 资料库格式比应用支持的版本更新时，应用拒绝打开，防止旧版本写坏新数据。
 
@@ -42,7 +50,7 @@
 
 应用菜单“资料库 → 导出完整迁移副本…”会在没有分析或下载任务时暂停后端，生成独立目录，并验证 SHA-256。导出成功后恢复服务；失败时保留原资料库及诊断现场，不自动覆盖、恢复或切换数据。
 
-本次已生成 `dist/Media-Manager-Data-2026-10-18` 目录，包含：
+此前生成的 `dist/Media-Manager-Data-2026-10-18` 已按用户要求清理。以后可从上述菜单重新导出，生成的目录包含：
 
 ```text
 library/     数据库、工程、标注、缩略图、既有备份
@@ -57,7 +65,7 @@ export.json  全部文件与链接的校验清单
 先退出应用。运行应用内自带的工具，无需安装 Python：
 
 ```bash
-TOOL="/Applications/Media Manager.app/Contents/Resources/backend/media-manager-backend"
+TOOL="/Applications/映屿 · luminisle.app/Contents/Resources/backend/media-manager-backend"
 "$TOOL" export --library "$HOME/Library/Application Support/Media Manager/library" \
   --profile "$HOME/Library/Application Support/Media Manager" \
   --destination "/你的备份盘/一个尚不存在的迁移目录"

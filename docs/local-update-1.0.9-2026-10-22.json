@@ -1,0 +1,178 @@
+{
+  "status": "complete",
+  "date": "2026-10-22",
+  "version": "1.0.9",
+  "previous_version": "1.0.8",
+  "installed_application": "/Users/zack/Applications/映屿 · luminisle.app",
+  "scope": "Audio waveform thumbnails follow the active theme in the library, inspector and workbench; existing cached JPEGs reused without reimporting source audio.",
+  "package_validation": {
+    "version": "1.0.9",
+    "appId": "com.zack.media-manager",
+    "frontend_files_match": 33,
+    "signature": "ad-hoc; deep strict verification passed",
+    "private_database_or_gguf_embedded": false,
+    "upgrade_document_matches": true
+  },
+  "packaged_smoke": {
+    "runtime": {
+      "version": "1.0.9",
+      "name": "映屿 · luminisle",
+      "packaged": true,
+      "profile": "/var/folders/c8/vyx6__614hs4kb2xs86z1vsh0000gn/T/luminisle-109-smoke-4gnodT/profile",
+      "resources": "/Users/zack/program/python/video_analyzer/dist/mac-arm64/映屿 · luminisle.app/Contents/Resources"
+    },
+    "titleAndIcon": true,
+    "waveformFilterPresent": true,
+    "waveform_themes_verified": 8,
+    "appearances": [
+      {
+        "theme": "jade",
+        "mode": "light",
+        "waveformPixels": 5824,
+        "backgroundPixels": 66705
+      },
+      {
+        "theme": "jade",
+        "mode": "dark",
+        "waveformPixels": 5824,
+        "backgroundPixels": 66694
+      },
+      {
+        "theme": "paper",
+        "mode": "light",
+        "waveformPixels": 5824,
+        "backgroundPixels": 67197
+      },
+      {
+        "theme": "paper",
+        "mode": "dark",
+        "waveformPixels": 5824,
+        "backgroundPixels": 66752
+      },
+      {
+        "theme": "study",
+        "mode": "light",
+        "waveformPixels": 5824,
+        "backgroundPixels": 66797
+      },
+      {
+        "theme": "study",
+        "mode": "dark",
+        "waveformPixels": 5824,
+        "backgroundPixels": 66762
+      },
+      {
+        "theme": "porcelain",
+        "mode": "light",
+        "waveformPixels": 5824,
+        "backgroundPixels": 67237
+      },
+      {
+        "theme": "porcelain",
+        "mode": "dark",
+        "waveformPixels": 5824,
+        "backgroundPixels": 66686
+      }
+    ],
+    "errors": [],
+    "failed": [],
+    "apiWrites": [],
+    "isolatedProfile": true,
+    "paidAI": false
+  },
+  "installed_smoke": {
+    "runtime": {
+      "version": "1.0.9",
+      "name": "映屿 · luminisle",
+      "packaged": true,
+      "profile": "/Users/zack/Library/Application Support/Media Manager",
+      "resources": "/Users/zack/Applications/映屿 · luminisle.app/Contents/Resources"
+    },
+    "titleAndIcon": true,
+    "waveformFilterPresent": true,
+    "libraryVisible": true,
+    "preferences_preserved": true,
+    "errors": [],
+    "consoleErrors": [],
+    "failed": [],
+    "apiWrites": [],
+    "isolatedProfile": false,
+    "paidAI": false
+  },
+  "normal_launch": {
+    "normal_launch": true,
+    "version": "1.0.9",
+    "backend_from_installed_app": true
+  },
+  "data_preservation": {
+    "all_tables_unchanged": true,
+    "tables_checked": 13,
+    "media": 10960,
+    "projects": 2,
+    "model_config_unchanged": true,
+    "existing_backups_unchanged": true,
+    "upgrade_snapshots_verified": [
+      "20261022-083736-a94ba85f.db"
+    ],
+    "integrity": "ok"
+  },
+  "additional_checks": {
+    "frontend_regressions": "16/16 passed",
+    "desktop_runtime_paths": "passed",
+    "frozen_backend_self_test": {
+      "ok": true,
+      "runtime": "3.12.9",
+      "frozen": true
+    },
+    "git_diff_check": "passed",
+    "source_waveform_validation": "docs/audio-thumbnail-theme-validation-2026-10-22.json"
+  },
+  "limitations": [
+    "Local ad-hoc signature; no Developer ID notarization",
+    "Cloud AI and full inference were not retested",
+    "Automatic internet updating is not configured"
+  ],
+  "safety": "No database restore or rollback. Existing library, models, settings and previous backups retained. No media edits, paid AI calls, commit or push.",
+  "cleanup": {
+    "complete": true,
+    "retained": [
+      "Installed 1.0.9 application",
+      "Existing library, verified upgrade snapshot and earlier backups",
+      "External models",
+      "Source, build dependencies and prior validation evidence"
+    ],
+    "validated_current_run_directories": {
+      "dist": {
+        "absent_before_this_build": true,
+        "created_at": 1792629322.907795
+      },
+      "build/runtime": {
+        "absent_before_this_build": true,
+        "created_at": 1792629105.1671324
+      },
+      "build/tools": {
+        "absent_before_this_build": true,
+        "created_at": 1792629094.3510494
+      },
+      "build/pyinstaller": {
+        "absent_before_this_build": true,
+        "created_at": 1792629105.1671965
+      },
+      "build/local-update-1.0.9": {
+        "absent_before_this_build": true,
+        "created_at": 1792629091.0801485
+      }
+    },
+    "removed_current_run_generated_directories": [
+      "dist",
+      "build/runtime",
+      "build/tools",
+      "build/pyinstaller",
+      "build/local-update-1.0.9"
+    ],
+    "old_application_moved_to_trash": "/Users/zack/.Trash/Luminisle-1.0.8-replaced-20261022.app",
+    "trash_emptied": false,
+    "installers_retained": false,
+    "health_verified_after_cleanup": true
+  }
+}

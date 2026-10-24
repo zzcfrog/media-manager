@@ -6,7 +6,7 @@ app = create_app()
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 6622))
     url = f"http://127.0.0.1:{port}"
-    print(f"Media Manager running at {url}")
+    print(f"映屿 · luminisle running at {url}")
     if not os.environ.get("ELECTRON"):
         import webbrowser
         webbrowser.open(url)

@@ -132,32 +132,34 @@ const ADVANCED_FILTER_SPEC = {
 
 const GalleryPage = {
   template: `
-  <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+  <div class="library-workspace">
     <!-- Filter bar: type, fav/analyzed, stars, colors, reset, search, sort, group, view -->
     <div class="filter-bar" :class="{ 'adv-open': advPanelOpen && currentSpec.length }">
+      <div class="filter-controls">
       <q-btn-group unelevated style="border-radius:6px;overflow:hidden">
-        <q-btn unelevated dense size="sm" label="ALL"
-               :style="filters.media_type==='all'?'background:var(--accent) !important;color:#fff !important':''"
+        <q-btn unelevated dense size="sm" :label="t('g.all')"
+               :style="filters.media_type==='all'?'background:var(--accent) !important;color:var(--on-accent) !important':''"
                @click="filters.media_type='all'; load()">
           <q-tooltip :delay="1000">{{ t('g.all') }}</q-tooltip>
         </q-btn>
-        <q-btn unelevated dense size="sm" icon="image"
-               :style="filters.media_type==='image'?'background:var(--accent) !important;color:#fff !important':''"
+        <q-btn unelevated dense size="sm" icon="image" :aria-label="t('g.images')"
+               :style="filters.media_type==='image'?'background:var(--accent) !important;color:var(--on-accent) !important':''"
                @click="filters.media_type='image'; load()">
           <q-tooltip :delay="1000">{{ t('g.images') }}</q-tooltip>
         </q-btn>
-        <q-btn unelevated dense size="sm" icon="smart_display"
-               :style="filters.media_type==='video'?'background:var(--accent) !important;color:#fff !important':''"
+        <q-btn unelevated dense size="sm" icon="smart_display" :aria-label="t('g.videos')"
+               :style="filters.media_type==='video'?'background:var(--accent) !important;color:var(--on-accent) !important':''"
                @click="filters.media_type='video'; load()">
           <q-tooltip :delay="1000">{{ t('g.videos') }}</q-tooltip>
         </q-btn>
-        <q-btn unelevated dense size="sm" icon="music_note"
-               :style="filters.media_type==='audio'?'background:var(--accent) !important;color:#fff !important':''"
+        <q-btn unelevated dense size="sm" icon="music_note" :aria-label="t('g.music')"
+               :style="filters.media_type==='audio'?'background:var(--accent) !important;color:var(--on-accent) !important':''"
                @click="filters.media_type='audio'; load()">
           <q-tooltip :delay="1000">{{ t('g.music') }}</q-tooltip>
         </q-btn>
       </q-btn-group>
       <q-btn v-if="currentSpec.length" flat dense size="sm" no-caps class="adv-toggle-btn"
+             :aria-label="t('g.adv_filter_panel')" :aria-expanded="advPanelOpen"
              :class="advPanelOpen ? 'adv-btn-open' : (advAnyActive() ? 'adv-btn-active' : '')"
              @click="advPanelOpen = !advPanelOpen">
         <q-icon name="tune" size="18px" style="margin-right:6px"></q-icon>
@@ -211,20 +213,29 @@ const GalleryPage = {
         :options="durGroupOptions" emit-value map-options
         style="min-width:100px" class="q-ml-xs"></q-select>
       <q-btn-group flat style="flex-shrink:0">
-        <q-btn flat dense icon="apps" size="md" @click="viewMode='grid'" :style="{color: viewMode==='grid' ? 'var(--accent)' : 'var(--text3)'}">
+        <q-btn flat dense icon="apps" size="md" :aria-label="t('g.grid_view')" @click="viewMode='grid'" :style="{color: viewMode==='grid' ? 'var(--accent)' : 'var(--text3)'}">
           <q-tooltip :delay="1000">{{ t('g.grid_view') }}</q-tooltip>
         </q-btn>
-        <q-btn flat dense icon="view_column" size="md" @click="viewMode='masonry'" :style="{color: viewMode==='masonry' ? 'var(--accent)' : 'var(--text3)'}">
+        <q-btn flat dense icon="view_column" size="md" :aria-label="t('g.masonry_view')" @click="viewMode='masonry'" :style="{color: viewMode==='masonry' ? 'var(--accent)' : 'var(--text3)'}">
           <q-tooltip :delay="1000">{{ t('g.masonry_view') }}</q-tooltip>
         </q-btn>
-        <q-btn flat dense size="md" @click="viewMode='justified'" :style="{color: viewMode==='justified' ? 'var(--accent)' : 'var(--text3)'}">
+        <q-btn flat dense size="md" :aria-label="t('g.justified_view')" @click="viewMode='justified'" :style="{color: viewMode==='justified' ? 'var(--accent)' : 'var(--text3)'}">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><rect x="1" y="3" width="18" height="4"/><rect x="1" y="8" width="18" height="4"/><rect x="1" y="13" width="18" height="4"/></svg>
           <q-tooltip :delay="1000">{{ t('g.justified_view') }}</q-tooltip>
         </q-btn>
-        <q-btn flat dense icon="list" size="md" @click="viewMode='list'" :style="{color: viewMode==='list' ? 'var(--accent)' : 'var(--text3)'}">
+        <q-btn flat dense icon="list" size="md" :aria-label="t('g.list_view')" @click="viewMode='list'" :style="{color: viewMode==='list' ? 'var(--accent)' : 'var(--text3)'}">
           <q-tooltip :delay="1000">{{ t('g.list_view') }}</q-tooltip>
         </q-btn>
       </q-btn-group>
+      </div>
+      <div v-if="!$root.pickerMode" class="filter-actions">
+        <q-btn v-if="selArr.length" unelevated dense no-caps color="primary" icon="auto_awesome" class="batch-analysis-btn"
+               :label="t('g.ctx_analyze_n', {n: selArr.length})" @click="openBatchAnalysisDialog()"></q-btn>
+        <q-btn flat round dense icon="info_outline" class="inspector-toggle" :aria-label="t('ui.inspector')"
+               :aria-pressed="inspectorOpen" :class="{'is-active': inspectorOpen}" @click="inspectorOpen = !inspectorOpen">
+          <q-tooltip :delay="600">{{ t('ui.inspector') }}</q-tooltip>
+        </q-btn>
+      </div>
     </div>
     <!-- 高级筛选面板：Office Ribbon 同屏组段式——每分组一段（组间竖分隔线 + 组底小字组名），组内维度固定两行网格；组段恒单行，放不下横向滚动 -->
     <div v-if="advPanelOpen && currentSpec.length" class="adv-filter-panel" ref="advPanel"
@@ -286,6 +297,7 @@ const GalleryPage = {
       </div>
     </div>
     <!-- Main gallery area with grid/list views and lasso selection -->
+    <div class="library-body">
     <div ref="galleryPage" class="gallery-page" @mousedown="startLasso" @contextmenu.prevent>
       <!-- Grid view: grouped with timeline -->
       <template v-if="items.length && viewMode==='grid' && groupedItems">
@@ -304,7 +316,7 @@ const GalleryPage = {
               <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
               <div class="thumb-wrap">
-                <img class="thumb" :src="thumbSrc(m)" :data-stage="thumbStage(m)" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
+                <img class="thumb" :src="thumbSrc(m)" :data-stage="thumbStage(m)" :class="{'audio-waveform-thumb': m.media_type==='audio' && thumbStage(m)==='waveform'}" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
                 <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
                 <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
                 <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
@@ -340,7 +352,7 @@ const GalleryPage = {
           <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
           <div class="thumb-wrap">
-            <img class="thumb" :src="thumbSrc(m)" :data-stage="thumbStage(m)" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
+            <img class="thumb" :src="thumbSrc(m)" :data-stage="thumbStage(m)" :class="{'audio-waveform-thumb': m.media_type==='audio' && thumbStage(m)==='waveform'}" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
             <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
             <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
             <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
@@ -378,7 +390,7 @@ const GalleryPage = {
               <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
               <div class="masonry-img">
-                <img :src="thumbSrc(m)" :data-stage="thumbStage(m)" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
+                <img :src="thumbSrc(m)" :data-stage="thumbStage(m)" :class="{'audio-waveform-thumb': m.media_type==='audio' && thumbStage(m)==='waveform'}" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
                 <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
                 <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
                 <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
@@ -408,7 +420,7 @@ const GalleryPage = {
           <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
           <div class="masonry-img">
-            <img :src="thumbSrc(m)" :data-stage="thumbStage(m)" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
+            <img :src="thumbSrc(m)" :data-stage="thumbStage(m)" :class="{'audio-waveform-thumb': m.media_type==='audio' && thumbStage(m)==='waveform'}" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
             <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
             <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
             <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
@@ -439,7 +451,7 @@ const GalleryPage = {
                    @contextmenu.prevent="showCtx($event, m)">
                 <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
-                <img :src="thumbSrc(m)" :data-stage="thumbStage(m)" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
+                <img :src="thumbSrc(m)" :data-stage="thumbStage(m)" :class="{'audio-waveform-thumb': m.media_type==='audio' && thumbStage(m)==='waveform'}" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
                 <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
                 <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
                 <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
@@ -468,7 +480,7 @@ const GalleryPage = {
                @contextmenu.prevent="showCtx($event, m)">
             <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
-            <img :src="thumbSrc(m)" :data-stage="thumbStage(m)" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
+            <img :src="thumbSrc(m)" :data-stage="thumbStage(m)" :class="{'audio-waveform-thumb': m.media_type==='audio' && thumbStage(m)==='waveform'}" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
             <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
             <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
             <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
@@ -497,7 +509,7 @@ const GalleryPage = {
                  @dblclick="openDetail(m.id)"
                  @contextmenu.prevent="showCtx($event, m)">
               <div class="row-thumb-wrap">
-                <img class="row-thumb" :src="thumbSrc(m)" :data-stage="thumbStage(m)" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
+                <img class="row-thumb" :src="thumbSrc(m)" :data-stage="thumbStage(m)" :class="{'audio-waveform-thumb': m.media_type==='audio' && thumbStage(m)==='waveform'}" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
                 <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
               </div>
               <div class="row-name" :title="m.file_name">{{ m.file_name }}</div>
@@ -538,7 +550,7 @@ const GalleryPage = {
              @dblclick="openDetail(m.id)"
              @contextmenu.prevent="showCtx($event, m)">
           <div class="row-thumb-wrap">
-            <img class="row-thumb" :src="thumbSrc(m)" :data-stage="thumbStage(m)" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
+            <img class="row-thumb" :src="thumbSrc(m)" :data-stage="thumbStage(m)" :class="{'audio-waveform-thumb': m.media_type==='audio' && thumbStage(m)==='waveform'}" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
             <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
           </div>
           <div class="row-name" :title="m.file_name">{{ m.file_name }}</div>
@@ -565,6 +577,9 @@ const GalleryPage = {
       <div v-if="loadingMore" class="load-more-spinner">
         <q-spinner-dots color="grey-6" size="28px"></q-spinner-dots>
       </div>
+    </div>
+    <media-inspector v-if="!$root.pickerMode && inspectorOpen" :media="inspectedMedia" :selection-count="selArr.length"
+                     @close="inspectorOpen=false" @open="openDetail" @analyze="openBatchAnalysisDialog()"></media-inspector>
     </div>
     <q-toolbar class="gallery-footer" style="border-top:1px solid var(--border);min-height:36px;flex-shrink:0;position:relative">
       <span class="text-caption" style="color:var(--text3)">{{ t('g.total', {n: total}) }}
@@ -625,6 +640,10 @@ const GalleryPage = {
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="time_to_leave" size="14px" color="grey-6"></q-icon></q-item-section>
           <q-item-section>{{ selArr.length > 1 ? t('g.ctx_adjust_time_n', {n: selArr.length}) : t('g.ctx_adjust_time') }}</q-item-section>
         </q-item>
+        <q-item clickable @click="openAdjustTime('creation')" style="padding-left:8px;padding-right:12px">
+          <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="more_time" size="14px" color="grey-6"></q-icon></q-item-section>
+          <q-item-section>{{ selArr.length > 1 ? t('g.ctx_adjust_creation_time_n', {n: selArr.length}) : t('g.ctx_adjust_creation_time') }}</q-item-section>
+        </q-item>
         <q-separator style="background:var(--border)"></q-separator>
         <q-item clickable @click="ctxMenu.show = false; deleteCtx()" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="delete_outline" size="14px" color="negative"></q-icon></q-item-section>
@@ -667,24 +686,24 @@ const GalleryPage = {
         </q-card-actions>
       </q-card>
     </q-dialog>
-    <!-- 拍摄时间时区调整 -->
+    <!-- 拍摄时间 / 文件创建时间调整 -->
     <q-dialog v-model="adjustTime.show">
       <q-card style="min-width:380px" class="dialog-card">
         <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" v-close-popup></q-btn>
         <q-card-section>
-          <div class="text-h6">{{ t('g.adjust_time_title') }}</div>
+          <div class="text-h6">{{ t(adjustTime.kind === 'creation' ? 'g.adjust_creation_time_title' : 'g.adjust_time_title') }}</div>
         </q-card-section>
         <q-card-section>
-          <p class="text-body2">{{ t('g.adjust_time_msg', {n: selArr.length}) }}</p>
+          <p class="text-body2">{{ t(adjustTime.kind === 'creation' ? 'g.adjust_creation_time_msg' : 'g.adjust_time_msg', {n: adjustTime.ids.length}) }}</p>
           <div style="display:flex;align-items:center;gap:12px;margin:8px 4px 4px">
             <span style="font-size:12px;color:var(--text3)">-24h</span>
             <q-slider v-model="adjustTime.hours" :min="-24" :max="24" :step="1" label :label-value="adjustTime.hours + 'h'" color="primary" style="flex:1"></q-slider>
             <span style="font-size:12px;color:var(--text3)">+24h</span>
           </div>
           <p class="text-caption" :style="{color: adjustTime.hours > 0 ? 'var(--accent)' : (adjustTime.hours < 0 ? 'var(--accent)' : 'var(--text3)')}">
-            {{ adjustTime.hours > 0 ? t('g.adjust_time_later', {n: adjustTime.hours}) : (adjustTime.hours < 0 ? t('g.adjust_time_earlier', {n: -adjustTime.hours}) : t('g.adjust_time_zero')) }}
+            {{ adjustTime.hours > 0 ? t(adjustTime.kind === 'creation' ? 'g.adjust_creation_time_later' : 'g.adjust_time_later', {n: adjustTime.hours}) : (adjustTime.hours < 0 ? t(adjustTime.kind === 'creation' ? 'g.adjust_creation_time_earlier' : 'g.adjust_time_earlier', {n: -adjustTime.hours}) : t('g.adjust_time_zero')) }}
           </p>
-          <p class="text-caption text-orange-8" style="margin-top:8px">⚠ {{ t('g.adjust_time_warn') }}</p>
+          <p class="text-caption text-orange-8" style="margin-top:8px">⚠ {{ t(adjustTime.kind === 'creation' ? 'g.adjust_creation_time_warn' : 'g.adjust_time_warn') }}</p>
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat :label="t('g.cancel')" @click="adjustTime.show=false"></q-btn>
@@ -904,10 +923,11 @@ const GalleryPage = {
       items: [], loadError: '', total: 0, page: 1, perPage: 60, loading: false, loadingMore: false, allLoaded: false, viewMode: "grid", searchText: "",
       sortBy: "imported_at", sortOrder: "desc", gridScale: 1, masonryCols: 5, justifiedRowH: 220,
       selArr: [], _allSelected: false, lasso: null, lastClickIdx: -1,
+      inspectorOpen: localStorage.getItem('libraryInspector') !== 'false',
       ctxMenu: { show: false, item: null, x: 0, y: 0 },
       confirmDelete: { show: false, id: null, name: "" },
       confirmBatch: { show: false },
-      adjustTime: { show: false, hours: 0 },
+      adjustTime: { show: false, hours: 0, kind: 'shooting', ids: [] },
       fileOpProgress: { show: false, done: 0, total: 0, updated: 0, errors: 0, label: "" },
       showBatchAnalysisDialog: false,
       batchAnalysisInfo: { videos: 0, images: 0, analyzedCount: 0, videoModel: '', imageModel: '', existingAction: 'reanalyze' },
@@ -930,6 +950,9 @@ const GalleryPage = {
     };
   },
   watch: {
+    inspectorOpen(value) {
+      if (!this.$root.pickerMode) localStorage.setItem('libraryInspector', String(value));
+    },
     sortBy(val) {
       const isTime = val === "imported_at" || val === "date_taken";
       const isDur = val === "duration";
@@ -949,6 +972,9 @@ const GalleryPage = {
     },
   },
   computed: {
+    inspectedMedia() {
+      return this.selArr.length === 1 ? this.items.find(item => item.id === this.selArr[0]) || null : null;
+    },
     currentSpec() {
       return ADVANCED_FILTER_SPEC[this.filters.media_type] || [];
     },
@@ -1638,6 +1664,8 @@ const GalleryPage = {
       if (this.$root.pickerMode && !this._isPicker) return;
       if (!this.$root.pickerMode && this.$root.currentView !== "gallery") return;
       const key = e.key;
+      if (['Enter', ' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key) &&
+          e.target.closest('button, a, [role="button"], [role="combobox"], [role="slider"], [role="tab"], [role="option"]')) return;
       // Arrow keys - move selection
       if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(key)) {
         e.preventDefault(); e.stopPropagation();
@@ -1770,26 +1798,30 @@ const GalleryPage = {
         this.load && this.load();
       });
     },
-    openAdjustTime() {
-      this.adjustTime.hours = 0;
-      this.adjustTime.show = true;
+    openAdjustTime(kind = 'shooting') {
+      this.ctxMenu.show = false;
+      if (!this.selArr.length || this.fileOpProgress.show) return;
+      this.adjustTime = { show: true, hours: 0, kind, ids: [...this.selArr] };
     },
     async doAdjustTime() {
-      const hours = this.adjustTime.hours;
+      const { hours, kind, ids } = this.adjustTime;
+      if (!hours || !ids.length || this.fileOpProgress.show) return;
+      const creation = kind === 'creation';
       this.adjustTime.show = false;
       const res = await this._streamFileOp(
-        "/api/library/shift-shooting-time", { ids: [...this.selArr], hours }, "g.adjust_time_progress"
+        creation ? "/api/library/shift-creation-time" : "/api/library/shift-shooting-time",
+        { ids: [...ids], hours }, creation ? "g.adjust_creation_time_progress" : "g.adjust_time_progress"
       );
       if (!res) return;
       const errs = res.errors || 0;
       Quasar.Notify.create({
         type: errs > 0 && !(res.updated > 0) ? "negative" : (errs > 0 ? "warning" : "positive"),
         position: "top", timeout: errs > 0 ? 6000 : 4000,
-        message: this.t("g.adjust_time_done", {
+        message: this.t(creation ? "g.adjust_creation_time_done" : "g.adjust_time_done", {
           hours: (hours > 0 ? "+" : "") + hours,
           updated: res.updated, skipped: res.skipped, errors: errs,
         })
-        + (errs > 0 ? "  ⚠ " + this.t("g.file_op_errors_hint") : ""),
+        + (errs > 0 ? "  ⚠ " + this.t(creation ? "g.creation_time_errors_hint" : "g.file_op_errors_hint") : ""),
       });
       this.load && this.load();
     },
@@ -1832,6 +1864,7 @@ const GalleryPage = {
             }
           }
         }
+        if (!finalEv) throw new Error(this.t("g.file_op_interrupted"));
       } catch (e) {
         this.fileOpProgress.show = false;
         Quasar.Notify.create({

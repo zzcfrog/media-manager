@@ -3,19 +3,42 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Media Manager</title>
+<title>映屿 · luminisle</title>
+<link rel="icon" href="/static/icon.png?v=luminisle-1">
+<link rel="preload" href="/static/fonts/MaterialIcons-Regular.ttf" as="font" type="font/ttf" crossorigin>
 <link rel="stylesheet" href="/static/css/quasar.prod.css">
 <link rel="stylesheet" href="/static/css/material-icons.css">
 <link rel="stylesheet" href="/static/css/main.css?v=20260608b">
+<link rel="stylesheet" href="/static/css/native.css?v=20261018-folders-compact">
+<script src="/static/js/appearance.js?v=20261021"></script>
+<link rel="stylesheet" href="/static/css/themes.css?v=20261022-waveform">
 </head>
-<body>
+<body class="native-ui">
+<!-- Existing audio thumbnails are blue waveforms on black. Recolor their blue-channel
+     coverage at display time, including cached thumbnails whose sources are offline. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <filter id="audio-thumbnail-theme" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 1 0 0" result="waveform"></feColorMatrix>
+      <feFlood style="flood-color:var(--accent)" result="ink"></feFlood>
+      <feComposite in="ink" in2="waveform" operator="in" result="colored-waveform"></feComposite>
+      <feFlood style="flood-color:var(--surface2)" result="paper"></feFlood>
+      <feComposite in="colored-waveform" in2="paper" operator="over"></feComposite>
+    </filter>
+  </defs>
+</svg>
 <div id="app">
   <q-layout view="hHh LpR fF" style="height:100vh">
     <!-- Top bar -->
-    <q-header style="height:40px;border-bottom:1px solid var(--border)">
-      <q-toolbar style="min-height:40px;height:40px">
-        <img src="/static/icon.png" style="width:24px;height:24px;border-radius:5px">
-        <span class="text-weight-bold" style="font-size:13px;margin:0 8px;color:var(--accent)">MediaManager</span>
+    <q-header class="app-header">
+      <q-toolbar class="app-toolbar">
+        <q-btn flat round dense icon="vertical_split" class="sidebar-toggle" :aria-label="t('side.collapse')"
+               :aria-pressed="!drawerMini" @click="drawerMini = !drawerMini">
+          <q-tooltip :delay="600">{{ t('side.collapse') }}</q-tooltip>
+        </q-btn>
+        <div class="app-wordmark"><img src="/static/icon.png?v=luminisle-1" alt=""><span>映屿 · luminisle</span></div>
+        <span class="app-toolbar-divider"></span>
+        <h1 class="app-section-title" :title="currentView==='gallery' && selectedFolder ? selectedFolder : workspaceTitle">{{ workspaceTitle }}</h1>
         <q-space></q-space>
         <template v-if="bgTasks.length">
           <div class="bg-task-bar">
@@ -43,33 +66,35 @@
             </div>
           </q-menu>
         </template>
-        <q-btn flat round dense icon="palette" size="sm" color="grey-6">
-	          <q-tooltip :delay="1000">{{ t('top.accent_color') }}</q-tooltip>
-          <q-menu anchor="bottom right" self="top right">
-            <div style="padding:12px;min-width:200px" class="bg-menu-popup">
-              <div class="text-caption text-grey-5 q-mb-sm">{{ t('s.accent') }}</div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap">
-                <span v-for="c in skinColors" :key="c.value" class="skin-dot"
-                      :style="{background: c.color}" :class="{active: accentColor===c.value}"
-                      @click="setAccentColor(c.value)"></span>
-              </div>
+        <q-btn flat dense no-caps icon="add" :label="t('side.import')" class="app-import" @click="openImport"></q-btn>
+        <div class="app-tools">
+        <q-btn flat round dense icon="palette" size="sm" color="grey-6" class="appearance-trigger"
+               :aria-label="t('appearance.title')" :aria-expanded="showAppearance" aria-haspopup="dialog">
+          <q-tooltip :delay="600">{{ t('appearance.title') }}</q-tooltip>
+          <q-menu v-model="showAppearance" anchor="bottom right" self="top right" :offset="[0, 10]"
+                  class="appearance-menu" role="dialog" :aria-label="t('appearance.title')" @keydown.stop @keydown.esc.prevent="showAppearance = false">
+            <div class="appearance-menu-header">
+              <h2>{{ t('appearance.title') }}</h2>
+              <q-btn flat round dense icon="close" size="sm" :aria-label="t('appearance.close')" v-close-popup></q-btn>
             </div>
+            <appearance-picker :theme="appearanceTheme" :mode="themeMode" @theme-change="setAppearanceTheme" @mode-change="setThemeMode" @dismiss="showAppearance = false"></appearance-picker>
           </q-menu>
         </q-btn>
-        <q-btn flat round dense :icon="themeIcon" size="sm" color="grey-6" @click="cycleTheme">
+        <q-btn flat round dense :icon="themeIcon" size="sm" color="grey-6" :aria-label="t('s.theme')" @click="cycleTheme">
           <q-tooltip :delay="1000">{{ t('top.' + (themeMode === 'dark' ? 'dark_mode' : themeMode === 'light' ? 'light_mode' : 'auto_mode')) }}</q-tooltip>
         </q-btn>
         <q-btn flat round dense icon="refresh" size="sm" color="grey-6"
                @mousedown="startLongRefresh" @mouseup="cancelLongRefresh" @mouseleave="endLongRefresh"
-               @touchstart="startLongRefresh" @touchend="cancelLongRefresh">
+               @touchstart="startLongRefresh" @touchend="cancelLongRefresh" :aria-label="t('top.refresh')">
           <q-tooltip :delay="1000">{{ t('top.refresh') }}</q-tooltip>
         </q-btn>
-        <q-btn flat round dense icon="keyboard" size="sm" color="grey-6" @click="showShortcuts=true">
+        <q-btn flat round dense icon="keyboard" size="sm" color="grey-6" :aria-label="t('top.shortcuts')" @click="showShortcuts=true">
           <q-tooltip :delay="1000">{{ t('top.shortcuts') }}</q-tooltip>
         </q-btn>
-        <q-btn flat round dense icon="settings" size="sm" color="grey-6" @click="showSettings=true">
+        <q-btn flat round dense icon="settings" size="sm" color="grey-6" :aria-label="t('top.settings')" @click="showSettings=true">
           <q-tooltip :delay="1000">{{ t('top.settings') }}</q-tooltip>
         </q-btn>
+        </div>
       </q-toolbar>
       <q-linear-progress v-if="syncInBackground && !syncSummary" indeterminate color="primary" size="3px" style="position:absolute;bottom:0;left:0;right:0"></q-linear-progress>
     </q-header>
@@ -84,7 +109,7 @@
           <span style="font-size:12px;color:var(--accent);margin-left:8px">{{ t('wb.media_selected', {n: pickerSelected.length}) }}</span>
           <q-space></q-space>
           <q-btn unelevated no-caps dense :label="t('wb.confirm_add')"
-                 :style="pickerSelected.length ? 'background:var(--accent);color:#fff;padding:2px 16px;border-radius:8px' : 'background:var(--surface2);color:var(--text3);padding:2px 16px;border-radius:8px'"
+                 :style="pickerSelected.length ? 'background:var(--accent);color:var(--on-accent);padding:2px 16px;border-radius:8px' : 'background:var(--surface2);color:var(--text3);padding:2px 16px;border-radius:8px'"
                  :disable="!pickerSelected.length" @click="confirmPicker"></q-btn>
         </div>
         <div class="picker-body">
@@ -102,16 +127,16 @@
     </div>
 
     <!-- Sidebar -->
-    <q-drawer v-model="drawerOpen" :width="260" :mini="drawerMini" :breakpoint="0" bordered style="display:flex;flex-direction:column" mini-width="56">
+    <q-drawer v-model="drawerOpen" :width="256" :mini="drawerMini" :breakpoint="0" bordered class="app-sidebar" mini-width="56">
       <q-list dense>
-        <q-item-label header style="display:flex;align-items:center;justify-content:space-between;padding-right:10px">
+        <q-item-label v-show="!drawerMini" header style="display:flex;align-items:center;justify-content:space-between;padding-right:10px">
           <span>{{ t('side.browse') }}</span>
           <q-btn v-if="!drawerMini" dense no-caps unelevated icon="add_circle_outline"
                  :label="t('side.import')" @click="openImport"
                  class="sidebar-action-btn"></q-btn>
         </q-item-label>
-        <q-item clickable
-          :style="route==='#/gallery' && !selectedFolder ? 'background:var(--accent-dim);border-radius:4px' : ''"
+        <q-item clickable class="sidebar-nav-item" :aria-label="t('side.library')"
+          :active="route==='#/gallery' && !selectedFolder" active-class="sidebar-active-item"
           @click="navToLibrary">
           <q-item-section avatar><q-icon name="movie" size="18px" :color="route==='#/gallery' && !selectedFolder ? 'primary' : 'grey-6'"></q-icon></q-item-section>
           <q-item-section>{{ t('side.library') }}</q-item-section>
@@ -123,30 +148,29 @@
         <div v-show="libraryExpanded && !drawerMini">
           <folder-tree :nodes="folderTree" :selected="selectedFolder" :context-menu="true" count-field="totalCount" @select="onFolderSelect" @contextmenu="showFolderCtx"></folder-tree>
         </div>
-        <q-item clickable :active="route==='#/favorites'"
+        <q-item clickable class="sidebar-nav-item" :aria-label="t('side.favorites')" :active="route==='#/favorites'"
                 @click="nav('#/favorites')"
                 active-class="sidebar-active-item">
-          <q-item-section avatar><q-icon name="favorite" size="18px"></q-icon></q-item-section>
+          <q-item-section avatar><q-icon name="favorite_border" size="18px"></q-icon></q-item-section>
           <q-item-section>{{ t('side.favorites') }}</q-item-section>
         </q-item>
-        <q-item clickable :active="route==='#/duplicates'" @click="nav('#/duplicates')"
+        <q-item clickable class="sidebar-nav-item" :aria-label="t('side.find_dup')" :active="route==='#/duplicates'" @click="nav('#/duplicates')"
                 active-class="sidebar-active-item">
           <q-item-section avatar><q-icon name="content_copy" size="18px"></q-icon></q-item-section>
           <q-item-section>{{ t('side.find_dup') }}</q-item-section>
         </q-item>
         <q-separator style="background:var(--border);margin:8px 0"></q-separator>
-        <q-item-label header style="display:flex;align-items:center;justify-content:space-between;padding-right:10px">
+        <q-item-label v-show="!drawerMini" header style="display:flex;align-items:center;justify-content:space-between;padding-right:10px">
           <span>{{ t('cg.section') }}</span>
           <q-btn v-if="!drawerMini" dense no-caps unelevated icon="auto_awesome"
                  :label="t('cg.new_plan')" @click="openNewCreativePlan"
                  class="sidebar-action-btn"></q-btn>
         </q-item-label>
-        <q-item v-for="p in projectList" :key="p.id" clickable dense
+        <q-item v-for="p in projectList" :key="p.id" clickable dense class="sidebar-nav-item" :aria-label="p.name"
                 :active="route==='#/workbench/'+p.id"
                 @click="nav('#/workbench/'+p.id)"
                 @contextmenu.prevent="showProjectCtx($event, p)"
-                active-class="sidebar-active-item"
-                style="padding:4px 16px">
+                active-class="sidebar-active-item">
           <q-item-section avatar>
             <q-icon :name="p.creative_brief ? 'auto_awesome' : 'dashboard'" size="18px"></q-icon>
           </q-item-section>
@@ -157,6 +181,11 @@
           <q-item-section style="font-size:12px;color:var(--text3)">{{ t('cg.no_plans') }}</q-item-section>
         </q-item>
       </q-list>
+      <div class="sidebar-footer">
+        <q-btn flat no-caps icon="settings" :label="drawerMini ? '' : t('top.settings')"
+               :aria-label="t('top.settings')" @click="showSettings=true"></q-btn>
+        <span v-if="!drawerMini" class="sidebar-footer-name">映屿 · luminisle</span>
+      </div>
     </q-drawer>
 
     <!-- Folder context menu -->
@@ -240,7 +269,7 @@
 
     <!-- Main content -->
     <q-page-container>
-      <q-page style="display:flex;flex-direction:column;height:calc(100vh - 40px);overflow:hidden">
+      <q-page class="app-page" :class="'workspace-' + currentView">
         <keep-alive>
           <gallery-page v-if="currentView==='gallery' && !pickerMode" ref="gallery"></gallery-page>
         </keep-alive>
@@ -256,18 +285,11 @@
                    :edit-project-id="wizardEditProjectId"
                    @done="onCreativeDone"></creative-wizard>
 
-  <!-- Drawer toggle -->
-  <q-btn flat round dense :icon="drawerMini ? 'chevron_right' : 'chevron_left'" size="xs" color="grey-6"
-          class="drawer-toggle-btn" @click="drawerMini = !drawerMini"
-          :style="{position:'fixed', left: (drawerMini ? 46 : 250) + 'px', top: '30px', zIndex: 2000}">
-    <q-tooltip :delay="1000">{{ t('side.collapse') }}</q-tooltip>
-  </q-btn>
-
   <!-- Workbench material panel toggle (moved into workbench component) -->
 
   <!-- Settings modal -->
   <q-dialog v-model="showSettings" @show="loadSettings">
-    <q-card style="width:480px" class="dialog-card">
+    <q-card class="dialog-card settings-dialog">
       <q-btn flat round dense icon="close" size="sm" color="grey-6" class="dialog-close" v-close-popup></q-btn>
       <q-card-section>
         <div class="text-h6">{{ t('s.title') }}</div>
@@ -287,16 +309,7 @@
             <div class="settings-label">{{ t('s.language') }}</div>
             <q-select v-model="settingsForm.language" :options="settingLangOptions" dense filled emit-value map-options @update:model-value="onLanguageChange"></q-select>
           </div>
-          <div>
-            <div class="settings-label">{{ t('s.theme') }}</div>
-            <q-select v-model="themeMode" :options="settingThemeOptions" dense filled emit-value map-options @update:model-value="applyTheme"></q-select>
-          </div>
-          <div>
-            <div class="text-caption text-grey-5 q-mb-sm">{{ t('s.accent') }}</div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <span v-for="c in skinColors" :key="c.value" class="skin-dot" :style="{background: c.color}" :class="{active: accentColor===c.value}" @click="setAccentColor(c.value)"></span>
-            </div>
-          </div>
+          <appearance-picker :theme="appearanceTheme" :mode="themeMode" @theme-change="setAppearanceTheme" @mode-change="setThemeMode" @dismiss="showSettings = false"></appearance-picker>
         </q-tab-panel>
         <!-- Image tab -->
         <q-tab-panel :name="'image'" class="settings-panel">
@@ -626,30 +639,21 @@
         </q-card-section>
         <q-card-section>
           <div class="row justify-between text-caption text-grey-6 q-mb-sm">
-            <span>{{ t('imp.progress', {done: importedItems.length, total: importTotal}) }}</span>
-            <span>{{ Math.round(importedItems.length / Math.max(1, importTotal) * 100) }}%</span>
+            <span>{{ t('imp.progress', {done: importProcessed, total: importTotal}) }}</span>
+            <span>{{ Math.round(importProcessed / Math.max(1, importTotal) * 100) }}%</span>
           </div>
-          <q-linear-progress :value="importedItems.length / Math.max(1, importTotal)" color="primary" size="6px"></q-linear-progress>
+          <q-linear-progress :value="importProcessed / Math.max(1, importTotal)" color="primary" size="6px"></q-linear-progress>
         </q-card-section>
-        <q-card-section ref="importListWrap" style="max-height:300px;overflow-y:auto">
-          <div class="import-preview-grid">
-            <div v-for="item in importedItems" :key="item.id" class="import-preview-card">
-              <div class="import-preview-thumb">
-                <img v-if="item.thumbnail_path" :src="API.thumbUrl(item.id)">
-                <div v-else class="import-preview-placeholder">
-                  <q-icon :name="item.media_type === 'video' ? 'movie' : item.media_type === 'audio' ? 'music_note' : 'image'" size="24px" color="grey-6"></q-icon>
-                </div>
-              </div>
-              <div class="import-preview-name">{{ item.file_name }}</div>
-            </div>
-          </div>
+        <q-card-section>
+          <import-preview :items="importedItems" importing></import-preview>
         </q-card-section>
       </template>
 
       <!-- Step 3: Done -->
       <template v-if="importStep === 'done'">
         <q-card-section>
-          <div class="text-h6">{{ t('imp.done') }}</div>
+          <div class="text-h6">{{ t(importError ? 'imp.interrupted' : 'imp.done') }}</div>
+          <div v-if="importError" class="text-negative q-mt-sm" role="alert">{{ t('imp.retry_hint') }}</div>
         </q-card-section>
         <q-card-section>
           <div style="display:flex;justify-content:center;gap:32px;padding:12px 0">
@@ -683,19 +687,8 @@
             </div>
           </div>
         </q-card-section>
-        <q-card-section v-if="importedItems.length" style="max-height:300px;overflow-y:auto">
-          <div class="import-preview-grid">
-            <div v-for="item in importedItems" :key="item.id" class="import-preview-card" @click="openDetail(item.id)" style="cursor:pointer">
-              <div class="import-preview-thumb">
-                <img v-if="item.thumbnail_path" :src="API.thumbUrl(item.id)">
-                <div v-else class="import-preview-placeholder">
-                  <q-icon :name="item.media_type === 'video' ? 'movie' : item.media_type === 'audio' ? 'music_note' : 'image'" size="24px" color="grey-6"></q-icon>
-                </div>
-              </div>
-              <div class="import-preview-name">{{ item.file_name }}</div>
-              <div class="import-preview-meta" v-if="item.width">{{ item.width }}x{{ item.height }} &middot; {{ fmtSize(item.file_size) }}</div>
-            </div>
-          </div>
+        <q-card-section v-if="importedItems.length">
+          <import-preview :items="importedItems" @open="openDetail"></import-preview>
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat :label="t('sync.close')" @click="showImport=false; loadSidebar(); $nextTick(() => $refs.gallery?.load())"></q-btn>
@@ -740,9 +733,11 @@
 <script src="/static/js/lottie.min.js"></script>
 <script src="/static/js/api.js"></script>
 <script src="/static/js/format.js"></script>
+<script src="/static/js/import-preview.js"></script>
 <script src="/static/js/i18n.js"></script>
 <script src="/static/js/folder-tree.js"></script>
 <script src="/static/js/gallery.js"></script>
+<script src="/static/js/media-inspector.js"></script>
 <script src="/static/js/detail.js"></script>
 <script src="/static/js/duplicates.js"></script>
 <script src="/static/js/workbench.js"></script>
@@ -788,6 +783,8 @@ const app = Vue.createApp({
       importStep: "select",
       importing: false,
       importTotal: 0,
+      importProcessed: 0,
+      importError: false,
       importedItems: [],
       skippedItems: [],
       failedItems: [],
@@ -808,26 +805,20 @@ const app = Vue.createApp({
       bgTasks: [],
       drawerOpen: true,
       drawerMini: false,
-      themeMode: localStorage.getItem("theme") || "dark",
-      accentColor: localStorage.getItem("accent") || "#6c8cff",
-      skinColors: [
-        { value: "#6c8cff", color: "#6c8cff" },
-        { value: "#42a5f5", color: "#42a5f5" },
-        { value: "#26c6da", color: "#26c6da" },
-        { value: "#66bb6a", color: "#66bb6a" },
-        { value: "#ffca28", color: "#ffca28" },
-        { value: "#ff7043", color: "#ff7043" },
-        { value: "#ef5350", color: "#ef5350" },
-        { value: "#ab47bc", color: "#ab47bc" },
-      ],
+      themeMode: initialAppearance.mode,
+      appearanceTheme: initialAppearance.theme,
+      showAppearance: false,
     };
   },
   created() {
+    document.body.classList.toggle('desktop-mac', window.electronAPI?.platform === 'darwin');
     this.loadSidebar();
     this.loadProjectList();
     API.getSettings().then(s => { i18nState.locale = s.language || "zh"; }).catch(() => {});
     this.applyTheme();
-    if (this.accentColor) this.setAccentColor(this.accentColor);
+    this._systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
+    this._onSystemTheme = () => { if (this.themeMode === 'auto') this.applyTheme(); };
+    this._systemTheme.addEventListener('change', this._onSystemTheme);
     // Restore selected folder
     const savedFolder = localStorage.getItem('selectedFolder');
     if (savedFolder) this.selectedFolder = savedFolder;
@@ -945,6 +936,7 @@ const app = Vue.createApp({
     }, 3000);
   },
   beforeUnmount() {
+    this._systemTheme?.removeEventListener('change', this._onSystemTheme);
     if (this._onKey) document.removeEventListener("keydown", this._onKey);
     if (this._closeFolderCtx) document.removeEventListener("click", this._closeFolderCtx);
     if (this._bgPollTimer) clearInterval(this._bgPollTimer);
@@ -973,14 +965,14 @@ const app = Vue.createApp({
       }
     }
   },
-  updated() {
-    if (this.importStep === "progress" && this.$refs.importListWrap) {
-      const el = this.$refs.importListWrap.$el || this.$refs.importListWrap;
-      el.scrollTop = el.scrollHeight;
-    }
-  },
   computed: {
     t() { return t; },
+    workspaceTitle() {
+      if (this.currentView === 'workbench') return this.t('cg.section');
+      if (this.currentView === 'duplicates') return this.t('side.find_dup');
+      if (this.selectedFolder) return this.selectedFolder.split('/').filter(Boolean).pop() || '/';
+      return this.route === '#/favorites' ? this.t('side.favorites') : this.t('side.library');
+    },
     bgTaskProgress() {
       const tasks = this.bgTasks.filter(t => t.id !== '__placeholder__');
       if (!tasks.length) return 0;
@@ -1010,13 +1002,6 @@ const app = Vue.createApp({
       return [
         { label: t('s.lang_zh'), value: "zh" },
         { label: t('s.lang_en'), value: "en" },
-      ];
-    },
-    settingThemeOptions() {
-      return [
-        { label: t('s.theme_dark'), value: "dark" },
-        { label: t('s.theme_light'), value: "light" },
-        { label: t('s.theme_auto'), value: "auto" },
       ];
     },
     computedResOptions() {
@@ -1187,23 +1172,21 @@ const app = Vue.createApp({
       this.themeMode = modes[(idx + 1) % 3];
       this.applyTheme();
     },
+    setAppearanceTheme(theme) {
+      if (!Appearance.themes.includes(theme)) return;
+      this.appearanceTheme = theme;
+      this.applyTheme();
+    },
+    setThemeMode(mode) {
+      if (!Appearance.modes.includes(mode)) return;
+      this.themeMode = mode;
+      this.applyTheme();
+    },
     applyTheme() {
       localStorage.setItem("theme", this.themeMode);
-      let dark;
-      if (this.themeMode === "auto") {
-        dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      } else {
-        dark = this.themeMode === "dark";
-      }
-      Quasar.Dark.set(dark);
-      document.body.style.background = dark ? "#0a0a0a" : "#f5f5f5";
-    },
-    setAccentColor(color) {
-      this.accentColor = color;
-      localStorage.setItem("accent", color);
-      document.documentElement.style.setProperty("--accent", color);
-      document.documentElement.style.setProperty("--accent-dim", color + "26");
-      document.documentElement.style.setProperty("--q-primary", color);
+      localStorage.setItem("appearanceTheme", this.appearanceTheme);
+      Quasar.Dark.set(Appearance.apply(this.appearanceTheme, this.themeMode));
+      window.electronAPI?.setTheme?.(this.themeMode).catch(error => console.error("Unable to sync window theme", error));
     },
     onLanguageChange(val) {
       i18nState.locale = val;
@@ -1379,6 +1362,7 @@ const app = Vue.createApp({
         return;
       }
       if (e.key === "Escape") {
+        if (this.showAppearance) return;
         if (this.showShortcuts) this.showShortcuts = false;
         else if (this.$refs.gallery) this.$refs.gallery.clearSelection();
         return;
@@ -1686,12 +1670,14 @@ const app = Vue.createApp({
     async startImport() {
       this.importStep = "progress";
       this.importing = true;
+      this.importError = false;
       this.importedItems = [];
       this.skippedItems = [];
       this.failedItems = [];
       this.showSkippedList = false;
       this.showFailedList = false;
       this.importTotal = 0;
+      this.importProcessed = 0;
 
       try {
         const scanRes = await API.scanPaths(this.selectedPaths);
@@ -1705,11 +1691,12 @@ const app = Vue.createApp({
           return;
         }
 
-        // SSE batch import — backend controls concurrency
+        // Backend prepares up to two files concurrently; each SSE success follows a database commit.
         const resp = await API.importBatch(files.map(f => f.file_path));
         const reader = resp.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
+        let completed = false;
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -1719,11 +1706,16 @@ const app = Vue.createApp({
           for (const line of lines) {
             if (!line.startsWith("data: ")) continue;
             const ev = JSON.parse(line.slice(6));
+            if (ev.type === "done") completed = true;
+            if (Number.isInteger(ev.done)) this.importProcessed = ev.done;
             if (ev.type === "ok" && ev.data) this.importedItems.push(ev.data);
+            else if (ev.type === "skip") this.skippedItems.push({ file_path: ev.file_path });
             else if (ev.type === "fail") this.failedItems.push({ file_name: ev.file_path.split("/").pop(), file_path: ev.file_path, error: ev.error });
           }
         }
+        if (!completed) throw new Error('Import stream ended before completion');
       } catch (e) {
+        this.importError = true;
         console.error(e);
       }
 
@@ -1737,11 +1729,11 @@ const app = Vue.createApp({
 app.use(Quasar, {
   config: {
     brand: {
-      primary: '#6c8cff',
+      primary: '#007aff',
       secondary: '#333',
-      accent: '#6c8cff',
-      dark: '#0a0a0a',
-      'dark-page': '#0a0a0a',
+      accent: '#007aff',
+      dark: '#252628',
+      'dark-page': '#1e1f21',
     },
     notify: { position: 'top', color: 'dark', textColor: 'white', timeout: 1800 }
   }
@@ -1753,8 +1745,11 @@ app.config.errorHandler = (err) => {
   console.error(err);
   Quasar.Notify.create({ message: err.message || t('g.n_error'), position: "top", color: "negative", timeout: 3000 });
 };
+app.component("appearance-picker", AppearancePicker);
 app.component("folder-tree", FolderTree);
+app.component("import-preview", ImportPreview);
 app.component("gallery-page", GalleryPage);
+app.component("media-inspector", MediaInspector);
 app.component("detail-page", DetailPage);
 app.component("duplicates-page", DuplicatesPage);
 app.component("workbench-page", WorkbenchPage);

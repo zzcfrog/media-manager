@@ -9,6 +9,7 @@ const WorkbenchPage = {
       <span v-if="project" style="font-size:15px;font-weight:500">{{ project.name }}</span>
       <span v-if="project && project.description" style="font-size:12px;color:var(--text3);margin-left:8px">{{ project.description }}</span>
       <q-btn v-if="project" flat dense no-caps icon="file_download"
+             class="wb-export"
              :label="t('wb.export_fcpxml')" size="sm" color="grey-7"
              style="margin-left:8px;font-size:12px" @click="exportProject">
         <q-tooltip :delay="500">{{ t('wb.export_fcpxml_tip') }}</q-tooltip>
@@ -126,7 +127,7 @@ const WorkbenchPage = {
                  @click="selectedMedia = m; timelinePlayMode = false"
                  draggable="true"
                  @dragstart="onMatDragStart($event, m)">
-              <img :src="'/media/thumbnail/' + m.id" class="wb-mat-thumb" loading="lazy">
+              <img :src="'/media/thumbnail/' + m.id" class="wb-mat-thumb" :class="{'audio-waveform-thumb': m.media_type==='audio'}" loading="lazy">
               <span v-if="isMediaOnTimeline(m.id)" class="wb-mat-badge">{{ t('wb.added') }}</span>
               <div class="wb-mat-overlay">
                 <div class="wb-mat-meta">

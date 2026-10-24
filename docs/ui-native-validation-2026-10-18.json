@@ -1,0 +1,320 @@
+{
+  "validated_at": "2026-10-18T05:15:06.214684+00:00",
+  "scope": "macOS presentation refactor with Liquid Glass-inspired controls and consistent rounded workspace geometry",
+  "delivery": "source code; installed application unchanged; no installer produced; not committed or pushed",
+  "preservation": {
+    "modules": 7,
+    "action_bindings": 273,
+    "v_model_bindings": 65,
+    "removed_actions": 0,
+    "removed_controls": 0
+  },
+  "python_tests": {
+    "passed": 49,
+    "failed": 0
+  },
+  "frontend_regressions": {
+    "passed": 16,
+    "failed": 0
+  },
+  "desktop_runtime_paths": "passed",
+  "existing_browser_regressions": [
+    {
+      "passed": [
+        "R45 menu fits viewport",
+        "R46 load failure is visible with no stale cards",
+        "R44 thumbnail has terminal fallback",
+        "R15 paired serialized save persists newest edit",
+        "R30 structural undo restores tracks and plan",
+        "R31 transcoded AVI seeks to source position",
+        "R40 unchanged blur preserves ASR/subtitle"
+      ],
+      "errors": []
+    },
+    {
+      "passed": [
+        "R29 delayed metadata cannot replace current media",
+        "R37 cancel retains draft selection",
+        "R38 failed apply displays error",
+        "R39 closed wizard cannot apply or navigate"
+      ],
+      "errors": []
+    },
+    {
+      "passed": [
+        "R08 stale filter response ignored",
+        "R06 dragged clip survives mindmap edit and persistence",
+        "R16 failed mindmap write preserves saved plan and tracks",
+        "R05 source snapshot remains visible and playable without old segment id"
+      ],
+      "errors": []
+    }
+  ],
+  "native_ui_browser": {
+    "passed": [
+      "native shell, sidebar, library and inspector fit the viewport",
+      "system theme changes are applied live",
+      "focused controls retain native keyboard activation instead of opening media",
+      "inspector toggle persists across reloads",
+      "selection, multi-selection and rating shortcuts remain functional",
+      "batch analysis confirmation is reachable without executing AI",
+      "grid, masonry, justified and list views all render",
+      "search, empty results and reset remain usable",
+      "all advanced image filter dimensions remain reachable",
+      "sidebar collapse and restore retain content geometry",
+      "file/folder import controls and disabled empty submission are preserved",
+      "shortcut reference remains accessible",
+      "all five settings tabs, Chinese/English and save payload are preserved (write mocked)",
+      "video inspector, metadata toggle, waveform and scopes remain present",
+      "image zoom and image metadata controls remain functional",
+      "audio playback surface, music tags, emotional axes and waveform remain present",
+      "near duplicate, similar and clustering modes remain reachable",
+      "editing preview, timeline, mind map, export and creation controls are preserved",
+      "library and complete settings sheet fit 1000×650, 1280×800 and 1920×1080"
+    ],
+    "errors": [],
+    "externalWrites": [],
+    "settingsWrite": "mocked; payload checked"
+  },
+  "electron": {
+    "passed": [
+      "real Electron startup with isolated library and profile",
+      "native macOS traffic lights positioned correctly",
+      "draggable toolbar reserves native window controls",
+      "renderer preload API retained",
+      "timeline preview and export remain available",
+      "FCPXML and SRT ZIP saved through native IPC; CRC and contents verified"
+    ],
+    "errors": [],
+    "window_buttons": {
+      "x": 18,
+      "y": 20
+    },
+    "export_bytes": 847,
+    "export_entries": [
+      "Synthetic project.fcpxml",
+      "Synthetic project.srt"
+    ]
+  },
+  "viewports": [
+    [
+      1000,
+      600
+    ],
+    [
+      1000,
+      650
+    ],
+    [
+      1280,
+      800
+    ],
+    [
+      1600,
+      1000
+    ],
+    [
+      1920,
+      1080
+    ]
+  ],
+  "real_data_writes": false,
+  "model_weight_changes": false,
+  "paid_AI_calls": false,
+  "backend_api_or_schema_changes": false,
+  "source_hashes": {
+    "electron/main.js": "f80c27d0d165f2bd6304da87aad4f4eef69c554714450b697e4dad35b7e32c00",
+    "electron/preload.js": "8777ff9219d77edc5c7a79b7965e5ca3dee808ba6b2c9a4c33e6ca53668b90b7",
+    "frontend/index.html": "5329d4c431e1bfae50bc91b58249f263c66e78270b128bf4e1dad70d8ae65337",
+    "frontend/js/detail.js": "9c59ce869f481a26920b9b06e49bd1a363e4a1e51ed206b14758e243a7cdac99",
+    "frontend/js/gallery.js": "0bf68b0a98972770159b16bc0ac92081e71c0b238fb1ad09302dec2028490e53",
+    "frontend/js/i18n.js": "c492057a3d4e045d28ca1b8b73e9ef81f50cf02fbcce1a0c3cc46d287b3fc1bb",
+    "frontend/js/workbench.js": "b0078234bab7b75189dbf9139b3cd91c22b85d52bdf77efe1e22e102b72555de",
+    "tests/browser-regressions.cjs": "bf2980d98c139fb7bbcf85a5d5f98fe91eabd39c1d337c9c0824e5e33fb5dc9e",
+    "tests/browser_fixture.py": "75e78393406c30afc8de3524e4ae1be19d9111abd88a12d64f8f2683d2e51acf",
+    "tests/frontend-regressions.cjs": "1adc3c6300a7e24b86ba7bf3539256daef42da7b281aaa55d317629fc54d4c2e",
+    "frontend/css/native.css": "f362074fafcfe317b7835e492cc0bd7da20324ee408b3ff99516006f63279412",
+    "frontend/js/media-inspector.js": "44696f22665a72e1b2feb89e3596607880b0d3d018b5fc761643821d43f694bc",
+    "frontend/js/duplicates.js": "081e6dedae2aedb5e94aa64e3e3656b7408932986809a26edf2657fadc05294a"
+  },
+  "unverified": [
+    "Real cloud AI analysis and full model inference",
+    "Large model downloads",
+    "External NLE import",
+    "Fresh packaged release installation"
+  ],
+  "screenshots": {
+    "note": "Synthetic library and public Lorem Picsum placeholders; no user media",
+    "files": [
+      "docs/screenshots/mac-native-library.png",
+      "docs/screenshots/mac-native-detail.png",
+      "docs/screenshots/mac-native-workbench.png"
+    ]
+  },
+  "static_checks": "JavaScript syntax and git diff --check passed",
+  "temporary_test_servers": "stopped; synthetic libraries, profiles, exports and downloaded fixture posters removed",
+  "minimum_window_boundary_checks": {
+    "passed": [
+      "at minimum window size, metadata scrolls and retains the video viewport",
+      "editing preview, tracks and status bar fit the minimum 1000x600 window",
+      "settings actions remain visible at minimum window size"
+    ],
+    "errors": []
+  },
+  "network_audit": {
+    "errors": [],
+    "failed": [],
+    "unexpectedHTTP": [],
+    "expectedFallbacks": [
+      {
+        "path": "/media/cover/6",
+        "status": 404
+      }
+    ]
+  },
+  "base_commit": "c3cf0372720a04441b0bdcef67c0b4dbcbebf043",
+  "liquid_glass_iteration": {
+    "native_material": "Electron 35 under-window vibrancy; CSS optical approximation, not NSGlassEffectView",
+    "geometry": {
+      "outer_radius_px": 20,
+      "inner_radius_px": 14,
+      "workspace_gap_px": 8,
+      "main_routes": [
+        "gallery",
+        "detail",
+        "workbench",
+        "duplicates"
+      ]
+    },
+    "frontend_regressions": {
+      "passed": 16,
+      "failed": 0
+    },
+    "desktop_runtime_paths": "passed",
+    "python_tests": "not rerun in the styling-only iteration; previous 49-pass result retained",
+    "native_ui_browser": {
+      "passed": [
+        "native shell, sidebar, library and inspector fit the viewport",
+        "system theme changes are applied live",
+        "focused controls retain native keyboard activation instead of opening media",
+        "inspector toggle persists across reloads",
+        "selection, multi-selection and rating shortcuts remain functional",
+        "batch analysis confirmation is reachable without executing AI",
+        "grid, masonry, justified and list views all render",
+        "search, empty results and reset remain usable",
+        "all advanced image filter dimensions remain reachable",
+        "sidebar collapse and restore retain content geometry",
+        "file/folder import controls and disabled empty submission are preserved",
+        "shortcut reference remains accessible",
+        "all five settings tabs, Chinese/English and save payload are preserved (write mocked)",
+        "video inspector, metadata toggle, waveform and scopes remain present",
+        "image zoom and image metadata controls remain functional",
+        "audio playback surface, music tags, emotional axes and waveform remain present",
+        "near duplicate, similar and clustering modes remain reachable",
+        "editing preview, timeline, mind map, export and creation controls are preserved",
+        "library and complete settings sheet fit 1000×650, 1280×800 and 1920×1080"
+      ],
+      "errors": [],
+      "externalWrites": [],
+      "settingsWrite": "mocked; payload checked"
+    },
+    "materials_and_geometry": {
+      "passed": [
+        "light material, rounded optical edge, theme contrast and inspector",
+        "dark material, rounded optical edge, theme contrast and inspector",
+        "glass popover and context menu positioning remain usable",
+        "prefers-reduced-transparency selects opaque readable controls",
+        "prefers-contrast selects opaque readable controls",
+        "glass zoom capsule leaves image pixels unfiltered",
+        "gallery uses matching 20px outer corners and aligned 8px gaps",
+        "detail/1 uses matching 20px outer corners and aligned 8px gaps",
+        "workbench/1 uses matching 20px outer corners and aligned 8px gaps",
+        "duplicates uses matching 20px outer corners and aligned 8px gaps",
+        "collapsed navigation retains 8px gutters, matching corners and usable settings button"
+      ],
+      "errors": [],
+      "realDataAccess": false,
+      "paidAI": false
+    },
+    "minimum_window_boundary_checks": {
+      "passed": [
+        "at minimum window size, metadata scrolls and retains the video viewport",
+        "editing preview, tracks and status bar fit the minimum 1000x600 window",
+        "settings actions remain visible at minimum window size"
+      ],
+      "errors": []
+    },
+    "electron": {
+      "passed": [
+        "real Electron startup with isolated library and profile",
+        "native macOS traffic lights positioned correctly",
+        "transparent renderer background with native vibrancy configured",
+        "draggable toolbar reserves native window controls",
+        "renderer preload API retained",
+        "timeline preview and export remain available",
+        "FCPXML and SRT ZIP saved through native IPC; CRC and contents verified"
+      ],
+      "errors": [],
+      "native": {
+        "profile": "/var/folders/c8/vyx6__614hs4kb2xs86z1vsh0000gn/T/video-analyzer-liquid-glass-electron-qx743dk5/profile",
+        "position": {
+          "x": 18,
+          "y": 20
+        },
+        "bounds": {
+          "x": 64,
+          "y": 53,
+          "width": 1600,
+          "height": 900
+        },
+        "background": "#000000"
+      },
+      "exportBytes": 845,
+      "exportEntries": [
+        "Synthetic project.fcpxml",
+        "Synthetic project.srt"
+      ],
+      "realDataAccess": false,
+      "paidAI": false
+    },
+    "existing_browser_regressions": [
+      {
+        "passed": [
+          "R45 menu fits viewport",
+          "R46 load failure is visible with no stale cards",
+          "R44 thumbnail has terminal fallback",
+          "R15 paired serialized save persists newest edit",
+          "R30 structural undo restores tracks and plan",
+          "R31 transcoded AVI seeks to source position",
+          "R40 unchanged blur preserves ASR/subtitle"
+        ],
+        "errors": []
+      },
+      {
+        "passed": [
+          "R29 delayed metadata cannot replace current media",
+          "R37 cancel retains draft selection",
+          "R38 failed apply displays error",
+          "R39 closed wizard cannot apply or navigate"
+        ],
+        "errors": []
+      },
+      {
+        "passed": [
+          "R08 stale filter response ignored",
+          "R06 dragged clip survives mindmap edit and persistence",
+          "R16 failed mindmap write preserves saved plan and tracks",
+          "R05 source snapshot remains visible and playable without old segment id"
+        ],
+        "errors": []
+      }
+    ],
+    "evidence_directory": "build/ui-liquid-glass/",
+    "unverified": [
+      "Exact native Liquid Glass optical refraction and morphing (not implemented)",
+      "Wallpaper-specific optical appearance across all system settings",
+      "Fresh packaged release installation"
+    ],
+    "temporary_resources": "both dedicated fixture servers stopped; synthetic libraries, native profile, models directories, export ZIP, downloaded posters and scratch scripts removed; evidence retained in build/ui-liquid-glass/"
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "date": "2026-10-22",
+  "feature": "右键菜单：调整文件系统创建时间",
+  "delivery": "source_only_not_packaged_or_installed",
+  "platform": "macOS",
+  "scope": {
+    "endpoint": "POST /api/library/shift-creation-time",
+    "hours": [
+      -24,
+      24
+    ],
+    "step_hours": 1,
+    "single_and_multiple_selection": true,
+    "filesystem_timestamp_precision": "seconds",
+    "production_data_modified": false
+  },
+  "python": {
+    "command": ".build-venv/bin/python -m unittest discover -s tests -v",
+    "passed": 70,
+    "failed": 0,
+    "new_creation_time_tests": 9,
+    "evidence": [
+      "真实合成 JPEG/MOV：+8、-24、+24 小时写入并读回正确",
+      "修改前后文件 SHA-256、inode、大小、修改时间和完整资料库记录一致",
+      "父进程不同时区时按绝对 UTC 时间写入正确",
+      "51 文件分两批，分别读回校验创建时间",
+      "重复 ID 去重、0 小时无操作、参数越界和缺少工具不写入",
+      "离线文件/目录/不存在记录跳过；不支持创建时间时不使用 ctime 替代",
+      "子进程退出成功但未写入时报告失败；部分失败/超时按实际写入结果计数且不重试"
+    ]
+  },
+  "frontend": {
+    "creation_time_tests_passed": 8,
+    "existing_regressions_passed": 16,
+    "desktop_runtime_regression": "passed",
+    "javascript_syntax": "passed",
+    "git_diff_check": "passed"
+  },
+  "browser": {
+    "engine": "Playwright Chromium",
+    "isolated_fixture": true,
+    "checks_passed": 7,
+    "checks": [
+      "右键入口、0 时禁用、取消不修改原文件",
+      "拖动滑块使单个视频的真实创建时间后移 24 小时",
+      "多选照片和视频前移 24 小时，核对内容与其他时间不变",
+      "1000×650 深色弹窗布局和英文文案",
+      "失败校验的可见提示",
+      "中断流关闭进度并提醒检查部分完成状态",
+      "原有拍摄时间弹窗独立可用"
+    ],
+    "page_errors": [],
+    "failed_requests": [],
+    "console_errors": []
+  },
+  "limitations": [
+    "未在真实移动硬盘或真实素材上执行写入测试",
+    "其他操作系统和文件系统未验证",
+    "本次未打包、替换本地应用、提交或推送"
+  ],
+  "subsequent_delivery": {
+    "version": "1.0.10",
+    "status": "installed",
+    "evidence": "docs/local-update-1.0.10-2026-10-22.json"
+  }
+}
