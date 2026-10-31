@@ -1,6 +1,6 @@
 {
   "date": "2026-10-31",
-  "status": "installed_and_verified",
+  "status": "complete",
   "version": "1.0.16",
   "previous_version": "1.0.15",
   "installed_application": "/Users/zack/Applications/映屿 · luminisle.app",
@@ -166,12 +166,97 @@
     "automatic_rollback_or_restore": false
   },
   "cleanup": {
-    "status": "pending_after_git_push",
-    "preserve": "real library, all existing library upgrade backups, external models, benchmark models and human labels, diagnostic logs"
+    "status": "complete",
+    "removed": [
+      {
+        "path": "dist",
+        "logical_bytes": 1483248846
+      },
+      {
+        "path": "build/pyinstaller",
+        "logical_bytes": 116550814
+      },
+      {
+        "path": "build/runtime",
+        "logical_bytes": 317369530
+      },
+      {
+        "path": "build/tools",
+        "logical_bytes": 101211590
+      },
+      {
+        "path": "build/gui-preview-20261031-071650",
+        "logical_bytes": 524453362
+      },
+      {
+        "path": "build/release-1.0.15/previous-1.0.14.app",
+        "logical_bytes": 664786379
+      },
+      {
+        "path": "build/release-1.0.15/pre-install.db",
+        "logical_bytes": 98332672
+      },
+      {
+        "path": "build/release-1.0.15/pre-install.db-wal",
+        "logical_bytes": 0
+      },
+      {
+        "path": "build/release-1.0.15/pre-install.db-shm",
+        "logical_bytes": 32768
+      },
+      {
+        "path": "build/release-1.0.15/unused-data",
+        "logical_bytes": 389919
+      },
+      {
+        "path": "build/release-1.0.16/previous-1.0.15.app",
+        "logical_bytes": 665049561
+      },
+      {
+        "path": "build/release-1.0.16/pre-install.db",
+        "logical_bytes": 98910208
+      },
+      {
+        "path": "build/release-1.0.16/pre-install.db-wal",
+        "logical_bytes": 0
+      },
+      {
+        "path": "build/release-1.0.16/pre-install.db-shm",
+        "logical_bytes": 32768
+      },
+      {
+        "path": "build/release-1.0.16/baseline",
+        "logical_bytes": 98910208
+      },
+      {
+        "path": "build/release-1.0.16/rehearsal-library",
+        "logical_bytes": 1745178108
+      }
+    ],
+    "logical_bytes": 5914456733,
+    "note": "Logical file sizes; APFS clone sharing means this is not a measurement of physical free-space gain.",
+    "preserved": [
+      "installed 1.0.16 application and real library",
+      "all existing real-library upgrade backups including the 1.0.16 snapshot",
+      "/Users/zack/models and externally configured classification/face models",
+      "benchmark models, human labels and model evaluation results",
+      "diagnostic logs and release verification results",
+      "current UI audit/fix evidence"
+    ],
+    "development_preview_closed": true,
+    "production_healthy_after_cleanup": true
   },
   "limitations": [
     "Actual AI inference, original-media writes and real exports were not exercised by the release verification.",
     "Face clustering accuracy and production thresholds still need independent calibration.",
     "Local ad-hoc signing; no Developer ID notarization."
-  ]
+  ],
+  "git": {
+    "release_commit": "e4d32661759e42566c802e37b3d5ad31923bb678",
+    "release_pushed_to": [
+      "Gitee main",
+      "GitHub main"
+    ],
+    "cleanup_receipt": "committed separately after cleanup"
+  }
 }
