@@ -4,14 +4,14 @@ const DuplicatesPage = {
        @mousedown="startLasso" @contextmenu.prevent>
     <div class="filter-bar" @mousedown.stop>
       <q-btn flat dense icon="arrow_back" :label="t('dup.back')" color="grey-6" style="border-radius:6px;padding:3px 6px;font-size:13px" @click="goBack"></q-btn>
-      <q-btn-group unelevated style="border-radius:6px;overflow:hidden">
-        <q-btn unelevated dense :color="dupType==='near'?'primary':'grey-9'" :text-color="dupType==='near'?'white':'grey-6'" icon="filter_none" size="sm" :label="t('dup.near')" @click="switchType('near')">
+      <q-btn-group unelevated v-sliding-segments="dupType" style="overflow:hidden">
+        <q-btn unelevated dense :aria-pressed="dupType==='near'" :color="dupType==='near'?'primary':'grey-9'" :text-color="dupType==='near'?'white':'grey-6'" icon="filter_none" size="sm" :label="t('dup.near')" @click="switchType('near')">
           <q-tooltip :delay="1000">{{ t('dup.near_tip') }}</q-tooltip>
         </q-btn>
-        <q-btn unelevated dense :color="dupType==='similar'?'primary':'grey-9'" :text-color="dupType==='similar'?'white':'grey-6'" icon="difference" size="sm" :label="t('dup.similar')" @click="switchType('similar')">
+        <q-btn unelevated dense :aria-pressed="dupType==='similar'" :color="dupType==='similar'?'primary':'grey-9'" :text-color="dupType==='similar'?'white':'grey-6'" icon="difference" size="sm" :label="t('dup.similar')" @click="switchType('similar')">
           <q-tooltip :delay="1000">{{ t('dup.similar_tip') }}</q-tooltip>
         </q-btn>
-        <q-btn unelevated dense :color="dupType==='cluster'?'primary':'grey-9'" :text-color="dupType==='cluster'?'white':'grey-6'" icon="bubble_chart" size="sm" :label="t('dup.cluster')" @click="switchType('cluster')">
+        <q-btn unelevated dense :aria-pressed="dupType==='cluster'" :color="dupType==='cluster'?'primary':'grey-9'" :text-color="dupType==='cluster'?'white':'grey-6'" icon="bubble_chart" size="sm" :label="t('dup.cluster')" @click="switchType('cluster')">
           <q-tooltip :delay="1000">{{ t('dup.cluster_tip') }}</q-tooltip>
         </q-btn>
       </q-btn-group>
@@ -55,6 +55,7 @@ const DuplicatesPage = {
               <div v-if="selArr.includes(item.id)" class="sel-overlay"></div>
               <div class="dup-card-img">
                 <img :src="'/media/thumbnail/' + item.id" draggable="false" @load="onThumbLoad">
+                <tag-status :media="item"></tag-status>
                 <button class="dup-exclude-btn" :title="t('dup.exclude')" @click.stop="openExcludeDialog(item, g)">✕</button>
               </div>
               <div class="dup-card-info">

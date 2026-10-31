@@ -1,0 +1,54 @@
+{
+  "status": "complete",
+  "date": "2026-10-30",
+  "version": "1.0.14",
+  "previous_version": "1.0.12",
+  "installed_application": "/Users/zack/Applications/映屿 · luminisle.app",
+  "old_application_preserved": "/Users/zack/.Trash/Luminisle-1.0.12-replaced-20261030-18831927.app",
+  "package_validation": "docs/package-size-1.0.14-validation.json",
+  "scope": [
+    "Run existing Pillow/NumPy image preprocessing without bundling PyTorch/torchvision",
+    "Keep only Chinese and English Electron locale resources and required jieba resources",
+    "Preserve the entire ONNX Runtime package unchanged"
+  ],
+  "installed_smoke": {
+    "normal_launch": true,
+    "health_version": "1.0.14",
+    "signature_deep_strict_verified": true,
+    "existing_library_and_two_projects_visible": true,
+    "favorite_page_visible": true,
+    "favorite_count": 1524,
+    "stack_mode_and_count_badges_visible": true,
+    "private_screenshot": "/Users/zack/.codex/visualizations/2026/10/16/01a1444f-99c6-7963-89e8-5b8dda4ef801/luminisle-1.0.14-installed.png"
+  },
+  "data_preservation": {
+    "tables_checked": 13,
+    "all_tables_unchanged": true,
+    "media": 11835,
+    "projects": 2,
+    "thumbnails_checked": 13996,
+    "existing_backups_unchanged": true,
+    "model_config_unchanged": true,
+    "other_library_files_unchanged": true,
+    "automatic_upgrade_snapshots_verified": [
+      "upgrade-backups/20261030-093501-e64f2fdd.json"
+    ]
+  },
+  "safety": "Only replaced the application and ran its normal startup; no source media writes, database restore, rollback, model relocation, paid AI, commit or push.",
+  "cleanup": {
+    "temporary_database_duplicate_removed_after_automatic_snapshot_verification": true,
+    "temporary_staging_path_removed_by_installation": true,
+    "dmg_ejected": true,
+    "installers_retained": [],
+    "old_app_in_trash_retained": false,
+    "trash_emptied": false,
+    "current_upgrade_snapshot_removed": true,
+    "packaging_temporaries_removed": true,
+    "cleanup_date": "2026-10-30",
+    "cleanup_record": "docs/cleanup-1.0.14-2026-10-30.json"
+  },
+  "limitations": [
+    "Native acceptance inspected the existing library and favorite page; no real-media edits or paid AI calls.",
+    "Detailed search, feature extraction and language switching were validated with synthetic data before installation; see the package validation record."
+  ]
+}

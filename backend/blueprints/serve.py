@@ -239,7 +239,8 @@ def serve_thumbnail(media_id):
         abort(404)
 
     # If ?t= is specified, extract frame at that timestamp via ffmpeg
-    t_param = request.args.get("t")
+    cache_only = request.args.get("cached") == "1"
+    t_param = None if cache_only else request.args.get("t")
     if t_param is not None:
         try:
             t_sec = float(t_param)
@@ -269,6 +270,10 @@ def serve_thumbnail(media_id):
         path = THUMB_DIR / row["thumbnail_path"]
         if path.exists():
             return send_file(path, mimetype="image/jpeg")
+
+    if cache_only:
+        from flask import abort
+        abort(404)
 
     # Thumbnail missing — regenerate on the fly
     from ..services.importer import _generate_thumbnail

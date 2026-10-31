@@ -38,15 +38,16 @@ def main():
         print(json.dumps(verify_library(args.library)));return
     if args.command == 'self-test':
         import flask, openai, httpx, socksio, jieba, PIL, rawpy, pillow_heif
-        import torch, torchvision, onnxruntime, faster_whisper, hdbscan, requests
+        import onnxruntime, faster_whisper, hdbscan, requests, tokenizers
         from backend.services import embedding
+        from backend.services import taxonomy, classification_jobs, semantic_classifier
         # Constructing a SOCKS transport is offline; catches omitted optional dependencies.
         with httpx.Client(proxy='socks5://127.0.0.1:9'):
             pass
         print(json.dumps({'ok':True,'runtime':sys.version.split()[0],'frozen':bool(getattr(sys,'frozen',False))}));return
 
     from backend.config import DATA_DIR
-    version = os.environ.get('MEDIA_MANAGER_VERSION', '1.0.10')
+    version = os.environ.get('MEDIA_MANAGER_VERSION', '1.0.16')
     DATA_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
     with library_lock(DATA_DIR):
         prepare_upgrade(DATA_DIR, version)  # Always before schema initialization or stale-task reset.

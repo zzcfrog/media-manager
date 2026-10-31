@@ -335,6 +335,47 @@ def list_media():
         )
         params.append(seg_q)
 
+    from ..services import taxonomy
+    try:
+        positive = [int(i) for i in request.args.get('tag_ids', '').split(',') if i]
+        negative = [int(i) for i in request.args.get('exclude_tag_ids', '').split(',') if i]
+        predicate, tag_params = taxonomy.filter_sql(db, positive, negative,
+            request.args.get('tag_mode', 'any'), request.args.get('include_children') != 'false')
+    except (ValueError, taxonomy.Conflict) as exc:
+        return jsonify({'error': str(exc)}), 409
+    if predicate:
+        where_clauses.append(predicate)
+        params.extend(tag_params)
+
+    from ..services.people import MEMBERSHIP_SQL, Conflict as PeopleConflict, _person
+    try:
+        person_mode=request.args.get('person_mode','any')
+        if person_mode not in ('any','all'):raise PeopleConflict('人物组合方式无效')
+        person_lists=[]
+        for key in ('person_ids','exclude_person_ids'):
+            raw=request.args.get(key,'')
+            if raw and any(not p.isdigit() or int(p)<=0 for p in raw.split(',')):
+                raise PeopleConflict('人物筛选编号无效')
+            ids=sorted(set(int(p) for p in raw.split(',') if p))
+            if len(ids)>100:raise PeopleConflict('人物筛选最多 100 位')
+            for pid in ids:_person(db,pid)
+            person_lists.append(ids)
+        positive,negative=person_lists
+        if positive:
+            marks=','.join('?' for _ in positive)
+            sub='SELECT pm.media_id FROM ('+MEMBERSHIP_SQL+') pm WHERE pm.person_id IN ('+marks+')'
+            if person_mode=='all':
+                sub+=' GROUP BY pm.media_id HAVING COUNT(DISTINCT pm.person_id)=?'
+            where_clauses.append('media.id IN ('+sub+')')
+            params.extend(positive)
+            if person_mode=='all':params.append(len(positive))
+        if negative:
+            marks=','.join('?' for _ in negative)
+            where_clauses.append('media.id NOT IN (SELECT pm.media_id FROM ('+MEMBERSHIP_SQL+') pm WHERE pm.person_id IN ('+marks+'))')
+            params.extend(negative)
+    except (ValueError,PeopleConflict) as exc:
+        return jsonify({'error':str(exc)}),409
+
     where = (" WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
 
     order_expr = "(width * height)" if sort == "resolution" else sort
@@ -346,10 +387,17 @@ def list_media():
         rows = db.execute(f"SELECT id FROM media{where}", params).fetchall()
         return jsonify({"data": [r["id"] for r in rows], "total": total})
 
-    rows = db.execute(
-        f"SELECT * FROM media{where} ORDER BY {order_expr} {order} LIMIT ? OFFSET ?",
-        params + [per_page, (page - 1) * per_page],
-    ).fetchall()
+    stack_type = request.args.get("stack_type")
+    stacked = favorite == "true" and stack_type in {"near", "similar", "cluster"}
+    if stacked:
+        # Group the entire filtered favorite set before paging, so a burst is never
+        # split across pages. This only reads existing vectors, never the originals.
+        rows = db.execute(f"SELECT * FROM media{where} ORDER BY {order_expr} {order}, id {order}", params).fetchall()
+    else:
+        rows = db.execute(
+            f"SELECT * FROM media{where} ORDER BY {order_expr} {order} LIMIT ? OFFSET ?",
+            params + [per_page, (page - 1) * per_page],
+        ).fetchall()
 
     data = []
     for r in rows:
@@ -363,13 +411,29 @@ def list_media():
                 d["music_summary"] = None
         data.append(d)
 
+    counts = taxonomy.summaries(db, [m['id'] for m in data])
+    person_counts={}
+    if data:
+        ids=[m['id'] for m in data]
+        person_counts=dict(db.execute('SELECT media_id,COUNT(*) FROM ('+MEMBERSHIP_SQL+') WHERE media_id IN ('+
+                          ','.join('?' for _ in ids)+') GROUP BY media_id',ids))
+    for item in data:
+        item['tag_count'] = counts[item['id']]
+        item['person_count'] = person_counts.get(item['id'],0)
+    display_total = total
+    if stacked:
+        data = _favorite_stacks(db, rows, data, stack_type)
+        display_total = len(data)
+        data = data[(page - 1) * per_page:page * per_page]
+
     return jsonify({
         "data": data,
         "pagination": {
             "page": page,
             "per_page": per_page,
             "total": total,
-            "pages": (total + per_page - 1) // per_page,
+            "display_total": display_total,
+            "pages": (display_total + per_page - 1) // per_page,
         },
     })
 
@@ -629,11 +693,9 @@ def get_media(media_id):
     if not row:
         return jsonify({"error": "Not found"}), 404
     media = dict(row)
-    tags = db.execute(
-        "SELECT t.id, t.name FROM tags t JOIN media_tags mt ON t.id = mt.tag_id WHERE mt.media_id = ?",
-        (media_id,),
-    ).fetchall()
-    media["tags"] = [dict(t) for t in tags]
+    from ..services.taxonomy import tag_rows
+    media['tags'] = tag_rows(db, media_id)
+    media['tag_count'] = len(media['tags'])
     media.pop("embedding", None)
     return jsonify(media)
 
@@ -845,7 +907,8 @@ def backfill_picture_control():
 
 def _fetch_embedding_rows(db):
     rows = db.execute(
-        "SELECT id, file_path, file_name, media_type, file_size, embedding, thumbnail_path "
+        "SELECT id, file_path, file_name, media_type, file_size, embedding, thumbnail_path, "
+        "(SELECT COUNT(*) FROM media_tags mt WHERE mt.media_id=media.id) tag_count "
         "FROM media WHERE embedding IS NOT NULL"
     ).fetchall()
     return rows
@@ -946,6 +1009,56 @@ def _load_exclusions(db, dup_type):
         (dup_type,),
     ).fetchall()
     return {(r["media_id_a"], r["media_id_b"]) for r in rows}
+
+
+def _favorite_stacks(db, rows, data, stack_type):
+    images, vectors = [], []
+    for index, row in enumerate(rows):
+        if row["media_type"] != "image" or not row["embedding"]:
+            continue
+        try:
+            vector = np.frombuffer(row["embedding"], dtype=np.float32)
+        except ValueError:
+            continue
+        if (not vector.size or not np.isfinite(vector).all() or np.linalg.norm(vector) == 0
+                or vectors and vector.size != vectors[0].size):
+            continue
+        images.append(index)
+        vectors.append(vector)
+    if len(images) < 2:
+        return data
+
+    vecs = np.array(vectors)
+    ids = [rows[index]["id"] for index in images]
+    excluded = _load_exclusions(db, stack_type)
+    if stack_type == "cluster":
+        import hdbscan
+        labels = hdbscan.HDBSCAN(min_cluster_size=2, min_samples=min(2, len(vecs) - 1),
+                                 metric="euclidean").fit_predict(vecs)
+        groups = [[i for i, label in enumerate(labels) if label == target]
+                  for target in set(labels) if target != -1]
+        if excluded:
+            split = []
+            for group in groups:
+                group_ids = [ids[i] for i in group]
+                if any(a in group_ids and b in group_ids for a, b in excluded):
+                    for subgroup in _union_find_groups(vecs[group] @ vecs[group].T, .5, group_ids, excluded):
+                        split.append([group[i] for i in subgroup])
+                else:
+                    split.append(group)
+            groups = split
+    else:
+        groups = _union_find_groups(vecs @ vecs.T, .96 if stack_type == "near" else .90, ids, excluded)
+
+    covers, hidden = {}, set()
+    for group in groups:
+        indices = sorted(images[i] for i in group)
+        if len(indices) < 2:
+            continue
+        # First in the active sort is the cover. Members retain the same order.
+        covers[indices[0]] = {**data[indices[0]], "stack_items": [data[i] for i in indices]}
+        hidden.update(indices[1:])
+    return [covers.get(i, item) for i, item in enumerate(data) if i not in hidden]
 
 
 @bp.route("/duplicates")
@@ -1136,7 +1249,7 @@ def write_xmp(media_id):
         return jsonify({"error": "Video not supported"}), 400
 
     tags = db.execute(
-        "SELECT t.name FROM tags t JOIN media_tags mt ON t.id = mt.tag_id WHERE mt.media_id = ?",
+        "SELECT COALESCE(n.name,t.name) name FROM tags t JOIN media_tags mt ON t.id = mt.tag_id LEFT JOIN taxonomy_nodes n ON n.id=t.id WHERE mt.media_id = ?",
         (media_id,),
     ).fetchall()
     tag_names = [t["name"] for t in tags]
@@ -1196,7 +1309,7 @@ def batch_write_xmp():
             continue
 
         tags = db.execute(
-            "SELECT t.name FROM tags t JOIN media_tags mt ON t.id = mt.tag_id WHERE mt.media_id = ?",
+            "SELECT COALESCE(n.name,t.name) name FROM tags t JOIN media_tags mt ON t.id = mt.tag_id LEFT JOIN taxonomy_nodes n ON n.id=t.id WHERE mt.media_id = ?",
             (mid,),
         ).fetchall()
         tag_names = [t["name"] for t in tags]

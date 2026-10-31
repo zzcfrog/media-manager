@@ -105,6 +105,9 @@ def get_project(pid):
             (pid,),
         ).fetchall()
     result["media"] = [dict(r) for r in media]
+    from ..services.taxonomy import summaries
+    counts=summaries(db,[m['id'] for m in result['media']])
+    for item in result['media']: item['tag_count']=counts[item['id']]
     result["media_count"] = len(media)
     return jsonify({"data": result})
 

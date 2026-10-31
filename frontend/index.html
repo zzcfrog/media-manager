@@ -9,15 +9,21 @@
 <link rel="stylesheet" href="/static/css/quasar.prod.css">
 <link rel="stylesheet" href="/static/css/material-icons.css">
 <link rel="stylesheet" href="/static/css/main.css?v=20260608b">
-<link rel="stylesheet" href="/static/css/native.css?v=20261018-folders-compact">
+<link rel="stylesheet" href="/static/css/native.css?v=20261031-ui-spec-fixes">
 <script src="/static/js/appearance.js?v=20261021"></script>
-<link rel="stylesheet" href="/static/css/themes.css?v=20261022-waveform">
+<link rel="stylesheet" href="/static/css/taxonomy.css?v=20261031-ui-spec-fixes">
+<link rel="stylesheet" href="/static/css/people.css?v=20261031-ui-spec-fixes">
+<link rel="stylesheet" href="/static/css/themes.css?v=20261031-ui-spec-fixes">
 </head>
 <body class="native-ui">
 <!-- Existing audio thumbnails are blue waveforms on black. Recolor their blue-channel
      coverage at display time, including cached thumbnails whose sources are offline. -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
   <defs>
+    <mask id="taxonomy-descendant-checks" x="0" y="0" width="24" height="24" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" style="mask-type:luminance">
+      <rect width="24" height="24" fill="white"></rect>
+      <g fill="none" stroke="black" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="m16.6 5.5 1.2 1.2 2.7-2.6"></path><path d="m16.6 18.5 1.2 1.2 2.7-2.6"></path></g>
+    </mask>
     <filter id="audio-thumbnail-theme" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
       <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 1 0 0" result="waveform"></feColorMatrix>
       <feFlood style="flood-color:var(--accent)" result="ink"></feFlood>
@@ -154,6 +160,10 @@
           <q-item-section avatar><q-icon name="favorite_border" size="18px"></q-icon></q-item-section>
           <q-item-section>{{ t('side.favorites') }}</q-item-section>
         </q-item>
+        <people-sidebar></people-sidebar>
+        <taxonomy-sidebar mode="classify"></taxonomy-sidebar>
+        <taxonomy-collections-sidebar></taxonomy-collections-sidebar>
+        <taxonomy-sidebar mode="taxonomy"></taxonomy-sidebar>
         <q-item clickable class="sidebar-nav-item" :aria-label="t('side.find_dup')" :active="route==='#/duplicates'" @click="nav('#/duplicates')"
                 active-class="sidebar-active-item">
           <q-item-section avatar><q-icon name="content_copy" size="18px"></q-icon></q-item-section>
@@ -273,12 +283,16 @@
         <keep-alive>
           <gallery-page v-if="currentView==='gallery' && !pickerMode" ref="gallery"></gallery-page>
         </keep-alive>
-        <detail-page v-if="currentView==='detail'" :key="detailId"></detail-page>
+        <detail-page v-if="currentView==='detail'" ref="detail" :key="detailId"></detail-page>
+        <people-page v-if="currentView==='people'"></people-page>
+        <taxonomy-page v-if="currentView==='taxonomy'"></taxonomy-page>
         <duplicates-page v-if="currentView==='duplicates'"></duplicates-page>
         <workbench-page v-if="currentView==='workbench'" ref="workbench" :key="workbenchId" :project-id="workbenchId"></workbench-page>
       </q-page>
     </q-page-container>
   </q-layout>
+
+  <people-dialogs v-if="peopleDialog" :key="peopleDialog.token" :request="peopleDialog" @close="peopleDialog=null"></people-dialogs>
 
   <!-- Creative Wizard Dialog -->
   <creative-wizard :show="showCreativeWizard" @update:show="showCreativeWizard=$event"
@@ -313,7 +327,7 @@
         </q-tab-panel>
         <!-- Image tab -->
         <q-tab-panel :name="'image'" class="settings-panel">
-          <q-btn-toggle v-model="settingsForm.imageEngine" class="engine-toggle" no-caps unelevated dense
+          <q-btn-toggle v-model="settingsForm.imageEngine" v-sliding-segments="settingsForm.imageEngine" class="engine-toggle" no-caps unelevated dense
             :options="[{ label: t('s.engine_cloud'), value: 'cloud' }, { label: t('s.engine_local'), value: 'local' }]"></q-btn-toggle>
           <template v-if="settingsForm.imageEngine !== 'local'">
             <div>
@@ -374,7 +388,7 @@
         </q-tab-panel>
         <!-- Video tab -->
         <q-tab-panel :name="'video'" class="settings-panel">
-          <q-btn-toggle v-model="settingsForm.videoEngine" class="engine-toggle" no-caps unelevated dense
+          <q-btn-toggle v-model="settingsForm.videoEngine" v-sliding-segments="settingsForm.videoEngine" class="engine-toggle" no-caps unelevated dense
             :options="[{ label: t('s.engine_cloud'), value: 'cloud' }, { label: t('s.engine_local'), value: 'local' }]"></q-btn-toggle>
           <template v-if="settingsForm.videoEngine !== 'local'">
             <div>
@@ -465,7 +479,7 @@
           </template>
           <div class="settings-section">{{ t('s.asr_section') }}</div>
           <div v-if="settingsForm.useMultimodal && settingsForm.videoEngine !== 'local'" class="settings-hint"><span class="material-icons">info</span><span>{{ t('s.asr_inactive_hint') }}</span></div>
-          <q-btn-toggle v-model="settingsForm.asrMode" class="engine-toggle" no-caps unelevated dense
+          <q-btn-toggle v-model="settingsForm.asrMode" v-sliding-segments="settingsForm.asrMode" class="engine-toggle" no-caps unelevated dense
             :options="[{ label: t('s.engine_cloud_short'), value: 'cloud' }, { label: t('s.engine_local_whisper'), value: 'local' }]"></q-btn-toggle>
           <template v-if="settingsForm.asrMode !== 'cloud'">
             <div>
@@ -484,7 +498,7 @@
         </q-tab-panel>
         <!-- Music tab -->
         <q-tab-panel :name="'music'" class="settings-panel">
-          <q-btn-toggle v-model="settingsForm.musicEngine" class="engine-toggle" no-caps unelevated dense
+          <q-btn-toggle v-model="settingsForm.musicEngine" v-sliding-segments="settingsForm.musicEngine" class="engine-toggle" no-caps unelevated dense
             :options="[{ label: t('s.engine_local_short'), value: 'local' }, { label: t('s.engine_cloud_short'), value: 'cloud', disable: true }]"></q-btn-toggle>
           <div v-if="settingsForm.musicEngine === 'cloud'" class="settings-hint">
             <span class="material-icons">hourglass_empty</span><span>{{ t('s.music_cloud_hint') }}</span>
@@ -736,21 +750,27 @@
 <script src="/static/js/import-preview.js"></script>
 <script src="/static/js/i18n.js"></script>
 <script src="/static/js/folder-tree.js"></script>
-<script src="/static/js/gallery.js"></script>
-<script src="/static/js/media-inspector.js"></script>
-<script src="/static/js/detail.js"></script>
-<script src="/static/js/duplicates.js"></script>
-<script src="/static/js/workbench.js"></script>
+<script src="/static/js/sliding-segments.js?v=20261031-local-coordinates"></script>
+<script src="/static/js/taxonomy.js?v=20261031-collection-add-button"></script>
+<script src="/static/js/people.js?v=20261031-subnav-icons"></script>
+<script src="/static/js/gallery.js?v=20261031-ui-spec-fixes"></script>
+<script src="/static/js/media-inspector.js?v=20261024"></script>
+<script src="/static/js/detail.js?v=20261029-navigation"></script>
+<script src="/static/js/duplicates.js?v=20261031-sliding-segments"></script>
+<script src="/static/js/workbench.js?v=20261031-ui-spec-fixes"></script>
 <script src="/static/js/creative-wizard.js"></script>
 <script src="/static/js/mindmap.js"></script>
 <script src="/static/js/seg-emotions.js"></script>
 <script>
 const app = Vue.createApp({
+  mixins: [PeopleRootMixin],
   data() {
     return {
       route: "#/gallery",
       currentView: "gallery",
       detailId: null,
+      detailOrigin: null,
+      detailLibraryDirty: false,
       workbenchId: null,
       projectList: [],
       showCreativeWizard: false,
@@ -766,6 +786,9 @@ const app = Vue.createApp({
       pickerFolder: null,
       matCollapsed: false,
       galleryItems: [],
+      taxonomyRevision: 0, taxonomySelectedMediaRows: {}, taxonomyNodes: [], taxonomyCollections: [], taxonomyError: '', taxonomySelected: null,
+      taxonomyQuery: {}, taxonomySelectedMedia: [], taxonomyCollectionLoading:false,taxonomyCollectionError:'',
+
       searchQuery: "",
       showImport: false,
       showSettings: false,
@@ -813,6 +836,14 @@ const app = Vue.createApp({
   created() {
     document.body.classList.toggle('desktop-mac', window.electronAPI?.platform === 'darwin');
     this.loadSidebar();
+    this.reloadTaxonomy();
+    this._taxonomyClient=Date.now().toString(36)+Math.random().toString(36).slice(2);
+    this._taxonomyDisposed=false;
+    this.pollTaxonomyStatus();
+    this._taxonomyTimer=setInterval(()=>this.pollTaxonomyStatus(),4000);
+    this._taxonomyPlayback=()=>this.reportTaxonomyPlayback();
+    for(const name of ['play','pause','ended'])document.addEventListener(name,this._taxonomyPlayback,true);
+
     this.loadProjectList();
     API.getSettings().then(s => { i18nState.locale = s.language || "zh"; }).catch(() => {});
     this.applyTheme();
@@ -936,6 +967,8 @@ const app = Vue.createApp({
     }, 3000);
   },
   beforeUnmount() {
+    this._taxonomyDisposed=true;clearInterval(this._taxonomyTimer);
+    for(const name of ['play','pause','ended'])document.removeEventListener(name,this._taxonomyPlayback,true);
     this._systemTheme?.removeEventListener('change', this._onSystemTheme);
     if (this._onKey) document.removeEventListener("keydown", this._onKey);
     if (this._closeFolderCtx) document.removeEventListener("click", this._closeFolderCtx);
@@ -967,7 +1000,12 @@ const app = Vue.createApp({
   },
   computed: {
     t() { return t; },
+    taxonomyOptions() { return this.taxonomyNodes.filter(n=>n.status==='active'||n.status==='paused').map(n=>({label:n.path,value:n.id})); },
     workspaceTitle() {
+      if(this.route.startsWith('#/people')) return this.route.startsWith('#/people/person/') ? (this.peopleQuery.person_ids?.length>1?taxText('人物组合','People combination'):(this.peopleCurrent?.display_name || taxText('人物','People'))) : taxText('人物','People');
+      if(this.route.startsWith('#/taxonomy')) return taxText('标签树维护','Tag taxonomy');
+      if(this.route.startsWith('#/classify/collection/'))return this.taxonomyCollections.find(c=>c.id===Number(this.route.split('/')[3]))?.name || taxText('智能图集','Smart collection');
+      if(this.route.startsWith('#/classify')) return this.taxonomyNodes.find(n=>n.id===this.taxonomySelected)?.path || taxText('智能分类','Smart categories');
       if (this.currentView === 'workbench') return this.t('cg.section');
       if (this.currentView === 'duplicates') return this.t('side.find_dup');
       if (this.selectedFolder) return this.selectedFolder.split('/').filter(Boolean).pop() || '/';
@@ -1138,8 +1176,9 @@ const app = Vue.createApp({
   },
   methods: {
     API,
-    nav(hash) { location.hash = hash; },
+    nav(hash) { this._collectionRequest=(this._collectionRequest||0)+1; this.detailOrigin = null; location.hash = hash; },
     navToLibrary() {
+      this.detailOrigin = null;
       this.selectedFolder = null;
       if (location.hash === "#/gallery") {
         this.$nextTick(() => {
@@ -1195,52 +1234,96 @@ const app = Vue.createApp({
       this.bgTasks = this.bgTasks.filter(t => t.status === "running");
     },
     bgTaskGo(id) {
+      this.openDetail(id);
+    },
+    captureDetailOrigin(useSavedScroll = false) {
+      const g = this.$refs.gallery;
+      this._detailGallery = g || null;
+      this.detailLibraryDirty = false;
+      this.detailOrigin = {
+        route: this.route, selectedFolder: this.selectedFolder,
+        libraryExpanded: this.libraryExpanded,
+        peopleQuery: JSON.parse(JSON.stringify(this.peopleQuery||{})), peopleSelected: this.peopleSelected,
+        taxonomyQuery: JSON.parse(JSON.stringify(this.taxonomyQuery||{})),
+        scrollTop: (useSavedScroll ? g?.savedScrollTop : g?.$refs.galleryPage?.scrollTop) || 0,
+      };
+      this.galleryItems = g ? [...g.allMediaItems] : [];
+    },
+    openDetail(id) {
+      this.showImport = false;
+      if (this.currentView !== 'detail') {
+        this.captureDetailOrigin();
+        this._detailOriginReady = true;
+      }
       location.hash = "#/detail/" + id;
     },
-    openDetail(id) { this.showImport = false; location.hash = "#/detail/" + id; },
+    returnFromDetail() {
+      location.hash = this.detailOrigin?.route || "#/gallery";
+    },
     resolveRoute() {
+      const navigationGeneration = this._routeGeneration = (this._routeGeneration || 0) + 1;
       const hash = location.hash || "#/gallery";
+      const previousRoute = this.route;
       this.route = hash;
       const prevView = this.currentView;
+      this.taxonomyCollectionLoading=false;this.taxonomyCollectionError='';
+      if(this.pendingPeopleSeek&&hash!=='#/detail/'+this.pendingPeopleSeek.mediaId)this.pendingPeopleSeek=null;
+      if(!hash.startsWith('#/people')&&!hash.startsWith('#/detail/')&&!(prevView==='detail'&&hash===this.detailOrigin?.route)){this.peopleQuery={};this.peopleSelected=null;}
       if (hash.startsWith("#/detail/")) {
-        const g = this.$refs.gallery;
-        if (g?.items) {
-          this.galleryItems = [...g.items];
-          this._galleryNextPage = g.page + 1;
-          this._galleryAllLoaded = g.allLoaded;
+        if (prevView !== "detail") {
+          if (!this._detailOriginReady) {
+            this.captureDetailOrigin(true);
+            this.detailOrigin.route = previousRoute;
+          }
+          this._detailOriginReady = false;
         }
         this.currentView = "detail";
         this.detailId = parseInt(hash.split("/")[2]);
-        const setFolder = (filePath) => {
-          const parts = filePath.split("/");
-          parts.pop();
-          const dir = parts.join("/") || "/";
-          this.libraryExpanded = true;
-          // Expand only the ancestor path to the target folder
-          const ancestors = [];
-          let cur = "";
-          for (const p of dir.split("/").filter(Boolean)) {
-            cur += "/" + p;
-            ancestors.push(cur);
-          }
-          const expanded = new Set(this.expandedFolders);
-          for (const a of ancestors) expanded.add(a);
-          this.expandedFolders = [...expanded];
-          this.selectedFolder = dir;
-          this.$nextTick(() => {
-            const el = document.querySelector('.q-tree__node--selected');
-            if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-          });
-        };
-        const m = this.galleryItems.find(i => i.id === this.detailId);
-        if (m && m.file_path) {
-          setFolder(m.file_path);
-        } else {
-          API.getMedia(this.detailId).then(media => {
-            if (media && media.file_path) setFolder(media.file_path);
-          }).catch(() => {});
-        }
+      } else if (prevView === "detail" && hash === this.detailOrigin?.route &&
+                 (hash === "#/gallery" || hash === "#/favorites" || hash.startsWith("#/classify") || hash.startsWith("#/people/person/"))) {
+        const origin = this.detailOrigin;
+        this.selectedFolder = origin.selectedFolder;
+        this.libraryExpanded = origin.libraryExpanded;
+        this.peopleQuery=origin.peopleQuery||{};this.peopleSelected=origin.peopleSelected||null;
+        this.taxonomyQuery=origin.taxonomyQuery||{};
+        this.currentView = "gallery";
+        this.detailOrigin = null;
+        this.$nextTick(async () => {
+          const g = this.$refs.gallery;
+          if (!g) return;
+          if (this.detailLibraryDirty) await g.refreshAfterDetail();
+          // Cached cards use content-visibility; allow their layout to resume
+          // before restoring a position below the first screen.
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            if (this._routeGeneration === navigationGeneration && this.currentView === "gallery" && this.route === hash && g.$refs.galleryPage) {
+              g.$refs.galleryPage.scrollTop = origin.scrollTop;
+            }
+          }));
+        });
+      } else if (hash.startsWith('#/people/person/')) {
+        const id=Number(hash.split('/')[3]);
+        if(!Number.isInteger(id)||id<=0){location.hash='#/people';return;}
+        this.currentView='gallery';this.peopleSelected=id;this.peopleQuery={person_ids:[id],person_mode:'all'};
+        this.taxonomyQuery={};this.selectedFolder=null;this.libraryExpanded=false;
+        this.reloadPeopleCatalog();this.reloadPeopleStatus();this.ensurePeoplePerson?.(id);
+        this.$nextTick(()=>{if(this.$refs.gallery){this.$refs.gallery.favFilter=null;this.$refs.gallery.load();}});
+      } else if (hash.startsWith('#/people')) {
+        this.currentView='people';this.peopleQuery={};this.peopleSelected=null;this.libraryExpanded=false;
+      } else if (hash==='#/taxonomy/collections') {
+        this.nav('#/classify');return;
+      } else if (hash.startsWith('#/taxonomy')) {
+        this.currentView='taxonomy'; this.libraryExpanded=false; this.taxonomySelected=Number(hash.split('/')[2]) || null;
+      } else if (hash.startsWith('#/classify/collection/')) {
+        this.currentView='gallery';this.taxonomySelected=null;this.taxonomyQuery={};this.libraryExpanded=false;
+        this.taxonomyCollectionLoading=true;this.$nextTick(()=>this.loadTaxonomyCollection(Number(hash.split('/')[3])));
+      } else if (hash.startsWith('#/classify')) {
+        this.currentView='gallery'; this.taxonomySelected=Number(hash.split('/')[2]) || null;
+        this.selectedFolder=null;this.libraryExpanded=false;
+        if(!this._openingTaxonomyCollection)this.taxonomyQuery={tag_ids:this.taxonomySelected?[this.taxonomySelected]:[],tag_mode:'any',include_children:true};
+        this._openingTaxonomyCollection=false;
+        this.$nextTick(()=>{if(this.$refs.gallery){this.$refs.gallery.favFilter=null;this.$refs.gallery.load();}});
       } else if (hash === "#/favorites") {
+        this.taxonomyQuery={};
         this.currentView = "gallery";
         this.selectedFolder = null;
         this.libraryExpanded = false;
@@ -1254,14 +1337,72 @@ const app = Vue.createApp({
         this.currentView = "workbench";
         this.workbenchId = parseInt(hash.split("/")[2]);
       } else {
+        this.taxonomyQuery={};
         this.currentView = "gallery";
-        this.selectedFolder = null;
+        this.selectedFolder = this._pendingFolder || null;
+        this._pendingFolder = null;
         this.libraryExpanded = true;
         this.$nextTick(() => {
           if (this.$refs.gallery) this.$refs.gallery.favFilter = null;
           this.$refs.gallery?.load();
         });
       }
+    },
+    async reportTaxonomyPlayback(){
+      const active=[...document.querySelectorAll('video,audio')].some(e=>!e.paused&&!e.ended);
+      if(!active && !this._taxonomyWasPlaying)return;
+      this._taxonomyWasPlaying=active;
+      try{await API._fetch('/api/taxonomy/jobs/activity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({client:this._taxonomyClient,active})});}catch{}
+    },
+    async pollTaxonomyStatus(){
+      if(this._taxonomyStatusBusy || this._taxonomyDisposed)return;
+      this._taxonomyStatusBusy=true;
+      try{
+        const status=await TaxonomyAPI('/status');if(this._taxonomyDisposed)return;
+        if(this._taxonomyLabelRevision!==undefined && this._taxonomyLabelRevision!==status.label_revision){
+          this.taxonomyRevision++;this._taxonomyNeedsRefresh=true;this.detailLibraryDirty=true;await this.reloadTaxonomy();
+        }
+        this._taxonomyLabelRevision=status.label_revision;
+        const gallery=this.$refs.gallery;
+        if(this._taxonomyNeedsRefresh && this.currentView==='gallery' && gallery && !gallery.loading && !gallery.loadingMore){
+          await gallery.refreshAfterDetail();this._taxonomyNeedsRefresh=false;
+        }
+        await this.reportTaxonomyPlayback();
+      }catch{}finally{this._taxonomyStatusBusy=false;}
+    },
+    async reloadTaxonomy() {
+      const generation=this._taxonomyGeneration=(this._taxonomyGeneration||0)+1;
+      try {
+        const [tree,collections]=await Promise.all([TaxonomyAPI('/tree'),TaxonomyAPI('/collections')]);
+        if(generation!==this._taxonomyGeneration)return;
+        this.taxonomyNodes=tree.data;this.taxonomyCollections=collections.data;this.taxonomyError='';
+      }catch(e){if(generation===this._taxonomyGeneration)this.taxonomyError=e.message;}
+    },
+    openTaxonomyCollection(collection) {
+      const route='#/classify/collection/'+collection.id;
+      if(this.route===route)this.loadTaxonomyCollection(collection.id);else this.nav(route);
+    },
+    async loadTaxonomyCollection(id) {
+      const route=this.route,token=this._collectionRequest=(this._collectionRequest||0)+1;
+      this.taxonomyCollectionLoading=true;this.taxonomyCollectionError='';
+      const gallery=this.$refs.gallery;
+      if(gallery){gallery._loadGeneration=(gallery._loadGeneration||0)+1;gallery.items=[];gallery.total=0;gallery.allLoaded=true;gallery.loadingMore=false;gallery.loading=true;this.galleryItems=[];}
+      try {
+        const result=await TaxonomyAPI('/collections/'+id);
+        if(this.route!==route || token!==this._collectionRequest)return;
+        const query=result.query;
+        const rules={};for(const key of ['tag_ids','exclude_tag_ids','tag_mode','include_children'])if(query[key]!==undefined)rules[key]=query[key];
+        this.taxonomyQuery=rules;this.selectedFolder=query.folder || null;this.searchQuery=query.q || '';
+        const g=this.$refs.gallery;
+        if(g){
+          g.resetFilters(false);this.taxonomyQuery=rules;this.selectedFolder=query.folder || null;this.searchQuery=query.q || '';g.searchText=query.q || '';
+          g.filters.media_type=query.media_type || 'all';g.filters.rating=query.rating || null;
+          g.favFilter=query.favorite==='true'?'fav':query.favorite==='false'?'unfav':null;
+          g.sortBy=query.sort || 'imported_at';g.sortOrder=query.order || 'desc';
+          this.taxonomyCollectionLoading=false;await g.load();
+        }
+      }catch(e){if(this.route===route && token===this._collectionRequest){this.taxonomyCollectionError=e.message;if(this.$refs.gallery){this.$refs.gallery.items=[];this.$refs.gallery.loading=false;}}}
+      finally{if(this.route===route && token===this._collectionRequest)this.taxonomyCollectionLoading=false;}
     },
     async loadSidebar() {
       try {
@@ -1376,39 +1517,24 @@ const app = Vue.createApp({
       const ni = idx + dir;
       if (ni < 0) return null;
       if (ni >= items.length) {
-        if (this._galleryAllLoaded) return null;
         try {
-          const g = this.$refs.gallery;
+          const g = this._detailGallery;
           if (!g) return null;
-          const params = { page: this._galleryNextPage, per_page: g.perPage, sort: g.sortBy, order: g.sortOrder };
-          if (g.filters.media_type !== "all") params.media_type = g.filters.media_type;
-          if (g.filters.rating) params.rating = g.filters.rating;
-          if (g.filters.color_label) params.color_label = g.filters.color_label;
-          if (g.favFilter === 'fav') params.favorite = "true";
-          else if (g.favFilter === 'unfav') params.favorite = "false";
-          if (g.analysisFilter === 'analyzed') params.analysis_status = "analyzed";
-          else if (g.analysisFilter === 'not') params.analysis_status = "not_analyzed";
-          if (this.searchQuery) params.q = this.searchQuery;
-          if (this.selectedFolder) params.folder = this.selectedFolder;
-          const res = await API.getLibrary(params);
-          const data = res.data || [];
-          if (data.length < g.perPage) this._galleryAllLoaded = true;
-          if (data.length) {
-            this.galleryItems.push(...data);
-            this._galleryNextPage++;
-            return data[0].id;
-          }
-          return null;
+          await g.loadMore();
+          return this.galleryItems[ni]?.id || null;
         } catch { return null; }
       }
       return items[ni].id;
     },
     onFolderSelect(path) {
+      this.detailOrigin = null;
       this.selectedFolder = this.selectedFolder === path ? null : path;
       this.libraryExpanded = true;
-      if (this.currentView !== "gallery") {
+      if (this.currentView !== "gallery" || this.route !== "#/gallery") {
+        this._pendingFolder = this.selectedFolder;
         location.hash = "#/gallery";
       } else {
+        if (this.$refs.gallery) this.$refs.gallery.favFilter = null;
         this.$refs.gallery?.load();
       }
     },
@@ -1729,11 +1855,7 @@ const app = Vue.createApp({
 app.use(Quasar, {
   config: {
     brand: {
-      primary: '#007aff',
       secondary: '#333',
-      accent: '#007aff',
-      dark: '#252628',
-      'dark-page': '#1e1f21',
     },
     notify: { position: 'top', color: 'dark', textColor: 'white', timeout: 1800 }
   }
@@ -1745,10 +1867,27 @@ app.config.errorHandler = (err) => {
   console.error(err);
   Quasar.Notify.create({ message: err.message || t('g.n_error'), position: "top", color: "negative", timeout: 3000 });
 };
+app.directive("sliding-segments", SlidingSegments);
 app.component("appearance-picker", AppearancePicker);
 app.component("folder-tree", FolderTree);
+app.component('taxonomy-sidebar',TaxonomySidebar);
+app.component('taxonomy-tag-icon',TaxonomyTagIcon);
+app.component('taxonomy-tag-picker',TaxonomyTagPicker);
+app.component('taxonomy-page',TaxonomyPage);
+app.component('taxonomy-tools',TaxonomyTools);
+app.component('taxonomy-filters',TaxonomyFilters);
+app.component('smart-collection-icon',SmartCollectionIcon);
+app.component('taxonomy-gallery-actions',TaxonomyGalleryActions);
+app.component('taxonomy-collections-sidebar',TaxonomyCollectionsSidebar);
+app.component('tag-status',TagStatus);
 app.component("import-preview", ImportPreview);
 app.component("gallery-page", GalleryPage);
+app.component("people-sidebar", PeopleSidebar);
+app.component("people-page", PeoplePage);
+app.component("people-dialogs", PeopleDialogs);
+app.component("people-gallery-tools", PeopleGalleryTools);
+app.component("people-media", PeopleMedia);
+app.component("people-cover-picker", PeopleCoverPicker);
 app.component("media-inspector", MediaInspector);
 app.component("detail-page", DetailPage);
 app.component("duplicates-page", DuplicatesPage);

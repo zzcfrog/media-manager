@@ -1,0 +1,122 @@
+{
+  "status": "ready_for_user_review",
+  "date": "2026-10-30",
+  "samples": 128,
+  "photos": 96,
+  "video_covers": 32,
+  "cached_source_sha256_verified": 128,
+  "fixed_candidate_count": 100,
+  "max_known_labels_per_image": 5,
+  "max_extra_names_per_image": 3,
+  "model": {
+    "name": "Qwen3-Omni-30B-A3B-Instruct",
+    "quantization": "Q4_K_M",
+    "projection_quantization": "Q8_0",
+    "runtime": "llama.cpp b10451, Metal",
+    "context": 8192,
+    "parallel": 1,
+    "temperature": 0,
+    "thinking": false,
+    "mean_request_seconds": 2.7606557633771445,
+    "median_request_seconds": 2.705861625028774,
+    "p95_request_seconds": 3.3684133329661563,
+    "sum_request_seconds": 353.3639377122745,
+    "retry_samples": 0,
+    "scope": "Existing-label selection plus free extra labels and brief visual evidence; not just fixed-vocabulary ranking."
+  },
+  "summary": {
+    "samples": 128,
+    "same_top1": 69,
+    "different_top1": 59,
+    "three_same_top1": 30,
+    "omni_differs_both_top1": 73,
+    "omni_completed": 128,
+    "new_term_count": 194,
+    "with_extra": 126,
+    "terms_repeated_independently": 54,
+    "omni_empty_known": 0
+  },
+  "new_vocabulary": {
+    "status": "proposed_unreviewed",
+    "name_deduplication": "NFKC, casefold, remove whitespace; exact names only",
+    "count": 194,
+    "images_with_extras": 126,
+    "independently_repeated_names": 54,
+    "exact_existing_or_same_image_duplicates_omitted": 44,
+    "production_existing_names_checked": 2,
+    "production_tags_written": false,
+    "catalog_written_after_each_response": true,
+    "unreviewed_names_fed_to_subsequent_images": false,
+    "pilot_three_records_excluded": true
+  },
+  "verification": {
+    "structured_responses": 128,
+    "retry_samples": 0,
+    "source_order_verified": true,
+    "csv_rows_including_header": {
+      "three-model-labels-private.csv": 3446,
+      "new-tag-candidates-private.csv": 195
+    },
+    "http_images_decodable": 128,
+    "http_unknown_image_path_api_rejected": true,
+    "http_wrong_host_403": true,
+    "http_prefixless_root_404": true,
+    "js_syntax_passed": true,
+    "python_compile_passed": true,
+    "browser_omni_differs_both": 73,
+    "browser_three_same": 30,
+    "browser_video_cover_filter": 32,
+    "browser_catalog_term_filter_results": 16,
+    "browser_top10_lengths": [
+      10,
+      10,
+      5
+    ],
+    "browser_empty_search": 0,
+    "browser_preview_and_escape_close": true,
+    "browser_pagination_passed": true,
+    "browser_omni_score_nodes": 0,
+    "browser_console_errors_warnings": 0,
+    "browser_horizontal_overflow": false,
+    "delivery_tab": {
+      "cards": 8,
+      "result_count": 128,
+      "loaded_visible_images_at_check": 3,
+      "privacy_masked": false,
+      "image_visibility": "visible",
+      "marked_deliverable": true
+    },
+    "privacy_masked_layout_screenshot": "/Users/zack/.codex/visualizations/2026/10/16/01a1444f-99c6-7963-89e8-5b8dda4ef801/omni-three-model-review-layout-2026-10-30.png"
+  },
+  "safety": {
+    "production_database_written": false,
+    "source_media_read": false,
+    "cached_previews_only": true,
+    "media_uploaded": false,
+    "paid_AI_called": false,
+    "production_application_modified": false,
+    "production_tag_count_after": 2,
+    "source_model_size_mtime_inode_unchanged": true,
+    "inference_service_stopped": true,
+    "production_health_http_200": true
+  },
+  "limitations": [
+    "No human ground truth; agreement is not accuracy.",
+    "New names need semantic deduplication, hierarchy validation and visual review.",
+    "Video covers only; not full-video analysis.",
+    "Timing includes known-label selection, extra-name generation and brief evidence; excludes model loading.",
+    "No import-concurrency, sustained queue, original-media decoding or production tagging integration tested."
+  ],
+  "delivery": {
+    "loopback_only": true,
+    "read_only": true,
+    "review_server_retained": true,
+    "private_results_directory": "build/omni-label-review-2026-10-30/results",
+    "preview_copies_reused_from_previous_review": true
+  },
+  "cleanup": {
+    "own_tmp_and_pycache_removed": true,
+    "new_dependencies_installed": false,
+    "new_model_downloads": false
+  }
+}

@@ -1,0 +1,510 @@
+{
+  "version": "1.0.13",
+  "dmg_bytes": 300696567,
+  "dmg_sha256": "5f187acfcd1f47f9e5a04b72ef9d0725bc168276d567f15c7aaf8d62ba1d2452",
+  "application_bytes": 739411452,
+  "measurement": "Logical regular-file bytes, excluding symlinks. Percentages use expanded application total, not compressed DMG bytes.",
+  "categories": [
+    {
+      "name": "Python backend and libraries",
+      "bytes": 349751634,
+      "MB": 349.75,
+      "percent_of_application": 47.3
+    },
+    {
+      "name": "Electron frameworks",
+      "bytes": 255283158,
+      "MB": 255.28,
+      "percent_of_application": 34.53
+    },
+    {
+      "name": "FFmpeg / ffprobe / ExifTool",
+      "bytes": 101213078,
+      "MB": 101.21,
+      "percent_of_application": 13.69
+    },
+    {
+      "name": "llama.cpp runtime",
+      "bytes": 28117926,
+      "MB": 28.12,
+      "percent_of_application": 3.8
+    },
+    {
+      "name": "Frontend / icons / launcher / other resources",
+      "bytes": 5045656,
+      "MB": 5.05,
+      "percent_of_application": 0.68
+    }
+  ],
+  "backend_executable": {
+    "name": "media-manager-backend",
+    "bytes": 35190112,
+    "MB": 35.19,
+    "percent_of_application": 4.76
+  },
+  "backend_internal_parts": [
+    {
+      "name": "onnxruntime",
+      "bytes": 77578358,
+      "MB": 77.58,
+      "percent_of_application": 10.49,
+      "percent_of_backend": 22.18
+    },
+    {
+      "name": "av",
+      "bytes": 44980768,
+      "MB": 44.98,
+      "percent_of_application": 6.08,
+      "percent_of_backend": 12.86
+    },
+    {
+      "name": "jieba",
+      "bytes": 38261173,
+      "MB": 38.26,
+      "percent_of_application": 5.17,
+      "percent_of_backend": 10.94
+    },
+    {
+      "name": "scipy",
+      "bytes": 36497648,
+      "MB": 36.5,
+      "percent_of_application": 4.94,
+      "percent_of_backend": 10.44
+    },
+    {
+      "name": "sklearn",
+      "bytes": 17723877,
+      "MB": 17.72,
+      "percent_of_application": 2.4,
+      "percent_of_backend": 5.07
+    },
+    {
+      "name": "pillow_heif",
+      "bytes": 12600048,
+      "MB": 12.6,
+      "percent_of_application": 1.7,
+      "percent_of_backend": 3.6
+    },
+    {
+      "name": "hdbscan",
+      "bytes": 12075058,
+      "MB": 12.08,
+      "percent_of_application": 1.63,
+      "percent_of_backend": 3.45
+    },
+    {
+      "name": "tokenizers",
+      "bytes": 9581392,
+      "MB": 9.58,
+      "percent_of_application": 1.3,
+      "percent_of_backend": 2.74
+    },
+    {
+      "name": "PIL",
+      "bytes": 7507456,
+      "MB": 7.51,
+      "percent_of_application": 1.02,
+      "percent_of_backend": 2.15
+    },
+    {
+      "name": "hf_xet",
+      "bytes": 7376144,
+      "MB": 7.38,
+      "percent_of_application": 1.0,
+      "percent_of_backend": 2.11
+    },
+    {
+      "name": "numpy",
+      "bytes": 7361184,
+      "MB": 7.36,
+      "percent_of_application": 1.0,
+      "percent_of_backend": 2.1
+    },
+    {
+      "name": "python3.12",
+      "bytes": 6891952,
+      "MB": 6.89,
+      "percent_of_application": 0.93,
+      "percent_of_backend": 1.97
+    },
+    {
+      "name": "Python.framework",
+      "bytes": 5970358,
+      "MB": 5.97,
+      "percent_of_application": 0.81,
+      "percent_of_backend": 1.71
+    },
+    {
+      "name": "rawpy",
+      "bytes": 5699260,
+      "MB": 5.7,
+      "percent_of_application": 0.77,
+      "percent_of_backend": 1.63
+    },
+    {
+      "name": "ctranslate2",
+      "bytes": 4963468,
+      "MB": 4.96,
+      "percent_of_application": 0.67,
+      "percent_of_backend": 1.42
+    },
+    {
+      "name": "libcrypto.3.dylib",
+      "bytes": 4862416,
+      "MB": 4.86,
+      "percent_of_application": 0.66,
+      "percent_of_backend": 1.39
+    },
+    {
+      "name": "pydantic_core",
+      "bytes": 4344528,
+      "MB": 4.34,
+      "percent_of_application": 0.59,
+      "percent_of_backend": 1.24
+    },
+    {
+      "name": "frontend",
+      "bytes": 2453247,
+      "MB": 2.45,
+      "percent_of_application": 0.33,
+      "percent_of_backend": 0.7
+    },
+    {
+      "name": "faster_whisper",
+      "bytes": 1363050,
+      "MB": 1.36,
+      "percent_of_application": 0.18,
+      "percent_of_backend": 0.39
+    },
+    {
+      "name": "base_library.zip",
+      "bytes": 1333532,
+      "MB": 1.33,
+      "percent_of_application": 0.18,
+      "percent_of_backend": 0.38
+    },
+    {
+      "name": "libsqlite3.0.dylib",
+      "bytes": 1233968,
+      "MB": 1.23,
+      "percent_of_application": 0.17,
+      "percent_of_backend": 0.35
+    },
+    {
+      "name": "libssl.3.dylib",
+      "bytes": 901744,
+      "MB": 0.9,
+      "percent_of_application": 0.12,
+      "percent_of_backend": 0.26
+    },
+    {
+      "name": "jiter",
+      "bytes": 726880,
+      "MB": 0.73,
+      "percent_of_application": 0.1,
+      "percent_of_backend": 0.21
+    },
+    {
+      "name": "charset_normalizer",
+      "bytes": 475376,
+      "MB": 0.48,
+      "percent_of_application": 0.06,
+      "percent_of_backend": 0.14
+    },
+    {
+      "name": "yaml",
+      "bytes": 397664,
+      "MB": 0.4,
+      "percent_of_application": 0.05,
+      "percent_of_backend": 0.11
+    },
+    {
+      "name": "certifi",
+      "bytes": 240216,
+      "MB": 0.24,
+      "percent_of_application": 0.03,
+      "percent_of_backend": 0.07
+    },
+    {
+      "name": "numpy-2.5.4.dist-info",
+      "bytes": 210535,
+      "MB": 0.21,
+      "percent_of_application": 0.03,
+      "percent_of_backend": 0.06
+    },
+    {
+      "name": "libmpdec.4.dylib",
+      "bytes": 188480,
+      "MB": 0.19,
+      "percent_of_application": 0.03,
+      "percent_of_backend": 0.05
+    },
+    {
+      "name": "pydantic-2.14.1.dist-info",
+      "bytes": 149665,
+      "MB": 0.15,
+      "percent_of_application": 0.02,
+      "percent_of_backend": 0.04
+    },
+    {
+      "name": "_pillow_heif.cpython-312-darwin.so",
+      "bytes": 141696,
+      "MB": 0.14,
+      "percent_of_application": 0.02,
+      "percent_of_backend": 0.04
+    },
+    {
+      "name": "markupsafe",
+      "bytes": 68464,
+      "MB": 0.07,
+      "percent_of_application": 0.01,
+      "percent_of_backend": 0.02
+    },
+    {
+      "name": "onnxruntime-1.31.0.dist-info",
+      "bytes": 66555,
+      "MB": 0.07,
+      "percent_of_application": 0.01,
+      "percent_of_backend": 0.02
+    },
+    {
+      "name": "tqdm-4.70.1.dist-info",
+      "bytes": 64033,
+      "MB": 0.06,
+      "percent_of_application": 0.01,
+      "percent_of_backend": 0.02
+    },
+    {
+      "name": "rawpy-0.27.1.dist-info",
+      "bytes": 37386,
+      "MB": 0.04,
+      "percent_of_application": 0.01,
+      "percent_of_backend": 0.01
+    },
+    {
+      "name": "httpcore2-2.13.1.dist-info",
+      "bytes": 33062,
+      "MB": 0.03,
+      "percent_of_application": 0.0,
+      "percent_of_backend": 0.01
+    },
+    {
+      "name": "backend",
+      "bytes": 27210,
+      "MB": 0.03,
+      "percent_of_application": 0.0,
+      "percent_of_backend": 0.01
+    },
+    {
+      "name": "hdbscan-0.8.44.dist-info",
+      "bytes": 21453,
+      "MB": 0.02,
+      "percent_of_application": 0.0,
+      "percent_of_backend": 0.01
+    },
+    {
+      "name": "faster_whisper-1.2.1.dist-info",
+      "bytes": 19770,
+      "MB": 0.02,
+      "percent_of_application": 0.0,
+      "percent_of_backend": 0.01
+    },
+    {
+      "name": "setuptools",
+      "bytes": 18263,
+      "MB": 0.02,
+      "percent_of_application": 0.0,
+      "percent_of_backend": 0.01
+    },
+    {
+      "name": "typing_extensions-4.16.0.dist-info",
+      "bytes": 17912,
+      "MB": 0.02,
+      "percent_of_application": 0.0,
+      "percent_of_backend": 0.01
+    },
+    {
+      "name": "ctranslate2-4.8.3.dist-info",
+      "bytes": 16706,
+      "MB": 0.02,
+      "percent_of_application": 0.0,
+      "percent_of_backend": 0.0
+    },
+    {
+      "name": "httpx2-2.13.1.dist-info",
+      "bytes": 16058,
+      "MB": 0.02,
+      "percent_of_application": 0.0,
+      "percent_of_backend": 0.0
+    },
+    {
+      "name": "pillow_heif-1.8.1.dist-info",
+      "bytes": 15175,
+      "MB": 0.02,
+      "percent_of_application": 0.0,
+      "percent_of_backend": 0.0
+    },
+    {
+      "name": "werkzeug-3.1.9.dist-info",
+      "bytes": 13932,
+      "MB": 0.01,
+      "percent_of_application": 0.0,
+      "percent_of_backend": 0.0
+    },
+    {
+      "name": "jieba-0.42.1.dist-info",
+      "bytes": 8797,
+      "MB": 0.01,
+      "percent_of_application": 0.0,
+      "percent_of_backend": 0.0
+    },
+    {
+      "name": "flask-3.1.3.dist-info",
+      "bytes": 8489,
+      "MB": 0.01,
+      "percent_of_application": 0.0,
+      "percent_of_backend": 0.0
+    },
+    {
+      "name": "click-8.5.0.dist-info",
+      "bytes": 6661,
+      "MB": 0.01,
+      "percent_of_application": 0.0,
+      "percent_of_backend": 0.0
+    },
+    {
+      "name": "markupsafe-3.0.4.dist-info",
+      "bytes": 5422,
+      "MB": 0.01,
+      "percent_of_application": 0.0,
+      "percent_of_backend": 0.0
+    },
+    {
+      "name": "itsdangerous-2.2.0.dist-info",
+      "bytes": 5033,
+      "MB": 0.01,
+      "percent_of_application": 0.0,
+      "percent_of_backend": 0.0
+    }
+  ],
+  "tool_parts": [
+    {
+      "name": "bin",
+      "bytes": 81194787
+    },
+    {
+      "name": "exiftool",
+      "bytes": 20015800
+    },
+    {
+      "name": "native-manifest.json",
+      "bytes": 2491
+    }
+  ],
+  "largest_files": [
+    {
+      "path": "Contents/Frameworks/Electron Framework.framework/Versions/A/Electron Framework",
+      "bytes": 166152400,
+      "MB": 166.15
+    },
+    {
+      "path": "Contents/Resources/backend/_internal/onnxruntime/capi/onnxruntime_pybind11_state.so",
+      "bytes": 40552592,
+      "MB": 40.55
+    },
+    {
+      "path": "Contents/Resources/backend/media-manager-backend",
+      "bytes": 35190112,
+      "MB": 35.19
+    },
+    {
+      "path": "Contents/Resources/backend/_internal/onnxruntime/capi/libonnxruntime.1.31.0.dylib",
+      "bytes": 32863344,
+      "MB": 32.86
+    },
+    {
+      "path": "Contents/Frameworks/Electron Framework.framework/Versions/A/Libraries/libvk_swiftshader.dylib",
+      "bytes": 16776016,
+      "MB": 16.78
+    },
+    {
+      "path": "Contents/Resources/backend/_internal/av/.dylibs/libavcodec.63.1.102.dylib",
+      "bytes": 13049952,
+      "MB": 13.05
+    },
+    {
+      "path": "Contents/Resources/backend/_internal/jieba/lac_small/model_baseline/word_emb",
+      "bytes": 10721821,
+      "MB": 10.72
+    },
+    {
+      "path": "Contents/Frameworks/Electron Framework.framework/Versions/A/Resources/icudtl.dat",
+      "bytes": 10466624,
+      "MB": 10.47
+    },
+    {
+      "path": "Contents/Resources/tools/bin/libavcodec.61.dylib",
+      "bytes": 10200256,
+      "MB": 10.2
+    },
+    {
+      "path": "Contents/Resources/backend/_internal/pillow_heif/.dylibs/libx265.217.dylib",
+      "bytes": 10036480,
+      "MB": 10.04
+    },
+    {
+      "path": "Contents/Resources/backend/_internal/tokenizers/tokenizers.abi3.so",
+      "bytes": 9581392,
+      "MB": 9.58
+    },
+    {
+      "path": "Contents/Resources/bin/darwin-arm64/llama-b10451/libllama-server-impl.dylib",
+      "bytes": 9512736,
+      "MB": 9.51
+    },
+    {
+      "path": "Contents/Resources/bin/darwin-arm64/llama-b10451/libllama-common.0.1.0.dylib",
+      "bytes": 7884080,
+      "MB": 7.88
+    },
+    {
+      "path": "Contents/Resources/backend/_internal/hf_xet/hf_xet.abi3.so",
+      "bytes": 7376144,
+      "MB": 7.38
+    },
+    {
+      "path": "Contents/Frameworks/Electron Framework.framework/Versions/A/Libraries/libGLESv2.dylib",
+      "bytes": 7096752,
+      "MB": 7.1
+    },
+    {
+      "path": "Contents/Resources/backend/_internal/av/.dylibs/libx265.217.dylib",
+      "bytes": 6864416,
+      "MB": 6.86
+    },
+    {
+      "path": "Contents/Resources/backend/_internal/jieba/analyse/idf.txt",
+      "bytes": 6200957,
+      "MB": 6.2
+    },
+    {
+      "path": "Contents/Resources/backend/_internal/Python.framework/Versions/3.12/Python",
+      "bytes": 5966944,
+      "MB": 5.97
+    },
+    {
+      "path": "Contents/Frameworks/Electron Framework.framework/Versions/A/Resources/resources.pak",
+      "bytes": 5926559,
+      "MB": 5.93
+    },
+    {
+      "path": "Contents/Resources/tools/bin/libx265.215.dylib",
+      "bytes": 5462368,
+      "MB": 5.46
+    }
+  ],
+  "read_only": true,
+  "installed_app_modified": false,
+  "user_data_accessed": false,
+  "temporary_mount_detached": true
+}

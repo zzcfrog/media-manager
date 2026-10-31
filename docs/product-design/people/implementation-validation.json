@@ -1,0 +1,67 @@
+{
+  "date": "2026-10-30",
+  "status": "source_implemented_and_verified",
+  "production_deployed": false,
+  "production_library_accessed": false,
+  "original_media_modified": false,
+  "models_downloaded_or_modified": false,
+  "new_runtime_dependencies": [],
+  "python": {
+    "command": ".build-venv/bin/python -m unittest discover -s tests -q",
+    "passed": 236,
+    "people_data_tests": 23,
+    "people_job_tests": 15,
+    "face_engine_tests": 16,
+    "people_integration_tests": 6
+  },
+  "javascript": {
+    "people_state": "passed",
+    "gallery_state_passed": 13,
+    "inspector_passed": 8,
+    "syntax": "passed"
+  },
+  "browser": {
+    "passed": 17,
+    "unexpected_console_or_page_errors": 0,
+    "unexpected_failed_requests": 0,
+    "expected_fault": "HTTP 503 retry in a separate synthetic test page",
+    "checks": [
+      "Real API overview and externally configured model empty state",
+      "Light/dark theme without hard white borders",
+      "Search empty state and recovery",
+      "Sidebar expander does not change the selected content",
+      "People gallery detail return preserves original route, person query and scroll",
+      "Homonym rename requires explicit separate-identity confirmation",
+      "Person cover picker reaches and selects faces beyond the first page, then supports undo",
+      "Person include/exclude composes with existing gallery filters",
+      "Face split and undo retain a usable gallery",
+      "Multiple selected photos split only the current person faces and support undo",
+      "Manual back-view association creates no fabricated face observation",
+      "Observed video time seeks safely in the real player",
+      "Review pagination reaches past the first 40 items and footer shows the full count",
+      "Merge preview, apply and narrow undo through actual API",
+      "Explicit model/scope settings with no recognition triggered by viewing",
+      "Four appearance themes in light/dark plus compact desktop layout",
+      "Read failure is shown with a working retry; expected isolated HTTP 503 handled without page errors"
+    ]
+  },
+  "model_smoke": "model-validation.json",
+  "storage": {
+    "isolated_export_restore_fingerprint": "passed",
+    "names_and_outside_exclusions": "preserved",
+    "relative_crops": "preserved"
+  },
+  "review": "All confirmed data, cache, async navigation, refresh, cover and video revision/budget findings fixed and independently rechecked",
+  "diff_whitespace_check": "passed",
+  "unverified": [
+    "Person-disjoint real-world cluster accuracy and production threshold calibration",
+    "Full-library import and sustained CPU/memory/disk performance",
+    "All RAW camera models and all video encodings",
+    "Packaged Electron build, production-library upgrade and local-app replacement"
+  ],
+  "limits": [
+    "Video observations are bounded content-adaptive samples; no continuous appearance intervals",
+    "Cross-media batch face correction is limited to 100 media per operation",
+    "Automatic scanning is off by default; model and scope are chosen explicitly"
+  ]
+}

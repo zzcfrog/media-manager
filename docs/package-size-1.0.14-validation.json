@@ -1,0 +1,80 @@
+{
+  "version": "1.0.14",
+  "status": "validated local candidate; not installed",
+  "scope": [
+    "Keep only en, en_GB, zh_CN, zh_TW Electron locale resources",
+    "Remove unused jieba analyse, posseg and lac_small resources; retain ordinary segmentation, dictionary and HMM"
+  ],
+  "sizes": {
+    "previous_dmg_bytes": 300696567,
+    "candidate_dmg_bytes": 272135008,
+    "dmg_saved_bytes": 28561559,
+    "dmg_reduction_percent": 9.5,
+    "previous_application_bytes": 739411452,
+    "candidate_application_bytes": 664786379,
+    "previous_backend_bytes": 349751634,
+    "candidate_backend_bytes": 316567006,
+    "jieba_bytes": 6347662,
+    "electron_locale_bytes": 2012085
+  },
+  "onnx": {
+    "unchanged": true,
+    "bytes": 77578358,
+    "files_byte_identical_to_previous_package": 316,
+    "standalone_C_library_retained": true
+  },
+  "artifact": {
+    "name": "Luminisle-1.0.14-arm64.dmg",
+    "bytes": 272135008,
+    "MB": 272.14,
+    "sha256": "12749c2e72dabcfd384cd1cd5146127718ced9a652e9b294011512b733f74b8a"
+  },
+  "tests": {
+    "python": 82,
+    "frontend": 16,
+    "desktop_runtime": "passed",
+    "segmentation_query_and_FTS_equivalence": "passed",
+    "frozen_self_test": "passed",
+    "frozen_real_onnx_features": "passed",
+    "frozen_chinese_search_hit_and_empty": "passed",
+    "frozen_two_photo_stack": "passed",
+    "browser_zh_to_en_to_zh": "passed",
+    "browser_console_errors_warnings": 0,
+    "bundled_frontend_source_matches": 34,
+    "synthetic_export_verify_restore": "passed",
+    "signature_deep_strict": "passed",
+    "dmg_integrity": "passed",
+    "zip_integrity": "passed"
+  },
+  "installed_application": {
+    "version": "1.0.12",
+    "replaced": false
+  },
+  "safety": {
+    "production_library_accessed": false,
+    "external_models_modified": false,
+    "existing_search_index_changed": false,
+    "paid_AI_called": false
+  },
+  "screenshot": "screenshots/package-1.0.14-resource-trim.jpg",
+  "limitations": [
+    "Local ad-hoc signing without Developer ID notarization.",
+    "ASR transcription and VLM generation were not re-run; their packages are retained and ONNX is byte-identical."
+  ],
+  "cleanup": {
+    "test_server_stopped": true,
+    "temporary_library_removed": true,
+    "baseline_dmg_retained": "Luminisle-1.0.13-arm64.dmg",
+    "removed_paths": [
+      "build/runtime",
+      "build/tools",
+      "build/pyinstaller",
+      "dist/mac-arm64",
+      "dist/Luminisle-1.0.14-arm64.zip",
+      "dist/Luminisle-1.0.14-arm64.zip.blockmap",
+      "dist/Luminisle-1.0.14-arm64.dmg.blockmap",
+      "dist/builder-debug.yml",
+      "build/resource-trim-validation/frozen-ready.json"
+    ]
+  }
+}

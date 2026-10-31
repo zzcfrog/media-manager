@@ -210,16 +210,29 @@ def stop() -> dict:
 _engine_cond = threading.Condition()
 _engine_users = 0
 _engine_model: str | None = None
+_foreground_waiters = 0
 
 
-def acquire_engine(model_id: str) -> dict:
-    """占用式获取引擎：等待无占用或占用模型相同 → 计数 +1 → ensure。
-    分析线程必须 try/finally 配对 release_engine()。"""
-    global _engine_users, _engine_model
+def acquire_engine(model_id: str, *, background=False, cancelled=None) -> dict:
+    """Foreground leases keep existing sharing; background waits for an idle engine."""
+    global _engine_users, _engine_model, _foreground_waiters
     with _engine_cond:
-        _engine_cond.wait_for(lambda: _engine_users == 0 or _engine_model == model_id)
-        _engine_users += 1
-        _engine_model = model_id
+        if not background:
+            _foreground_waiters += 1
+        try:
+            while not (_engine_users == 0 and (not background or _foreground_waiters == 0) or
+                       not background and _engine_model == model_id):
+                if cancelled and cancelled():
+                    raise InterruptedError('模型等待已取消')
+                _engine_cond.wait(timeout=0.25)
+            if cancelled and cancelled():
+                raise InterruptedError('模型等待已取消')
+            _engine_users += 1
+            _engine_model = model_id
+        finally:
+            if not background:
+                _foreground_waiters -= 1
+            _engine_cond.notify_all()
     try:
         return ensure(model_id)
     except Exception:

@@ -1,0 +1,60 @@
+{
+  "date": "2026-10-30",
+  "status": "complete",
+  "scope": "User-authorized replacement of unused legacy vocabulary and installation of default taxonomy; existing 1.0.15 application reused",
+  "catalog": "backend/resources/default-taxonomy.v1.json",
+  "catalog_file_sha256": "5a8ae01493c710cac56be30b213bf1409a7d3d79284cf32cc167d849b5a963bc",
+  "preset_digest": "3a23a0757dec75759f6b2e865d3e520ea8ee55a3b2e5226456fafafd0a2056ff",
+  "nodes": 1107,
+  "leaf_nodes": 966,
+  "aliases": 153,
+  "levels": 4,
+  "roots": {
+    "场景": 240,
+    "主体": 506,
+    "活动": 174,
+    "视觉特征": 187
+  },
+  "removed_legacy": {
+    "ids": [
+      1,
+      2
+    ],
+    "names": [
+      "风景",
+      "建筑"
+    ],
+    "references_before_removal": 0,
+    "ids_not_reused": true
+  },
+  "production_backup": "/Users/zack/Library/Application Support/Media Manager/library/upgrade-backups/taxonomy-preset-20261030-192906-954bb15a.db",
+  "non_vocabulary_tables_unchanged": 35,
+  "other_settings_unchanged": true,
+  "external_model_config_unchanged": true,
+  "original_media_modified": false,
+  "automatic_assignments": 0,
+  "foreign_key_violations": 0,
+  "model_inference_or_cloud_called": false,
+  "tests": {
+    "preset_tests": 9,
+    "full_python_regressions": 176,
+    "independent_review": "passed; normalized alias duplication fixed and covered",
+    "maximum_actual_model_text_tokens": 61,
+    "fresh_source_first_run_and_restart": "passed",
+    "production_readonly_browser": {
+      "canonical_editor": "番茄",
+      "alias_search": "西红柿",
+      "four_level_path": "主体 / 食物与饮品 / 蔬菜与菌菇食材 / 番茄 · 可用于自动分类",
+      "four_roots_visible": true,
+      "legacy_unfiled_absent": true,
+      "no_automatic_media_assignments": true,
+      "pageErrors": [],
+      "failedRequests": [],
+      "mutationRequests": []
+    }
+  },
+  "application_restarted_normally": true,
+  "packaged_binary_rebuilt": false,
+  "future_empty_library_bootstrap_in_source": true,
+  "git_commit_or_push": false
+}

@@ -128,6 +128,7 @@ const WorkbenchPage = {
                  draggable="true"
                  @dragstart="onMatDragStart($event, m)">
               <img :src="'/media/thumbnail/' + m.id" class="wb-mat-thumb" :class="{'audio-waveform-thumb': m.media_type==='audio'}" loading="lazy">
+              <tag-status :media="m"></tag-status>
               <span v-if="isMediaOnTimeline(m.id)" class="wb-mat-badge">{{ t('wb.added') }}</span>
               <div class="wb-mat-overlay">
                 <div class="wb-mat-meta">
@@ -2323,7 +2324,7 @@ const WorkbenchPage = {
         title: t("wb.export_fcpxml"),
         message: t("wb.export_fcpxml_prompt"),
         prompt: { model: this.project.name, type: "text", outlined: true, dense: true },
-        cancel: true,
+        cancel: { label: t('g.cancel'), flat: true, color: 'grey-7' },
         persistent: false,
         ok: { label: t("wb.export_fcpxml"), color: "accent", unelevated: true },
       }).onOk(async (name) => {

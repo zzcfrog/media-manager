@@ -1,7 +1,7 @@
 {
   "name": "media-manager",
   "productName": "映屿 · luminisle",
-  "version": "1.0.10",
+  "version": "1.0.16",
   "main": "main.js",
   "scripts": {
     "start": "ELECTRON_RUN_AS_NODE= electron .",
@@ -52,6 +52,12 @@
       }
     ],
     "mac": {
+      "electronLanguages": [
+        "en",
+        "en_GB",
+        "zh_CN",
+        "zh_TW"
+      ],
       "category": "public.app-category.video",
       "minimumSystemVersion": "26.0",
       "icon": "icon.icns",

@@ -96,6 +96,8 @@
 :root[data-appearance-theme] body.native-ui :is(input, textarea)::placeholder { color: var(--text3) !important; -webkit-text-fill-color: var(--text3) !important; }
 :root[data-appearance-theme] body.native-ui :is(.text-grey-4, .text-grey-5, .text-grey-6, .text-grey-7, .text-grey-8) { color: var(--text2) !important; }
 :root[data-appearance-theme] body.native-ui :is(.bg-primary, .filter-bar .q-btn-group .q-btn.bg-primary, .sidebar-action-btn, .wb-export, .mat-type-active, .seg-added-badge, .dup-badge, .wb-mat-badge) { color: var(--on-accent) !important; }
+/* Quasar selected buttons use on-accent ink, so their moving plate must be solid. */
+:root[data-appearance-theme] body.native-ui .sliding-segments:has(> .q-btn.bg-primary[aria-pressed="true"]) { --segment-background:var(--accent); --segment-ink:var(--on-accent); }
 :root[data-appearance-theme] body.native-ui .gallery-page::-webkit-scrollbar-thumb { background-color: var(--border2); }
 :root[data-appearance-theme] body.native-ui .folder-tree-icon { stroke: var(--accent); }
 :root[data-appearance-theme="paper"] body.native-ui .app-sidebar .sidebar-active-item,

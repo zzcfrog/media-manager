@@ -1,0 +1,82 @@
+{
+  "version": "1.0.13",
+  "status": "validated local candidate; not installed",
+  "changes": [
+    "Replace torchvision PIL transforms with pixel-identical Pillow/NumPy preprocessing",
+    "Exclude torch and torchvision from the frozen runtime; retain ONNX, CTranslate2 ASR, native tools and external models"
+  ],
+  "sizes": {
+    "baseline_dmg_bytes": 441728540,
+    "candidate_dmg_bytes": 300696567,
+    "dmg_reduction_percent": 31.93,
+    "baseline_application_bytes": 1253244830,
+    "candidate_application_bytes": 739411452,
+    "baseline_backend_bytes": 862717932,
+    "candidate_backend_bytes": 349751634
+  },
+  "artifact": {
+    "name": "Luminisle-1.0.13-arm64.dmg",
+    "bytes": 300696567,
+    "MB": 300.7,
+    "sha256": "5f187acfcd1f47f9e5a04b72ef9d0725bc168276d567f15c7aaf8d62ba1d2452"
+  },
+  "tests": {
+    "python": 81,
+    "preprocess_reference_cases": 9,
+    "actual_onnx_vector_byte_comparisons": 6,
+    "gallery_state": 13,
+    "frontend": 16,
+    "desktop_runtime": "passed",
+    "frozen_self_test": "passed",
+    "signature_deep_strict": "passed",
+    "dmg_integrity": "passed",
+    "zip_integrity": "passed",
+    "bundled_frontend_source_matches": 34,
+    "bundle_version": "1.0.13"
+  },
+  "frozen_browser": {
+    "synthetic_imports": 2,
+    "real_onnx_features": true,
+    "two_photo_stack_expands": true,
+    "detail_returns_to_favorites": true,
+    "inspector_histograms": true,
+    "console_errors_warnings": 0,
+    "screenshot": "screenshots/package-1.0.13-slim-smoke.jpg"
+  },
+  "migration": {
+    "synthetic_export_verify_restore": "passed",
+    "production_library_modified": false,
+    "schema_changed": false,
+    "existing_features_need_recompute": false
+  },
+  "installed_application": {
+    "version": "1.0.12",
+    "replaced": false
+  },
+  "limits": [
+    "Local ad-hoc signing; no Developer ID notarization.",
+    "Actual ASR transcription and local VLM generation were not re-run; their runtime modules and tools are retained and import self-tests passed."
+  ],
+  "cleanup": {
+    "synthetic_library_removed": true,
+    "test_server_stopped": true,
+    "duplicate_zip_and_generated_build_directories": "removed",
+    "removed_paths": [
+      "build/runtime",
+      "build/tools",
+      "build/pyinstaller",
+      "dist/mac-arm64",
+      "dist/Luminisle-1.0.13-arm64.zip",
+      "dist/Luminisle-1.0.13-arm64.zip.blockmap",
+      "dist/Luminisle-1.0.13-arm64.dmg.blockmap",
+      "dist/builder-debug.yml",
+      "build/slim-package-validation/frozen-ready.json"
+    ]
+  },
+  "contents_audit": {
+    "report": "package-contents-1.0.13.json",
+    "read_only_dmg_mount": true,
+    "temporary_mount_detached": true,
+    "hash_matches_delivered_installer": true
+  }
+}

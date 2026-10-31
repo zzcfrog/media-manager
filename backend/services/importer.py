@@ -133,6 +133,10 @@ def import_single_file(file_path: str) -> dict | None:
         raise
 
 
+from .classification_jobs import foreground_work
+
+
+@foreground_work
 def _prepare_import(filepath: Path, exif_tags=None) -> dict:
     """Prepare media on a worker; never access a Flask context or database here."""
     start = perf_counter()
@@ -252,6 +256,15 @@ def _save_import(db, prepared, existing):
         from ..blueprints.analysis import refresh_media_fts
         refresh_media_fts(db, media_id)
         row = dict(db.execute("SELECT * FROM media WHERE id = ?", (media_id,)).fetchone())
+        from ..db import get_setting
+        classify = get_setting(db,'classification_enabled','false') == 'true'
+        if classify:
+            from .classification_jobs import enqueue
+            enqueue(db,media_id,'fast',batch_id=prepared.get('_classification_batch'))
+        organize_people = get_setting(db,'people_enabled','false') == 'true'
+        if organize_people:
+            from .people_jobs import enqueue as enqueue_people
+            enqueue_people(db,media_id)
         db.commit()
     except Exception:
         db.rollback()
@@ -264,12 +277,27 @@ def _save_import(db, prepared, existing):
                 except OSError:
                     logger.warning("旧缓存清理失败: {}", existing[c])
 
+    if classify:
+        try:
+            from flask import current_app
+            from .classification_jobs import ensure_worker
+            ensure_worker(current_app._get_current_object())
+        except Exception:
+            logger.warning('分类任务已登记，后台调度稍后重试')
+    if organize_people:
+        try:
+            from flask import current_app
+            from .people_jobs import ensure_worker as ensure_people_worker
+            ensure_people_worker(current_app._get_current_object())
+        except Exception:
+            logger.warning('人物任务已登记，后台调度稍后重试')
     logger.info("imported: {} id={}", values["file_name"], media_id)
     return row
 
 
 def import_batch(db, paths):
     """Bounded preparation, ordered commits and progress; discard uncommitted caches on disconnect."""
+    classification_batch=__import__("uuid").uuid4().hex
     with ThreadPoolExecutor(max_workers=IMPORT_WORKERS, thread_name_prefix="media-import") as pool:
         for offset in range(0, len(paths), IMPORT_BATCH_SIZE):
             chunk = [Path(p) for p in paths[offset:offset + IMPORT_BATCH_SIZE]]
@@ -284,7 +312,12 @@ def import_batch(db, paths):
                     event = {"done": index, "total": len(paths), "file_path": str(path)}
                     future = futures.pop(path, None)
                     try:
-                        result = _import_one(db, path, prepared=future.result()) if future else None
+                        if future:
+                            prepared=future.result()
+                            prepared['_classification_batch']=classification_batch
+                            result=_import_one(db,path,prepared=prepared)
+                        else:
+                            result=None
                         if result:
                             result.pop("embedding", None)
                             event.update(type="ok", data=result)

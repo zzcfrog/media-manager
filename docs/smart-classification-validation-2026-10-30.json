@@ -1,0 +1,73 @@
+{
+  "date": "2026-10-30",
+  "status": "local_delivery_complete_independent_quality_pending",
+  "authorization": "development_and_isolated_tests_only",
+  "python": {
+    "passed": 167,
+    "failed": 0
+  },
+  "frontend": {
+    "core": 16,
+    "gallery_state": 13,
+    "inspector": 8,
+    "creation_time": 8,
+    "taxonomy_state": 30
+  },
+  "browser": {
+    "core_groups": 4,
+    "themes_and_browsing": 38,
+    "new_split_target": 5,
+    "history_queue_retention": 7,
+    "mapping_concurrency": 3,
+    "normal_unexpected_errors": 0,
+    "expected_faults": [
+      "503/offline injection",
+      "409 changed mapping target"
+    ]
+  },
+  "performance": {
+    "hardware": "Apple M3 Max 48 GB",
+    "synthetic_media": 100000,
+    "nodes": 5000,
+    "tree_p95_ms": 436.86,
+    "list_and_combination_p95_ms": [
+      1.424,
+      48.986
+    ],
+    "example_100000_p95_ms": 1460.049,
+    "import_9_pairs_total_overhead_percent": 0.763,
+    "scope": "synthetic local SSD hot cache; inference disabled for import comparison"
+  },
+  "model": {
+    "family": "SigLIP2 Base16 224 paired ONNX",
+    "runtime": "CPU four threads",
+    "cold_seconds": 2.288,
+    "warm_cached_mean_ms": 0.334,
+    "new_chinese_text_ms": 31.654,
+    "new_text_image_calls": 0,
+    "new_text_text_calls": 1,
+    "semantic_accuracy": "not independently human-validated",
+    "automatic_profiles_installed": 0
+  },
+  "production": {
+    "database_writes": true,
+    "application_replaced": true,
+    "paid_ai_calls": false,
+    "committed_or_pushed": false,
+    "schema_migration": true,
+    "original_tables_unchanged": true
+  },
+  "remaining": [
+    "independent human truth and calibrated automatic policies",
+    "real Omni and foreground resource contention; Python extra peak budget excludes child processes",
+    "unexercised deep pagination/scroll/keyboarding and fault combinations"
+  ],
+  "evidence": [
+    "build/taxonomy-validation/",
+    "build/taxonomy-ui-validation/",
+    "build/taxonomy-appearance-validation/",
+    "build/classification-model-validation/",
+    "build/taxonomy-performance-validation/"
+  ],
+  "local_delivery_record": "docs/local-update-1.0.15-2026-10-30.json"
+}

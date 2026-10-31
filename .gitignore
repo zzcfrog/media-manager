@@ -23,3 +23,6 @@ scripts/
 .build-venv/
 build/
 .DS_Store
+
+# Local workflow session state
+.workflow-sessions/

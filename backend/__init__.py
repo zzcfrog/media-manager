@@ -19,10 +19,18 @@ def create_app() -> Flask:
     cleanup_temp()
     init_db(app)
 
+    with app.app_context():
+        from .db import get_db
+        from .services.taxonomy_presets import ensure_defaults
+        with get_db() as db:
+            ensure_defaults(db)
+
     from .blueprints.serve import bp as serve_bp
     from .blueprints.library import bp as library_bp
     from .blueprints.analysis import bp as analysis_bp
     from .blueprints.tags import bp as tags_bp
+    from .blueprints.taxonomy import bp as taxonomy_bp
+    from .blueprints.people import bp as people_bp
     from .blueprints.settings import bp as settings_bp
     from .blueprints.workbench import bp as workbench_bp
     from .blueprints.creative import bp as creative_bp
@@ -32,6 +40,8 @@ def create_app() -> Flask:
     app.register_blueprint(library_bp, url_prefix="/api/library")
     app.register_blueprint(analysis_bp, url_prefix="/api/analysis")
     app.register_blueprint(tags_bp, url_prefix="/api/tags")
+    app.register_blueprint(taxonomy_bp, url_prefix="/api/taxonomy")
+    app.register_blueprint(people_bp, url_prefix="/api/people")
     app.register_blueprint(settings_bp, url_prefix="/api/settings")
     app.register_blueprint(workbench_bp, url_prefix="/api/workbench")
     app.register_blueprint(creative_bp, url_prefix="/api/creative")
@@ -50,6 +60,11 @@ def create_app() -> Flask:
         if needs_asr and not __import__("os").environ.get("MEDIA_MANAGER_SKIP_PRELOAD") and asr_engine_name in available_engines():
             asr_model_name = get_setting(db, "asr_model", "large-v3")
             preload_all(asr_engine_name, asr_model_name)
+
+    from .services.classification_jobs import ensure_worker
+    ensure_worker(app)
+    from .services.people_jobs import ensure_worker as ensure_people_worker
+    ensure_people_worker(app)
 
     @app.route("/")
     def index():

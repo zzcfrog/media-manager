@@ -1,0 +1,122 @@
+{
+  "status": "complete",
+  "date": "2026-10-24",
+  "version": "1.0.11",
+  "previous_version": "1.0.10",
+  "installed_application": "/Users/zack/Applications/映屿 · luminisle.app",
+  "scope": "紧凑素材库检查器；更多已有元数据；缓存预览亮度和 RGB 直方图。",
+  "package_validation": {
+    "version": "1.0.11",
+    "appId": "com.zack.media-manager",
+    "frontend_files_match": 34,
+    "signature": "ad-hoc; deep strict verification passed",
+    "private_database_or_external_model_weights_embedded": false,
+    "upgrade_document_matches": true,
+    "artifacts": {
+      "Luminisle-1.0.11-arm64.dmg": {
+        "bytes": 441697840,
+        "sha256": "25056a034cd57a906421854f4728bac1944281796aa44cc443a7cd7799f2a0c9"
+      },
+      "Luminisle-1.0.11-arm64.zip": {
+        "bytes": 443236775,
+        "sha256": "7a2c4c631429e4fb25454158bc482941d4fad1fad4a132f869e9fb4444d98009"
+      }
+    }
+  },
+  "packaged_smoke": {
+    "version": "1.0.11",
+    "isolated_library": true,
+    "frontend_files_match": 34,
+    "frozen_backend_started": true,
+    "cache_only_existing_and_missing": "passed",
+    "records_unchanged": true,
+    "external_models_loaded": false,
+    "paid_ai": false,
+    "production_data_accessed": false
+  },
+  "installed_smoke": {
+    "normal_launch": true,
+    "health_version": "1.0.11",
+    "installed_signature_deep_strict_verified": true,
+    "existing_library_and_projects_visible": true,
+    "photo_luminance_and_rgb_histograms_visible": true,
+    "compact_metadata_and_fixed_actions_visible": true,
+    "video_metadata_and_decimal_frame_rate_visible": true,
+    "previous_video_filter_and_selection_restored": true,
+    "real_media_modified": false
+  },
+  "data_preservation": {
+    "all_tables_unchanged": true,
+    "tables_checked": 13,
+    "media": 10960,
+    "projects": 2,
+    "thumbnails_unchanged": true,
+    "thumbnail_files_checked": 13121,
+    "model_config_unchanged": true,
+    "existing_backups_unchanged": true,
+    "new_upgrade_backup_files": [
+      "upgrade-backups/20261024-194148-f1c59212.db",
+      "upgrade-backups/20261024-194148-f1c59212.db-shm",
+      "upgrade-backups/20261024-194148-f1c59212.db-wal",
+      "upgrade-backups/20261024-194148-f1c59212.json"
+    ],
+    "integrity": "ok",
+    "upgrade_snapshot_matches_pre_upgrade_tables": true
+  },
+  "additional_checks": {
+    "source_python_tests": "73/73 passed in source validation",
+    "frontend_regressions": "16/16 passed again before package build",
+    "inspector_regressions": "6/6 passed again before package build",
+    "desktop_runtime_paths": "passed",
+    "frozen_backend_self_test": {
+      "ok": true,
+      "runtime": "3.12.9",
+      "frozen": true
+    },
+    "source_validation": "docs/inspector-validation-2026-10-24.json"
+  },
+  "limitations": [
+    "直方图基于缓存缩略图的 8 位像素，不能代替 RAW/HDR 原始数据统计。",
+    "没有重新验证云端 AI 或完整本地生成模型推理。",
+    "本地 ad-hoc 签名，没有 Developer ID 公证；未配置互联网自动更新。"
+  ],
+  "safety": "No data restore, rollback, source-media edits, model relocation, paid AI, commit or push.",
+  "cleanup": {
+    "complete": true,
+    "build_preflight": {
+      "version": "1.0.11",
+      "paths": {
+        "dist": {
+          "existed_before_build": false
+        },
+        "build/runtime": {
+          "existed_before_build": false
+        },
+        "build/tools": {
+          "existed_before_build": false
+        },
+        "build/pyinstaller": {
+          "existed_before_build": false
+        }
+      }
+    },
+    "old_application_moved_to_trash": "/Users/zack/.Trash/Luminisle-1.0.10-replaced-20261024-194125.app",
+    "trash_emptied": false,
+    "removed_current_run_generated_directories": [
+      "dist",
+      "build/runtime",
+      "build/tools",
+      "build/pyinstaller",
+      "build/local-update-1.0.11"
+    ],
+    "installers_retained": false,
+    "retained": [
+      "Installed application",
+      "Production library and all backups",
+      "External models",
+      "Source and build dependencies",
+      "Pre-existing build directories"
+    ],
+    "health_verified_after_cleanup": true
+  }
+}

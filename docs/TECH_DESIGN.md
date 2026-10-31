@@ -1,5 +1,7 @@
 # TECH_DESIGN — 视频分析器
 
+界面设计与后续 UI 变更统一参照 [UI 规范](UI-SPEC.md)。
+
 ## 1. 技术栈
 
 | 层 | 技术 |
@@ -20,6 +22,15 @@
 | 端口 | 6622 |
 
 ## 2. 项目结构
+
+### 2026-10-29：详情来源与喜欢照片堆叠
+
+- `index.html` 在进入详情前记录来源路由、文件夹、侧栏状态及素材区滚动位置；Vue keep-alive 保留筛选、排序、选区和分页。返回时不重新初始化素材库；发生评分、喜欢、颜色、分析片段或 XMP 变更时，仅重读已加载的页。等待缓存卡片的 `content-visibility` 布局恢复后再恢复滚动，过期路由回调不再调整当前位置。详情跨页浏览复用缓存 gallery 实例的查询与分页。
+- `GET /api/library/?favorite=true&stack_type=near|similar|cluster`：在全部匹配结果内，仅使用照片已有的有效 embedding 分组，再对封面分页。`stack_items` 含组内完整素材记录（剔除 embedding），第一条为封面；`pagination.total` 是原始素材数，`display_total` 和 `pages` 以封面/单独素材数计算。未指定、非法档位或非喜欢查询沿用普通列表。`fields=id` 始终返回全部匹配原始 ID，供明确的全选操作使用。
+- 堆叠复用现有余弦阈值、HDBSCAN 参数和 `dup_exclusions`，没有数据库迁移或特征补算。仅在筛选后的喜欢集合内聚类，不借助未喜欢或被筛除的照片连接分组。无向量、损坏、非有限值、零向量或维度不匹配的素材保留为单项。
+- 前端 `items` 保存分页的封面记录，`allMediaItems` 提供组内完整记录给检查器和单张命令，`displayItems` 按展开状态渲染四种视图及日期分组。`favoriteStackMode` 单独保存档位；展开状态属于当前列表。回归与合成浏览器证据见 历史 UI 验证附件（已清理）。
+
+以下为项目目录结构。
 
 ```
 video_analyzer/
@@ -610,8 +621,10 @@ hdbscan>=0.8.0      # HDBSCAN 聚类（图片相似检测）
 |------|------|
 | `/media/video/<id>` | 原生格式（mp4/m4v/webm/mov）直接发送（支持 Range）；其他格式实时 ffmpeg 转码为 H.264 |
 | `/media/image/<id>` | JPG/PNG 等直接发送；RAW 用 rawpy 解码为 JPEG；HEIC/AVIF 用 pillow-heif 解码 |
-| `/media/thumbnail/<id>` | 从 DB 查 thumbnail_path，与 THUMB_DIR 拼接后发送；文件不存在时自动重新生成 |
+| `/media/thumbnail/<id>` | 从 DB 查 thumbnail_path，与 THUMB_DIR 拼接后发送；默认在文件不存在时自动重新生成。可选 `?cached=1` 仅发送现有缓存，缺失返回 404，忽略 `t` 截帧参数，不解码原片或更新记录 |
 | `/media/cover/<id>` | 音频内嵌封面：非 audio → 404；查 cover_art_path 存在则发送；缺失且源文件在 → 懒提取 + UPDATE 落库（历史音频自动回填）后发送；否则 404 |
+
+素材库检查器（`frontend/js/media-inspector.js`）直接展示素材列表已有的元数据，不增加元数据扫描、模型调用或数据库字段。预览使用上述 `cached=1` 模式，以素材 ID、缓存路径和文件修改时间作为预览版本；单独管理预览与分析请求状态。图片载入后使用离屏 Canvas，将最长边限制为 320 像素，计算 256 档亮度（加权 RGB）及三通道分布，以 SVG 绘制两幅图。亮度图独立归一化，RGB 三通道共用最大值。图表标注「预览 · 8 位」；切换素材、缓存不可读、Canvas 失败时清除旧图并提供重试，不把占位图作为图片统计。已有分析请求继续用 generation 隔离过期响应。
 
 ## 8. 图片相似检测
 
@@ -622,7 +635,9 @@ hdbscan>=0.8.0      # HDBSCAN 聚类（图片相似检测）
 - **模型**：`backend/models/resnet50.onnx`（~89.6MB，gitignored）
 - **导出**：`backend/export_model.py`（一次性脚本，需临时安装 torch + torchvision）
 - **运行时**：onnxruntime（CoreML + CPU 提供者），无需 PyTorch
-- **预处理**：Resize(256) → CenterCrop(224) → ToTensor → ImageNet Normalize
+- **预处理**：Pillow 双线性短边缩放到 256 → 使用 Python round 规则中心裁切 224 → NumPy float32 NCHW `/255` → ImageNet Normalize；与原 torchvision PIL 流程逐元素一致
+- **打包依赖**：1.0.13 起运行时移除 torch/torchvision，并在 PyInstaller 显式排除；保留 ONNX Runtime、CTranslate2/faster-whisper 及原生 llama-server。Torchvision 仅作为可选的开发兼容性测试依赖，现有模型和已存特征不变
+- **资源精简**：1.0.14 保留 Electron 的 en/en_GB/zh_CN/zh_TW；jieba 使用普通分词和 HMM，打包排除未使用的 analyse、posseg、lac_small。ONNX Runtime 不作裁剪；中文搜索分词结果及 FTS 索引保持兼容
 - **输出**：2048 维向量 → L2 归一化 → float32 BLOB（8KB/张）
 - **支持格式**：标准图片（PIL）、RAW（rawpy）、HEIF（pillow-heif）
 - **仅图片**：视频不计算 embedding（存 NULL）
@@ -783,3 +798,63 @@ PUT /api/workbench/<pid>/tracks（批量替换）
 - **安全**：路径遍历、任意文件读取（A1/A2）发布前需修
 - **并发分析竞态**（A3）：processing 状态防重复提交已实现，信号量控制 VLM API 并发
 - **JSON 解析失败处理**（A13）：应标记为 error 而非 done
+
+### 智能分类基线（2026-10-30，1.0.15本机交付）
+
+默认词库资源为backend/resources/default-taxonomy.v1.json，taxonomy_presets在新空库首次启动时幂等导入；已有树或预置标记则跳过，保留人工修改。词库安装不写素材关联，不排AI任务。维护工具必须显式指定资料库和待清理的无引用legacy标签，默认只读预览；应用停机锁内先快照，再单事务导入，按35张非词库表及非目标设置核对，失败留证不自动恢复。本机1.0.15已完成独立数据导入；空库初始化逻辑随下一次软件构建交付。
+
+分类增量使用 `backend/services/taxonomy.py` 的附属表，保持既有 tags/media_tags 及 ResNet 字段原状；taxonomy_nodes 以旧 tag ID 为概念 ID，显示名称与内部唯一存储名称分开。FTS、旧标签 API 和 XMP 导出读取显示名称。新表业务字段均在 created_at、updated_at 前，不调整已部署表的历史列序。
+
+本机 `/api/taxonomy` 处理树、人工决定、关系建议／人工锁、预览方案及原子变更、分组候选、素材／关系任务、独立验证档案、智能图集及例图。导入及分析结果同事务写轻量任务意图，提交后由 classification_jobs 执行。任务依据包含输入修订和实际文字匹配；显式请求可提高优先级，相关词库改变允许补跑，未变的已完成任务去重。未来孤立租约到期由恢复计时器唤醒，预算退出清理自己持有的租约，取消后拒绝迟到写回。
+
+SigLIP2 Base/16 224 的外部配对 ONNX 已通过官方图文特征数值与真实CPU运行核验，应用不引入 torch/transformers；导出工具仅用于开发。中文识别描述、祖先语境和已生效别名组成文字依据，文字变化复用有效图片特征。Omni 复用本地引擎，不云回退。独立语义质量尚未验收；自动补标／自动关系分别默认关闭，且必须匹配人工真值验证档案才可应用，模型自评分不授予执行权。
+
+合并／拆分、自动标签和采纳的关系保留前后快照，撤销校验后续修改。新拆分目标在方案执行事务中创建，撤销后停用并保留ID。改映射审核使用目标识别含义及所选素材人工决定摘要，防止确认旧目标。新词拒绝按含义关闭，不作全库禁词。历史字段保留来源未知快照，新增字段编辑追踪AI／人工来源。
+
+时间与Python额外峰值预算可暂停本轮任务；后者不包含本地模型子进程，不能宣称总内存上限。例图缓存分块矩阵检索，保留每项预览修订核验，不混用ResNet特征；有有效文字向量时合并定义依据，否则返回definition_used=false。候选默认不自动清理，显式90天保留期清理只覆盖已拒绝／过期诊断候选。
+
+当前实施和未完成范围：[Kiro 实施进度](../.kiro/specs/smart-classification/implementation-progress-2026-10-30.md)。1.0.15正式包和本机升级已通过数据完整性验证；独立模型质量与真实总资源仍待验收，交付记录见local-update-1.0.15-2026-10-30.json。
+
+### 标签导航和层级选择器（2026-10-30）
+
+标签导航采用全局侧栏：智能分类展开纯标签树，维护入口只在主区域维护；树内无搜索、隐藏空分类和独立滚动。`TaxonomyTagPicker` 使用严格独立勾选，保留不可选祖先上下文、同义表达搜索、同名路径、一级父级null和临时拆分目标。[分类布局](UI-TAXONOMY-LAYOUT-2026-10-30.md)记录前一轮验证。
+
+2026-10-31：按用户最新要求恢复直接展示基础筛选和四个视图按钮的布局，撤回分类专用单行／浮层方案。`GalleryViewIcon`、`GalleryViewControls` 在 `GalleryPage` 内共用，使用20px整数网格、统一2px内外间隙和1px圆角的实心块面表达四种布局；`modelValue` 与 `update:modelValue`只切换显示偏好，不重新请求图库或清除选区。该图库组件覆盖智能分类、素材库、喜欢及文件夹浏览。
+
+确认稿图标接入：图库“全部类型”使用20px内联扇形媒体C，内部使用独立的gallery-media-*类名，避免匹配素材卡片的样式或交互选择器；子标签开关使用等大节点的对称分叉C，两个子节点以实心镂空勾选／空心表达include_children。共享SVG mask只在页面定义一次，避免图库挂载产生重复ID；图标本身不增加焦点，继续由按钮提供名称及按下状态。
+
+图库标签条件集中在`TaxonomyFilters`的`.taxonomy-tag-controls`单一容器，含`compact`选择器、子标签范围、Any／All方形Tag图文切换。`TaxonomyTagIcon`接受`mode`（默认single，另支持any、all），内部复用`TaxonomyTagShape`的标签轮廓；选择器、分类树节点、素材角标、搜索建议和footer统一使用single。Any后层空心、All后层实心，前层均实心；匹配图形20px，按钮28px，文字9.2px／600，背景图形45%不透明度。文字以1.35px背景色描边先绘制，避让图形线条，选中底片使用--accent实色、图文使用--on-accent，避让描边同步--accent，未选中仍用灰色；所有样式限定taxonomy命名空间。中文辅助名称使用“任一／全部”，查询仍为tag_mode=any/all。`compact`仅影响摘要与264px菜单的展示，默认false保留维护表单原行为；模式点击继续调用原change查询，已选模式不重复加载。
+
+`SlidingSegments` 全局指令用局部布局坐标驱动伪元素底片，通过updated及ResizeObserver同步互斥按钮组的选中位置和宽度；首次显示／缩放直接定位，正常切换230ms，减少动态效果为零过渡，卸载释放观察器和待执行帧。适用于图库、标签匹配、人物显示、设置引擎、查重分档及音频显示方式；不改各组原有v-model和业务事件。
+
+`GalleryOrderControls` 将排序字段、方向与分组组织为同一容器，使用受控 `sortBy,sortOrder,groupBy` 和对应更新事件。排序／方向改变仍由父级调用原load，分组只更新本地展示；时间和时长选项继续由原图库提供，不适用分组时隐藏分组字段。排序默认宽86px、分组74px，较窄主区为80px／70px，保持同一基线、统一背景与轻分隔线。组件通过局部 `galleryControlText` 提供中文／英文辅助标签，不要求图库独立加载时存在 taxonomy 全局变量。交付及验证见 [图库共用控件](UI-GALLERY-CONTROLS-2026-10-31.md)。
+
+图库留白：`.library-workspace`的`--gallery-inline-inset`设为0，筛选栏与`.library-body`左侧共用同一基线，侧栏外部间隙自然形成8px留白；图库筛选栏顶部内边距归零，最小高度为32px控件加8px底距，首行上沿与侧栏面板对齐。`.gallery-page`内边距归零，使四种视图的内容顶部与检查器顶部一致。筛选栏底部、网格横纵间距、瀑布流列间距及卡片底部间距、等行高行内及行间距统一引用`--workspace-gap`（8px），等行高原算法的8px计算继续匹配。右侧`scrollbar-gutter:stable`保留8px滚动条槽，`.library-body`的gap和右内边距归零；检查器到窗口的8px距离仅由`.app-page`外层提供。图库外框允许overflow visible，媒体区仍由`.library-body`及`.gallery-page`控制滚动，避免贴顶控件被外框圆角裁剪。移除1050px断点处的额外内边距，避免窄窗口重新错位；其他筛选栏继续使用12px回退值。
+
+侧栏维持一个外层`.q-list`滚动区，`.app-sidebar`的overflow设为visible；将列表右边界扩至侧栏面板外侧8px缝隙的末端，稳定滚动条槽恰好占用这段缝隙。负右margin按面板内边距、1px边框和8px外缝计算，列表右padding补偿原菜单宽度；展开侧栏使用8px内距，mini使用3px，底部设置栏继续固定。顶栏以`--toolbar-control-height:38px`统一导入按钮及五按钮组外框高度，顶栏右padding改为`--workspace-gap`，窄窗口同样保留8px。
+
+文件类型切换采用更窄的按钮内边距，筛选栏盒状控件统一32px。素材种类与视图切换统一10px外圆角，2px内边距对应8px内部按钮圆角，删除旧6px内联圆角。`TaxonomyFilters` 将标签选择与子标签范围开关放在同一个视觉分组内，范围通过可按下层级图标与tooltip呈现，不再显示独立文字；创建图集移至footer，采用加号和文字按钮，保留可访问名称。
+
+`TaxonomyFilters` 在主筛选栏直接展示标签树选择、任意／全部匹配、子标签开关，取消新增排除条件；`GalleryPage.activeFilterTags` 同步生成footer路径／规则摘要，预览区占用计数与缩放控件之间的弹性空间并可水平查看。
+
+`TaxonomyGalleryActions` 在footer最左侧、素材数量之前直接显示「＋智能图集」，顶部不再显示；保持原pickerMode隐藏条件，按钮固定32px高、不随长筛选摘要压缩，以主题底色、细边框和独立加号区分创建动作。`SmartCollectionIcon`在侧栏和弹窗共用文件夹轮廓与实心四角星，星形在24px画布内由7px扩大至10px。`TaxonomyCollectionCreate` 冻结 `_buildParams` 中可持久化的条件；未支持条件阻止创建，异步写回受发起路由和组件存活状态保护。名称替换仅影响文案，`taxonomy_collections` 数据格式不变。图集左侧条目的右键／Shift+F10菜单仅有重命名和删除，展开和迷你侧栏共用 `TaxonomyCollectionEntry`。名称弹窗与删除确认由侧栏父组件持有，关闭迷你菜单不会卸载弹窗。
+
+文件类型与高级筛选采用`.gallery-media-filter-controls`内联分组，8px间距且不拆行，标签控件随后排列。`currentSpec`、切换类型和筛选查询逻辑不变；高级筛选按钮使用主题变量，32px高／12px文字，图标继承文字色。高级面板外缘与主区域对齐，面板padding、组间和字段间距统一8px，覆盖旧深色字段和箭头的硬编码色；保留两行分组和横向滚动交互。`TaxonomyTagPicker`的触发文字、菜单和操作文字统一12px，仅改变排版。验证见历史 UI 验证附件（已清理）。
+
+`PATCH /api/taxonomy/collections/<id>` 支持只提交 `name,version`，保持原query字节不变，并通过版本匹配拒绝迟到覆盖；已有全query更新接口兼容保留，UI不提供规则编辑或管理页。`#/taxonomy/collections`旧管理路由转到智能分类。`#/classify/collection/<id>`仍支持刷新与详情返回；打开时只将标签规则存入 `taxonomyQuery`，其他条件回填图库可见状态，避免旧保存值持续覆盖用户选择。删除当前图集后离开该路由，素材、标签和文件保留。
+
+`SmartCollectionIcon` 使用与文件夹树相同的1.7px圆角线描，主题色和选中色一致，侧栏、保存按钮和创建弹窗共用。范围与验证见[智能图集改进](UI-SMART-COLLECTIONS-2026-10-31.md)。
+
+### 人物相册（2026-10-30，源码开发交付，生产尚未升级）
+
+人物身份与普通标签分开，路由为 `#/people`、`#/people/unnamed|review|hidden` 和 `#/people/person/<id>`。人物图集复用 GalleryPage、筛选、检查器和详情来源恢复。`person_ids`、`exclude_person_ids`、`person_mode=any|all` 与标签、文件夹、喜欢等条件求交；计数按素材去重。
+
+`people.py` 管理 `people_persons/faces/media_decisions/face_exclusions/distinct/reviews/changes/plans` 八张附属表；`people_jobs.py` 管理持久队列。所有新表末尾是 `created_at,updated_at`，不重排已有表。人工确认、排除、暂不归组、误检及同名身份独立保存。重扫按输入版本、时间点和位置匹配，检测器的序号变化不能挪移已确认身份。自动关联保留固定锚点及按质量/ID选择的代表，避免候选相似度驱动的相似链漂移；模型空间由权重和预处理摘要隔离。
+
+`/api/people` 提供人物、素材关联、人脸纠正、合并预览/应用、撤销、核对、分页人脸封面、设置和任务端点。合并检测正向人脸成员与素材排除的冲突；撤销原位恢复已有记录，只删除本次新增行，核对后续状态并保留范围外排除。审核和封面分页有界，不把固定前200/100项当作全部。
+
+导入事务只登记人物任务，提交后启动 worker；默认关闭今后导入自动整理。手动范围可独立运行，历史全库需显式 `confirm_all=true`。单条/批量完整 AI 分析的 `organize_people` 仅附加本地人物队列，不向云端上传人脸。后台与快速分类共用 `background_work.inference_slot`，并观察现有导入/分析/播放忙碌信号；租约、续期、暂停/取消、重启恢复和输入/模型修订校验拒绝迟到写入。
+
+`face_engine.py` 直接用既有 numpy、Pillow、ONNX Runtime 加载外部 SCRFD+ArcFace 配对，支持 Buffalo L、Raccoon S，无下载、无额外训练框架。CoreML 初始化失败可回退 CPU；会话提供器列表不等于所有算子实际运行在硬件加速器。照片优先可用预览，必要时读原片/RAW内嵌预览；原片变更后要求更新素材，不能把旧人工脸关系套给新文件。视频先读取少量均匀侦察帧，再按画面变化和覆盖权重分配剩余预算；已知帧率量化观察时点，计划和实际帧按输入版本缓存，离线可复用。每个素材内相同对齐RGB人脸按像素摘要复用特征，避免重复推理，不依靠框位置相近推断身份。仅显示观察到的时间点，不宣称连续追踪、完整出场区间或完整检出。
+
+`people-cache/` 位于资料库内；裁切 JPEG 按内容摘要复用，帧按素材版本/时间点缓存。取消只清理本轮无当前或撤销记录引用的裁切。姓名、人工决定、特征及队列位于 SQLite，裁切/帧为相对缓存引用，现有完整迁移会携带该目录；外部模型不会因此复制进安装包。验证与实际限制见 [人物实施记录](product-design/people/implementation.md)。

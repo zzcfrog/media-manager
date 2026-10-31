@@ -1,0 +1,112 @@
+{
+  "date": "2026-10-29",
+  "version": "1.0.12",
+  "status": "complete",
+  "delivery": "local production package; installed application not replaced",
+  "scope": [
+    "Detail returns to its origin with filters, folder, selection and scroll position",
+    "Favorites photo stacks: near/similar/cluster/off with inline expansion",
+    "Stack mode selector beside the right-side view controls"
+  ],
+  "artifacts": {
+    "Luminisle-1.0.12-arm64.dmg": {
+      "bytes": 441728540,
+      "sha256": "bd008a9b6e2bb87bcb11f97693637caae9d27646980893156eca7321b11b3e49"
+    },
+    "Luminisle-1.0.12-arm64.zip": {
+      "bytes": 443239942,
+      "sha256": "75467ad50d0fd7d801150c49246d2bcbdb1c32bd667122bf0dbe1e3b214aa7c4"
+    }
+  },
+  "package_validation": {
+    "app_id": "com.zack.media-manager",
+    "architecture": "arm64",
+    "signature": "ad-hoc; deep strict verification passed",
+    "dmg_integrity": "passed",
+    "zip_integrity": "passed",
+    "zip_manifest_version": "1.0.12",
+    "electron_runtime_source_match": 3,
+    "frontend_files_match": 34,
+    "bundled_tools": "ffmpeg 7.1.1, ffprobe 7.1.1, ExifTool 13.55",
+    "frozen_self_test": {
+      "ok": true,
+      "runtime": "3.12.9",
+      "frozen": true
+    },
+    "private_database_or_model_weights_embedded": false
+  },
+  "tests": {
+    "python": "78/78 passed",
+    "gallery_state": "13/13 passed",
+    "frontend": "16/16 passed",
+    "inspector": "6/6 passed",
+    "creation_time_frontend": "8/8 passed",
+    "desktop_runtime": "passed",
+    "git_diff_check": "passed"
+  },
+  "frozen_backend_smoke": {
+    "version": "1.0.12",
+    "frontend_files_match": 34,
+    "stack_tiers": "near, similar, cluster: two groups of four",
+    "off_returns_all": true,
+    "offline_cached_thumbnail": true,
+    "media_records_unchanged": true,
+    "production_data_accessed": false,
+    "external_models_loaded": false,
+    "paid_ai": false
+  },
+  "browser": {
+    "target": "Frozen backend and frontend served directly from the generated application bundle",
+    "two_collapsed_four_photo_stacks": true,
+    "expansion_displays_five_cards": true,
+    "right_side_stack_control": true,
+    "unexpected_console_warnings_errors": 0,
+    "screenshot": "screenshots/packaged-1.0.12-stacks-2026-10-29.png"
+  },
+  "installed_application": {
+    "path": "/Users/zack/Applications/映屿 · luminisle.app",
+    "version": "1.0.11",
+    "unchanged": true
+  },
+  "safety": {
+    "production_library_accessed": false,
+    "source_media_modified": false,
+    "external_models_loaded": false,
+    "paid_ai": false,
+    "commit_or_push": false
+  },
+  "cleanup": {
+    "test_server_stopped": true,
+    "synthetic_library_removed": true,
+    "temporary_browser_tab_closed": true,
+    "installers_retained": false,
+    "removed_current_run_generated_paths": [
+      "build/runtime",
+      "build/tools",
+      "build/pyinstaller",
+      "dist/mac-arm64",
+      "dist/builder-debug.yml",
+      "dist/Luminisle-1.0.12-arm64.dmg.blockmap",
+      "dist/Luminisle-1.0.12-arm64.zip.blockmap",
+      "build/package-1.0.12-smoke.log",
+      "build/package-1.0.12-self-test.sample.txt",
+      "build/package-1.0.12-tests.log",
+      "build/package-1.0.12-smoke.py",
+      "build/package-1.0.12-dmg-verify.log",
+      "build/package-1.0.12-artifacts.json",
+      "build/package-1.0.12-build.log",
+      "build/package-1.0.12-signature.log",
+      "build/package-1.0.12-zip-verify.log",
+      "build/package-1.0.12-frontend-tests.log",
+      "build/package-1.0.12-smoke.json",
+      "build/package-1.0.12-preflight.json"
+    ],
+    "build_environment_retained": true,
+    "installer_cleanup_date": "2026-10-29",
+    "installer_cleanup_record": "build/package-cleanup-1.0.12-2026-10-29.json"
+  },
+  "limitations": [
+    "Local ad-hoc signature; no Developer ID notarization or internet auto-update.",
+    "This request creates a package only; native installed app was not replaced or relaunched."
+  ]
+}

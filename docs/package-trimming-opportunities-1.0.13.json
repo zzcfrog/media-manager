@@ -1,0 +1,49 @@
+{
+  "locales": {
+    "all_MB": 43.42,
+    "unused_MB_if_keep_zh_en": 41.41
+  },
+  "jieba": {
+    "__init__.py": 0.02,
+    "__main__.py": 0.0,
+    "_compat.py": 0.0,
+    "analyse": 6.21,
+    "dict.txt": 5.07,
+    "finalseg": 2.6,
+    "lac_small": 12.99,
+    "posseg": 11.37
+  },
+  "bundled_tests": {
+    "scipy": 0.0,
+    "sklearn": 0.14,
+    "hdbscan": 0.07,
+    "onnxruntime": 0.0
+  },
+  "analysis_only": true,
+  "installer_unchanged": true,
+  "onnx_probe": {
+    "standalone_C_library_absent": true,
+    "isolated_python_runtime_loaded": true,
+    "real_resnet_cpu_inference": true,
+    "output_dimensions": 2048,
+    "original_package_modified": false,
+    "CoreML_and_frozen_runtime_verified": false
+  },
+  "jieba_probe": {
+    "synthetic_search_phrases": 8,
+    "normal_segmentation_unchanged": true,
+    "removed_only_in_isolated_copy": [
+      "lac_small",
+      "analyse",
+      "posseg"
+    ],
+    "installed_package_modified": false,
+    "frozen_search_index_validation_complete": false
+  },
+  "candidate_savings_uncompressed_MB": {
+    "electron_locales": 41.41,
+    "unused_jieba_resources": 30.57,
+    "onnx_C_library_pending_full_validation": 32.86,
+    "sum_not_a_DMG_size_prediction": 104.84
+  }
+}

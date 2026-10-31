@@ -1,0 +1,69 @@
+{
+  "date": "2026-10-30",
+  "scope": "Isolated library; six prior benchmark previews only; no originals/production DB accessed",
+  "models": {
+    "buffalo_l": {
+      "initialization_seconds": 0.333,
+      "cached_previews": 6,
+      "detected_faces": 9,
+      "usable_faces": 8,
+      "warm_total_seconds": 1.726,
+      "blank_no_faces": true,
+      "available_session_providers": [
+        "CoreMLExecutionProvider",
+        "CPUExecutionProvider"
+      ]
+    },
+    "raccoon_s": {
+      "initialization_seconds": 0.574,
+      "cached_previews": 6,
+      "detected_faces": 8,
+      "usable_faces": 8,
+      "warm_total_seconds": 1.033,
+      "blank_no_faces": true,
+      "available_session_providers": [
+        "CoreMLExecutionProvider",
+        "CPUExecutionProvider"
+      ]
+    }
+  },
+  "pipeline": {
+    "face_count": 1,
+    "photo_and_rescan_seconds": 0.633,
+    "manual_decision_rescan_preserved": true,
+    "foreign_key_check": 0,
+    "video_observation_points": [
+      0.0,
+      1.0,
+      2.0
+    ],
+    "video_media_deduplicated": true,
+    "offline_video_cache_rescan": true
+  },
+  "benchmark_cache_unchanged": true,
+  "cpu_fallback_validation": {
+    "buffalo_l": {
+      "initialization_seconds": 0.189,
+      "cached_previews": 6,
+      "detected_faces": 9,
+      "usable_faces": 8,
+      "warm_total_seconds": 1.731,
+      "blank_no_faces": true,
+      "available_session_providers": [
+        "CPUExecutionProvider"
+      ]
+    },
+    "raccoon_s": {
+      "initialization_seconds": 0.256,
+      "cached_previews": 6,
+      "detected_faces": 8,
+      "usable_faces": 8,
+      "warm_total_seconds": 1.067,
+      "blank_no_faces": true,
+      "available_session_providers": [
+        "CPUExecutionProvider"
+      ]
+    }
+  },
+  "note": "Provider list is session configuration, not per-operator hardware placement proof. Six cached samples are a functional smoke test, not a quality or full-library throughput benchmark; other test load is uncontrolled."
+}

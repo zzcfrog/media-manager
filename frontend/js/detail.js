@@ -243,6 +243,7 @@ const DetailPage = {
         </div>
       </div>
       <div class="detail-sidebar">
+        <div v-if="media&&media.media_type!=='audio'" class="people-detail-panel"><people-media :media="media"></people-media></div>
         <div class="detail-inspector-title"><q-icon name="auto_awesome" size="16px"></q-icon>{{ t('ui.ai_analysis') }}</div>
         <!-- Analysis section -->
         <div v-if="analysis.status==='done' && analysis.segments?.length" style="border-top:1px solid var(--border);display:flex;flex-direction:column;flex:1;min-height:0">
@@ -412,6 +413,7 @@ const DetailPage = {
               <span v-else>{{ t('d.independent_asr', {engine: confirmInfo.asrEngine}) }}</span>
             </div>
           </div>
+          <q-checkbox v-if="media?.media_type!=='audio'" v-model="organizeTags" :label="t('g.organize_analysis_tags')"></q-checkbox>
           <div v-if="confirmInfo.engine !== 'local'" style="margin-top:16px;padding:8px 12px;border-radius:6px;background:var(--surface2);font-size:12px;color:var(--text3)">
             <q-icon name="info" size="14px" style="margin-right:4px"></q-icon>
             {{ t('d.ai_cost_warning') }}
@@ -442,6 +444,7 @@ const DetailPage = {
       isFullscreen: false,
       analyzing: false, analysisProgress: "", activeSeg: -1,
       analysisStages: [], analyzeTipText: "",
+      organizeTags: localStorage.getItem('organizeAnalysisTags') === 'true',
       showAnalysisDialog: false, showClearDialog: false, showDeleteSegDialog: false,
       deleteSegInfo: null,
       confirmInfo: { resolution: "480P", fps: "30", bitrate: "2.00 Mbps", modelLabel: "智谱 GLM-4.6V", useMultimodal: true, asrEngine: "Whisper" },
@@ -954,6 +957,7 @@ const DetailPage = {
       seg[field] = value;
       try {
         await API.updateSegment(seg.media_id, seg.id, { [field]: value });
+        this.$root.detailLibraryDirty = true;
       } catch (e) {
         seg[field] = old;
         Quasar.Notify.create({ message: t('d.n_save_fail', {err: e.message || e}), position: 'top', color: 'negative', timeout: 2000 });
@@ -967,6 +971,7 @@ const DetailPage = {
       seg[field] = newArr;
       try {
         await API.updateSegment(seg.media_id, seg.id, { [field]: newArr });
+        this.$root.detailLibraryDirty = true;
       } catch (e) {
         seg[field] = old;
         Quasar.Notify.create({ message: t('d.n_save_fail', {err: e.message || e}), position: 'top', color: 'negative', timeout: 2000 });
@@ -982,6 +987,7 @@ const DetailPage = {
       seg[field] = [...arr];
       try {
         await API.updateSegment(seg.media_id, seg.id, { [field]: arr });
+        this.$root.detailLibraryDirty = true;
       } catch (e) {
         seg[field] = old;
         Quasar.Notify.create({ message: t('d.n_save_fail', {err: e.message || e}), position: 'top', color: 'negative', timeout: 2000 });
@@ -1004,6 +1010,7 @@ const DetailPage = {
       this.showDeleteSegDialog = false;
       try {
         await API.deleteSegment(info.seg.media_id, info.seg.id, adjust);
+        this.$root.detailLibraryDirty = true;
         if (adjust === 'prev' && info.hasPrev) {
           this.analysis.segments[info.index - 1].time_end = info.timeEnd;
         } else if (adjust === 'next' && info.hasNext) {
@@ -1024,8 +1031,11 @@ const DetailPage = {
       if (key === "ArrowLeft" || key === "ArrowRight") {
         e.preventDefault(); e.stopPropagation();
         const dir = key === "ArrowLeft" ? -1 : 1;
-        const adjId = await this.$root.getAdjacentId(this.media?.id, dir);
-        if (adjId) location.hash = "#/detail/" + adjId;
+        const currentId = this.media?.id;
+        const navigationGeneration = this.$root._routeGeneration;
+        const adjId = await this.$root.getAdjacentId(currentId, dir);
+        if (adjId && this.$root.currentView === 'detail' && this.$root.detailId === currentId &&
+            this.$root._routeGeneration === navigationGeneration) location.hash = "#/detail/" + adjId;
         return;
       }
       // Color labels 6/7/8/9/0
@@ -1068,10 +1078,11 @@ const DetailPage = {
         return;
       }
     },
-    goBack() { window.location.hash = "#/gallery"; },
+    goBack() { this.$root.returnFromDetail(); },
     async setRating(val) {
       try {
         await API.updateMedia(this.media.id, { rating: val });
+        this.$root.detailLibraryDirty = true;
         this.media.rating = val;
         Quasar.Notify.create({ message: val ? t('d.n_rated', {stars: '★'.repeat(val)}) : t('d.n_unrated'), position: 'top', timeout: 1200 });
       } catch (e) {
@@ -1081,6 +1092,7 @@ const DetailPage = {
     async setColor(c) {
       try {
         await API.updateMedia(this.media.id, { color_label: c });
+        this.$root.detailLibraryDirty = true;
         this.media.color_label = c;
         const names = { red: t('d.color.red'), yellow: t('d.color.yellow'), green: t('d.color.green'), blue: t('d.color.blue'), purple: t('d.color.purple') };
         Quasar.Notify.create({ message: c ? t('d.n_color_set', {color: names[c] || c}) : t('d.n_color_clear'), position: 'top', timeout: 1200 });
@@ -1092,6 +1104,7 @@ const DetailPage = {
       try {
         const fav = this.media.favorite ? 0 : 1;
         await API.updateMedia(this.media.id, { favorite: fav });
+        this.$root.detailLibraryDirty = true;
         this.media.favorite = fav;
         Quasar.Notify.create({ message: fav ? t('d.n_fav') : t('d.n_unfav'), position: 'top', timeout: 1200 });
       } catch (e) {
@@ -1105,6 +1118,7 @@ const DetailPage = {
       try {
         const res = await API.writeXmp(this.media.id);
         if (res.ok) {
+          this.$root.detailLibraryDirty = true;
           this.media.has_xmp = 1;
           Quasar.Notify.create({ message: t('d.n_xmp_ok'), position: 'top', timeout: 1500 });
         } else {
@@ -1117,6 +1131,7 @@ const DetailPage = {
     async clearAnalysis() {
       try {
         await API.clearAnalysis(this.media.id);
+        this.$root.detailLibraryDirty = true;
         this.analysis = { status: "none", segments: [] };
         this.$nextTick(() => this._initLottieIdle());
       } catch (e) {
@@ -1182,7 +1197,9 @@ const DetailPage = {
       const isAlive = () => self.$el && self.$el.isConnected;
       // Start analysis
       try {
-        const resp = await API.startAnalysis(this.media.id);
+        localStorage.setItem('organizeAnalysisTags', String(this.organizeTags));
+        const resp = await API.startAnalysis(this.media.id,this.organizeTags);
+        this.$root.detailLibraryDirty = true;
         if (!resp.ok) {
           let msg = t('d.n_request_fail', {status: resp.status});
           try { const body = await resp.json(); if (body.error) msg = body.error; } catch {}
@@ -1421,6 +1438,14 @@ const DetailPage = {
         setTimeout(() => { const idx = root.bgTasks.indexOf(task); if (idx >= 0) root.bgTasks.splice(idx, 1); }, 300000);
       }
     },
+    seekPeopleTime(seconds) {
+      const player=this.$refs.player,value=Number(seconds);
+      if(!player||!Number.isFinite(value)||value<0)return;
+      if(player.readyState<1){this.$root.pendingPeopleSeek={mediaId:this.media.id,seconds:value};return;}
+      player.currentTime=Math.min(value,Math.max(0,(player.duration||this.media.duration||value)-.01));
+      this.detailCurrentTime=player.currentTime;
+      if(this.$root.pendingPeopleSeek?.mediaId===this.media.id)this.$root.pendingPeopleSeek=null;
+    },
     seekTo(timeStr) {
       const player = this.$refs.player;
       if (!player || !timeStr) return;
@@ -1495,7 +1520,8 @@ const DetailPage = {
       this.detailDuration = player.duration;
       this.detailCurrentTime = 0;
       this.loadWaveform();
-      player.currentTime = 0.1;
+      const pending=this.$root.pendingPeopleSeek;
+      if(pending?.mediaId===this.media?.id)this.seekPeopleTime(pending.seconds);else player.currentTime = 0.1;
       this.startSegTrack();
     },
     onVideoPlay() { this.detailPlaying = true; this.startWaveformAnim(); this.startScopes(); },

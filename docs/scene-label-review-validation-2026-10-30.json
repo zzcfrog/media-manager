@@ -1,0 +1,88 @@
+{
+  "status": "ready_for_user_review",
+  "date": "2026-10-30",
+  "samples": 128,
+  "photos": 96,
+  "video_covers": 32,
+  "same_cached_samples_as_speed_test_sha256_verified": true,
+  "candidate_descriptions": 100,
+  "candidate_language": "English with Chinese display mapping",
+  "predictions_per_model_per_sample": 10,
+  "summary": {
+    "samples": 128,
+    "same_top1": 69,
+    "different_top1": 59
+  },
+  "models": {
+    "clip": {
+      "repo": "openai/clip-vit-base-patch32",
+      "revision": "3d74acf9a28c67741b2f4f2ea7635f0aaf6f0268",
+      "device": "MPS",
+      "dtype": "FP32",
+      "seconds_including_loading": 1.9164437080034986,
+      "full_forward_numerical_parity_checked": true,
+      "score_definition": "softmax over the fixed 100 candidates"
+    },
+    "siglip2": {
+      "repo": "google/siglip2-base-patch16-224",
+      "revision": "75de2d55ec2d0b4efc50b3e9ad70dba96a7b2fa2",
+      "device": "MPS",
+      "dtype": "FP32",
+      "seconds_including_loading": 2.713271041982807,
+      "full_forward_numerical_parity_checked": true,
+      "score_definition": "sigmoid of the independent image-text logit"
+    }
+  },
+  "score_meanings": {
+    "clip": "softmax over the fixed 100 candidate descriptions",
+    "siglip2": "independent sigmoid image-text score",
+    "comparable_between_models": false,
+    "calibrated_correctness_probability": false
+  },
+  "verification": {
+    "prediction_records": 128,
+    "sorted_unique_top10_per_model": true,
+    "finite_scores": true,
+    "csv_rows_including_header": 2561,
+    "cached_images_served_and_decodable": 128,
+    "http_boundary_checks": 5,
+    "browser_top10_and_different_top1_filter": 59,
+    "browser_video_cover_filter": 32,
+    "browser_empty_search": 0,
+    "browser_pagination_and_preview_escape_close": true,
+    "browser_console_errors_warnings": 0,
+    "browser_first_page_images_loaded": 12,
+    "browser_horizontal_overflow": false,
+    "user_delivery_preview_visible": true,
+    "private_layout_screenshot": "/Users/zack/.codex/visualizations/2026/10/16/01a1444f-99c6-7963-89e8-5b8dda4ef801/scene-label-review-layout-2026-10-30.png"
+  },
+  "safety": {
+    "production_database_written": false,
+    "source_media_modified": false,
+    "production_application_modified": false,
+    "existing_models_modified": false,
+    "media_uploaded": false,
+    "paid_AI_called": false
+  },
+  "limitations": [
+    "Fixed candidate vocabulary; Top5/Top10 are suggestions, not confirmed labels or an automatic tagging threshold.",
+    "No human ground truth or accuracy score; model agreement is not accuracy.",
+    "Cached previews only; video covers do not represent all video content.",
+    "Each model uses its official preprocessing at 224x224."
+  ],
+  "delivery": {
+    "private_results_directory": "build/scene-label-review-2026-10-30/results",
+    "private_csv": "build/scene-label-review-2026-10-30/results/label-suggestions-private.csv",
+    "loopback_only": true,
+    "read_only": true,
+    "page_opened_for_user": true
+  },
+  "cleanup": {
+    "extra_inference_dependencies_removed": [
+      "deps"
+    ],
+    "cached_preview_copies_and_results_retained_for_requested_review": true,
+    "review_server_retained_for_user": true,
+    "downloaded_weights_reused_from_speed_test": true
+  }
+}

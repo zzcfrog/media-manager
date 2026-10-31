@@ -1,0 +1,53 @@
+{
+  "status": "complete",
+  "date": "2026-10-29",
+  "version": "1.0.12",
+  "previous_version": "1.0.11",
+  "installed_application": "/Users/zack/Applications/映屿 · luminisle.app",
+  "old_application_preserved": "/Users/zack/.Trash/Luminisle-1.0.11-replaced-20261029-38bcc806.app",
+  "package_validation": "docs/local-package-1.0.12-2026-10-29.json",
+  "scope": [
+    "Detail returns to its origin with filters, folder, selection and scroll position",
+    "Favorites photo stacks: near/similar/cluster/off with inline expansion",
+    "Stack mode selector beside the right-side view controls"
+  ],
+  "installed_smoke": {
+    "normal_launch": true,
+    "health_version": "1.0.12",
+    "signature_deep_strict_verified": true,
+    "existing_library_and_two_projects_visible": true,
+    "favorite_page_visible": true,
+    "right_side_stack_mode_selector_visible": true,
+    "photo_stack_count_badges_visible": true,
+    "four_view_modes_available": true,
+    "private_screenshot": "/Users/zack/.codex/visualizations/2026/10/16/01a1444f-99c6-7963-89e8-5b8dda4ef801/luminisle-1.0.12-installed.png"
+  },
+  "data_preservation": {
+    "version": "1.0.12",
+    "health": "healthy",
+    "tables_checked": 13,
+    "all_tables_unchanged": true,
+    "media": 11835,
+    "projects": 2,
+    "thumbnails_checked": 13996,
+    "existing_backups_unchanged": true,
+    "model_config_unchanged": true,
+    "automatic_upgrade_snapshots_verified": [
+      "upgrade-backups/20261029-204044-04456dcd.json"
+    ]
+  },
+  "safety": "No source media edits, database restoration, rollback, backup deletion, model relocation, paid AI, commit or push.",
+  "cleanup": {
+    "temporary_upgrade_copy_removed": true,
+    "installers_retained": false,
+    "old_app_in_trash_retained": true,
+    "trash_emptied": false,
+    "temporary_database_duplicate_removed_after_automatic_snapshot_verification": true,
+    "installer_cleanup_date": "2026-10-29",
+    "installer_cleanup_record": "build/package-cleanup-1.0.12-2026-10-29.json"
+  },
+  "limitations": [
+    "Native acceptance inspected the existing favorite page without changing the user's selection or operating real media.",
+    "Detailed return/expansion and race-condition regressions use synthetic data; see the source and package validation records."
+  ]
+}

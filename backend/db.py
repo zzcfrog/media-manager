@@ -405,6 +405,12 @@ def init_db(app):
         db.execute("PRAGMA journal_mode=WAL")
         db.executescript(_SCHEMA)
         _migrate(db)
+        from .services.taxonomy import init_schema
+        init_schema(db)
+        from .services.people import init_schema as init_people
+        from .services.people_jobs import init_schema as init_people_jobs
+        init_people(db)
+        init_people_jobs(db)
         for k, v in _DEFAULTS.items():
             db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
         # Reset stale 'processing' status from previous interrupted runs

@@ -1,0 +1,78 @@
+{
+  "status": "complete",
+  "deleted": [
+    {
+      "path": "/Users/zack/program/python/video_analyzer/dist/Luminisle-1.0.13-arm64.dmg",
+      "files": 1,
+      "bytes": 300696567
+    },
+    {
+      "path": "/Users/zack/program/python/video_analyzer/dist/Luminisle-1.0.14-arm64.dmg",
+      "files": 1,
+      "bytes": 272135008
+    },
+    {
+      "path": "/Users/zack/program/python/video_analyzer/build/slim-package-validation",
+      "files": 13,
+      "bytes": 360177
+    },
+    {
+      "path": "/Users/zack/program/python/video_analyzer/build/resource-trim-validation",
+      "files": 11,
+      "bytes": 178019
+    },
+    {
+      "path": "/Users/zack/program/python/video_analyzer/build/package-audit-1.0.13",
+      "files": 5,
+      "bytes": 6474
+    },
+    {
+      "path": "/Users/zack/program/python/video_analyzer/build/local-update-1.0.14-2026-10-30",
+      "files": 5,
+      "bytes": 2236875
+    },
+    {
+      "path": "/Users/zack/.Trash/Luminisle-1.0.12-replaced-20261030-18831927.app",
+      "files": 4411,
+      "bytes": 1253244830
+    },
+    {
+      "path": "/Users/zack/Library/Application Support/Media Manager/library/upgrade-backups/20261030-093501-e64f2fdd.db",
+      "files": 1,
+      "bytes": 98332672
+    },
+    {
+      "path": "/Users/zack/Library/Application Support/Media Manager/library/upgrade-backups/20261030-093501-e64f2fdd.db-shm",
+      "files": 1,
+      "bytes": 32768
+    },
+    {
+      "path": "/Users/zack/Library/Application Support/Media Manager/library/upgrade-backups/20261030-093501-e64f2fdd.db-wal",
+      "files": 1,
+      "bytes": 0
+    },
+    {
+      "path": "/Users/zack/Library/Application Support/Media Manager/library/upgrade-backups/20261030-093501-e64f2fdd.json",
+      "files": 1,
+      "bytes": 1879
+    }
+  ],
+  "bytes_removed": 1927225269,
+  "empty_dist_removed": true,
+  "date": "2026-10-30",
+  "version": "1.0.14",
+  "scope": "Only 1.0.13/1.0.14 packaging intermediates, installers, replaced 1.0.12 application, and the 1.0.12-to-1.0.14 upgrade snapshot.",
+  "verification": {
+    "installed_health_version": "1.0.14",
+    "installed_signature_verified": true,
+    "all_database_tables_unchanged": true,
+    "tables_checked": 13,
+    "media": 11835,
+    "projects": 2,
+    "model_config_unchanged": true,
+    "both_human_label_files_unchanged": true,
+    "other_upgrade_backup_files_unchanged": 48,
+    "trash_not_emptied": true,
+    "original_media_and_external_models_not_targeted": true
+  }
+}

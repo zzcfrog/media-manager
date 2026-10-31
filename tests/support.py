@@ -18,7 +18,7 @@ atexit.register(shutil.rmtree, _ROOT, ignore_errors=True)
 
 from flask import Flask
 from backend.db import init_db, get_db, close_db
-from backend.blueprints import analysis, library, workbench, creative, serve, tags
+from backend.blueprints import analysis, library, workbench, creative, serve, tags, taxonomy
 
 
 class DatabaseCase(unittest.TestCase):
@@ -27,7 +27,7 @@ class DatabaseCase(unittest.TestCase):
         self.app = Flask(__name__)
         self.app.config.update(TESTING=True, DATABASE=str(self.case / 'test.db'))
         init_db(self.app)
-        for module in (analysis, library, workbench, creative, tags):
+        for module in (analysis, library, workbench, creative, tags, taxonomy):
             self.app.register_blueprint(module.bp, url_prefix='/api/' + module.bp.name)
         self.app.register_blueprint(serve.bp)
         self.client = self.app.test_client()

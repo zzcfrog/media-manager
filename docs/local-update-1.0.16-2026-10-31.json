@@ -1,0 +1,177 @@
+{
+  "date": "2026-10-31",
+  "status": "installed_and_verified",
+  "version": "1.0.16",
+  "previous_version": "1.0.15",
+  "installed_application": "/Users/zack/Applications/映屿 · luminisle.app",
+  "authorization": "User requested production package, local replacement, commit/push and temporary-file cleanup.",
+  "package": {
+    "app_id": "com.zack.media-manager",
+    "architecture": "arm64",
+    "application_bytes": 665596367,
+    "dmg_bytes": 272526159,
+    "dmg_sha256": "e4580358bad822958676820f1a6561b5d775a9ae48c8889d646f495916175837",
+    "deep_strict_signature": "passed",
+    "dmg_checksum": "passed",
+    "zip_integrity": "passed",
+    "frontend_files_identical": 39,
+    "private_data_or_external_models_bundled": false
+  },
+  "checks": {
+    "python_unittests": 239,
+    "frontend_regressions": 16,
+    "gallery_state_regressions": 17,
+    "taxonomy_state_regressions": 30,
+    "people_state_regressions": "passed",
+    "desktop_runtime": "passed",
+    "ui_source_browser_groups": 73,
+    "packaged_browser": {
+      "routes": [
+        {
+          "route": "#/gallery",
+          "title": "映屿 · luminisle",
+          "textLength": 3814
+        },
+        {
+          "route": "#/classify",
+          "title": "映屿 · luminisle",
+          "textLength": 3586
+        },
+        {
+          "route": "#/taxonomy",
+          "title": "映屿 · luminisle",
+          "textLength": 533
+        },
+        {
+          "route": "#/people",
+          "title": "映屿 · luminisle",
+          "textLength": 691
+        }
+      ],
+      "errors": [],
+      "failedRequests": [],
+      "metrics": [
+        {
+          "width": 1600,
+          "overflow": false,
+          "controls": [
+            32,
+            32,
+            32
+          ]
+        },
+        {
+          "width": 1000,
+          "overflow": false,
+          "controls": [
+            32,
+            32,
+            32
+          ]
+        }
+      ],
+      "ok": true
+    }
+  },
+  "migration_rehearsal": {
+    "ok": true,
+    "packaged_frontend_files_matched": 39,
+    "private_or_external_model_weights": 0,
+    "bundled_runtime_vad_and_examples_bytes": 1246054,
+    "original_tables_unchanged": 39,
+    "new_tables": [
+      "people_changes",
+      "people_distinct",
+      "people_face_exclusions",
+      "people_faces",
+      "people_jobs",
+      "people_media_decisions",
+      "people_persons",
+      "people_plans",
+      "people_reviews"
+    ],
+    "new_tables_empty": true,
+    "timestamp_column_order_valid": true,
+    "foreign_key_violations": 0,
+    "automatic_upgrade_snapshot_verified": true
+  },
+  "installed_validation": {
+    "health_version": "1.0.16",
+    "normal_profile_and_library": true,
+    "media": 11835,
+    "projects": 2,
+    "original_tables_unchanged": {
+      "collection_items": true,
+      "collections": true,
+      "dup_exclusions": true,
+      "media": true,
+      "media_fts": true,
+      "media_segment": true,
+      "media_tags": true,
+      "music_segment": true,
+      "project_media": true,
+      "project_tracks": true,
+      "projects": true,
+      "settings": true,
+      "tags": true,
+      "taxonomy_analysis_batches": true,
+      "taxonomy_analysis_requests": true,
+      "taxonomy_candidate_context": true,
+      "taxonomy_candidates": true,
+      "taxonomy_changes": true,
+      "taxonomy_closed_proposals": true,
+      "taxonomy_collections": true,
+      "taxonomy_decision_events": true,
+      "taxonomy_decisions": true,
+      "taxonomy_examples": true,
+      "taxonomy_expressions": true,
+      "taxonomy_features": true,
+      "taxonomy_field_provenance": true,
+      "taxonomy_historical_snapshots": true,
+      "taxonomy_job_context": true,
+      "taxonomy_jobs": true,
+      "taxonomy_nodes": true,
+      "taxonomy_plans": true,
+      "taxonomy_relation_jobs": true,
+      "taxonomy_relation_locks": true,
+      "taxonomy_relation_suggestions": true,
+      "taxonomy_relations": true,
+      "taxonomy_sources": true,
+      "taxonomy_split_targets": true,
+      "taxonomy_text_features": true,
+      "taxonomy_validation_profiles": true
+    },
+    "new_tables": 9,
+    "new_tables_empty": true,
+    "timestamp_column_order_valid": true,
+    "foreign_key_violations": 0,
+    "existing_files_verified": 14054,
+    "model_configuration_unchanged": true,
+    "automatic_policies_off": true,
+    "signature_deep_strict": true,
+    "automatic_upgrade_snapshot": "/Users/zack/Library/Application Support/Media Manager/library/upgrade-backups/20261031-191648-16c840ed.db",
+    "snapshot_matches_original": true,
+    "original_media_or_model_files_modified": false
+  },
+  "native_window": {
+    "verified": true,
+    "existing_media_visible": 11835,
+    "existing_projects_visible": 2,
+    "new_navigation_entries_visible": true
+  },
+  "diagnostic": {
+    "first_verifier_lsof_check_failed": true,
+    "cause": "Flask closes request-scoped SQLite handles; health has no database handle. lsof is not a valid post-start library identity check.",
+    "recovery_preserved": true,
+    "automatic_rollback_or_restore": false
+  },
+  "cleanup": {
+    "status": "pending_after_git_push",
+    "preserve": "real library, all existing library upgrade backups, external models, benchmark models and human labels, diagnostic logs"
+  },
+  "limitations": [
+    "Actual AI inference, original-media writes and real exports were not exercised by the release verification.",
+    "Face clustering accuracy and production thresholds still need independent calibration.",
+    "Local ad-hoc signing; no Developer ID notarization."
+  ]
+}

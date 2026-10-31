@@ -2,7 +2,7 @@
 
 **AI 驱动的素材管理助手 — 让你专注于创作，而不是整理素材。**
 
-[品牌与图标维护](docs/BRANDING.md) · [升级与数据迁移](docs/UPGRADE-AND-DATA.md)
+[UI 规范](docs/UI-SPEC.md) · [文档目录](docs/README.md) · [品牌与图标维护](docs/BRANDING.md) · [升级与数据迁移](docs/UPGRADE-AND-DATA.md)
 
 你在剪辑时是不是也遇到过这些问题？
 
@@ -12,9 +12,7 @@
 
 映屿 · luminisle 用 AI 帮你自动完成这些。导入素材 → 一键分析 → 每一段视频都被打上结构化标签，写入 XMP 侧车文件，直接在 Lightroom、达芬奇、剪映里搜索和筛选。
 
-<p align="center"><img src="docs/screenshots/mac-native-library.png" width="100%" /></p>
-
-界面采用 macOS 桌面风格，包含系统外观跟随、素材检查器、统一预览和剪辑工作台；原有筛选、标注、分析、创作与导出入口保留。[界面变更与验证记录](docs/UI-NATIVE-2026-10-18.md)。新版截图使用独立演示资料库，下方部分功能演示图来自早期界面。
+界面采用 macOS 桌面风格，包含系统外观跟随、素材检查器、统一预览和剪辑工作台；原有筛选、标注、分析、创作与导出入口保留。后续界面统一参照 [UI 规范](docs/UI-SPEC.md)，历史演示截图已清理。
 
 ---
 
@@ -34,8 +32,6 @@
 
 视频产出 13 个维度、图片产出 16 个维度的结构化标签，所有字段支持点击编辑。
 
-<p align="center"><img src="docs/screenshots/mac-native-detail.png" width="100%" /></p>
-
 ### 批量分析
 
 画廊中选中多个素材，右键一键提交批量 AI 分析。确认弹窗显示：
@@ -44,13 +40,6 @@
 - 已有分析结果的素材处理策略（重新分析 / 跳过）
 
 分析过程中顶部进度条实时跟踪所有任务状态。
-
-<table>
-  <tr>
-    <td><img src="docs/screenshots/批量选择.webp" width="100%" /></td>
-    <td><img src="docs/screenshots/批量分析.webp" width="100%" /></td>
-  </tr>
-</table>
 
 ### 无缝衔接编辑软件
 
@@ -66,38 +55,12 @@
 
 ### 浏览与管理
 
-- **多种视图** — 瀑布流、等高行、列表三种布局，按 `G` 键快速切换
+- **多种视图** — 网格、瀑布流、等高行、列表四种布局，按 `G` 键快速切换
 - **文件夹目录树** — 侧边栏 Lightroom 风格目录树，按文件夹快速筛选
 - **全文搜索** — 中文分词搜索文件名、画面描述、对话内容、标签
 - **多维筛选** — 类型、评分、颜色标签、喜欢、分析状态
 - **排序与分组** — 按导入时间/拍摄时间/名称/分辨率/时长/大小/评分排序，支持按时间段或时长分组
 - **状态持久化** — 所有筛选条件、排序、视图刷新页面后自动恢复
-
-<table>
-  <tr>
-    <td align="center">瀑布流</td>
-    <td align="center">等高行</td>
-    <td align="center">列表</td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/瀑布流.webp" width="100%" /></td>
-    <td><img src="docs/screenshots/等高行.webp" width="100%" /></td>
-    <td><img src="docs/screenshots/列表.webp" width="100%" /></td>
-  </tr>
-</table>
-
-<table>
-  <tr>
-    <td align="center">多维筛选</td>
-    <td align="center">全文搜索</td>
-    <td align="center">时间线分组</td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/筛选.webp" width="100%" /></td>
-    <td><img src="docs/screenshots/搜索.webp" width="100%" /></td>
-    <td><img src="docs/screenshots/时间线.webp" width="100%" /></td>
-  </tr>
-</table>
 
 ### 智能分析
 
@@ -118,17 +81,6 @@
 - **标签** — AI 分析完成后自动关联主体、颜色、场景等标签
 - **查找相似** — 基于 ResNet50 深度特征 + HDBSCAN 聚类，弹窗展示酷似/相似/聚类三级结果
 
-<table>
-  <tr>
-    <td align="center">查找相似</td>
-    <td align="center">聚类</td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/相似.webp" width="100%" /></td>
-    <td><img src="docs/screenshots/聚类.webp" width="100%" /></td>
-  </tr>
-</table>
-
 ### 专业工具
 
 - **XMP 写入** — 评分、颜色标签、AI 标签和描述写入标准 XMP，兼容 Adobe 全家桶
@@ -137,28 +89,13 @@
 - **图片全屏看图** — 缩放（25%-500%）+ 拖拽平移 + 导航缩略图 + 全屏模式
 - **RGB 直方图** — 三通道色彩分布
 
-<p align="center"><img src="docs/screenshots/图片详情页.webp" width="100%" /></p>
-
 ### 导入
-
-<p align="center"><img src="docs/screenshots/导入中.webp" width="100%" /></p>
 
 ### 主题与语言
 
 - **国际化** — 中文 / English 双语支持
 - **桌面端** — Electron 封装，独立窗口，原生文件选择器
 - **后台任务恢复** — 刷新页面后自动从后端恢复分析进度
-
-<table>
-  <tr>
-    <td align="center">浅色主题</td>
-    <td align="center">设置页</td>
-  </tr>
-  <tr>
-    <td><img src="docs/screenshots/白色主题.webp" width="100%" /></td>
-    <td><img src="docs/screenshots/语言主题设置.webp" width="100%" /></td>
-  </tr>
-</table>
 
 ---
 
@@ -273,6 +210,8 @@ cd electron && npm start
 
 ## 文档
 
+- [UI 规范（当前设计基准）](docs/UI-SPEC.md)
+- [文档目录与维护规则](docs/README.md)
 - [使用指南](docs/USAGE.md)
 - [产品需求文档](docs/PRD.md)
 - [交互设计](docs/UE_DESIGN.md)

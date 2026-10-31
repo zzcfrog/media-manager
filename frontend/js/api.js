@@ -106,17 +106,18 @@ scanPaths(paths) {
   getProgress() {
     return this._fetch("/api/analysis/progress");
   },
-  startAnalysis(mediaId) {
+  startAnalysis(mediaId, organizeTags = false) {
     return fetch(`/api/analysis/${mediaId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({organize_tags: organizeTags}),
     });
   },
-  startBatchAnalysis(ids, skipDone = false) {
+  startBatchAnalysis(ids, skipDone = false, organizeTags = false, organizePeople = false) {
     return this._fetch("/api/analysis/batch", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids, skip_done: skipDone }),
+      body: JSON.stringify({ ids, skip_done: skipDone, organize_tags: organizeTags, organize_people: organizePeople }),
     });
   },
   getSettings() {

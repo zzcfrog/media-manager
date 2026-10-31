@@ -8,7 +8,6 @@ from loguru import logger
 import numpy as np
 import onnxruntime as ort
 from PIL import Image
-from torchvision import transforms
 from ..config import RAW_EXTS, MODELS_ROOT
 
 _ort_session = None
@@ -16,12 +15,23 @@ _session_lock = threading.Lock()
 _MODEL_PATH = MODELS_ROOT / "resnet50.onnx"
 _FFMPEG_TIMEOUT = 60
 
-_TRANSFORM = transforms.Compose([
-    transforms.Resize(256),
-    transforms.CenterCrop(224),
-    transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-])
+_IMAGE_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)[:, None, None]
+_IMAGE_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)[:, None, None]
+
+
+def _preprocess_image(image):
+    """Match the previous PIL-based torchvision pipeline, including crop rounding."""
+    width, height = image.size
+    size = (256, int(256 * height / width)) if width <= height else (int(256 * width / height), 256)
+    image = image.resize(size, Image.Resampling.BILINEAR)
+    left = int(round((size[0] - 224) / 2.0))
+    top = int(round((size[1] - 224) / 2.0))
+    image = image.crop((left, top, left + 224, top + 224))
+    tensor = np.asarray(image, dtype=np.float32).transpose(2, 0, 1).copy()
+    tensor /= np.float32(255)
+    tensor -= _IMAGE_MEAN
+    tensor /= _IMAGE_STD
+    return tensor[None]
 
 _HEIF_EXTS = {".heic", ".heif", ".hif", ".avif"}
 
@@ -89,7 +99,7 @@ def compute_embedding(filepath, media_type: str = "image", duration: float = Non
     if img is None:
         return None
     try:
-        tensor = _TRANSFORM(img.convert("RGB")).unsqueeze(0).numpy()
+        tensor = _preprocess_image(img.convert("RGB"))
         output = _get_session().run(None, {"input": tensor})[0]
         vec = output.flatten()
         norm = np.linalg.norm(vec)

@@ -28,7 +28,7 @@ async function verifyFolderTree(page, base, output) {
   await page.route('**/api/library/folders', route => route.fulfill({json:{data:folders}}));
   await page.addInitScript(() => { localStorage.setItem('theme','dark'); localStorage.setItem('accent','#25b7e5'); localStorage.removeItem('selectedFolder'); });
   await page.goto(base+'/#/gallery');
-  const tree = page.locator('.app-sidebar .folder-tree');
+  const tree = page.locator('.app-sidebar .folder-tree:has(.folder-tree-item[data-path])');
   // Attribute selectors avoid matching a parent node's descendant folder.
   const row = p => tree.locator(`.folder-tree-item[data-path="${p}"]`);
   const header = p => row(p).locator('xpath=../../..');

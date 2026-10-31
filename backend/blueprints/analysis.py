@@ -1,7 +1,8 @@
-from flask import Blueprint, request, jsonify, Response, current_app
+from flask import Blueprint, request, jsonify, Response, current_app, g
 import json
 import threading
 import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from loguru import logger
 from pathlib import Path
@@ -32,6 +33,13 @@ def _claim_analysis(db, media_id, skip_done=False):
         "AND (?=0 OR COALESCE(analysis_status,'none') != 'done')",
         (media_id, int(skip_done)),
     )
+    if cursor.rowcount == 1:
+        enabled=bool((request.get_json(silent=True) or {}).get('organize_tags'))
+        db.execute('INSERT INTO taxonomy_analysis_requests(media_id,enabled) VALUES (?,?) '
+                   'ON CONFLICT(media_id) DO UPDATE SET enabled=excluded.enabled',(media_id,int(enabled)))
+        db.execute('INSERT INTO taxonomy_analysis_batches(media_id,batch_id) VALUES (?,?) '
+                   'ON CONFLICT(media_id) DO UPDATE SET batch_id=excluded.batch_id',
+                   (media_id,getattr(g,'classification_analysis_batch',None) or uuid.uuid4().hex))
     db.commit()
     return cursor.rowcount == 1
 
@@ -148,6 +156,12 @@ def start_analysis(media_id):
         return jsonify({"error": "该素材正在分析中"}), 409
     app = current_app._get_current_object()
 
+    if (request.get_json(silent=True) or {}).get('organize_people'):
+        from ..services.people_jobs import enqueue, ensure_worker
+        enqueue(db,media_id,priority=100,force=True)
+        db.commit()
+        ensure_worker(app)
+
     if media["media_type"] == "video":
         return _start_video_analysis(media_id, media, app)
     elif media["media_type"] == "image":
@@ -160,6 +174,7 @@ def start_analysis(media_id):
 
 @bp.route("/batch", methods=["POST"])
 def start_batch_analysis():
+    g.classification_analysis_batch=uuid.uuid4().hex
     ids = request.json.get("ids", [])
     skip_done = request.json.get("skip_done", False)
     logger.info("API start_batch_analysis: ids={} skip_done={}", ids, skip_done)
@@ -177,9 +192,17 @@ def start_batch_analysis():
         ).fetchone()
         if not media:
             continue
+        if request.json.get('organize_people'):
+            from ..services.people_jobs import enqueue as enqueue_people
+            enqueue_people(db,media_id,priority=100,force=True)
+            db.commit()
         if media["analysis_status"] == "processing":
             continue
         if skip_done and media["analysis_status"] == "done":
+            if request.json.get('organize_tags'):
+                from ..services.classification_jobs import enqueue
+                enqueue(db,media_id,'analysis',priority=100,batch_id=g.classification_analysis_batch)
+                db.commit()
             continue
 
         file_path = media["file_path"]
@@ -222,6 +245,12 @@ def start_batch_analysis():
 
         submitted.append(media_id)
 
+    if request.json.get('organize_tags'):
+        from ..services.classification_jobs import ensure_worker
+        ensure_worker(app)
+    if request.json.get('organize_people'):
+        from ..services.people_jobs import ensure_worker as ensure_people_worker
+        ensure_people_worker(app)
     logger.info("API start_batch_analysis done: submitted={} skipped={}", submitted, len(ids) - len(submitted))
     return jsonify({"submitted": submitted, "skipped": len(ids) - len(submitted)})
 
@@ -1127,8 +1156,25 @@ def save_segments(media_id, segments, model=""):
             "UPDATE media SET analysis_status = 'done', analysis_model = ?, analysis_date = datetime('now'), updated_at = datetime('now') WHERE id = ?",
             (model, media_id),
         )
+        from ..services.taxonomy_review import digest as field_digest
+        for saved in db.execute('SELECT id,main_subjects,scene_type,lighting,weather FROM media_segment WHERE media_id=?',(media_id,)).fetchall():
+            for field in ('main_subjects','scene_type','lighting','weather'):
+                db.execute('INSERT INTO taxonomy_field_provenance(segment_id,field,value_hash,origin) VALUES (?,?,?,?) '
+                           "ON CONFLICT(segment_id,field) DO UPDATE SET value_hash=excluded.value_hash,origin=excluded.origin,updated_at=datetime('now')",
+                           (saved['id'],field,field_digest(saved[field]),'ai'))
         _refresh_fts(db, media_id, segments)
+        organize=db.execute('SELECT enabled FROM taxonomy_analysis_requests WHERE media_id=?',(media_id,)).fetchone()
+        if organize and organize[0]:
+            from ..services.classification_jobs import enqueue
+            batch=db.execute('SELECT batch_id FROM taxonomy_analysis_batches WHERE media_id=?',(media_id,)).fetchone()
+            enqueue(db,media_id,'analysis',priority=100,batch_id=batch[0] if batch else None)
         db.commit()
+    if organize and organize[0]:
+        try:
+            from ..services.classification_jobs import ensure_worker
+            ensure_worker(current_app._get_current_object())
+        except Exception:
+            logger.warning('标签任务已保存，后台调度稍后重试')
 
 def refresh_media_fts(db, media_id):
     segments = [_segment_to_dict(r) for r in db.execute(
@@ -1157,10 +1203,8 @@ def _refresh_fts(db, media_id, segments, extra_tags: str = ""):
     if not row:
         return
     file_name = row["file_name"]
-    tag_rows = db.execute(
-        "SELECT t.name FROM tags t JOIN media_tags mt ON t.id = mt.tag_id WHERE mt.media_id = ?",
-        (media_id,),
-    ).fetchall()
+    from ..services.taxonomy import tag_rows as effective_tags
+    tag_rows = effective_tags(db, media_id)
     # extra_tags：音乐分析的受控标签文本（拼入 tags 列，可检索）
     tags_str = " ".join(list(r["name"] for r in tag_rows) + ([extra_tags] if extra_tags else []))
 
@@ -1230,6 +1274,13 @@ def update_segment(media_id, seg_id):
     params.append(seg_id)
     db.execute(f"UPDATE media_segment SET {', '.join(fields)} WHERE id = ?", params)
 
+    from ..services.taxonomy_review import digest as field_digest
+    saved=db.execute('SELECT * FROM media_segment WHERE id=?',(seg_id,)).fetchone()
+    for field in ('main_subjects','scene_type','lighting','weather'):
+        if field in data:
+            db.execute('INSERT INTO taxonomy_field_provenance(segment_id,field,value_hash,origin) VALUES (?,?,?,?) '
+                       "ON CONFLICT(segment_id,field) DO UPDATE SET value_hash=excluded.value_hash,origin=excluded.origin,updated_at=datetime('now')",
+                       (seg_id,field,field_digest(saved[field]),'manual'))
     segments = [_segment_to_dict(r) for r in db.execute(f"SELECT {_SEGMENT_COLS} FROM media_segment WHERE media_id = ? ORDER BY seq", (media_id,)).fetchall()]
     _refresh_fts(db, media_id, segments)
     db.commit()

@@ -130,35 +130,73 @@ const ADVANCED_FILTER_SPEC = {
   ],
 };
 
+const galleryControlText = (zh,en) => typeof i18nState!=='undefined' && i18nState.locale==='en' ? en : zh;
+
+const GalleryViewIcon = {
+  props:{mode:String},
+  template:`<svg class="gallery-view-icon" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+    <template v-if="mode==='grid'"><rect x="2" y="2" width="7" height="7" rx="1"></rect><rect x="11" y="2" width="7" height="7" rx="1"></rect><rect x="2" y="11" width="7" height="7" rx="1"></rect><rect x="11" y="11" width="7" height="7" rx="1"></rect></template>
+    <template v-else-if="mode==='masonry'"><rect x="2" y="2" width="7" height="9" rx="1"></rect><rect x="2" y="13" width="7" height="5" rx="1"></rect><rect x="11" y="2" width="7" height="5" rx="1"></rect><rect x="11" y="9" width="7" height="9" rx="1"></rect></template>
+    <template v-else-if="mode==='justified'"><rect x="2" y="2" width="9" height="7" rx="1"></rect><rect x="13" y="2" width="5" height="7" rx="1"></rect><rect x="2" y="11" width="5" height="7" rx="1"></rect><rect x="9" y="11" width="9" height="7" rx="1"></rect></template>
+    <template v-else-if="mode==='list'"><rect x="2" y="2" width="4" height="4" rx="1"></rect><rect x="2" y="8" width="4" height="4" rx="1"></rect><rect x="2" y="14" width="4" height="4" rx="1"></rect><rect x="8" y="2" width="10" height="4" rx="1"></rect><rect x="8" y="8" width="10" height="4" rx="1"></rect><rect x="8" y="14" width="10" height="4" rx="1"></rect></template>
+  </svg>`
+};
+const GalleryViewControls = {
+  props:{modelValue:String},emits:['update:modelValue'],components:{'gallery-view-icon':GalleryViewIcon},
+  computed:{options(){return[{value:'grid',label:t('g.grid_view')},{value:'masonry',label:t('g.masonry_view')},{value:'justified',label:t('g.justified_view')},{value:'list',label:t('g.list_view')}];}},
+  methods:{tt:galleryControlText},
+  template:`<div class="gallery-view-switcher" v-sliding-segments="modelValue" role="group" :aria-label="tt('显示模式','View mode')"><q-btn v-for="o in options" :key="o.value" flat dense :aria-label="o.label" :aria-pressed="modelValue===o.value" :class="{'is-active':modelValue===o.value}" @click="$emit('update:modelValue',o.value)"><gallery-view-icon :mode="o.value"></gallery-view-icon><q-tooltip>{{o.label}}</q-tooltip></q-btn></div>`
+};
+const GalleryOrderControls = {
+  props:{sortBy:String,sortOrder:String,groupBy:String,sortOptions:Array,groupOptions:Array},
+  emits:['update:sortBy','update:sortOrder','update:groupBy'],methods:{tt:galleryControlText},
+  template:`<div class="gallery-order-controls" role="group" :aria-label="tt('排序与分组','Sort and group')">
+    <q-select :model-value="sortBy" dense filled options-dense emit-value map-options class="gallery-sort-select" popup-content-class="gallery-order-menu" :options="sortOptions" :aria-label="tt('排序','Sort')" @update:model-value="$emit('update:sortBy',$event)"><q-tooltip>{{sortOptions.find(o=>o.value===sortBy)?.label}}</q-tooltip></q-select>
+    <q-btn flat dense :icon="sortOrder==='desc'?'arrow_downward':'arrow_upward'" :aria-label="tt('切换排序方向','Toggle sort direction')" @click="$emit('update:sortOrder',sortOrder==='desc'?'asc':'desc')"><q-tooltip>{{sortOrder==='desc'?tt('降序','Descending'):tt('升序','Ascending')}}</q-tooltip></q-btn>
+    <template v-if="groupOptions.length"><span class="gallery-order-divider" aria-hidden="true"></span><q-select :model-value="groupBy" dense filled options-dense emit-value map-options class="gallery-group-select" popup-content-class="gallery-order-menu" :options="groupOptions" :aria-label="tt('分组','Group')" @update:model-value="$emit('update:groupBy',$event)"><q-tooltip>{{groupOptions.find(o=>o.value===groupBy)?.label}}</q-tooltip></q-select></template>
+  </div>`
+};
+
 const GalleryPage = {
+  components:{'gallery-view-controls':GalleryViewControls,'gallery-order-controls':GalleryOrderControls},
   template: `
-  <div class="library-workspace">
+  <div class="library-workspace" :aria-busy="loading ? 'true' : 'false'" style="position:relative">
+    <q-linear-progress v-if="loading" indeterminate class="gallery-loading" :aria-label="taxText('正在读取素材…','Loading media…')" style="position:absolute;top:0;left:0;right:0;z-index:2"></q-linear-progress>
+    <taxonomy-tools v-if="!$root.pickerMode && selArr.length && !$root.route.startsWith('#/classify')" :gallery="this"></taxonomy-tools>
+    <div v-if="$root.taxonomyCollectionError" class="taxonomy-error" role="alert">{{$root.taxonomyCollectionError}}<q-btn flat dense icon="refresh" :aria-label="taxText('重试图集','Retry collection')" @click="$root.loadTaxonomyCollection(Number($root.route.split('/')[3]))"></q-btn></div>
+    <people-gallery-tools v-if="!$root.pickerMode" :gallery="this"></people-gallery-tools>
     <!-- Filter bar: type, fav/analyzed, stars, colors, reset, search, sort, group, view -->
     <div class="filter-bar" :class="{ 'adv-open': advPanelOpen && currentSpec.length }">
       <div class="filter-controls">
-      <q-btn-group unelevated style="border-radius:6px;overflow:hidden">
-        <q-btn unelevated dense size="sm" :label="t('g.all')"
-               :style="filters.media_type==='all'?'background:var(--accent) !important;color:var(--on-accent) !important':''"
+      <div class="gallery-media-filter-controls">
+      <q-btn-group unelevated class="gallery-type-controls" v-sliding-segments="filters.media_type" role="group" :aria-label="taxText('素材类型','Media type')">
+        <q-btn unelevated dense size="sm" :aria-label="t('g.all')"
+               :aria-pressed="filters.media_type==='all'"
                @click="filters.media_type='all'; load()">
+          <svg class="gallery-all-media-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <g class="gallery-media-fan-card" transform="rotate(-7 9 10)"><rect class="gallery-media-tile" x="3" y="3" width="12" height="14" rx="2"></rect><g class="gallery-media-cut"><circle cx="6.3" cy="6.8" r="1.2"></circle><path d="m4.4 14.6 3.5-4.5 3.9 4.5Z"></path></g></g>
+            <g class="gallery-media-fan-card" transform="translate(-0.6 0.4) rotate(7 16 11)"><rect class="gallery-media-tile" x="10" y="4" width="12" height="14" rx="2"></rect><path class="gallery-media-cut" d="M14 8.1 19 11 14 13.9Z"></path></g>
+            <g transform="translate(-1.6 0)"><path class="gallery-media-note" d="M8.8 11h5v2h-3v6.8c0 1.7-1.5 2.9-3.4 2.9-1.8 0-3.1-1-3.1-2.3 0-1.7 2.2-2.8 4.5-2.2Z"></path></g>
+          </svg>
           <q-tooltip :delay="1000">{{ t('g.all') }}</q-tooltip>
         </q-btn>
         <q-btn unelevated dense size="sm" icon="image" :aria-label="t('g.images')"
-               :style="filters.media_type==='image'?'background:var(--accent) !important;color:var(--on-accent) !important':''"
+               :aria-pressed="filters.media_type==='image'"
                @click="filters.media_type='image'; load()">
           <q-tooltip :delay="1000">{{ t('g.images') }}</q-tooltip>
         </q-btn>
         <q-btn unelevated dense size="sm" icon="smart_display" :aria-label="t('g.videos')"
-               :style="filters.media_type==='video'?'background:var(--accent) !important;color:var(--on-accent) !important':''"
+               :aria-pressed="filters.media_type==='video'"
                @click="filters.media_type='video'; load()">
           <q-tooltip :delay="1000">{{ t('g.videos') }}</q-tooltip>
         </q-btn>
         <q-btn unelevated dense size="sm" icon="music_note" :aria-label="t('g.music')"
-               :style="filters.media_type==='audio'?'background:var(--accent) !important;color:var(--on-accent) !important':''"
+               :aria-pressed="filters.media_type==='audio'"
                @click="filters.media_type='audio'; load()">
           <q-tooltip :delay="1000">{{ t('g.music') }}</q-tooltip>
         </q-btn>
       </q-btn-group>
-      <q-btn v-if="currentSpec.length" flat dense size="sm" no-caps class="adv-toggle-btn"
+      <q-btn v-if="currentSpec.length" flat dense no-caps class="adv-toggle-btn"
              :aria-label="t('g.adv_filter_panel')" :aria-expanded="advPanelOpen"
              :class="advPanelOpen ? 'adv-btn-open' : (advAnyActive() ? 'adv-btn-active' : '')"
              @click="advPanelOpen = !advPanelOpen">
@@ -167,70 +205,61 @@ const GalleryPage = {
         <q-icon :name="advPanelOpen ? 'expand_less' : 'expand_more'" size="16px" style="margin-left:2px"></q-icon>
         <q-tooltip :delay="1000">{{ t('g.adv_filter_panel') }}</q-tooltip>
       </q-btn>
+      </div>
+      <taxonomy-filters v-if="!$root.pickerMode && ($root.route.startsWith('#/classify') || $root.taxonomyQuery?.tag_ids?.length || $root.taxonomyQuery?.exclude_tag_ids?.length)" :gallery="this"></taxonomy-filters>
       <div style="display:flex;gap:2px">
-        <q-btn flat round dense size="sm" @click="cycleFavFilter(); showFilterToast(); load()"
-               :class="favFilter === 'unfav' ? 'filter-icon-off' : ''">
+        <q-btn flat round dense size="sm" class="gallery-filter-action" @click="cycleFavFilter(); showFilterToast(); load()"
+               :class="favFilter === 'unfav' ? 'filter-icon-off' : ''" :aria-pressed="!!favFilter"
+               :aria-label="favFilter === 'fav' ? t('g.fav_only') : favFilter === 'unfav' ? t('g.unfav_only') : t('g.fav_filter')">
           <q-icon v-if="favFilter === 'fav'" name="favorite" color="red" size="18px"></q-icon>
           <q-icon v-else-if="favFilter === 'unfav'" name="favorite_border" color="grey-7" size="18px" style="opacity:0.5"></q-icon>
           <q-icon v-else name="favorite_border" color="grey-7" size="18px"></q-icon>
           <q-tooltip :delay="1000">{{ favFilter === 'fav' ? t('g.fav_only') : favFilter === 'unfav' ? t('g.unfav_only') : t('g.fav_filter') }}</q-tooltip>
         </q-btn>
-        <q-btn flat round dense size="sm" @click="cycleAnalysisFilter(); showFilterToast(); load()"
-               :class="analysisFilter === 'not' ? 'filter-icon-off' : ''">
+        <q-btn flat round dense size="sm" class="gallery-filter-action" @click="cycleAnalysisFilter(); showFilterToast(); load()"
+               :class="analysisFilter === 'not' ? 'filter-icon-off' : ''" :aria-pressed="!!analysisFilter"
+               :aria-label="analysisFilter === 'analyzed' ? t('g.analyzed_only') : analysisFilter === 'not' ? t('g.not_analyzed_only') : t('g.analysis_filter')">
           <q-icon name="auto_awesome" :color="analysisFilter === 'analyzed' ? 'primary' : 'grey-7'" size="18px"
                   :style="analysisFilter === 'not' ? 'opacity:0.5' : ''"></q-icon>
           <q-tooltip :delay="1000">{{ analysisFilter === 'analyzed' ? t('g.analyzed_only') : analysisFilter === 'not' ? t('g.not_analyzed_only') : t('g.analysis_filter') }}</q-tooltip>
         </q-btn>
       </div>
       <div class="filter-stars">
-        <span v-for="n in 5" :key="n" class="star-btn" :class="{lit: filters.rating && n <= filters.rating}" @click="toggleRating(n)">★</span>
+        <button v-for="n in 5" :key="n" type="button" class="star-btn" :class="{lit: filters.rating && n <= filters.rating}" :aria-label="taxText('最低评分 '+n+' 星','Minimum rating '+n+' stars')" :aria-pressed="Number(filters.rating)===n" @click="toggleRating(n)">★</button>
       </div>
       <div class="filter-colors">
-        <span v-for="c in colorOptions" :key="c.value" class="color-swatch" :class="['bg-'+c.value, {active: filters.color_label===c.value, dim: filters.color_label && filters.color_label!==c.value}]" @click="toggleColor(c.value)"></span>
+        <button v-for="c in colorOptions" :key="c.value" type="button" class="color-swatch" :class="['bg-'+c.value, {active: filters.color_label===c.value, dim: filters.color_label && filters.color_label!==c.value}]" :aria-label="t('g.color_'+c.value)" :aria-pressed="filters.color_label===c.value" @click="toggleColor(c.value)"></button>
       </div>
-      <q-input v-model="searchText" dense filled :placeholder="t('g.search_placeholder')"
-               color="grey-5" style="width:220px" @keyup.enter="doSearch">
+      <q-input v-model="searchText" dense filled class="gallery-search" :placeholder="t('g.search_placeholder')" :aria-label="t('g.search_placeholder')"
+               color="grey-5" style="width:220px" @keyup.enter="doSearch" @update:model-value="showTagSuggestions=!!searchText.trim()" @focus="showTagSuggestions=!!searchText.trim()">
+        <q-menu v-model="showTagSuggestions" no-parent-event no-focus fit anchor="bottom left" self="top left">
+          <q-list dense><q-item clickable @click="doSearch" v-close-popup><q-item-section>{{taxText('全文搜索：','Full-text search: ') + searchText}}</q-item-section></q-item>
+          <q-item v-for="n in matchingTaxonomyTags" :key="n.id" clickable @click="chooseTaxonomyTag(n)" v-close-popup><q-item-section avatar><taxonomy-tag-icon style="width:16px;height:16px"></taxonomy-tag-icon></q-item-section><q-item-section>{{n.path}}</q-item-section></q-item></q-list>
+        </q-menu>
         <template v-slot:append>
-          <q-icon v-if="searchText" name="close" size="14px" color="grey-6" style="cursor:pointer" @click="searchText=''; doSearch()"></q-icon>
-          <q-btn flat round dense icon="search" size="xs" color="grey-6" @click="doSearch"></q-btn>
+          <q-btn v-if="searchText" flat round dense icon="close" size="xs" color="grey-6" :aria-label="taxText('清除搜索','Clear search')" @click="searchText=''; doSearch()"></q-btn>
+          <q-btn flat round dense icon="search" size="xs" color="grey-6" :aria-label="taxText('搜索','Search')" @click="doSearch"></q-btn>
         </template>
       </q-input>
-      <q-btn v-if="hasFilters" flat round dense icon="filter_list_off" size="sm" color="grey-6" @click="resetFilters">
+      <q-btn v-if="hasFilters" flat round dense icon="filter_list_off" size="sm" color="grey-6" class="gallery-filter-action" :aria-label="t('g.reset_filter')" @click="resetFilters">
         <q-tooltip :delay="1000">{{ t('g.reset_filter') }}</q-tooltip>
       </q-btn>
-      <div class="spacer"></div>
-      <div class="sort-group">
-        <q-select v-model="sortBy" dense filled options-dense
-          :options="sortOptions" emit-value map-options
-          @update:model-value="load"></q-select>
-        <q-btn flat dense :icon="sortOrder==='desc' ? 'arrow_downward' : 'arrow_upward'"
-               color="grey-6" size="sm" @click="sortOrder=sortOrder==='desc'?'asc':'desc'; load()"></q-btn>
+      </div><div class="filter-display-controls">
+      <gallery-order-controls :sort-by="sortBy" :sort-order="sortOrder" :group-by="groupBy" :sort-options="sortOptions" :group-options="isTimeSort?timeGroupOptions:(sortBy==='duration'?durGroupOptions:[])"
+        @update:sort-by="sortBy=$event;load()" @update:sort-order="sortOrder=$event;load()" @update:group-by="groupBy=$event"></gallery-order-controls>
+      <div class="gallery-view-controls">
+      <q-select v-if="favoriteView" v-model="stackMode" dense filled options-dense
+        class="favorite-stack-select" :aria-label="t('g.photo_stacks')"
+        :options="stackOptions" emit-value map-options @update:model-value="load">
+        <template v-slot:prepend><q-icon name="photo_library" size="17px"></q-icon></template>
+        <q-tooltip :delay="700">{{ t('g.stack_hint') }}</q-tooltip>
+      </q-select>
+      <gallery-view-controls v-model="viewMode"></gallery-view-controls>
       </div>
-      <q-select v-if="isTimeSort" v-model="groupBy" dense filled options-dense
-        :options="timeGroupOptions" emit-value map-options
-        style="min-width:100px" class="q-ml-xs"></q-select>
-      <q-select v-if="sortBy==='duration'" v-model="groupBy" dense filled options-dense
-        :options="durGroupOptions" emit-value map-options
-        style="min-width:100px" class="q-ml-xs"></q-select>
-      <q-btn-group flat style="flex-shrink:0">
-        <q-btn flat dense icon="apps" size="md" :aria-label="t('g.grid_view')" @click="viewMode='grid'" :style="{color: viewMode==='grid' ? 'var(--accent)' : 'var(--text3)'}">
-          <q-tooltip :delay="1000">{{ t('g.grid_view') }}</q-tooltip>
-        </q-btn>
-        <q-btn flat dense icon="view_column" size="md" :aria-label="t('g.masonry_view')" @click="viewMode='masonry'" :style="{color: viewMode==='masonry' ? 'var(--accent)' : 'var(--text3)'}">
-          <q-tooltip :delay="1000">{{ t('g.masonry_view') }}</q-tooltip>
-        </q-btn>
-        <q-btn flat dense size="md" :aria-label="t('g.justified_view')" @click="viewMode='justified'" :style="{color: viewMode==='justified' ? 'var(--accent)' : 'var(--text3)'}">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><rect x="1" y="3" width="18" height="4"/><rect x="1" y="8" width="18" height="4"/><rect x="1" y="13" width="18" height="4"/></svg>
-          <q-tooltip :delay="1000">{{ t('g.justified_view') }}</q-tooltip>
-        </q-btn>
-        <q-btn flat dense icon="list" size="md" :aria-label="t('g.list_view')" @click="viewMode='list'" :style="{color: viewMode==='list' ? 'var(--accent)' : 'var(--text3)'}">
-          <q-tooltip :delay="1000">{{ t('g.list_view') }}</q-tooltip>
-        </q-btn>
-      </q-btn-group>
       </div>
       <div v-if="!$root.pickerMode" class="filter-actions">
         <q-btn v-if="selArr.length" unelevated dense no-caps color="primary" icon="auto_awesome" class="batch-analysis-btn"
-               :label="t('g.ctx_analyze_n', {n: selArr.length})" @click="openBatchAnalysisDialog()"></q-btn>
+               :aria-label="t('g.ctx_analyze_n', {n: selArr.length})" @click="openBatchAnalysisDialog()"><span class="batch-analysis-label">{{t('g.ctx_analyze_n', {n: selArr.length})}}</span><q-tooltip>{{t('g.ctx_analyze_n', {n: selArr.length})}}</q-tooltip></q-btn>
         <q-btn flat round dense icon="info_outline" class="inspector-toggle" :aria-label="t('ui.inspector')"
                :aria-pressed="inspectorOpen" :class="{'is-active': inspectorOpen}" @click="inspectorOpen = !inspectorOpen">
           <q-tooltip :delay="600">{{ t('ui.inspector') }}</q-tooltip>
@@ -246,7 +275,7 @@ const GalleryPage = {
           <div v-for="row in groupRows(grp)" :key="row.map(d => d.param).join('-')" class="adv-group-row">
           <div v-for="dim in row" :key="dim.param" class="adv-dim"
                :class="{ active: advDimActive(dim) }">
-          <q-btn-toggle v-if="dim.type === 'toggle'"
+          <q-btn-toggle v-if="dim.type === 'toggle'" v-sliding-segments="filters[dim.param] || ''"
                         :model-value="filters[dim.param] || ''"
                         class="engine-toggle" no-caps unelevated dense
                         :options="dimOptions(dim)"
@@ -298,7 +327,8 @@ const GalleryPage = {
     </div>
     <!-- Main gallery area with grid/list views and lasso selection -->
     <div class="library-body">
-    <div ref="galleryPage" class="gallery-page" @mousedown="startLasso" @contextmenu.prevent>
+    <div ref="galleryPage" class="gallery-page" @mousedown="startLasso" @contextmenu.prevent
+         @scroll.passive="savedScrollTop = $event.target.scrollTop">
       <!-- Grid view: grouped with timeline -->
       <template v-if="items.length && viewMode==='grid' && groupedItems">
         <q-timeline color="primary" layout="dense" style="padding-left:8px">
@@ -307,12 +337,18 @@ const GalleryPage = {
             tag="div" class="timeline-group">
             <div class="grid" :class="{'grid-compact': gridScale <= 0.5}" :style="{'--card-w': (180*gridScale)+'px'}">
             <div class="media-card" v-for="m in g.items" :key="m.id"
-                 :class="{selected: selArr.includes(m.id)}"
+                 :class="{selected: selArr.includes(m.id), 'is-stack': m.stack_items?.length > 1}"
                  :data-id="m.id"
                  @mousedown.stop
                  @click="onCardClick(m, $event)"
                  @dblclick="openDetail(m.id)"
                  @contextmenu.prevent="showCtx($event, m)">
+              <button v-if="m.stack_items?.length > 1" class="photo-stack-badge" type="button"
+                :aria-label="stackLabel(m)" :aria-expanded="expandedStacks.includes(m.id)" :title="stackLabel(m)"
+                @mousedown.stop @click.stop="toggleStack(m)" @dblclick.stop>
+                <q-icon name="photo_library" size="13px"></q-icon>{{ m.stack_items.length }}
+                <q-icon :name="expandedStacks.includes(m.id) ? 'expand_less' : 'expand_more'" size="13px"></q-icon>
+              </button>
               <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
               <div class="thumb-wrap">
@@ -321,6 +357,7 @@ const GalleryPage = {
                 <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
                 <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
                 <span v-if="m.analysis_status==='done'" class="ai-badge"><q-icon name="auto_awesome" size="10px" color="white"></q-icon></span>
+                <tag-status :media="m"></tag-status>
                 <span v-if="m.media_type==='audio' && m.music_summary && m.music_summary.watermark==='Present'" class="wm-badge"><q-icon name="branding_watermark" size="11px" color="amber-4"><q-tooltip :delay="500">{{ t('g.watermark_badge') }}</q-tooltip></q-icon></span>
                 <span v-if="m.has_xmp && m.media_type==='image'" class="xmp-badge" style="color:white;font-size:7px;font-weight:700">XMP</span>
               </div>
@@ -342,13 +379,19 @@ const GalleryPage = {
       </template>
       <!-- Grid view: flat -->
       <div v-if="items.length && viewMode==='grid' && !groupedItems" class="grid" :class="{'grid-compact': gridScale <= 0.5}" :style="{'--card-w': (180*gridScale)+'px'}">
-        <div class="media-card" v-for="m in items" :key="m.id"
-             :class="{selected: selArr.includes(m.id)}"
+        <div class="media-card" v-for="m in displayItems" :key="m.id"
+             :class="{selected: selArr.includes(m.id), 'is-stack': m.stack_items?.length > 1}"
              :data-id="m.id"
              @mousedown.stop
              @click="onCardClick(m, $event)"
              @dblclick="openDetail(m.id)"
              @contextmenu.prevent="showCtx($event, m)">
+              <button v-if="m.stack_items?.length > 1" class="photo-stack-badge" type="button"
+                :aria-label="stackLabel(m)" :aria-expanded="expandedStacks.includes(m.id)" :title="stackLabel(m)"
+                @mousedown.stop @click.stop="toggleStack(m)" @dblclick.stop>
+                <q-icon name="photo_library" size="13px"></q-icon>{{ m.stack_items.length }}
+                <q-icon :name="expandedStacks.includes(m.id) ? 'expand_less' : 'expand_more'" size="13px"></q-icon>
+              </button>
           <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
           <div class="thumb-wrap">
@@ -357,6 +400,7 @@ const GalleryPage = {
             <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
             <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
             <span v-if="m.analysis_status==='done'" class="ai-badge"><q-icon name="auto_awesome" size="10px" color="white"></q-icon></span>
+            <tag-status :media="m"></tag-status>
                 <span v-if="m.media_type==='audio' && m.music_summary && m.music_summary.watermark==='Present'" class="wm-badge"><q-icon name="branding_watermark" size="11px" color="amber-4"><q-tooltip :delay="500">{{ t('g.watermark_badge') }}</q-tooltip></q-icon></span>
             <span v-if="m.has_xmp && m.media_type==='image'" class="xmp-badge" style="color:white;font-size:7px;font-weight:700">XMP</span>
           </div>
@@ -381,12 +425,18 @@ const GalleryPage = {
             tag="div" class="timeline-group">
             <div class="masonry" :style="{'--masonry-cols': masonryCols}">
             <div class="masonry-card" v-for="m in g.items" :key="m.id"
-                 :class="{selected: selArr.includes(m.id)}"
+                 :class="{selected: selArr.includes(m.id), 'is-stack': m.stack_items?.length > 1}"
                  :data-id="m.id"
                  @mousedown.stop
                  @click="onCardClick(m, $event)"
                  @dblclick="openDetail(m.id)"
                  @contextmenu.prevent="showCtx($event, m)">
+              <button v-if="m.stack_items?.length > 1" class="photo-stack-badge" type="button"
+                :aria-label="stackLabel(m)" :aria-expanded="expandedStacks.includes(m.id)" :title="stackLabel(m)"
+                @mousedown.stop @click.stop="toggleStack(m)" @dblclick.stop>
+                <q-icon name="photo_library" size="13px"></q-icon>{{ m.stack_items.length }}
+                <q-icon :name="expandedStacks.includes(m.id) ? 'expand_less' : 'expand_more'" size="13px"></q-icon>
+              </button>
               <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
               <div class="masonry-img">
@@ -395,6 +445,7 @@ const GalleryPage = {
                 <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
                 <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
                 <span v-if="m.analysis_status==='done'" class="ai-badge"><q-icon name="auto_awesome" size="10px" color="white"></q-icon></span>
+                <tag-status :media="m"></tag-status>
                 <span v-if="m.media_type==='audio' && m.music_summary && m.music_summary.watermark==='Present'" class="wm-badge"><q-icon name="branding_watermark" size="11px" color="amber-4"><q-tooltip :delay="500">{{ t('g.watermark_badge') }}</q-tooltip></q-icon></span>
                 <span v-if="m.has_xmp && m.media_type==='image'" class="xmp-badge" style="color:white;font-size:7px;font-weight:700">XMP</span>
               </div>
@@ -410,13 +461,19 @@ const GalleryPage = {
       </template>
       <!-- Masonry view: flat -->
       <div v-if="items.length && viewMode==='masonry' && !groupedItems" class="masonry" :style="{'--masonry-cols': masonryCols}">
-        <div class="masonry-card" v-for="m in items" :key="m.id"
-             :class="{selected: selArr.includes(m.id)}"
+        <div class="masonry-card" v-for="m in displayItems" :key="m.id"
+             :class="{selected: selArr.includes(m.id), 'is-stack': m.stack_items?.length > 1}"
              :data-id="m.id"
              @mousedown.stop
              @click="onCardClick(m, $event)"
              @dblclick="openDetail(m.id)"
              @contextmenu.prevent="showCtx($event, m)">
+              <button v-if="m.stack_items?.length > 1" class="photo-stack-badge" type="button"
+                :aria-label="stackLabel(m)" :aria-expanded="expandedStacks.includes(m.id)" :title="stackLabel(m)"
+                @mousedown.stop @click.stop="toggleStack(m)" @dblclick.stop>
+                <q-icon name="photo_library" size="13px"></q-icon>{{ m.stack_items.length }}
+                <q-icon :name="expandedStacks.includes(m.id) ? 'expand_less' : 'expand_more'" size="13px"></q-icon>
+              </button>
           <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
           <div class="masonry-img">
@@ -425,6 +482,7 @@ const GalleryPage = {
             <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
             <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
             <span v-if="m.analysis_status==='done'" class="ai-badge"><q-icon name="auto_awesome" size="10px" color="white"></q-icon></span>
+            <tag-status :media="m"></tag-status>
                 <span v-if="m.media_type==='audio' && m.music_summary && m.music_summary.watermark==='Present'" class="wm-badge"><q-icon name="branding_watermark" size="11px" color="amber-4"><q-tooltip :delay="500">{{ t('g.watermark_badge') }}</q-tooltip></q-icon></span>
             <span v-if="m.has_xmp && m.media_type==='image'" class="xmp-badge" style="color:white;font-size:7px;font-weight:700">XMP</span>
           </div>
@@ -444,11 +502,17 @@ const GalleryPage = {
             <div v-for="(row, ri) in layoutJustified(g.items)" :key="ri" class="justified-row">
               <div v-for="m in row.items" :key="m.id" class="justified-card"
                    :style="{width: m._jw + 'px', height: row.height + 'px'}"
-                   :class="{selected: selArr.includes(m.id)}"
+                   :class="{selected: selArr.includes(m.id), 'is-stack': m.stack_items?.length > 1}"
                    :data-id="m.id"
                    @click="onCardClick(m, $event)"
                    @dblclick="openDetail(m.id)"
                    @contextmenu.prevent="showCtx($event, m)">
+              <button v-if="m.stack_items?.length > 1" class="photo-stack-badge" type="button"
+                :aria-label="stackLabel(m)" :aria-expanded="expandedStacks.includes(m.id)" :title="stackLabel(m)"
+                @mousedown.stop @click.stop="toggleStack(m)" @dblclick.stop>
+                <q-icon name="photo_library" size="13px"></q-icon>{{ m.stack_items.length }}
+                <q-icon :name="expandedStacks.includes(m.id) ? 'expand_less' : 'expand_more'" size="13px"></q-icon>
+              </button>
                 <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
                 <img :src="thumbSrc(m)" :data-stage="thumbStage(m)" :class="{'audio-waveform-thumb': m.media_type==='audio' && thumbStage(m)==='waveform'}" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
@@ -456,6 +520,7 @@ const GalleryPage = {
                 <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
                 <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
                 <span v-if="m.analysis_status==='done'" class="ai-badge"><q-icon name="auto_awesome" size="10px" color="white"></q-icon></span>
+                <tag-status :media="m"></tag-status>
                 <span v-if="m.media_type==='audio' && m.music_summary && m.music_summary.watermark==='Present'" class="wm-badge"><q-icon name="branding_watermark" size="11px" color="amber-4"><q-tooltip :delay="500">{{ t('g.watermark_badge') }}</q-tooltip></q-icon></span>
                 <span v-if="m.has_xmp && m.media_type==='image'" class="xmp-badge" style="color:white;font-size:7px;font-weight:700">XMP</span>
                 <div v-if="m.rating" class="rating">{{ '★'.repeat(m.rating) }}</div>
@@ -470,14 +535,20 @@ const GalleryPage = {
       </template>
       <!-- Justified view: flat -->
       <template v-if="items.length && viewMode==='justified' && !groupedItems">
-        <div v-for="(row, ri) in layoutJustified(items)" :key="ri" class="justified-row">
+        <div v-for="(row, ri) in layoutJustified(displayItems)" :key="ri" class="justified-row">
           <div v-for="m in row.items" :key="m.id" class="justified-card"
                :style="{width: m._jw + 'px', height: row.height + 'px'}"
-               :class="{selected: selArr.includes(m.id)}"
+               :class="{selected: selArr.includes(m.id), 'is-stack': m.stack_items?.length > 1}"
                :data-id="m.id"
                @click="onCardClick(m, $event)"
                @dblclick="openDetail(m.id)"
                @contextmenu.prevent="showCtx($event, m)">
+              <button v-if="m.stack_items?.length > 1" class="photo-stack-badge" type="button"
+                :aria-label="stackLabel(m)" :aria-expanded="expandedStacks.includes(m.id)" :title="stackLabel(m)"
+                @mousedown.stop @click.stop="toggleStack(m)" @dblclick.stop>
+                <q-icon name="photo_library" size="13px"></q-icon>{{ m.stack_items.length }}
+                <q-icon :name="expandedStacks.includes(m.id) ? 'expand_less' : 'expand_more'" size="13px"></q-icon>
+              </button>
             <div v-if="selArr.includes(m.id)" class="sel-overlay"></div>
               <div v-if="$root.pickerMode" class="picker-check"><q-icon v-if="selArr.includes(m.id)" name="check" size="14px" color="white"></q-icon></div>
             <img :src="thumbSrc(m)" :data-stage="thumbStage(m)" :class="{'audio-waveform-thumb': m.media_type==='audio' && thumbStage(m)==='waveform'}" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
@@ -485,6 +556,7 @@ const GalleryPage = {
             <span v-if="m.favorite" class="fav-badge"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
             <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
             <span v-if="m.analysis_status==='done'" class="ai-badge"><q-icon name="auto_awesome" size="10px" color="white"></q-icon></span>
+            <tag-status :media="m"></tag-status>
                 <span v-if="m.media_type==='audio' && m.music_summary && m.music_summary.watermark==='Present'" class="wm-badge"><q-icon name="branding_watermark" size="11px" color="amber-4"><q-tooltip :delay="500">{{ t('g.watermark_badge') }}</q-tooltip></q-icon></span>
             <span v-if="m.has_xmp && m.media_type==='image'" class="xmp-badge" style="color:white;font-size:7px;font-weight:700">XMP</span>
             <div v-if="m.rating" class="rating">{{ '★'.repeat(m.rating) }}</div>
@@ -503,11 +575,17 @@ const GalleryPage = {
             tag="div" class="timeline-group">
             <div class="list">
             <div class="media-row" v-for="m in g.items" :key="m.id"
-                 :class="{selected: selArr.includes(m.id)}"
+                 :class="{selected: selArr.includes(m.id), 'is-stack': m.stack_items?.length > 1}"
                  :data-id="m.id"
                  @click="onCardClick(m, $event)"
                  @dblclick="openDetail(m.id)"
                  @contextmenu.prevent="showCtx($event, m)">
+              <button v-if="m.stack_items?.length > 1" class="photo-stack-badge" type="button"
+                :aria-label="stackLabel(m)" :aria-expanded="expandedStacks.includes(m.id)" :title="stackLabel(m)"
+                @mousedown.stop @click.stop="toggleStack(m)" @dblclick.stop>
+                <q-icon name="photo_library" size="13px"></q-icon>{{ m.stack_items.length }}
+                <q-icon :name="expandedStacks.includes(m.id) ? 'expand_less' : 'expand_more'" size="13px"></q-icon>
+              </button>
               <div class="row-thumb-wrap">
                 <img class="row-thumb" :src="thumbSrc(m)" :data-stage="thumbStage(m)" :class="{'audio-waveform-thumb': m.media_type==='audio' && thumbStage(m)==='waveform'}" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
                 <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
@@ -523,6 +601,7 @@ const GalleryPage = {
                 <span v-if="m.favorite" class="row-fav"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
                 <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
                 <span v-if="m.analysis_status==='done'" class="row-ai"><q-icon name="auto_awesome" size="12px" color="var(--accent)"></q-icon></span>
+                <tag-status :media="m" inline></tag-status>
               </span>
               <span style="width:32px"></span>
             </div>
@@ -543,12 +622,18 @@ const GalleryPage = {
           <span class="lh-col lh-sort" style="width:110px" @click="toggleSort('rating')">{{ t('g.col_rating') }} <span v-if="sortBy==='rating'">{{ sortOrder==='desc'?'↓':'↑' }}</span></span>
           <span style="width:32px"></span>
         </div>
-        <div class="media-row" v-for="m in items" :key="m.id"
-             :class="{selected: selArr.includes(m.id)}"
+        <div class="media-row" v-for="m in displayItems" :key="m.id"
+             :class="{selected: selArr.includes(m.id), 'is-stack': m.stack_items?.length > 1}"
              :data-id="m.id"
              @click="onCardClick(m, $event)"
              @dblclick="openDetail(m.id)"
              @contextmenu.prevent="showCtx($event, m)">
+              <button v-if="m.stack_items?.length > 1" class="photo-stack-badge" type="button"
+                :aria-label="stackLabel(m)" :aria-expanded="expandedStacks.includes(m.id)" :title="stackLabel(m)"
+                @mousedown.stop @click.stop="toggleStack(m)" @dblclick.stop>
+                <q-icon name="photo_library" size="13px"></q-icon>{{ m.stack_items.length }}
+                <q-icon :name="expandedStacks.includes(m.id) ? 'expand_less' : 'expand_more'" size="13px"></q-icon>
+              </button>
           <div class="row-thumb-wrap">
             <img class="row-thumb" :src="thumbSrc(m)" :data-stage="thumbStage(m)" :class="{'audio-waveform-thumb': m.media_type==='audio' && thumbStage(m)==='waveform'}" loading="lazy" @load="onImgLoad" @error="onThumbError($event, m)">
             <span class="type-badge"><q-icon :name="typeIcon(m)" size="12px" color="white"></q-icon></span>
@@ -564,6 +649,7 @@ const GalleryPage = {
             <span v-if="m.color_label" class="color-dot" :class="'color-' + m.color_label"></span>
             <span v-if="m.favorite" class="row-fav"><q-icon name="favorite" size="12px" color="red"></q-icon></span>
             <span v-if="m.analysis_status==='done'" class="row-ai"><q-icon name="auto_awesome" size="12px" color="var(--accent)"></q-icon></span>
+            <tag-status :media="m" inline></tag-status>
           </span>
           <span style="width:32px"></span>
         </div>
@@ -582,18 +668,20 @@ const GalleryPage = {
                      @close="inspectorOpen=false" @open="openDetail" @analyze="openBatchAnalysisDialog()"></media-inspector>
     </div>
     <q-toolbar class="gallery-footer" style="border-top:1px solid var(--border);min-height:36px;flex-shrink:0;position:relative">
-      <span class="text-caption" style="color:var(--text3)">{{ t('g.total', {n: total}) }}
+      <taxonomy-gallery-actions v-if="!$root.pickerMode" :gallery="this"></taxonomy-gallery-actions>
+      <span class="text-caption gallery-footer-count" style="color:var(--text3)">{{ t('g.total', {n: total}) }}
         <span v-if="selArr.length" style="color:var(--accent)" class="q-ml-sm">{{ t('g.selected', {n: selArr.length}) }}</span>
       </span>
-      <div v-if="activeFilterTags.length" class="header-tags" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)">
+      <div v-if="activeFilterTags.length" class="header-tags" role="status" :aria-label="taxText('当前筛选：','Current filters: ')+activeFilterTags.map(tag=>tag.label || tag.stars || tag.dot || '').join(' · ')">
         <span v-for="(tag, i) in activeFilterTags" :key="i" class="header-tag">
-          <span v-if="tag.icon" :class="tag.off ? 'filter-icon-off' : ''" style="position:relative;display:inline-flex;align-items:center"><q-icon :name="tag.icon" size="12px"></q-icon></span>
+          <span v-if="tag.icon" :class="tag.off ? 'filter-icon-off' : ''" style="position:relative;display:inline-flex;align-items:center"><taxonomy-tag-icon v-if="tag.icon==='sell'" style="width:12px;height:12px"></taxonomy-tag-icon><q-icon v-else :name="tag.icon" size="12px"></q-icon></span>
           <span v-if="tag.stars">{{ tag.stars }}</span>
           <span v-if="tag.dot" class="header-tag-dot" :class="'bg-'+tag.dot"></span>
-          <span v-if="tag.label">{{ tag.label }}</span>
+          <span v-if="tag.label">{{ tag.label }}</span><q-tooltip v-if="tag.label">{{tag.label}}</q-tooltip>
         </span>
       </div>
-      <q-space></q-space>
+      <q-space v-if="!activeFilterTags.length"></q-space>
+      <div class="gallery-size-controls">
       <template v-if="viewMode==='grid'">
         <span class="text-caption q-mr-sm" style="color:var(--text3)">{{ Math.round(gridScale*100) }}%</span>
         <q-slider v-model="gridScale" :min="0.5" :max="2" :step="0.25"
@@ -609,43 +697,44 @@ const GalleryPage = {
         <q-slider v-model="justifiedRowH" :min="120" :max="400" :step="10"
                   style="width:100px;--q-primary:var(--accent)" color="primary"></q-slider>
       </template>
+      </div>
     </q-toolbar>
     <!-- Context menu: view detail, remove, find similar -->
-    <div v-if="ctxMenu.show" ref="ctxPopup" class="ctx-menu-popup" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }">
-      <q-list dense style="min-width:200px;border-radius:8px;overflow:hidden">
-        <q-item clickable @click="ctxMenu.show = false; openDetail(selArr[0])" :disable="selArr.length > 1" style="padding-left:8px;padding-right:12px">
+    <div v-if="ctxMenu.show" ref="ctxPopup" class="ctx-menu-popup" role="menu" :aria-label="taxText('素材操作','Media actions')" :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }">
+      <q-list dense role="presentation" style="min-width:200px;border-radius:8px;overflow:hidden">
+        <q-item role="menuitem" tabindex="-1" clickable @click="ctxMenu.show = false; openDetail(selArr[0])" :disable="selArr.length > 1" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="visibility" size="14px" color="grey-6"></q-icon></q-item-section>
           <q-item-section>{{ t('g.ctx_view_detail') }}</q-item-section>
           <q-item-section side style="flex-shrink:0;white-space:nowrap;display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--text3)">↵</span></q-item-section>
         </q-item>
-        <q-item clickable @click="ctxMenu.show = false; revealCtx()" :disable="selArr.length !== 1" style="padding-left:8px;padding-right:12px">
+        <q-item role="menuitem" tabindex="-1" clickable @click="ctxMenu.show = false; revealCtx()" :disable="selArr.length !== 1" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="folder_open" size="14px" color="grey-6"></q-icon></q-item-section>
           <q-item-section>{{ t('g.ctx_reveal') }}</q-item-section>
         </q-item>
         <q-separator style="background:var(--border)"></q-separator>
-        <q-item v-if="selArr.length === 1 && ctxMenu.item && ctxMenu.item.media_type === 'image'" clickable @click="ctxMenu.show = false; findSimilar()" style="padding-left:8px;padding-right:12px">
+        <q-item role="menuitem" tabindex="-1" v-if="selArr.length === 1 && ctxMenu.item && ctxMenu.item.media_type === 'image'" clickable @click="ctxMenu.show = false; findSimilar()" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="content_copy" size="14px" color="grey-6"></q-icon></q-item-section>
           <q-item-section>{{ t('g.ctx_find_similar') }}</q-item-section>
         </q-item>
-        <q-item clickable @click="openBatchAnalysisDialog()" style="padding-left:8px;padding-right:12px">
+        <q-item role="menuitem" tabindex="-1" clickable @click="openBatchAnalysisDialog()" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="auto_awesome" size="14px" color="grey-6"></q-icon></q-item-section>
           <q-item-section>{{ selArr.length > 1 ? t('g.ctx_analyze_n', {n: selArr.length}) : t('g.ctx_analyze') }}</q-item-section>
         </q-item>
         <q-separator style="background:var(--border)"></q-separator>
-        <q-item clickable @click="ctxMenu.show = false; confirmSetFileDate()" style="padding-left:8px;padding-right:12px">
+        <q-item role="menuitem" tabindex="-1" clickable @click="ctxMenu.show = false; confirmSetFileDate()" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="schedule" size="14px" color="grey-6"></q-icon></q-item-section>
           <q-item-section>{{ selArr.length > 1 ? t('g.ctx_set_file_date_n', {n: selArr.length}) : t('g.ctx_set_file_date') }}</q-item-section>
         </q-item>
-        <q-item clickable @click="openAdjustTime()" style="padding-left:8px;padding-right:12px">
+        <q-item role="menuitem" tabindex="-1" clickable @click="openAdjustTime()" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="time_to_leave" size="14px" color="grey-6"></q-icon></q-item-section>
           <q-item-section>{{ selArr.length > 1 ? t('g.ctx_adjust_time_n', {n: selArr.length}) : t('g.ctx_adjust_time') }}</q-item-section>
         </q-item>
-        <q-item clickable @click="openAdjustTime('creation')" style="padding-left:8px;padding-right:12px">
+        <q-item role="menuitem" tabindex="-1" clickable @click="openAdjustTime('creation')" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="more_time" size="14px" color="grey-6"></q-icon></q-item-section>
           <q-item-section>{{ selArr.length > 1 ? t('g.ctx_adjust_creation_time_n', {n: selArr.length}) : t('g.ctx_adjust_creation_time') }}</q-item-section>
         </q-item>
         <q-separator style="background:var(--border)"></q-separator>
-        <q-item clickable @click="ctxMenu.show = false; deleteCtx()" style="padding-left:8px;padding-right:12px">
+        <q-item role="menuitem" tabindex="-1" clickable @click="ctxMenu.show = false; deleteCtx()" style="padding-left:8px;padding-right:12px">
           <q-item-section avatar style="min-width:24px;padding-right:8px"><q-icon name="delete_outline" size="14px" color="negative"></q-icon></q-item-section>
           <q-item-section style="color:var(--negative)">{{ selArr.length > 1 ? t('g.ctx_remove_n', {n: selArr.length}) : t('g.ctx_remove') }}</q-item-section>
           <q-item-section side style="flex-shrink:0;white-space:nowrap;display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--text3)">⌘+⌫</span></q-item-section>
@@ -733,6 +822,8 @@ const GalleryPage = {
           <div class="text-h6">{{ t('g.batch_analysis_title') }}</div>
         </q-card-section>
         <q-card-section style="padding-top:0">
+          <q-checkbox v-model="batchAnalysisInfo.organizeTags" :label="taxText('同时整理标签（复用分析结果）','Organize tags from analysis results')"></q-checkbox>
+          <q-checkbox v-model="batchAnalysisInfo.organizePeople" :label="taxText('同时在本地整理人物','Organize people locally too')"></q-checkbox>
           <!-- Stats -->
           <div style="display:flex;gap:16px;margin-bottom:16px">
             <div style="flex:1;text-align:center;padding:12px 8px;border-radius:8px;background:var(--surface2)">
@@ -788,14 +879,14 @@ const GalleryPage = {
             <div style="font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ similarDlg.source?.file_name }}</div>
           </div>
           <div style="flex:1"></div>
-          <q-btn-group unelevated class="sort-group" style="border-radius:6px;overflow:hidden;border:none;background:var(--surface2)">
-            <q-btn unelevated dense :color="similarDlg.similarType==='near'?'primary':'grey-9'" :text-color="similarDlg.similarType==='near'?'white':'grey-6'" icon="filter_none" :label="t('dup.near')" @click="switchSimilarType('near')" style="padding:3px 10px;min-height:28px;font-size:13px">
+          <q-btn-group unelevated class="sort-group" v-sliding-segments="similarDlg.similarType" style="overflow:hidden;border:none;background:var(--surface2)">
+            <q-btn unelevated dense :aria-pressed="similarDlg.similarType==='near'" :color="similarDlg.similarType==='near'?'primary':'grey-9'" :text-color="similarDlg.similarType==='near'?'white':'grey-6'" icon="filter_none" :label="t('dup.near')" @click="switchSimilarType('near')" style="padding:3px 10px;min-height:28px;font-size:13px">
               <q-tooltip :delay="1000">{{ t('dup.near_tip') }}</q-tooltip>
             </q-btn>
-            <q-btn unelevated dense :color="similarDlg.similarType==='similar'?'primary':'grey-9'" :text-color="similarDlg.similarType==='similar'?'white':'grey-6'" icon="difference" :label="t('dup.similar')" @click="switchSimilarType('similar')" style="padding:3px 10px;min-height:28px;font-size:13px">
+            <q-btn unelevated dense :aria-pressed="similarDlg.similarType==='similar'" :color="similarDlg.similarType==='similar'?'primary':'grey-9'" :text-color="similarDlg.similarType==='similar'?'white':'grey-6'" icon="difference" :label="t('dup.similar')" @click="switchSimilarType('similar')" style="padding:3px 10px;min-height:28px;font-size:13px">
               <q-tooltip :delay="1000">{{ t('dup.similar_tip') }}</q-tooltip>
             </q-btn>
-            <q-btn unelevated dense :color="similarDlg.similarType==='cluster'?'primary':'grey-9'" :text-color="similarDlg.similarType==='cluster'?'white':'grey-6'" icon="bubble_chart" :label="t('dup.cluster')" @click="switchSimilarType('cluster')" style="padding:3px 10px;min-height:28px;font-size:13px">
+            <q-btn unelevated dense :aria-pressed="similarDlg.similarType==='cluster'" :color="similarDlg.similarType==='cluster'?'primary':'grey-9'" :text-color="similarDlg.similarType==='cluster'?'white':'grey-6'" icon="bubble_chart" :label="t('dup.cluster')" @click="switchSimilarType('cluster')" style="padding:3px 10px;min-height:28px;font-size:13px">
               <q-tooltip :delay="1000">{{ t('dup.cluster_tip') }}</q-tooltip>
             </q-btn>
           </q-btn-group>
@@ -920,10 +1011,14 @@ const GalleryPage = {
   // -- Data: state, filters, sort/group options --
   data() {
     return {
+      showTagSuggestions:false,
       items: [], loadError: '', total: 0, page: 1, perPage: 60, loading: false, loadingMore: false, allLoaded: false, viewMode: "grid", searchText: "",
       sortBy: "imported_at", sortOrder: "desc", gridScale: 1, masonryCols: 5, justifiedRowH: 220,
       selArr: [], _allSelected: false, lasso: null, lastClickIdx: -1,
       inspectorOpen: localStorage.getItem('libraryInspector') !== 'false',
+      stackMode: ['off', 'near', 'similar', 'cluster'].includes(localStorage.getItem('favoriteStackMode')) ? localStorage.getItem('favoriteStackMode') : 'near',
+      expandedStacks: [],
+      savedScrollTop: 0,
       ctxMenu: { show: false, item: null, x: 0, y: 0 },
       confirmDelete: { show: false, id: null, name: "" },
       confirmBatch: { show: false },
@@ -953,6 +1048,9 @@ const GalleryPage = {
     inspectorOpen(value) {
       if (!this.$root.pickerMode) localStorage.setItem('libraryInspector', String(value));
     },
+    stackMode(value) {
+      if (!this.$root.pickerMode) localStorage.setItem('favoriteStackMode', value);
+    },
     sortBy(val) {
       const isTime = val === "imported_at" || val === "date_taken";
       const isDur = val === "duration";
@@ -972,8 +1070,31 @@ const GalleryPage = {
     },
   },
   computed: {
+    matchingTaxonomyTags() {
+      const q=this.searchText.trim().normalize('NFKC').toLocaleLowerCase();
+      if(!q || this.$root.pickerMode)return [];
+      return (this.$root.taxonomyNodes || []).filter(n=>n.status!=='inactive' && (n.path+' '+n.aliases.map(a=>a.text).join(' ')).normalize('NFKC').toLocaleLowerCase().includes(q)).slice(0,12);
+    },
+    favoriteView() {
+      return !this.$root.pickerMode && (this.$root.route === '#/favorites' ||
+        this.$root.currentView === 'detail' && this.$root.detailOrigin?.route === '#/favorites');
+    },
+    stackOptions() {
+      return [{ label: this.t('g.stack_off'), value: 'off' },
+        ...['near', 'similar', 'cluster'].map(value => ({ label: this.t('dup.' + value), value }))];
+    },
+    stackActive() {
+      return this.favoriteView && this.favFilter === 'fav' && this.stackMode !== 'off';
+    },
+    allMediaItems() {
+      return this.items.flatMap(item => item.stack_items?.length ? [item, ...item.stack_items.slice(1)] : [item]);
+    },
+    displayItems() {
+      return this.items.flatMap(item => item.stack_items?.length && this.expandedStacks.includes(item.id)
+        ? [item, ...item.stack_items.slice(1)] : [item]);
+    },
     inspectedMedia() {
-      return this.selArr.length === 1 ? this.items.find(item => item.id === this.selArr[0]) || null : null;
+      return this.selArr.length === 1 ? this.allMediaItems.find(item => item.id === this.selArr[0]) || null : null;
     },
     currentSpec() {
       return ADVANCED_FILTER_SPEC[this.filters.media_type] || [];
@@ -1034,10 +1155,16 @@ const GalleryPage = {
       return this.similarExcludeDlg.candidates.filter(c => c.selected).length;
     },
     hasFilters() {
-      return this.filters.media_type !== "all" || this.filters.rating || this.filters.color_label || this.favFilter || this.analysisFilter || this.searchText || this.advAnyActive();
+      return this.filters.media_type !== "all" || this.filters.rating || this.filters.color_label || this.favFilter || this.analysisFilter || this.searchText || this.advAnyActive() || (!this.$root.pickerMode && (this.$root.taxonomyQuery?.tag_ids?.length || this.$root.taxonomyQuery?.exclude_tag_ids?.length));
     },
     activeFilterTags() {
       const tags = [];
+      const query=this.$root.pickerMode?{}:(this.$root.taxonomyQuery || {});
+      if(query.tag_ids?.length){
+        for(const id of query.tag_ids)tags.push({icon:'sell',label:(this.$root.taxonomyNodes || []).find(n=>n.id===id)?.path || this.taxText('标签 #','Tag #')+id});
+        tags.push({icon:'rule',label:(query.tag_mode==='all'?this.taxText('全部符合','Match all'):this.taxText('任一符合','Match any'))+' · '+(query.include_children===false?this.taxText('仅所选标签','Selected tags only'):this.taxText('含子标签','Include child tags'))});
+      }
+      if(query.exclude_tag_ids?.length)tags.push({icon:'label_off',label:this.taxText('保留旧版排除条件','Legacy exclusions retained')});
       const folder = this.$root.selectedFolder;
       if (folder) {
         tags.push({ icon: 'folder', label: folder });
@@ -1079,7 +1206,7 @@ const GalleryPage = {
       const groups = [];
       let current = null;
       if (this.groupBy === "dur_seg") {
-        for (const m of this.items) {
+        for (const m of this.displayItems) {
           const key = this.getDurKey(m.duration);
           if (!current || current.key !== key) {
             current = { key, label: key, items: [] };
@@ -1089,7 +1216,7 @@ const GalleryPage = {
         }
       } else {
         if (!this.timeField) return null;
-        for (const m of this.items) {
+        for (const m of this.displayItems) {
           const raw = m[this.timeField];
           const key = this.getGroupKey(raw, this.groupBy);
           if (!current || current.key !== key) {
@@ -1162,7 +1289,7 @@ const GalleryPage = {
     }
     // 高级筛选：面板展开状态已由上面从 localStorage 恢复；拉取 facets
     this._loadFacets(this.filters.media_type);
-    this.load();
+    if (!this.$root.taxonomyCollectionLoading) this.load();
     document.addEventListener("mousedown", this.closeCtx);
     document.addEventListener("keydown", this.handleKey, true);
     this._closeSimilarCtx = (e) => {
@@ -1188,6 +1315,24 @@ const GalleryPage = {
   },
   // -- Methods: data loading, selection, keyboard, context menu, formatting --
   methods: {
+    toggleStack(item) {
+      if (this.expandedStacks.includes(item.id)) {
+        const hidden = new Set(item.stack_items.slice(1).map(member => member.id));
+        const hadHiddenSelection = this.selArr.some(id => hidden.has(id));
+        if (hadHiddenSelection) this._allSelected = false;
+        this.selArr = this.selArr.filter(id => !hidden.has(id));
+        if (hadHiddenSelection && !this.selArr.includes(item.id)) this.selArr.push(item.id);
+        this.expandedStacks = this.expandedStacks.filter(id => id !== item.id);
+      } else {
+        this.expandedStacks.push(item.id);
+      }
+      this.lastClickIdx = -1;
+      this.$nextTick(() => this._checkFill());
+    },
+    stackLabel(item) {
+      return this.t(this.expandedStacks.includes(item.id) ? 'g.stack_collapse' : 'g.stack_expand',
+        { n: item.stack_items.length });
+    },
     typeIcon(m) {
       return m.media_type === 'video' ? 'play_arrow' : m.media_type === 'audio' ? 'music_note' : 'image';
     },
@@ -1375,6 +1520,7 @@ const GalleryPage = {
     // Build query params from current filters (shared by load, loadMore, selectAll)
     _buildParams(page) {
       const params = { page, per_page: this.perPage, sort: this.sortBy, order: this.sortOrder };
+      if (this.stackActive) params.stack_type = this.stackMode;
       if (this.filters.media_type !== "all") params.media_type = this.filters.media_type;
       if (this.filters.rating) params.rating = this.filters.rating;
       if (this.filters.color_label) params.color_label = this.filters.color_label;
@@ -1397,6 +1543,19 @@ const GalleryPage = {
           const vals = this.advVal(dim);
           if (vals.length) params[dim.param] = vals; // 数组 → api.js 逐值 append 重复参数（同维度 OR）
         }
+      }
+      if(!this.$root.pickerMode && this.$root.taxonomyQuery) {
+        const query=this.$root.taxonomyQuery || {};
+        Object.assign(params,query);
+        if(Array.isArray(query.tag_ids))params.tag_ids=query.tag_ids.join(',');
+        if(Array.isArray(query.exclude_tag_ids))params.exclude_tag_ids=query.exclude_tag_ids.join(',');
+        if(query.include_children===false)params.include_children='false';
+      }
+      if(!this.$root.pickerMode&&this.$root.peopleQuery){
+        const query=this.$root.peopleQuery;
+        if(query.person_ids?.length)params.person_ids=query.person_ids.join(',');
+        if(query.exclude_person_ids?.length)params.exclude_person_ids=query.exclude_person_ids.join(',');
+        if(query.person_mode)params.person_mode=query.person_mode;
       }
       return params;
     },
@@ -1427,6 +1586,8 @@ const GalleryPage = {
     async load() {
       const generation = this._loadGeneration = (this._loadGeneration || 0) + 1;
       this._allSelected = false;
+      this.expandedStacks = [];
+      this.lastClickIdx = -1;
       if (this._saveFilters) this._saveFilters();
       if (!this.$root.pickerMode) this.selArr = [];
       this.page = 1;
@@ -1441,7 +1602,7 @@ const GalleryPage = {
         this.total = res.pagination?.total || 0;
         this.allLoaded = data.length < this.perPage;
         this.items = data;
-        if (!this.$root.pickerMode) this.$root.galleryItems = data;
+        if (!this.$root.pickerMode) this.$root.galleryItems = this.allMediaItems;
         this._loadFacets(this.filters.media_type);
       } catch(e) {
         if (generation !== this._loadGeneration) return;
@@ -1457,6 +1618,36 @@ const GalleryPage = {
         }
       }
     },
+    // Refresh edited detail metadata without resetting filters, page depth or selection.
+    async refreshAfterDetail() {
+      const generation = this._loadGeneration = (this._loadGeneration || 0) + 1;
+      const pages = this.page;
+      this.loading = true;
+      this.loadingMore = false;
+      let rows = [], result;
+      try {
+        for (let page = 1; page <= pages; page++) {
+          result = await API.getLibrary(this._buildParams(page));
+          if (generation !== this._loadGeneration) return;
+          rows.push(...(result.data || []));
+        }
+        this.items = rows;
+        this.loadError = '';
+        this.total = result.pagination?.total || 0;
+        this.allLoaded = pages >= (result.pagination?.pages || 1);
+        this.$root.galleryItems = this.allMediaItems;
+        const ids = new Set(this.allMediaItems.map(item => item.id));
+        this.selArr = this.selArr.filter(id => ids.has(id));
+        this.expandedStacks = this.expandedStacks.filter(id => ids.has(id));
+        this.lastClickIdx = this.displayItems.findIndex(item => item.id === this.selArr[this.selArr.length - 1]);
+        this.$root.detailLibraryDirty = false;
+        await this.$nextTick();
+      } catch (error) {
+        if (generation === this._loadGeneration) Quasar.Notify.create({ type: 'negative', message: this.t('g.load_failed') });
+      } finally {
+        if (generation === this._loadGeneration) this.loading = false;
+      }
+    },
     async loadMore() {
       if (this.loading || this.loadingMore || this.allLoaded) return;
       const generation = this._loadGeneration;
@@ -1468,7 +1659,7 @@ const GalleryPage = {
         const data = res.data || [];
         this.page = page;
         this.items = this.items.concat(data);
-        if (!this.$root.pickerMode) this.$root.galleryItems = this.items;
+        if (!this.$root.pickerMode) this.$root.galleryItems = this.allMediaItems;
         this.total = res.pagination?.total || 0;
         this.allLoaded = data.length < this.perPage;
       } catch(e) {
@@ -1485,13 +1676,14 @@ const GalleryPage = {
     },
     // If content doesn't fill the scroll container, keep loading
     _checkFill() {
+      if (!this.$root.pickerMode && this.$root.currentView !== 'gallery') return;
       const el = this.$refs.galleryPage;
       if (!el || this.allLoaded || this.loadingMore) return;
       if (el.scrollHeight <= el.clientHeight + 200) this.loadMore();
     },
     openDetail(id) {
       if (this.$root.pickerMode) return;
-      location.hash = `#/detail/${id}`;
+      this.$root.openDetail(id);
     },
     toggleSort(field) {
       if (this.sortBy === field) {
@@ -1534,11 +1726,20 @@ const GalleryPage = {
       const msg = parts.length ? parts.join(" · ") : this.t('g.filter_cleared');
       Quasar.Notify.create({ message: msg, position: 'top', timeout: 1800 });
     },
+    taxText(zh,en) { return typeof i18nState!=='undefined' && i18nState.locale==='en' ? en : zh; },
+    chooseTaxonomyTag(node) {
+      this.showTagSuggestions=false;
+      this.searchText='';this.$root.searchQuery='';
+      this.$root.taxonomyQuery={...this.$root.taxonomyQuery,tag_ids:[...new Set([...(this.$root.taxonomyQuery?.tag_ids||[]),node.id])]};
+      this.load();
+    },
     doSearch() {
+      this.showTagSuggestions=false;
       if (!this.$root.pickerMode) this.$root.searchQuery = this.searchText.trim();
       this.load();
     },
-    resetFilters() {
+    resetFilters(reload = true) {
+      if(!this.$root.pickerMode)this.$root.taxonomyQuery={};
       this.filters.media_type = "all";
       this.filters.rating = null;
       this.filters.color_label = null;
@@ -1548,11 +1749,11 @@ const GalleryPage = {
       this.analysisFilter = null;
       this.searchText = "";
       if (!this.$root.pickerMode) this.$root.searchQuery = "";
-      this.load();
+      if (reload) this.load();
     },
     onCardClick(m, e) {
       this._allSelected = false;
-      const idx = this.items.findIndex(item => item.id === m.id);
+      const idx = this.displayItems.findIndex(item => item.id === m.id);
       if (this.$root.pickerMode) {
         // Picker mode: toggle on every click
         const arr = [...this.selArr];
@@ -1564,7 +1765,7 @@ const GalleryPage = {
         const from = Math.min(this.lastClickIdx, idx);
         const to = Math.max(this.lastClickIdx, idx);
         const ids = [];
-        for (let i = from; i <= to; i++) ids.push(this.items[i].id);
+        for (let i = from; i <= to; i++) ids.push(this.displayItems[i].id);
         this.selArr = ids;
       } else if (e.ctrlKey || e.metaKey) {
         const arr = [...this.selArr];
@@ -1640,6 +1841,7 @@ const GalleryPage = {
     },
     showCtx(e, m) {
       if (this.$root.pickerMode) return;
+      this._ctxReturnFocus = document.activeElement;
       if (!this.selArr.includes(m.id)) this.selArr = [m.id];
       this.ctxMenu.item = m;
       this.ctxMenu.x = e.clientX;
@@ -1651,7 +1853,28 @@ const GalleryPage = {
         const rect = popup.getBoundingClientRect();
         this.ctxMenu.x = Math.max(4, Math.min(e.clientX, window.innerWidth - rect.width - 4));
         this.ctxMenu.y = Math.max(4, Math.min(e.clientY, window.innerHeight - rect.height - 4));
+        popup.querySelector('[role="menuitem"]:not(.disabled)')?.focus({ preventScroll: true });
       });
+    },
+    handleCtxKey(e) {
+      const items = [...(this.$refs.ctxPopup?.querySelectorAll('[role="menuitem"]') || [])]
+        .filter(item => !item.classList.contains('disabled') && item.getAttribute('aria-disabled') !== 'true');
+      if (e.key === 'Escape' || e.key === 'Tab') {
+        e.stopPropagation();
+        if (e.key === 'Escape') e.preventDefault();
+        const previous = this._ctxReturnFocus;
+        this._ctxReturnFocus = null;
+        this.ctxMenu.show = false;
+        previous?.isConnected && previous.focus({ preventScroll: true });
+        return;
+      }
+      if (!items.length || !['ArrowDown','ArrowUp','Home','End','Enter',' '].includes(e.key)) return;
+      e.preventDefault(); e.stopPropagation();
+      const index = items.indexOf(document.activeElement);
+      if (e.key === 'Enter' || e.key === ' ') { if (index >= 0) items[index].click(); return; }
+      const next = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1
+        : (index + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+      items[next].focus({ preventScroll: true });
     },
     closeCtx(e) {
       if (!this.ctxMenu.show) return;
@@ -1663,16 +1886,17 @@ const GalleryPage = {
       // In picker mode, only the picker instance handles keys; main instance must skip
       if (this.$root.pickerMode && !this._isPicker) return;
       if (!this.$root.pickerMode && this.$root.currentView !== "gallery") return;
+      if (this.ctxMenu?.show) { this.handleCtxKey(e); return; }
       const key = e.key;
       if (['Enter', ' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key) &&
           e.target.closest('button, a, [role="button"], [role="combobox"], [role="slider"], [role="tab"], [role="option"]')) return;
       // Arrow keys - move selection
       if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(key)) {
         e.preventDefault(); e.stopPropagation();
-        if (!this.items.length) return;
-        if (!this.selArr.length) { this.selArr = [this.items[0].id]; return; }
+        if (!this.displayItems.length) return;
+        if (!this.selArr.length) { this.selArr = [this.displayItems[0].id]; return; }
         const lastId = this.selArr[this.selArr.length - 1];
-        const idx = this.items.findIndex(m => m.id === lastId);
+        const idx = this.displayItems.findIndex(m => m.id === lastId);
         let ni = idx;
         if (this.viewMode === "grid") {
           let cols = Math.max(1, Math.floor((this.$refs.galleryPage?.clientWidth || 800) / (180 * this.gridScale)));
@@ -1682,17 +1906,17 @@ const GalleryPage = {
             const secondRow = Array.from(cards).findIndex(c => c.getBoundingClientRect().top > firstTop + 5);
             if (secondRow > 0) cols = secondRow;
           }
-          if (key === "ArrowRight") ni = Math.min(idx + 1, this.items.length - 1);
+          if (key === "ArrowRight") ni = Math.min(idx + 1, this.displayItems.length - 1);
           else if (key === "ArrowLeft") ni = Math.max(idx - 1, 0);
-          else if (key === "ArrowDown") ni = Math.min(idx + cols, this.items.length - 1);
+          else if (key === "ArrowDown") ni = Math.min(idx + cols, this.displayItems.length - 1);
           else if (key === "ArrowUp") ni = Math.max(idx - cols, 0);
         } else {
-          if (key === "ArrowDown" || key === "ArrowRight") ni = Math.min(idx + 1, this.items.length - 1);
+          if (key === "ArrowDown" || key === "ArrowRight") ni = Math.min(idx + 1, this.displayItems.length - 1);
           else ni = Math.max(idx - 1, 0);
         }
-        if (ni !== idx) this.selArr = [this.items[ni].id];
+        if (ni !== idx) this.selArr = [this.displayItems[ni].id];
         this.$nextTick(() => {
-          const el = document.querySelector(`[data-id="${this.items[ni]?.id}"]`);
+          const el = document.querySelector(`[data-id="${this.displayItems[ni]?.id}"]`);
           el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
         });
         return;
@@ -1724,7 +1948,7 @@ const GalleryPage = {
         e.preventDefault(); e.stopPropagation();
         const color = colorKeys[key];
         API.batchUpdate({ action: "color_label", value: color, ids: [...this.selArr] }).then(() => {
-          this.selArr.forEach(id => { const m = this.items.find(i => i.id === id); if (m) m.color_label = color; });
+          this.selArr.forEach(id => { const m = this.allMediaItems.find(i => i.id === id); if (m) m.color_label = color; });
         });
         return;
       }
@@ -1732,7 +1956,7 @@ const GalleryPage = {
       if (key >= "1" && key <= "5" && this.selArr.length) {
         e.preventDefault(); e.stopPropagation();
         API.batchUpdate({ action: "rate", value: parseInt(key), ids: [...this.selArr] }).then(() => {
-          this.selArr.forEach(id => { const m = this.items.find(i => i.id === id); if (m) m.rating = parseInt(key); });
+          this.selArr.forEach(id => { const m = this.allMediaItems.find(i => i.id === id); if (m) m.rating = parseInt(key); });
         });
         return;
       }
@@ -1741,11 +1965,12 @@ const GalleryPage = {
         if (!this.selArr.length) return;
         e.preventDefault(); e.stopPropagation();
         const id = this.selArr[0];
-        const m = this.items.find(i => i.id === id);
+        const m = this.allMediaItems.find(i => i.id === id);
         if (!m) return;
         const val = m.favorite ? 0 : 1;
         API.batchUpdate({ action: "favorite", value: val, ids: [...this.selArr] }).then(() => {
-          this.selArr.forEach(sid => { const sm = this.items.find(i => i.id === sid); if (sm) sm.favorite = val; });
+          this.selArr.forEach(sid => { const sm = this.allMediaItems.find(i => i.id === sid); if (sm) sm.favorite = val; });
+          if (this.stackActive) this.refreshAfterDetail();
         });
         return;
       }
@@ -1771,7 +1996,7 @@ const GalleryPage = {
         this.confirmBatch.show = true;
       } else {
         const id = this.selArr[0];
-        const m = this.items.find(i => i.id === id);
+        const m = this.allMediaItems.find(i => i.id === id);
         this.confirmDelete = { show: true, id, name: m ? m.file_name : "" };
       }
     },
@@ -1884,7 +2109,7 @@ const GalleryPage = {
         "glm-4.6v-flash": "智谱 GLM-4.6V-Flash", "glm-4.6v-flashx": "智谱 GLM-4.6V-FlashX",
         "glm-4.5v": "智谱 GLM-4.5V",
       };
-      const selected = this.items.filter(m => this.selArr.includes(m.id));
+      const selected = this.allMediaItems.filter(m => this.selArr.includes(m.id));
       const videos = selected.filter(m => m.media_type === 'video');
       const images = selected.filter(m => m.media_type === 'image');
       const audios = selected.filter(m => m.media_type === 'audio');
@@ -1898,6 +2123,8 @@ const GalleryPage = {
         imageModel: s.image_engine === 'local' ? (s.local_model || 'qwen3-vl-8b') : (modelLabels[s.image_model] || s.image_model),
         musicModel: s.music_model || 'qwen3-omni-30b-a3b',
         existingAction: analyzed.length > 0 ? 'skip' : 'reanalyze',
+        organizeTags: localStorage.getItem('organizeAnalysisTags') === 'true',
+        organizePeople: localStorage.getItem('organizeAnalysisPeople') === 'true',
       };
       this.showBatchAnalysisDialog = true;
     },
@@ -1905,6 +2132,10 @@ const GalleryPage = {
       // Save ids and options BEFORE clearing selection
       this._pendingBatchIds = [...this.selArr];
       this._pendingBatchSkipDone = this.batchAnalysisInfo.existingAction === 'skip';
+      this._pendingOrganizeTags = !!this.batchAnalysisInfo.organizeTags;
+      this._pendingOrganizePeople = !!this.batchAnalysisInfo.organizePeople;
+      localStorage.setItem('organizeAnalysisPeople',String(this._pendingOrganizePeople));
+      localStorage.setItem('organizeAnalysisTags', String(this._pendingOrganizeTags));
 
       // Ensure bg-task-bar is in DOM (needed for FLIP target)
       const root = this.$root;
@@ -1945,17 +2176,19 @@ const GalleryPage = {
       const root = this.$root;
       const ids = this._pendingBatchIds || [];
       const skipDone = this._pendingBatchSkipDone;
+      const organizePeople = !!this._pendingOrganizePeople;
       this._pendingBatchIds = null;
       this.clearSelection();
 
       // Remove placeholder if present
       root.bgTasks = root.bgTasks.filter(t => t.id !== '__placeholder__');
 
-      const res = await API.startBatchAnalysis(ids, skipDone);
+      const res = await API.startBatchAnalysis(ids, skipDone, this._pendingOrganizeTags, organizePeople);
+      if (organizePeople) await root.reloadPeopleStatus();
       const submittedIds = res.submitted || [];
 
       for (const id of submittedIds) {
-        const m = this.items.find(i => i.id === id);
+        const m = this.allMediaItems.find(i => i.id === id);
         if (!m) continue;
         const oldIdx = root.bgTasks.findIndex(t => t.id === id);
         if (oldIdx >= 0) root.bgTasks.splice(oldIdx, 1);
@@ -1976,7 +2209,7 @@ const GalleryPage = {
     },
     findSimilar() {
       const id = this.selArr[0];
-      const m = this.items.find(i => i.id === id);
+      const m = this.allMediaItems.find(i => i.id === id);
       if (!m) return;
       this.similarDlg = { show: true, source: m, loading: true, similarType: 'near', near: [], similar: [], cluster: [] };
       API.getSimilar(id).then(res => {
@@ -2017,6 +2250,7 @@ const GalleryPage = {
         await API.addDupExclusions(pairs, dupType);
         const excludeSet = new Set(selectedIds);
         this.similarDlg[dupType] = this.similarDlg[dupType].filter(i => !excludeSet.has(i.id));
+        if (this.stackActive) await this.refreshAfterDetail();
         Quasar.Notify.create({ message: this.t('g.excluded_n', {n: selectedIds.length}), position: 'top', timeout: 1500 });
       } catch (e) {
         Quasar.Notify.create({ message: this.t('g.exclude_failed', {msg: e.message || e}), position: 'top', color: 'negative', timeout: 2000 });
@@ -2029,9 +2263,7 @@ const GalleryPage = {
         for (const key of ['near', 'similar', 'cluster']) {
           this.similarDlg[key] = this.similarDlg[key].filter(i => i.id !== id);
         }
-        this.items = this.items.filter(i => i.id !== id);
-        if (!this.$root.pickerMode) this.$root.galleryItems = this.items;
-        this.total--;
+        await this.removeDeletedItems([id]);
         Quasar.Notify.create({ message: this.t('g.n_removed', {name: this.similarDeleteConfirm.name}), position: 'top', timeout: 1500 });
       } catch (e) {
         Quasar.Notify.create({ message: this.t('g.remove_failed', {msg: e.message || e}), position: 'top', color: 'negative', timeout: 2000 });
@@ -2043,7 +2275,7 @@ const GalleryPage = {
     },
     async doCtxWriteXmp() {
       const ids = this.selArr.filter(id => {
-        const m = this.items.find(i => i.id === id);
+        const m = this.allMediaItems.find(i => i.id === id);
         return m && m.media_type === 'image';
       });
       if (!ids.length) {
@@ -2052,7 +2284,7 @@ const GalleryPage = {
       }
       try {
         const res = await API.batchWriteXmp(ids);
-        ids.forEach(id => { const m = this.items.find(i => i.id === id); if (m) m.has_xmp = 1; });
+        ids.forEach(id => { const m = this.allMediaItems.find(i => i.id === id); if (m) m.has_xmp = 1; });
         Quasar.Notify.create({ message: this.t('g.xmp_written', {n: res.count}), position: 'top', timeout: 1500 });
       } catch (e) {
         Quasar.Notify.create({ message: this.t('g.write_failed', {msg: e.message}), position: 'top', color: 'negative', timeout: 2000 });
@@ -2061,9 +2293,7 @@ const GalleryPage = {
     async doDelete() {
       try {
         await API.deleteMedia(this.confirmDelete.id);
-        this.items = this.items.filter(i => i.id !== this.confirmDelete.id);
-        if (!this.$root.pickerMode) this.$root.galleryItems = this.items;
-        this.total--;
+        await this.removeDeletedItems([this.confirmDelete.id]);
         Quasar.Notify.create({ message: this.t('g.n_removed', {name: this.confirmDelete.name}), position: 'top', color: 'dark', textColor: 'white', timeout: 1800 });
       } catch (e) {
         console.error("delete error:", e);
@@ -2075,14 +2305,25 @@ const GalleryPage = {
       const ids = [...this.selArr];
       try {
         for (const id of ids) await API.deleteMedia(id);
-        const set = new Set(ids);
-        this.items = this.items.filter(i => !set.has(i.id));
-        if (!this.$root.pickerMode) this.$root.galleryItems = this.items;
-        this.total -= ids.length;
+        await this.removeDeletedItems(ids);
         Quasar.Notify.create({ message: this.t('g.n_items_removed', {n: ids.length}), position: 'top', color: 'dark', textColor: 'white', timeout: 1800 });
       } catch (e) { console.error("batch delete error:", e); }
       this.selArr = [];
       this.confirmBatch.show = false;
+    },
+    async removeDeletedItems(ids) {
+      const removed = new Set(ids);
+      this.items = this.items.flatMap(item => {
+        if (!item.stack_items?.length) return removed.has(item.id) ? [] : [item];
+        const { stack_items, ...cover } = item;
+        const remaining = [cover, ...stack_items.slice(1)].filter(member => !removed.has(member.id));
+        if (!remaining.length) return [];
+        return [{ ...remaining[0], ...(remaining.length > 1 ? { stack_items: remaining } : {}) }];
+      });
+      this.selArr = this.selArr.filter(id => !removed.has(id));
+      this.total -= ids.length;
+      if (!this.$root.pickerMode) this.$root.galleryItems = this.allMediaItems;
+      if (this.stackActive) await this.refreshAfterDetail();
     },
     fmtDur,
     fmtSize,

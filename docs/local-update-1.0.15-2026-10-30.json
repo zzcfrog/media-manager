@@ -1,0 +1,160 @@
+{
+  "status": "complete",
+  "date": "2026-10-30",
+  "version": "1.0.15",
+  "previous_version": "1.0.14",
+  "authorization": "User explicitly requested production package and local application replacement",
+  "installed_application": "/Users/zack/Applications/映屿 · luminisle.app",
+  "installer": {
+    "path": "/Users/zack/program/python/video_analyzer/dist/Luminisle-1.0.15-arm64.dmg",
+    "bytes": 272357909,
+    "sha256": "6e30d188d0ade00b1187514b9df17a4141fd6d63d7958733997e97ea4a94d711"
+  },
+  "package": {
+    "version": "1.0.15",
+    "app_id": "com.zack.media-manager",
+    "frontend_files_identical": 36,
+    "no_private_database_or_model_weights": true,
+    "application_bytes": 665049561,
+    "dmg_bytes": 272357909
+  },
+  "migration_rehearsal": {
+    "health_version": "1.0.15",
+    "pid": 9920,
+    "old_tables_equal": {
+      "collection_items": true,
+      "collections": true,
+      "dup_exclusions": true,
+      "media": true,
+      "media_fts": true,
+      "media_segment": true,
+      "media_tags": true,
+      "music_segment": true,
+      "project_media": true,
+      "project_tracks": true,
+      "projects": true,
+      "settings": true,
+      "tags": true
+    },
+    "new_tables": 26,
+    "new_column_order_ok": true,
+    "foreign_key_violations": 0,
+    "automatic_policies_default_off": true,
+    "production_database_untouched": true
+  },
+  "installed_validation": {
+    "health_version": "1.0.15",
+    "normal_profile_and_library": true,
+    "native_window_verified": true,
+    "new_entries_visible": true,
+    "existing_media_visible": 11835,
+    "projects_visible": 2,
+    "original_tables_equal": {
+      "collection_items": true,
+      "collections": true,
+      "dup_exclusions": true,
+      "media": true,
+      "media_fts": true,
+      "media_segment": true,
+      "media_tags": true,
+      "music_segment": true,
+      "project_media": true,
+      "project_tracks": true,
+      "projects": true,
+      "settings": true,
+      "tags": true
+    },
+    "new_tables": 26,
+    "new_column_order_ok": true,
+    "foreign_key_violations": 0,
+    "existing_files_verified": 14044,
+    "model_configuration_unchanged": true,
+    "automatic_upgrade_snapshot": "/Users/zack/Library/Application Support/Media Manager/library/upgrade-backups/20261030-185829-6abc537d.db",
+    "snapshot_matches_original": true,
+    "automatic_policies_default_off": true,
+    "signature_deep_strict": true
+  },
+  "frozen_classifier_smoke": {
+    "frozen_backend_real_pair_inference": "passed",
+    "feature_dimension": 768,
+    "formal_labels_without_review": 0,
+    "paid_ai_or_cloud": false,
+    "only_synthetic_preview_used": true
+  },
+  "diagnostic": {
+    "initial_launch_used_temporary_library": true,
+    "cause": "The installation helper passed its own MEDIA_MANAGER_HOME override to open.",
+    "temporary_instance_stopped": true,
+    "original_library_unchanged_during_that_attempt": true,
+    "resolution": "Removed the temporary launch environment override and started the same installed 1.0.15 normally.",
+    "automatic_rollback_or_restore": false
+  },
+  "retained_recovery": {
+    "previous_application": "/Users/zack/program/python/video_analyzer/build/release-1.0.15/previous-1.0.14.app",
+    "pre_install_database": "/Users/zack/program/python/video_analyzer/build/release-1.0.15/pre-install.db",
+    "automatic_snapshot": "/Users/zack/Library/Application Support/Media Manager/library/upgrade-backups/20261030-185829-6abc537d.db"
+  },
+  "limitations": [
+    "Independent semantic accuracy and real foreground/model resource contention are not certified by this update.",
+    "Automatic classification/refinement/application policies remain default off.",
+    "Local ad-hoc signature; no Developer ID notarization."
+  ],
+  "safety": {
+    "original_media_or_model_files_modified": false,
+    "real_library_relabeling": false,
+    "paid_ai_or_cloud": false,
+    "committed_or_pushed": false
+  },
+  "cleanup": {
+    "removed_generated_paths": [
+      {
+        "path": "build/pyinstaller",
+        "logical_bytes": 116322717
+      },
+      {
+        "path": "build/runtime",
+        "logical_bytes": 316825378
+      },
+      {
+        "path": "build/tools",
+        "logical_bytes": 101211590
+      },
+      {
+        "path": "dist/mac-arm64",
+        "logical_bytes": 665049561
+      },
+      {
+        "path": "dist/Luminisle-1.0.15-arm64.zip",
+        "logical_bytes": 272053514
+      },
+      {
+        "path": "dist/Luminisle-1.0.15-arm64.zip.blockmap",
+        "logical_bytes": 283450
+      },
+      {
+        "path": "dist/Luminisle-1.0.15-arm64.dmg.blockmap",
+        "logical_bytes": 285364
+      },
+      {
+        "path": "dist/builder-debug.yml",
+        "logical_bytes": 936
+      },
+      {
+        "path": "build/release-1.0.15/rehearsal-library",
+        "logical_bytes": 196964699
+      },
+      {
+        "path": "build/release-1.0.15/baseline",
+        "logical_bytes": 98365440
+      }
+    ],
+    "retained_installer": "dist/Luminisle-1.0.15-arm64.dmg",
+    "retained_recovery": {
+      "previous_application": "/Users/zack/program/python/video_analyzer/build/release-1.0.15/previous-1.0.14.app",
+      "pre_install_database": "/Users/zack/program/python/video_analyzer/build/release-1.0.15/pre-install.db",
+      "automatic_snapshot": "/Users/zack/Library/Application Support/Media Manager/library/upgrade-backups/20261030-185829-6abc537d.db"
+    },
+    "failed_initial_diagnostic_preserved": true,
+    "old_existing_backups_deleted": false
+  }
+}
