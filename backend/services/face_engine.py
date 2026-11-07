@@ -1,9 +1,10 @@
-"""Offline SCRFD + ArcFace inference using external ONNX pairs; no downloads.
+"""Offline SCRFD + ArcFace inference using independently selected external ONNX files.
 
 Only numpy/Pillow and the existing ONNX runtime are needed. Model spaces include
 the exact weights and preprocessing revision. Results are observations, not names.
 """
 import hashlib
+import base64
 import io
 import json
 import math
@@ -18,7 +19,11 @@ from ..config import THUMB_DIR, RAW_EXTS, HEIF_EXTS
 
 PROFILES = {
     'buffalo_l': ('det_10g.onnx', 'w600k_r50.onnx'),
+    'buffalo_m': ('det_2.5g.onnx', 'w600k_r50.onnx'),
+    'buffalo_s': ('det_500m.onnx', 'w600k_mbf.onnx'),
+    'buffalo_sc': ('det_500m.onnx', 'w600k_mbf.onnx'),
     'raccoon_s': ('det_10g_wo.onnx', 'w600k_mbf.onnx'),
+    'raccoon_l': ('det_10g_wo.onnx', 'w600k_r50.onnx'),
 }
 _DEST = np.array([[38.2946,51.6963],[73.5318,51.5014],[56.0252,71.7366],
                   [41.5493,92.3655],[70.7299,92.2041]], dtype=np.float64)
@@ -61,16 +66,105 @@ def nms(boxes,scores,threshold=.4):
     return keep
 
 
-def model_info(directory,profile='buffalo_l'):
-    if profile not in PROFILES:raise ValueError('不支持的人脸模型组合')
-    if not str(directory).strip():raise FileNotFoundError('请先选择外部人脸模型目录')
-    root=Path(directory).expanduser().resolve()
-    paths=[root/name for name in PROFILES[profile]]
+def model_paths(directory,profile='buffalo_l',detector_path='',recognizer_path='',verifier_path='',verify_enabled=False):
+    if profile=='custom':
+        if not detector_path or not recognizer_path:raise FileNotFoundError('请选择检测与特征识别模型文件')
+        paths=[Path(detector_path).expanduser().resolve(),Path(recognizer_path).expanduser().resolve()]
+    else:
+        if profile not in PROFILES:raise ValueError('不支持的人脸模型组合')
+        if not str(directory).strip() and not (detector_path and recognizer_path):
+            raise FileNotFoundError('请分别选择人脸检测与身份特征模型')
+        root=Path(directory).expanduser().resolve() if str(directory).strip() else None
+        paths=[Path(path).expanduser().resolve() if path else root/name
+               for path,name in zip((detector_path,recognizer_path),PROFILES[profile])]
+    if verify_enabled:
+        if verifier_path:paths.append(Path(verifier_path).expanduser().resolve())
+        elif profile.startswith('raccoon_') and root:paths.append(root/'face_verifier_mnv2.onnx')
+        else:raise FileNotFoundError('已开启人脸复核，请选择复核模型文件')
+    return paths
+
+
+def validate_session(model,stage,trial=False):
+    """Validate the supported adapter contract, never infer training identity from a filename."""
+    inputs=model.get_inputs();outputs=model.get_outputs()
+    if len(inputs)!=1:raise ValueError('模型需为单输入的 RGB NCHW 格式')
+    meta=inputs[0];shape=meta.shape
+    if len(shape)!=4 or shape[1]!=3 or (isinstance(shape[0],int) and shape[0]!=1):
+        raise ValueError('模型需为单张 RGB NCHW 输入')
+    if stage=='detector':
+        size=640;expected=9
+    elif stage=='recognizer':size=112;expected=1
+    elif stage=='verifier':
+        size=shape[2];expected=1
+        if not isinstance(size,int) or size<=0 or size>1024 or shape[3]!=size:
+            raise ValueError('人脸复核模型需为固定方形输入')
+    else:raise ValueError('模型阶段无效')
+    if len(outputs)!=expected or any(isinstance(n,int) and n!=size for n in shape[2:]):
+        raise ValueError({'detector':'需兼容 SCRFD 640×640 九路输出与五点关键点',
+                          'recognizer':'需兼容 ArcFace 112×112、512维身份特征',
+                          'verifier':'需兼容 FaceVerifier 单人脸概率输出'}[stage])
+    if stage=='recognizer' and shape[2:]!=[112,112]:raise ValueError('身份特征输入尺寸需为112×112')
+    types=('tensor(uint8)','tensor(float)') if stage=='verifier' else ('tensor(float)',)
+    if meta.type not in types:raise ValueError('模型输入数据类型不兼容')
+    if trial:
+        pixels=np.zeros((1,3,size,size),dtype=np.uint8 if meta.type=='tensor(uint8)' else np.float32)
+        result=model.run(None,{meta.name:pixels})
+        if not all(np.isfinite(value).all() for value in result):raise ValueError('模型输出含无效数值')
+        if stage=='detector':
+            for i,stride in enumerate((8,16,32)):
+                count=(640//stride)**2*2
+                for offset,width in ((0,1),(3,4),(6,10)):
+                    if np.asarray(result[i+offset]).shape not in ((count,width),(1,count,width)):
+                        raise ValueError('SCRFD 输出布局与五点关键点不兼容')
+        elif stage=='recognizer':
+            vector=normalized(result[0])
+            if len(vector)!=512:raise ValueError('身份特征需为512维')
+        else:
+            value=np.asarray(result[0]).reshape(-1)
+            if len(value)!=1 or not 0<=value[0]<=1:raise ValueError('复核模型需输出单个人脸概率')
+    return {'input_shape':list(shape),'input_type':meta.type,'outputs':len(outputs)}
+
+
+def probe_model(path,stage):
+    """CPU-only synthetic input probe. Compatibility does not attest accuracy or provenance."""
+    import onnxruntime as ort
+    if stage not in ('detector','recognizer','verifier'):raise ValueError('模型阶段无效')
+    if not isinstance(path,str) or not path or not Path(path).expanduser().is_absolute():
+        raise ValueError('请选择 ONNX 模型的绝对路径')
+    file=Path(path).expanduser().resolve()
+    if file.suffix.lower()!='.onnx' or not file.is_file() or not 0<file.stat().st_size<=2<<30:
+        raise ValueError('请选择有效的 ONNX 模型文件（最大2GB）')
+    signature=(stage,str(file),file.stat().st_size,file.stat().st_mtime_ns)
+    with _lock:
+        cached=_cache.get(('probe',signature))
+        if cached:return dict(cached)
+    try:
+        options=ort.SessionOptions();options.intra_op_num_threads=2;options.log_severity_level=3
+        model=ort.InferenceSession(str(file),sess_options=options,providers=['CPUExecutionProvider'])
+        result=validate_session(model,stage,trial=True)
+    except Exception as exc:
+        raise ValueError('模型接口核验失败：'+str(exc)[:500]) from exc
+    digest=hashlib.sha256()
+    with file.open('rb') as source:
+        for block in iter(lambda:source.read(8<<20),b''):digest.update(block)
+    if signature!=(stage,str(file),file.stat().st_size,file.stat().st_mtime_ns):raise ValueError('模型文件发生变化，请重新核验')
+    result.update(compatible=True,stage=stage,fingerprint=digest.hexdigest(),path=str(file))
+    with _lock:
+        # Probe caching is bounded independently from the currently active engine.
+        if sum(k[0]=='probe' for k in _cache if isinstance(k,tuple))>=64:
+            for key in list(_cache):
+                if isinstance(key,tuple) and key[0]=='probe':del _cache[key]
+        _cache[('probe',signature)]=dict(result)
+    return result
+
+
+def model_info(directory,profile='buffalo_l',**options):
+    paths=model_paths(directory,profile,**options)
     if not all(p.is_file() and p.stat().st_size for p in paths):
-        raise FileNotFoundError('缺少匹配的人脸检测和识别 ONNX 文件')
+        raise FileNotFoundError('缺少已选择的人脸模型文件：'+', '.join(p.name for p in paths if not p.is_file() or not p.stat().st_size))
     signature=tuple((str(p),p.stat().st_size,p.stat().st_mtime_ns) for p in paths)
     with _lock:
-        prior=_cache.get(('info',str(root),profile))
+        prior=_cache.get(('info',profile,tuple(map(str,paths))))
         if prior and prior['signature']==signature:return prior
     digest=hashlib.sha256(('scrfd-arcface-rgb-pillow-v1:'+profile).encode())
     for path in paths:
@@ -80,7 +174,7 @@ def model_info(directory,profile='buffalo_l'):
           'bytes':sum(p.stat().st_size for p in paths)}
     if signature!=tuple((str(p),p.stat().st_size,p.stat().st_mtime_ns) for p in paths):
         raise FileNotFoundError('模型加载期间发生变化，请重试')
-    with _lock:_cache[('info',str(root),profile)]=info
+    with _lock:_cache[('info',profile,tuple(map(str,paths)))]=info
     return info
 
 
@@ -102,9 +196,33 @@ class FaceEngine:
                 return ort.InferenceSession(str(path),sess_options=options,providers=['CPUExecutionProvider'])
         self.detector=session(info['paths'][0])
         self.recognizer=session(info['paths'][1])
-        if len(self.detector.get_outputs())!=9:raise ValueError('需要带五点关键点的 SCRFD 检测器')
-        if self.recognizer.get_inputs()[0].shape[-2:]!=[112,112]:raise ValueError('人脸识别器输入尺寸不兼容')
+        self.verifier=session(info['paths'][2]) if len(info['paths'])>2 else None
+        validate_session(self.detector,'detector')
+        validate_session(self.recognizer,'recognizer')
+        if self.verifier:validate_session(self.verifier,'verifier')
         self.info=info
+
+    def verify(self,image,box):
+        """Raccoon FaceVerifier scores face/non-face crops, not identity or liveness."""
+        model=getattr(self,'verifier',None)
+        if model is None:return True
+        return self.verify_crop(self.verification_crop(image,box))
+
+    def verification_crop(self,image,box):
+        model=self.verifier
+        meta=model.get_inputs()[0];size=meta.shape[-1]
+        x,y,x2,y2=map(float,box);side=max(2.,x2-x,y2-y)*1.3
+        cx,cy=(x+x2)/2,(y+y2)/2
+        return image.convert('RGB').transform((size,size),Image.Transform.AFFINE,
+             (side/size,0,cx-side/2,0,side/size,cy-side/2),resample=Image.Resampling.BILINEAR)
+
+    def verify_crop(self,crop):
+        model=self.verifier;meta=model.get_inputs()[0]
+        pixels=np.asarray(crop,dtype=np.uint8).transpose(2,0,1)[None]
+        if meta.type=='tensor(float)':pixels=pixels.astype(np.float32)
+        score=np.asarray(model.run(None,{meta.name:pixels})[0]).reshape(-1)
+        if len(score)!=1 or not np.isfinite(score).all() or not 0<=score[0]<=1:raise ValueError('人脸复核模型输出应为单个人脸概率')
+        return bool(score[0]>=.5)
 
     def detect(self,image):
         image=image.convert('RGB');width,height=image.size
@@ -132,37 +250,55 @@ class FaceEngine:
         return [{'box':boxes[i],'points':points[i],'score':float(scores[i])} for i in nms(boxes,np.asarray(scores))[:100]
                 if boxes[i,2]>boxes[i,0] and boxes[i,3]>boxes[i,1]]
 
+    def prepare_face(self,image,face,frame_time=None,include_verifier=False,include_portrait=False):
+        """Align and score without invoking either identity or verification networks."""
+        width,height=image.size;x,y,x2,y2=face['box'];w=x2-x;h=y2-y
+        matrix=np.vstack([alignment_matrix(face['points']),[0,0,1]])
+        inverse=np.linalg.inv(matrix)
+        crop=image.convert('RGB').transform((112,112),Image.Transform.AFFINE,
+                   tuple(inverse[:2].reshape(-1)),resample=Image.Resampling.BILINEAR)
+        gray=np.asarray(crop.convert('L'),dtype=np.float32)
+        sharpness=float(np.var(np.diff(gray,axis=0))+np.var(np.diff(gray,axis=1)))
+        quality=min(1.,min(w,h)/64)*min(1.,sharpness/50)*face['score']
+        prepared={'frame_time':frame_time,'bbox':[float(x/width),float(y/height),float(w/width),float(h/height)],
+                  'score':face['score'],'quality':float(quality),'crop':crop,'_eligible':min(w,h)>=24 and sharpness>=8}
+        if include_portrait:
+            side=min(384,max(112,round(min(w,h))))
+            portrait_transform=inverse[:2].copy();portrait_transform[:,:2]*=112/side
+            prepared['portrait']=image.convert('RGB').transform((side,side),Image.Transform.AFFINE,
+                 tuple(portrait_transform.reshape(-1)),resample=Image.Resampling.BICUBIC)
+        if include_verifier and getattr(self,'verifier',None) is not None:
+            prepared['_verification_crop']=self.verification_crop(image,face['box'])
+        return prepared
+
+    def embed_face(self,prepared,feature_cache=None,verified=False):
+        if not verified and getattr(self,'verifier',None) is not None:
+            if not self.verify_crop(prepared['_verification_crop']):return None
+        result={key:value for key,value in prepared.items() if not key.startswith('_')};vector=None
+        if prepared['_eligible']:
+            crop=prepared['crop'];key=hashlib.sha256(crop.tobytes()).hexdigest()
+            vector=feature_cache.get(key) if feature_cache is not None else None
+            if vector is None:
+                pixels=(np.asarray(crop,dtype=np.float32)-127.5)/127.5
+                vector=normalized(self.recognizer.run(None,{self.recognizer.get_inputs()[0].name:pixels.transpose(2,0,1)[None]})[0])
+                if feature_cache is not None:
+                    if len(feature_cache)>=256:feature_cache.pop(next(iter(feature_cache)))
+                    feature_cache[key]=vector
+            if len(vector)!=512:raise ValueError('人脸特征维度不兼容')
+        result['feature']=vector
+        return result
+
     def observe(self,image,frame_time=None,cancelled=lambda:False,feature_cache=None):
-        results=[];width,height=image.size
+        results=[]
         for face in self.detect(image):
             if cancelled():raise InterruptedError('人物整理已暂停')
-            x,y,x2,y2=face['box'];w=x2-x;h=y2-y
-            matrix=np.vstack([alignment_matrix(face['points']),[0,0,1]])
-            inverse=np.linalg.inv(matrix)
-            crop=image.convert('RGB').transform((112,112),Image.Transform.AFFINE,
-                       tuple(inverse[:2].reshape(-1)),resample=Image.Resampling.BILINEAR)
-            gray=np.asarray(crop.convert('L'),dtype=np.float32)
-            sharpness=float(np.var(np.diff(gray,axis=0))+np.var(np.diff(gray,axis=1)))
-            quality=min(1.,min(w,h)/64)*min(1.,sharpness/50)*face['score']
-            vector=None
-            if min(w,h)>=24 and sharpness>=8:
-                key=hashlib.sha256(crop.tobytes()).hexdigest()
-                vector=feature_cache.get(key) if feature_cache is not None else None
-                if vector is None:
-                    pixels=(np.asarray(crop,dtype=np.float32)-127.5)/127.5
-                    vector=normalized(self.recognizer.run(None,{self.recognizer.get_inputs()[0].name:pixels.transpose(2,0,1)[None]})[0])
-                    if feature_cache is not None:
-                        if len(feature_cache)>=256:feature_cache.pop(next(iter(feature_cache)))
-                        feature_cache[key]=vector
-                if len(vector)!=512:raise ValueError('人脸特征维度不兼容')
-            bbox=[float(x/width),float(y/height),float(w/width),float(h/height)]
-            results.append({'frame_time':frame_time,'bbox':bbox,'score':face['score'],
-                            'quality':float(quality),'feature':vector,'crop':crop})
+            if not self.verify(image,face['box']):continue
+            results.append(self.embed_face(self.prepare_face(image,face,frame_time,include_portrait=True),feature_cache,verified=True))
         return results
 
 
-def load_engine(directory,profile='buffalo_l'):
-    info=model_info(directory,profile)
+def load_engine(directory,profile='buffalo_l',**options):
+    info=model_info(directory,profile,**options)
     with _lock:
         current=_cache.get('engine')
         if current and current.info['key']==info['key']:return current
@@ -201,40 +337,57 @@ def _read_image(path):
         from pillow_heif import register_heif_opener
         register_heif_opener()
     if path.suffix.lower() in RAW_EXTS:
-        for tag in ('JpgFromRaw','PreviewImage','ThumbnailImage'):
-            result=subprocess.run(['exiftool','-b','-'+tag,str(path)],capture_output=True,timeout=15)
-            if result.returncode==0 and len(result.stdout)>100:
-                with Image.open(io.BytesIO(result.stdout)) as source:
-                    source.draft('RGB',(1600,1600))
-                    image=ImageOps.exif_transpose(source).convert('RGB');image.thumbnail((1600,1600))
-                    return image
-        raise FileNotFoundError('RAW 没有可用内嵌预览')
+        from .raw_preview import read_preview
+        return read_preview(path)
     with Image.open(path) as source:
         source.draft('RGB',(1600,1600))
         image=ImageOps.exif_transpose(source).convert('RGB');image.thumbnail((1600,1600))
         return image
 
 
-def read_frames(row,cache_root,cancelled,max_frames=24,revision=''):
+def read_frames(row,cache_root,cancelled,max_frames=24,revision='',video_settings=None):
     if cancelled():raise InterruptedError('人物整理已暂停')
     root=Path(cache_root);source=Path(row['file_path'])
     if row['media_type']=='image':
+        raw=source.suffix.lower() in RAW_EXTS
+        if raw:
+            from .raw_preview import cached_preview
+            cached=cached_preview(row)
+            if cached is not None:
+                try:
+                    with Image.open(cached) as image:return [(None,image.convert('RGB'))],'image_preview'
+                except (OSError,ValueError):pass
         preview=None
         if row.get('thumbnail_path'):
             path=(THUMB_DIR/row['thumbnail_path']).resolve()
             if path.is_relative_to(THUMB_DIR.resolve()) and path.is_file():
                 try:preview=_read_image(path)
                 except (OSError,ValueError):pass
-        if preview is not None and max(preview.size)>=800:return [(None,preview)],'image_preview'
+        if preview is not None and max(preview.size)>=(1600 if raw else 800):return [(None,preview)],'image_preview'
         if source.is_file():
             try:
                 image=_read_image(source)
                 return [(None,image)],'image_preview' if max(image.size)>=800 else 'image_preview_lowres'
             except (OSError,ValueError,subprocess.SubprocessError):
-                if preview is None:raise FileNotFoundError('图片解码失败，等待可用预览')
-        if preview is not None:return [(None,preview)],'image_preview_lowres'
-        raise FileNotFoundError('原文件离线且没有可用图片预览')
+                if raw:raise FileNotFoundError('RAW 高清预览不可用，请连接原片后重新识别')
+                raise FileNotFoundError('图片解码失败，等待原片或高清预览')
+        if raw:raise FileNotFoundError('RAW 原片离线且没有高清预览，请连接原片后重新识别')
+        raise FileNotFoundError('原文件离线且没有高清预览，请连接原片后重新识别')
     if row['media_type']!='video':raise ValueError('人物整理仅支持照片与视频')
+    if video_settings is not None:
+        from ..analyzer import iter_video_frames
+        from contextlib import closing
+        def sampled():
+            with closing(iter_video_frames(source,fps=video_settings['fps'],max_frames=video_settings['max_frames'],
+                         frame_res=video_settings['res'],cancelled=cancelled)) as windows:
+                for frames,_ in windows:
+                    for timestamp,encoded in frames:
+                        if cancelled():raise InterruptedError('人物整理已暂停')
+                        with Image.open(io.BytesIO(base64.b64decode(encoded.split(',',1)[1]))) as decoded:
+                            image=decoded.convert('RGB')
+                        yield timestamp,image
+        if not source.is_file():raise FileNotFoundError('视频离线，等待原文件')
+        return sampled(),'sampled_video'
     duration=row.get('duration') or 0
     budget=len(sample_times(duration,max_frames))
     rate=None

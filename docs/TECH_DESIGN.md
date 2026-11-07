@@ -2,6 +2,8 @@
 
 界面设计与后续 UI 变更统一参照 [UI 规范](UI-SPEC.md)。
 
+当前交付基线：1.0.24，2026-11-07。本文保留带日期的设计演进；当前模型选择及下载见[模型选择器](components/MODEL-SELECT.md)，人脸处理见[人脸扫描](PEOPLE-SCANNING.md)，后台调度见[后台任务](BACKGROUND-TASKS.md)。快速分类仅自动处理新导入照片，Google SigLIP 2提供17种托管规格；人脸支持InsightFace六款Buffalo／Raccoon套装和只读阶段卡片，视频采用动态跟踪及1／2／3fps取样、独立1080p／原片分辨率。旧封面快速分类、固定侦察帧、全局未来导入开关及整轮时间／内存预算描述仅属历史版本。
+
 ## 1. 技术栈
 
 | 层 | 技术 |
@@ -10,7 +12,7 @@
 | 前端 | Vue 3 (Options API), Quasar Framework (UMD) |
 | 数据库 | SQLite 3 + FTS5 全文搜索 |
 | 桌面端 | Electron 35.x |
-| AI/VLM | 智谱 AI GLM-4.6V（OpenAI 兼容 SDK） |
+| AI/VLM | 可配置云端供应商（OpenAI兼容SDK）与本地多模态模型，各分析能力可停用 |
 | ASR | faster-whisper large-v3（本地），插件架构支持扩展 |
 | 媒体处理 | ffmpeg/ffprobe, exiftool |
 | RAW 解码 | rawpy + Pillow |
@@ -799,19 +801,31 @@ PUT /api/workbench/<pid>/tracks（批量替换）
 - **并发分析竞态**（A3）：processing 状态防重复提交已实现，信号量控制 VLM API 并发
 - **JSON 解析失败处理**（A13）：应标记为 error 而非 done
 
+### 可选模型与导入整理（2026-11-06）
+
+backend/services/model_preferences.py集中读取显式启停。新增均为settings键值，不新增数据库列或迁移已有表：image_analysis_enabled、video_analysis_enabled、music_analysis_enabled、people_model_enabled、classification_model_enabled缺省true，以保持已有行为。图片/视频共享local_model，启停独立；主分析模型ID保留作上次配置，不启用通过独立开关表达。独立ASR及classification_omni_model使用none；语音不会预加载或重载none，音乐不会把none回退成Omni。设置保存严格校验新开关类型。
+
+分析单条/批量提交及队列线程入口校验启用状态；人脸/分类/关系入队、领取与执行取消检查也拒绝停用模型。sync_people_jobs和sync_classification_jobs将queued/running/waiting任务暂停并撤销租约，阻止迟到结果提交；重新启用仅重排具有该停用原因的任务。已进入主分析模型调用的任务不承诺瞬时终止，但之后的新提交及尚未执行的队列不会加载停用能力。已有分析和人工结果不删除；保存设置不创建全库扫描。
+
+GET /api/library/import-options只返回classification_enabled、people_enabled两个能力布尔值，不返回模型路径或API密钥。导入弹窗以读取代次隔离关闭/重开和迟到响应，失败禁用整理但允许普通导入；主设置保存后刷新仍打开的导入弹窗。classify_media仍为按次布尔选项，原子写入意图仅用于image；video和audio不再进入导入快速分类队列。人脸继续按people_media_type独立选择image/video/all。历史显式分类、AI结果映射和人工标签维护不受本次导入范围变更影响。
+
 ### 智能分类基线（2026-10-30，1.0.15本机交付）
 
 默认词库资源为backend/resources/default-taxonomy.v1.json，taxonomy_presets在新空库首次启动时幂等导入；已有树或预置标记则跳过，保留人工修改。词库安装不写素材关联，不排AI任务。维护工具必须显式指定资料库和待清理的无引用legacy标签，默认只读预览；应用停机锁内先快照，再单事务导入，按35张非词库表及非目标设置核对，失败留证不自动恢复。本机1.0.15已完成独立数据导入；空库初始化逻辑随下一次软件构建交付。
 
 分类增量使用 `backend/services/taxonomy.py` 的附属表，保持既有 tags/media_tags 及 ResNet 字段原状；taxonomy_nodes 以旧 tag ID 为概念 ID，显示名称与内部唯一存储名称分开。FTS、旧标签 API 和 XMP 导出读取显示名称。新表业务字段均在 created_at、updated_at 前，不调整已部署表的历史列序。
 
-本机 `/api/taxonomy` 处理树、人工决定、关系建议／人工锁、预览方案及原子变更、分组候选、素材／关系任务、独立验证档案、智能图集及例图。导入及分析结果同事务写轻量任务意图，提交后由 classification_jobs 执行。任务依据包含输入修订和实际文字匹配；显式请求可提高优先级，相关词库改变允许补跑，未变的已完成任务去重。未来孤立租约到期由恢复计时器唤醒，预算退出清理自己持有的租约，取消后拒绝迟到写回。
+本机 `/api/taxonomy` 处理树、人工决定、关系建议／人工锁、预览方案及原子变更、分组候选、素材／关系任务、独立验证档案、智能图集及例图。导入及分析结果同事务写轻量任务意图，提交后由 classification_jobs 执行。任务依据包含输入修订和实际文字匹配；显式请求可提高优先级，相关词库改变允许补跑，未变的已完成任务去重。未来孤立租约到期由恢复计时器唤醒，让路前台时撤销自己持有的租约并退回队列，取消后拒绝迟到写回。
 
-SigLIP2 Base/16 224 的外部配对 ONNX 已通过官方图文特征数值与真实CPU运行核验，应用不引入 torch/transformers；导出工具仅用于开发。中文识别描述、祖先语境和已生效别名组成文字依据，文字变化复用有效图片特征。Omni 复用本地引擎，不云回退。独立语义质量尚未验收；自动补标／自动关系分别默认关闭，且必须匹配人工真值验证档案才可应用，模型自评分不授予执行权。
+SigLIP2原始厂商为Google。后台固定清单backend/resources/siglip2-models.json登记全部17种规格：Base 6、Large 3、So400m 6、Giant-opt 2；固定分辨率15种使用ONNX Community导出，NaFlex 2种使用upshift完整图文配对导出。每种绑定revision、字节数、SHA-256、输出名、预处理及全部外部数据文件，前端不能注入下载源。下载后生成内部classification.json，加载支持768/1024/1152/1536维和224/256/384/512方形输入；NaFlex保留宽高比、最多256个16px patch，传入pixel_values/pixel_attention_mask/spatial_shapes，补零并校验输出维度。新清单显式配置小写文字、EOS及64个token；旧features清单继续可读。已有Base/16-224外部配对曾通过真实CPU数值核验；新增规格仅完成上游元数据/轻量图接口核对及小型ONNX端到端验证，未全量下载真实权重或评估准确率。应用不依赖torch/transformers。Omni仍复用本地引擎，不云回退；独立验证及自动应用策略不变。
+
+导入单文件及批量接口新增布尔classify_media，缺省false，严格拒绝字符串/数字等非布尔值。前端每次打开重置、开始时快照；导入成功的新照片在同事务登记fast任务意图，音频、重复跳过与取消不额外登记。旧classification_enabled设置保留读取兼容但不参与导入决策；后台在导入、AI分析及媒体播放结束后自动续跑，不再执行每轮资源预算，无数据库字段迁移。人脸界面仅上方可选择六个InsightFace套装，三阶段卡片只读且无路径/文件输入，整套下载自动绑定全部阶段；切换套装默认Buffalo关闭复核、Raccoon开启，显式用户覆盖保留，历史custom配置不静默重写。
+
+统一模型列表由 `frontend/js/model-select.js` 提供，人脸/分类下载分别使用 `face_model_downloads`、`classification_models`，Omni继续使用local_vlm下载。`model_store` 在模型根目录的faces/classification子目录保存相对文件、大小、修改时间及SHA-256记录；mtime变化时重新哈希，损坏或缺失不列为已安装。人脸settings KV保存 `people_<stage>_model`，快速分类保存 `classification_model_id`，实际使用时从当前根目录解析；外部路径以空模型ID区分，不重写用户独立路径。没有新增数据库列。下载不保存业务设置、不启动推理，下载中的任务参与桌面模型目录切换的忙碌检查。
 
 合并／拆分、自动标签和采纳的关系保留前后快照，撤销校验后续修改。新拆分目标在方案执行事务中创建，撤销后停用并保留ID。改映射审核使用目标识别含义及所选素材人工决定摘要，防止确认旧目标。新词拒绝按含义关闭，不作全库禁词。历史字段保留来源未知快照，新增字段编辑追踪AI／人工来源。
 
-时间与Python额外峰值预算可暂停本轮任务；后者不包含本地模型子进程，不能宣称总内存上限。例图缓存分块矩阵检索，保留每项预览修订核验，不混用ResNet特征；有有效文字向量时合并定义依据，否则返回definition_used=false。候选默认不自动清理，显式90天保留期清理只覆盖已拒绝／过期诊断候选。
+不再用墙钟预算或Python历史峰值增量结束分类轮次。旧键保留API兼容，但worker不使用；单次模型请求仍有独立超时。明确因旧预算暂停的任务自动恢复，手动暂停、取消和模型停用不被覆盖。例图缓存分块矩阵检索，保留每项预览修订核验，不混用ResNet特征；有有效文字向量时合并定义依据，否则返回definition_used=false。候选默认不自动清理，显式90天保留期清理只覆盖已拒绝／过期诊断候选。
 
 当前实施和未完成范围：[Kiro 实施进度](../.kiro/specs/smart-classification/implementation-progress-2026-10-30.md)。1.0.15正式包和本机升级已通过数据完整性验证；独立模型质量与真实总资源仍待验收，交付记录见local-update-1.0.15-2026-10-30.json。
 
@@ -847,14 +861,25 @@ SigLIP2 Base/16 224 的外部配对 ONNX 已通过官方图文特征数值与真
 
 ### 人物相册（2026-10-30，源码开发交付，生产尚未升级）
 
+2026-11-07后续源码：`raw_preview.py` 为RAW内嵌大JPEG／LibRaw回退与高清缓存共用实现；缓存键包含路径、文件大小及修改时间，原子发布并拒绝源文件变化，位于资料库 `raw-previews/`，现有完整迁移自然携带。导入仍生成320px网格图；大内嵌JPEG一次读取兼顾2560px缓存，不在导入额外做完整RAW解码。照片人脸识别不使用低清RAW网格图，展示头像与112px模型输入分开，视频候选采样内存不变。
+
+`people_similarity_threshold`（默认0.55）及 `people_adaptive_threshold`（默认true）复用settings KV，无表/列迁移。`people_grouping.py` 只读现有people_changes的最近100次有效人工操作，按模型空间计算有界校准，缓存仅保留操作修订与标量统计；撤销会使缓存失效。归组阈值不计入输入/模型任务修订，更改不丢弃队列。工作线程记录新观察时读取当前有效阈值，状态端点新增只读grouping摘要；身份相似度不是正确概率，现有人物不自动重新聚类。
+
 人物身份与普通标签分开，路由为 `#/people`、`#/people/unnamed|review|hidden` 和 `#/people/person/<id>`。人物图集复用 GalleryPage、筛选、检查器和详情来源恢复。`person_ids`、`exclude_person_ids`、`person_mode=any|all` 与标签、文件夹、喜欢等条件求交；计数按素材去重。
 
 `people.py` 管理 `people_persons/faces/media_decisions/face_exclusions/distinct/reviews/changes/plans` 八张附属表；`people_jobs.py` 管理持久队列。所有新表末尾是 `created_at,updated_at`，不重排已有表。人工确认、排除、暂不归组、误检及同名身份独立保存。重扫按输入版本、时间点和位置匹配，检测器的序号变化不能挪移已确认身份。自动关联保留固定锚点及按质量/ID选择的代表，避免候选相似度驱动的相似链漂移；模型空间由权重和预处理摘要隔离。
 
 `/api/people` 提供人物、素材关联、人脸纠正、合并预览/应用、撤销、核对、分页人脸封面、设置和任务端点。合并检测正向人脸成员与素材排除的冲突；撤销原位恢复已有记录，只删除本次新增行，核对后续状态并保留范围外排除。审核和封面分页有界，不把固定前200/100项当作全部。
 
-导入事务只登记人物任务，提交后启动 worker；默认关闭今后导入自动整理。手动范围可独立运行，历史全库需显式 `confirm_all=true`。单条/批量完整 AI 分析的 `organize_people` 仅附加本地人物队列，不向云端上传人脸。后台与快速分类共用 `background_work.inference_slot`，并观察现有导入/分析/播放忙碌信号；租约、续期、暂停/取消、重启恢复和输入/模型修订校验拒绝迟到写入。
+导入事务只登记人物任务，提交后启动worker；每次导入独立选择是否启用及图片／视频范围，不再设置全局“今后导入”开关。手动扫描可选整个已导入素材库或多个库内文件夹并递归子目录，支持跳过／覆盖已扫描项；全库确认由正常扫描提交语义表达，不再增加额外确认复选框。人物相关选择动作集中在人物页，图库完整AI分析保留，旧`organize_people`兼容入口只附加本地人物队列。后台与快速分类共用`background_work.inference_slot`，观察导入／分析／播放忙碌信号；租约、暂停／取消、重启恢复与输入／模型修订拒绝迟到写入。
 
-`face_engine.py` 直接用既有 numpy、Pillow、ONNX Runtime 加载外部 SCRFD+ArcFace 配对，支持 Buffalo L、Raccoon S，无下载、无额外训练框架。CoreML 初始化失败可回退 CPU；会话提供器列表不等于所有算子实际运行在硬件加速器。照片优先可用预览，必要时读原片/RAW内嵌预览；原片变更后要求更新素材，不能把旧人工脸关系套给新文件。视频先读取少量均匀侦察帧，再按画面变化和覆盖权重分配剩余预算；已知帧率量化观察时点，计划和实际帧按输入版本缓存，离线可复用。每个素材内相同对齐RGB人脸按像素摘要复用特征，避免重复推理，不依靠框位置相近推断身份。仅显示观察到的时间点，不宣称连续追踪、完整出场区间或完整检出。
+`face_engine.py`用numpy、Pillow和ONNX Runtime加载外部模型，不引入额外训练框架。套装下载由`face_model_downloads.py`管理固定来源、校验和模型根目录下的子目录；三阶段由套装确定，Buffalo默认复核关闭、Raccoon默认开启。CoreML初始化失败可回退CPU，会话提供器不代表所有算子实际硬件加速。RAW高清预览由`raw_preview.py`管理；离线人脸重扫不再用低清缩略图代替原片。视频由独立worker调用`video_people.py`，复用固定版本InsightFace PrivateFrame跟踪、切镜及代表脸选择；同轨迹身份共识保护人工结果，1fps不再受固定0.5秒分轨限制。每次连续出镜的代表脸上限默认4张，可调1～48张，不是每个视频的人数上限；不承诺全检出或完整真实出场区间。视频AI压缩与视频人脸分辨率独立，1080p短边缩放不放大小源，原片保留尺寸，均不写中间压缩视频。
 
 `people-cache/` 位于资料库内；裁切 JPEG 按内容摘要复用，帧按素材版本/时间点缓存。取消只清理本轮无当前或撤销记录引用的裁切。姓名、人工决定、特征及队列位于 SQLite，裁切/帧为相对缓存引用，现有完整迁移会携带该目录；外部模型不会因此复制进安装包。验证与实际限制见 [人物实施记录](product-design/people/implementation.md)。
+
+2026-11-06 Header后台任务统一：background_tasks.install由serve蓝图注册，GET /api/background-tasks只读聚合未完成分类阶段/关系、下载、构思及长请求生命周期，不返回请求体、路径、凭据或原始错误。类别控制撤销租约并执行模型停用门控；SSE直到关闭才释放，异常也释放。既有分析/ASR预加载和人脸适配保留，另接Electron迁移，共20类，见[后台任务](BACKGROUND-TASKS.md)。
+
+
+2026-11-06 B设置页：新增frontend/js/settings-layout.js的SettingsGroup/SettingsRow/SettingsHelp及共用本地下载状态展示，样式集中frontend/css/settings.css。AppearancePicker仅compact模式使用分组布局，工具栏浮层保留原样；RecognitionSettingsPanel沿用原草稿、下载上下文、异步代次与三阶段核验方法。模型选择/下载/移除事件和v-model绑定保留，未更改业务API或数据库结构。QTabPanels以flex收缩并由内部.q-panel.scroll统一滚动，固定底部动作；七页字段与分组参考UI规范1.31及components/SETTINGS.md。
+
+2026-11-07 设置固定外框：settings.css将对话框高度设为min(740px,100vh - 48px)，QTabPanels与内部QPanel以flex:1填满剩余空间，保持单一内部滚动。此调整仅涉及CSS及缓存版本，不变更配置保存、模型加载或业务接口；正常、加载、错误和七页切换使用同一外框。

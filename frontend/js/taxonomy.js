@@ -411,11 +411,12 @@ const TaxonomyAnalysisPreview = {
 const TaxonomyTools = {
   props: ['gallery'],
   components: {'taxonomy-plan-card': TaxonomyPlanCard,'taxonomy-analysis-preview':TaxonomyAnalysisPreview},
-  data: () => ({target: null, busy: false,
+  data: () => ({target: null, busy: false, menuOpen: false,
     clearExclusion: false, plan: null, showPlan: false, planRequest: null, resolutions: {},
     analysisPreview:null,analysisIds:[],showAnalysisPreview:false}),
   watch: {
-    '$root.route'() { this.showPlan = false; this.plan = null; this.planRequest = null; this.showAnalysisPreview = false; }
+    '$root.route'() { this.menuOpen = false; this.showPlan = false; this.plan = null; this.planRequest = null; this.showAnalysisPreview = false; },
+    'gallery.selArr'(value, previous = []) { if (value.length !== previous.length || value.some((id,index) => id !== previous[index])) this.menuOpen = false; }
   },
   beforeUnmount() { this.disposed = true; },
   methods: {
@@ -427,7 +428,7 @@ const TaxonomyTools = {
     async run(path, body, success) {
       if (this.busy) return; this.busy = true;
       try {
-        const result = await TaxonomyAPI(path, 'POST', body); await this.$root.reloadTaxonomy(); this.updateCounts(result);
+        const result = await TaxonomyAPI(path, 'POST', body); await this.$root.reloadTaxonomy(); this.updateCounts(result); this.menuOpen = false;
         if (success) Quasar.Notify.create({message: success});
         return result;
       } catch (error) { Quasar.Notify.create({message: error.message, type: 'negative'}); }
@@ -439,7 +440,7 @@ const TaxonomyTools = {
     async previewAnalysis() {
       if (this.busy || !this.gallery.selArr.length) return;
       const ids = [...this.gallery.selArr], route = this.$root.route; this.busy = true;
-      try { const preview = await TaxonomyAPI('/jobs/preview','POST',{media_ids:ids}); if (!this.disposed && this.$root.route === route) { this.analysisPreview = preview; this.analysisIds = ids; this.showAnalysisPreview = true; } }
+      try { const preview = await TaxonomyAPI('/jobs/preview','POST',{media_ids:ids}); if (!this.disposed && this.$root.route === route) { this.analysisPreview = preview; this.analysisIds = ids; this.menuOpen = false; this.showAnalysisPreview = true; } }
       catch (error) { Quasar.Notify.create({message:error.message,type:'negative'}); }
       finally { this.busy = false; }
     },
@@ -457,7 +458,7 @@ const TaxonomyTools = {
       try {
         const plan = await TaxonomyAPI('/decisions/preview', 'POST', body);
         if (this.disposed || this.$root.route !== route) return;
-        this.plan = plan; this.planRequest = body; this.resolutions = {}; this.showPlan = true;
+        this.plan = plan; this.planRequest = body; this.resolutions = {}; this.menuOpen = false; this.showPlan = true;
       } catch (error) { Quasar.Notify.create({message: error.message, type: 'negative'}); }
       finally { this.busy = false; }
     },
@@ -481,15 +482,19 @@ const TaxonomyTools = {
     },
   },
   template: `<div class="taxonomy-tools">
-    <template v-if="gallery.selArr.length && !$root.route.startsWith('#/classify')">
-      <taxonomy-tag-picker v-model="target" clearable :label="tt('为所选素材添加标签','Add tag to selection')"></taxonomy-tag-picker>
-      <q-btn flat dense :disable="!target || busy" @click="assign"><taxonomy-tag-icon style="width:18px;height:18px" class="q-mr-xs"></taxonomy-tag-icon>{{tt('添加标签','Add tag')}}</q-btn>
-      <q-btn flat dense icon="label_off" :disable="!target || busy" :label="tt('移除直接标签','Remove direct tag')" @click="previewRemoval('direct')"><q-tooltip>{{tt('仅移除直接关联，子标签仍会汇总到父级。','Only the direct association is removed. Descendant tags still roll up to the parent.')}}</q-tooltip></q-btn>
-      <q-btn flat dense :disable="!target || busy" :label="tt('排除此分类及子分类','Exclude category and descendants')" @click="previewRemoval('subtree')"></q-btn>
-      <q-checkbox v-model="clearExclusion" dense size="xs" :label="tt('添加时明确解除冲突排除','Clear conflicting exclusions when adding')"></q-checkbox>
-      <q-btn flat dense icon="auto_awesome" :disable="busy" :label="tt('整理已有分析','Organize analysis')" @click="previewAnalysis"></q-btn>
-      <q-btn flat dense :disable="busy" :label="tt('快速分类所选','Classify selection')" @click="run('/jobs',{media_ids:[...gallery.selArr],stage:'fast'},tt('已排队','Queued'))"></q-btn>
-    </template>
+    <q-btn flat dense no-caps class="taxonomy-actions-trigger" :class="{'is-active':menuOpen}" :disable="busy || !gallery.selArr.length" :loading="busy" :aria-label="tt('标签操作','Tag actions')" aria-haspopup="dialog" :aria-expanded="menuOpen">
+      <taxonomy-tag-icon></taxonomy-tag-icon><span>{{tt('标签','Tags')}}</span>
+      <q-menu v-model="menuOpen" class="taxonomy-selection-menu" role="dialog" :aria-label="tt('标签操作','Tag actions')" :aria-busy="busy" anchor="bottom right" self="top right" :offset="[0,8]" @keydown.stop @keydown.esc.capture.stop="menuOpen=false">
+        <header class="taxonomy-selection-heading"><h3>{{tt('标签','Tags')}}</h3><span>{{tt('已选 '+gallery.selArr.length+' 个素材',gallery.selArr.length+' media selected')}}</span><q-btn flat round dense icon="close" :aria-label="tt('关闭标签操作','Close tag actions')" @click="menuOpen=false"></q-btn></header>
+        <div class="taxonomy-selection-assign"><taxonomy-tag-picker v-model="target" clearable :disable="busy" :label="tt('选择标签','Choose tag')"></taxonomy-tag-picker>
+          <q-btn unelevated dense no-caps color="primary" :disable="!target || busy" :label="tt('添加标签','Add tag')" @click="assign"></q-btn></div>
+        <q-checkbox v-model="clearExclusion" dense size="xs" :disable="busy" :label="tt('添加时明确解除冲突排除','Clear conflicting exclusions when adding')"></q-checkbox>
+        <div class="taxonomy-selection-commands"><q-btn flat dense no-caps icon="label_off" :disable="!target || busy" :label="tt('移除直接标签','Remove direct tag')" @click="previewRemoval('direct')"><q-tooltip>{{tt('仅移除直接关联，子标签仍会汇总到父级。','Only the direct association is removed. Descendant tags still roll up to the parent.')}}</q-tooltip></q-btn>
+          <q-btn flat dense no-caps icon="block" :disable="!target || busy" :label="tt('排除此分类及子分类','Exclude category and descendants')" @click="previewRemoval('subtree')"></q-btn></div>
+        <div class="taxonomy-selection-commands taxonomy-selection-processing"><q-btn flat dense no-caps icon="auto_awesome" :disable="busy" :label="tt('整理已有分析','Organize analysis')" @click="previewAnalysis"></q-btn>
+          <q-btn flat dense no-caps icon="category" :disable="busy" :label="tt('快速分类所选','Classify selection')" @click="run('/jobs',{media_ids:[...gallery.selArr],stage:'fast'},tt('已排队','Queued'))"></q-btn></div>
+      </q-menu>
+    </q-btn>
     <q-dialog v-model="showPlan"><taxonomy-plan-card :plan="plan" :busy="busy" :resolutions="resolutions" @resolve="resolutions[$event.key]=$event.value" @repreview="repreview" @apply="applyPlan" @close="showPlan=false"></taxonomy-plan-card></q-dialog>
     <q-dialog v-model="showAnalysisPreview"><taxonomy-analysis-preview :preview="analysisPreview" :busy="busy" @confirm="confirmAnalysis" @close="showAnalysisPreview=false"></taxonomy-analysis-preview></q-dialog>
   </div>`
@@ -498,7 +503,7 @@ const TaxonomyTools = {
 const TaxonomyPage = {
   components: {'taxonomy-plan-card': TaxonomyPlanCard,'taxonomy-analysis-preview':TaxonomyAnalysisPreview},
   data: () => ({
-    tab: 'edit', form: {}, busy: false, error: '', aliases: '',
+    tab: 'edit', form: {}, busy: false, error: '', aliases: '', treeExpanded: [], treeInitialized: false,
     candidates: [], candidatesSelected: [], selectedCandidateRows: {}, reviewState: 'pending', reviewPage: 1, reviewPerPage: 20,
     groups: [], groupTotal: 0, activeGroup: null, candidatePage: 1, candidatePerPage: 48, candidateTotal: 0,
     reviewTarget: null, protectedBaseline: false, reviewRequest: null, showReviewRange: false, reviewNotice: '',
@@ -509,7 +514,7 @@ const TaxonomyPage = {
     target: null, splitTargets: [], splitAssignments: {}, newSplitTargets: [], nextSplitTargetId: -1,
     newSplitTarget: {name:'',parent_id:null,definition:''}, showNewSplitTarget: false,
     plan: null, showPlan: false, planRequest: null, resolutions: {}, lastChange: null,
-    config: {}, configLoaded: false, examples: [], found: [], findSelected: [], findPage: 1, findPerPage: 48,
+    examples: [], found: [], findSelected: [], findPage: 1, findPerPage: 48,
     relationships: [], relationshipLocks: [], relationshipSuggestions: [], relationshipState: 'pending',
     requests: {}, exampleNotice: '', aiPlanReason: '',
     validations: [], showValidation: false, validationForm: {kind:'association',model_key:'',tag_id:null,threshold:0.5},
@@ -519,7 +524,16 @@ const TaxonomyPage = {
   }),
   computed: {
     node() { return this.$root.taxonomyNodes.find(n => n.id === this.$root.taxonomySelected) || null; },
-    maintenanceOptions() { return this.$root.taxonomyNodes.map(n=>({label:n.path,value:n.id})); },
+    maintenanceTree() {
+      const nodes = new Map(this.$root.taxonomyNodes.map(n=>[n.id,{...n,label:n.name,children:[]}])), roots=[];
+      for (const node of nodes.values()) {
+        if (node.parent_id && nodes.has(node.parent_id)) nodes.get(node.parent_id).children.push(node);
+        else roots.push(node);
+      }
+      return roots;
+    },
+    maintenanceTabs() { return [{id:'edit',label:this.tt('标签内容','Tag details')},{id:'review',label:this.tt('标签建议','Suggestions')},
+      {id:'relationships',label:this.tt('关系整理','Relationships')},{id:'jobs',label:this.tt('后台任务','Tasks')},{id:'history',label:this.tt('变更历史','History')}]; },
     options() { return this.$root.taxonomyOptions.filter(n => n.value !== this.node?.id); },
     splitOptions() { return [...this.options,...this.newSplitTargets.map(target=>({label:this.tt('待建立：','To create: ')+target.name,value:target.id}))]; },
     pending() { return this.candidates; },
@@ -542,7 +556,14 @@ const TaxonomyPage = {
     }
   },
   watch: {
+    '$root.taxonomyNodes': {immediate:true, handler() {
+      if (!this.treeInitialized && this.maintenanceTree.length) {
+        this.treeExpanded=this.maintenanceTree.filter(n=>n.children.length).map(n=>n.id);this.treeInitialized=true;
+      }
+      this.revealMaintenanceNode();
+    }},
     node: {immediate: true, handler(node, old) {
+      this.revealMaintenanceNode();
       if (node && old && node.id === old.id && this.form.version !== node.version && ['name','definition','recognition_text','parent_id'].some(key => this.form[key] !== old[key])) {
         this.error = this.tt('标签已更新，你的编辑已保留；重载将放弃未保存内容。','Tag changed; your edits were retained. Reload discards unsaved edits.'); return;
       }
@@ -572,6 +593,26 @@ const TaxonomyPage = {
   methods: {
     tt: taxText,
     imageError: taxImageError,
+    revealMaintenanceNode() {
+      const byId=new Map(this.$root.taxonomyNodes.map(n=>[n.id,n])), expanded=new Set(this.treeExpanded), seen=new Set();
+      let node=byId.get(this.$root.taxonomySelected);
+      while (node?.parent_id && !seen.has(node.id)) { seen.add(node.id);expanded.add(node.parent_id);node=byId.get(node.parent_id); }
+      this.treeExpanded=[...expanded];
+      this.$nextTick(()=>this.$refs?.maintenanceTree?.$el.querySelector('[data-maintenance-tag="'+this.$root.taxonomySelected+'"]')?.scrollIntoView({block:'nearest'}));
+    },
+    chooseMaintenanceNode(id) { if (id != null) this.$root.nav('#/taxonomy/'+id); },
+    maintenanceTreeKeypress(event) {
+      if (![' ','Spacebar'].includes(event.key) || event.target.closest('.folder-tree-disclosure')) return;
+      const row=event.target.closest('.q-tree__node-header')?.querySelector('[data-maintenance-tag]');
+      if (row) { event.preventDefault();event.stopPropagation();this.chooseMaintenanceNode(Number(row.dataset.maintenanceTag)); }
+    },
+    maintenanceTabKeydown(event,index) {
+      const count=this.maintenanceTabs.length;
+      const next=event.key==='Home'?0:event.key==='End'?count-1:event.key==='ArrowRight'?(index+1)%count:event.key==='ArrowLeft'?(index+count-1)%count:null;
+      if (next===null) return;
+      event.preventDefault();this.tab=this.maintenanceTabs[next].id;
+      this.$nextTick(()=>this.$refs.maintenanceTabs.querySelectorAll('[role="tab"]')[next].focus());
+    },
     invalidate(key) { this.requests[key] = (this.requests[key] || 0)+1; return this.requests[key]; },
     current(key, token, tagId) { return !this.disposed && this.requests[key] === token && (tagId === undefined || this.node?.id === tagId); },
     async act(fn) {
@@ -587,11 +628,6 @@ const TaxonomyPage = {
         if (tab === 'review') await this.loadGroups();
         if (tab === 'relationships') await this.loadRelationships();
         if (tab === 'jobs') {
-          if (!this.configLoaded) {
-            const config = await TaxonomyAPI('/configuration');
-            if (!this.current('refresh', token) || this.tab !== tab) return;
-            this.config = config; this.configLoaded = true;
-          }
           const [result,relations] = await Promise.all([TaxonomyAPI('/jobs'),TaxonomyAPI('/relationships/jobs')]);
           if (this.current('refresh', token) && this.tab === tab) { this.jobs = result.data; this.relationshipJobs = relations.data; }
         }
@@ -938,7 +974,6 @@ const TaxonomyPage = {
       return this.tt({association:'素材标签',alias:'同义表达',near:'近义',related:'相关',duplicate:'建议合并',merge:'建议合并',parent:'建议父类'}[value] || '关系建议', {association:'Media label',alias:'Alias',near:'Near synonym',related:'Related',duplicate:'Suggested merge',merge:'Suggested merge',parent:'Suggested parent'}[value] || 'Relationship suggestion');
     },
     nodePath(id) { return this.$root.taxonomyNodes.find(node => node.id === id)?.path || '#'+id; },
-    saveConfiguration() { const config = {...this.config}; this.act(async () => { await TaxonomyAPI('/configuration', 'PATCH', config); Quasar.Notify.create({message: this.tt('设置已保存，适用于之后的导入和后台任务','Saved for future imports and background tasks')}); }); },
     previewCandidateCleanup() { const tab = this.tab;this.act(async()=>{const result = await TaxonomyAPI('/candidates/cleanup','POST',{});if (this.disposed || this.tab !== tab) return;this.cleanupPreview = result;this.showCandidateCleanup = true;}); },
     confirmCandidateCleanup() {
       if (!this.cleanupPreview?.count) return;
@@ -968,33 +1003,47 @@ const TaxonomyPage = {
     jobState(value) { return this.tt({queued:'排队',running:'运行中',paused:'已暂停',waiting:'等待资源或素材',failed:'失败',done:'已完成',cancelled:'已取消',stale:'依据已变化'}[value] || value, value); }
   },
   template: `<div class="taxonomy-page">
-    <div class="taxonomy-page-tabs"><q-tabs v-model="tab" dense align="left" no-caps>
-      <q-tab name="edit" :label="tt('标签内容','Tag details')"></q-tab><q-tab name="review" :label="tt('标签建议','Suggestions')"></q-tab>
-      <q-tab name="relationships" :label="tt('关系整理','Relationships')"></q-tab><q-tab name="jobs" :label="tt('后台任务','Background tasks')"></q-tab><q-tab name="history" :label="tt('变更历史','History')"></q-tab>
-    </q-tabs><q-btn flat dense icon="add" :label="tt('新增标签','New tag')" @click="create()"></q-btn></div>
+    <aside class="taxonomy-maintenance-browser" :aria-label="tt('标签内容树','Tag content tree')">
+      <div class="taxonomy-tree-toolbar"><span><taxonomy-tag-icon></taxonomy-tag-icon>{{tt('标签内容','Tags')}}</span><q-btn flat dense no-caps icon="add" :label="tt('新增标签','New tag')" :disable="busy" @click="create()"></q-btn></div>
+      <div class="taxonomy-maintenance-tree-scroll">
+        <q-tree v-if="maintenanceTree.length" ref="maintenanceTree" class="folder-tree taxonomy-maintenance-tree" :nodes="maintenanceTree" node-key="id" dense no-connectors :expanded="treeExpanded" @update:expanded="treeExpanded=$event"
+          :selected="$root.taxonomySelected" @update:selected="chooseMaintenanceNode" @keydown.stop @keypress.capture="maintenanceTreeKeypress">
+          <template #default-header="p"><div class="folder-tree-entry">
+            <button v-if="p.node.children.length" class="folder-tree-disclosure" type="button" @click.stop="p.expanded=!p.expanded" @keydown.stop @keypress.stop :aria-expanded="p.expanded" :aria-label="tt('展开或收起 '+p.node.name,'Expand or collapse '+p.node.name)"><svg viewBox="0 0 20 20" :class="{'is-expanded':p.expanded}"><path d="m7.5 4.5 5.5 5.5-5.5 5.5"/></svg></button><span v-else class="folder-tree-disclosure-spacer"></span>
+            <div class="folder-tree-item" :data-maintenance-tag="p.node.id"><taxonomy-tag-icon class="taxonomy-node-icon"></taxonomy-tag-icon><span class="folder-tree-label">{{p.node.name}}</span><span v-if="p.node.status!=='active'" class="taxonomy-tree-state" :title="tt(p.node.status==='paused'?'已暂停':'已停用',p.node.status==='paused'?'Paused':'Inactive')"><q-icon :name="p.node.status==='paused'?'pause_circle_outline':'block'" size="13px"></q-icon></span><q-tooltip>{{p.node.path}}</q-tooltip></div>
+          </div></template>
+        </q-tree>
+        <div v-else-if="$root.taxonomyLoading" class="taxonomy-tree-empty" role="status"><q-spinner size="24px"></q-spinner><p>{{tt('正在读取标签树…','Loading tag tree…')}}</p></div>
+        <div v-else class="taxonomy-tree-empty"><q-icon name="account_tree" size="28px"></q-icon><p>{{tt($root.taxonomyError?'标签树暂时无法读取':'还没有标签',$root.taxonomyError?'Tag tree unavailable':'No tags yet')}}</p></div>
+      </div>
+    </aside>
+    <section class="taxonomy-maintenance-detail" :aria-label="tt('标签维护内容','Tag maintenance content')">
+    <div class="taxonomy-page-tabs" role="tablist" :aria-label="tt('标签维护功能','Tag maintenance sections')" ref="maintenanceTabs" v-sliding-segments="tab">
+      <q-btn v-for="(item,index) in maintenanceTabs" :key="item.id" flat dense no-caps role="tab" :id="'taxonomy-tab-'+item.id" aria-controls="taxonomy-maintenance-panel" :aria-selected="tab===item.id" :aria-pressed="tab===item.id" :tabindex="tab===item.id?0:-1" :label="item.label" @click="tab=item.id" @keydown="maintenanceTabKeydown($event,index)"></q-btn>
+    </div>
+    <div class="taxonomy-detail-scroll" role="tabpanel" id="taxonomy-maintenance-panel" :aria-labelledby="'taxonomy-tab-'+tab">
     <div v-if="$root.taxonomyError" role="alert" class="taxonomy-error">{{$root.taxonomyError}}<q-btn flat dense icon="refresh" :aria-label="tt('重试标签树','Retry tag tree')" @click="$root.reloadTaxonomy()"></q-btn></div>
     <div v-if="error" role="alert" class="taxonomy-error">{{error}}<q-btn flat dense icon="refresh" :aria-label="tt('重载当前内容','Reload current content')" @click="refresh"></q-btn></div>
     <q-linear-progress v-if="busy" indeterminate></q-linear-progress>
-    <div v-if="tab==='edit' || tab==='relationships'" class="taxonomy-maintenance-select"><taxonomy-tag-picker :model-value="$root.taxonomySelected" :options="maintenanceOptions" :label="tt('选择维护的标签','Choose a tag to maintain')" @update:model-value="$root.nav('#/taxonomy/'+($event || ''))"></taxonomy-tag-picker></div>
-    <div v-if="tab==='edit'" class="taxonomy-editor">
+    <div v-if="tab==='edit'" class="taxonomy-editor taxonomy-content-editor">
       <template v-if="node">
-        <div class="taxonomy-hint">{{node.path}} · {{tt(node.status==='active'?'可用于自动分类':'自动分配已暂停',node.status==='active'?'Available to automatic classification':'Automatic assignment paused')}}</div>
+        <div class="taxonomy-node-heading"><div class="taxonomy-node-title"><span class="taxonomy-node-emblem"><taxonomy-tag-icon></taxonomy-tag-icon></span><div><h2>{{node.name}}</h2><p>{{node.path}}</p></div></div><q-btn flat dense icon="photo_library" :aria-label="tt('查看图集','Browse media')" @click="$root.nav('#/classify/'+node.id)"><q-tooltip>{{tt('查看图集','Browse media')}}</q-tooltip></q-btn><q-btn unelevated no-caps color="primary" icon="check" :label="tt('保存','Save')" @click="save" :loading="busy"></q-btn></div>
+        <section class="taxonomy-edit-section"><div class="taxonomy-section-heading"><h3>{{tt('基本信息','Basic information')}}</h3><span class="taxonomy-node-status"><q-icon :name="node.status==='active'?'check_circle_outline':'pause_circle_outline'" size="13px"></q-icon>{{tt(node.status==='active'?'自动分配可用':node.status==='paused'?'自动分配已暂停':'已停用',node.status==='active'?'Assignment available':node.status==='paused'?'Assignment paused':'Inactive')}}</span></div>
         <div class="taxonomy-form-grid"><q-input v-model="form.name" outlined dense :label="tt('标准名称','Canonical name')"></q-input>
           <taxonomy-tag-picker v-model="form.parent_id" :options="[{label:tt('一级标签','Root'),value:null},...options]" :label="tt('父级','Parent')"></taxonomy-tag-picker></div>
         <q-input v-model="form.definition" outlined dense type="textarea" autogrow :label="tt('定义与排除说明','Definition and exclusions')"></q-input>
         <q-input v-model="form.recognition_text" outlined dense :label="tt('识别描述（可选）','Recognition description (optional)')"></q-input>
-        <div class="taxonomy-actions"><q-btn unelevated color="primary" :label="tt('保存','Save')" @click="save" :disable="busy"></q-btn>
-          <q-btn flat :label="tt('新增子标签','New child')" @click="create(true)"></q-btn><q-btn flat :label="tt('查看图集','Browse media')" @click="$root.nav('#/classify/'+node.id)"></q-btn>
+        <div class="taxonomy-actions"><q-btn flat icon="add" :label="tt('新增子标签','New child')" @click="create(true)"></q-btn>
           <q-btn flat :label="tt(node.status==='active'?'暂停自动分配':'恢复自动分配',node.status==='active'?'Pause automatic assignment':'Resume assignment')" @click="setStatus(node.status==='active'?'paused':'active')"></q-btn>
-          <q-btn v-if="node.status!=='inactive'" flat :label="tt('预览停用','Preview deactivation')" @click="setStatus('inactive')"></q-btn></div>
-        <h3>{{tt('同义表达','Aliases')}}</h3><div class="taxonomy-actions"><q-chip v-for="alias in node.aliases || []" :key="alias.id" removable @remove="removeAlias(alias.id)">{{alias.text}}</q-chip></div>
+          <q-btn v-if="node.status!=='inactive'" flat :label="tt('预览停用','Preview deactivation')" @click="setStatus('inactive')"></q-btn></div></section>
+        <section class="taxonomy-edit-section"><h3>{{tt('同义表达','Aliases')}}</h3><div v-if="node.aliases?.length" class="taxonomy-actions taxonomy-aliases"><q-chip v-for="alias in node.aliases || []" :key="alias.id" removable @remove="removeAlias(alias.id)">{{alias.text}}</q-chip></div>
         <div class="taxonomy-actions"><q-input v-model="aliases" dense outlined :label="tt('增加同义表达','Add alias')"></q-input><q-btn flat icon="add" :aria-label="tt('保存同义表达','Save alias')" @click="alias" :disable="!aliases.trim() || busy"></q-btn>
-          <q-btn flat icon="auto_fix_high" :label="tt('AI 整理关系','Organize relationships')" @click="tab='relationships';organizeRelationships()" :disable="busy"></q-btn></div>
-        <h3>{{tt('合并与拆分','Merge and split')}}</h3>
+          <q-btn flat icon="auto_fix_high" :label="tt('AI 整理关系','Organize relationships')" @click="tab='relationships';organizeRelationships()" :disable="busy"></q-btn></div></section>
+        <section class="taxonomy-edit-section"><h3>{{tt('合并与拆分','Merge and split')}}</h3>
         <div class="taxonomy-actions"><taxonomy-tag-picker v-model="target" :options="options" :label="tt('合并到','Merge into')" style="min-width:220px"></taxonomy-tag-picker>
           <q-btn flat :label="tt('AI 建议合并目标','Suggest merge target')" @click="suggestPlan('merge')" :disable="busy"></q-btn><q-btn flat :label="tt('预览合并','Preview merge')" :disable="!target || busy" @click="preview('merge')"></q-btn></div>
-        <p v-if="aiPlanReason" class="taxonomy-hint">{{aiPlanReason}}</p>
-        <h3>{{tt('直接标注素材','Directly tagged media')}}</h3>
+        <p v-if="aiPlanReason" class="taxonomy-hint">{{aiPlanReason}}</p></section>
+        <section class="taxonomy-edit-section"><div class="taxonomy-section-heading"><h3>{{tt('直接标注素材','Directly tagged media')}}</h3><span>{{mediaTotal}}</span></div>
         <p class="taxonomy-hint">{{tt('所选素材 '+selectedMedia.length+' 项，包含从图库带来的明确选择。翻页不会自动选中新素材；未分配的素材保留原标签。',selectedMedia.length+' media selected, including explicit selections carried from the gallery. Changing pages never selects more media. Unassigned media retain the original tag.')}}</p>
         <div class="taxonomy-actions"><q-btn flat dense :label="tt('选择本页','Select this page')" @click="selectedMedia=[...new Set([...selectedMedia,...media.map(m=>m.id)])]"></q-btn><q-btn flat dense :label="tt('清空选择','Clear selection')" @click="selectedMedia=[]"></q-btn>
           <q-btn flat dense :label="tt('正例','Positive examples')" :disable="!selectedMedia.length || busy" @click="example('positive')"></q-btn><q-btn flat dense :label="tt('易混反例','Confusing negatives')" :disable="!selectedMedia.length || busy" @click="example('negative')"></q-btn>
@@ -1010,16 +1059,16 @@ const TaxonomyPage = {
           <q-virtual-scroll :items="selectedSplitRows" :virtual-scroll-item-size="60" class="taxonomy-assignment-list"><template #default="{item}"><div class="taxonomy-assignment" :key="item.id"><span>{{item.file_name}}<q-btn flat round dense size="xs" icon="close" :aria-label="tt('取消选择 '+item.file_name,'Deselect '+item.file_name)" @click="selectedMedia=selectedMedia.filter(id=>id!==item.id)"></q-btn></span><taxonomy-tag-picker v-model="splitAssignments[item.id]" :options="splitOptions" multiple :aria-label="tt(item.file_name+' 的目标','Targets for '+item.file_name)"></taxonomy-tag-picker></div></template></q-virtual-scroll>
           <q-btn flat :label="tt('预览拆分','Preview split')" :disable="busy" @click="preview('split')"></q-btn>
         </div>
-        <h3>{{tt('例图辅助分类','Example-assisted classification')}}</h3><p class="taxonomy-hint">{{tt('例图是检索依据，设置正反例不会自动给素材打标签，也不代表已训练模型。','Examples guide candidate search. Setting examples neither assigns tags nor trains a model.')}}</p>
+        </section><section class="taxonomy-edit-section"><h3>{{tt('例图辅助分类','Example-assisted classification')}}</h3><p class="taxonomy-hint">{{tt('例图是检索依据，设置正反例不会自动给素材打标签，也不代表已训练模型。','Examples guide candidate search. Setting examples neither assigns tags nor trains a model.')}}</p>
         <div class="taxonomy-actions"><q-chip v-for="exampleItem in examples" :key="exampleItem.media_id" removable @remove="removeExample(exampleItem.media_id)">{{exampleItem.role==='positive'?tt('正例','Positive'):tt('反例','Negative')}} · {{exampleItem.file_name || '#'+exampleItem.media_id}}</q-chip></div>
         <q-btn flat :label="tt('在资料库缓存中寻找候选','Find candidates in library cache')" :disable="busy || !examples.length" @click="findExamples"></q-btn><p v-if="exampleNotice" class="taxonomy-hint">{{exampleNotice}}</p>
         <div v-if="found.length"><p class="taxonomy-hint">{{tt('候选 '+found.length+' 项，已明确选择 '+findSelected.length+' 项。只有确认所选后才赋标签。',found.length+' candidates; '+findSelected.length+' explicitly selected. Tags are applied only after confirmation.')}}</p>
           <div class="taxonomy-media-grid"><label v-for="candidate in visibleFound" :key="candidate.media_id" class="taxonomy-media-item"><q-checkbox v-model="findSelected" :val="candidate.candidate_id" dense></q-checkbox><span class="taxonomy-preview"><img :src="'/media/thumbnail/'+candidate.media_id+'?cached=1'" alt="" loading="lazy" @error="imageError"><q-icon name="image_not_supported" class="taxonomy-offline-icon"></q-icon></span><span>{{candidate.file_name || '#'+candidate.media_id}}</span></label></div>
           <q-pagination v-if="findPages>1" v-model="findPage" :max="findPages" :max-pages="7" direction-links class="taxonomy-pagination"></q-pagination>
           <q-btn flat :disable="!findSelected.length || busy" :label="tt('确认标注所选 '+findSelected.length+' 项','Confirm '+findSelected.length+' selected')" @click="applyExamples"></q-btn>
-        </div>
+        </div></section>
       </template>
-      <div v-else class="taxonomy-empty"><q-icon name="account_tree" size="42px"></q-icon><p>{{tt('在上方选择要维护的标签，或新增标签','Choose a tag above, or create a new one')}}</p><q-btn color="primary" unelevated :label="tt('新增标签','New tag')" @click="create()"></q-btn></div>
+      <div v-else class="taxonomy-empty"><q-icon name="account_tree" size="36px"></q-icon><h3>{{tt('选择一个标签开始维护','Choose a tag to maintain')}}</h3><p>{{tt('在左侧展开标签层级，选择后在这里编辑内容。','Expand the tree on the left, then select a tag to edit its details here.')}}</p></div>
     </div>
     <div v-if="tab==='review'" class="taxonomy-editor">
       <div class="taxonomy-actions"><q-select v-model="reviewState" :options="[{label:tt('待确认','Pending'),value:'pending'},{label:tt('已拒绝','Rejected'),value:'rejected'},{label:tt('已采纳','Accepted'),value:'accepted'}]" emit-value map-options outlined dense :label="tt('审核状态','Review state')"></q-select><q-btn flat dense icon="refresh" :label="tt('刷新','Refresh')" @click="loadGroups();activeGroup && loadCandidates()"></q-btn></div>
@@ -1063,21 +1112,11 @@ const TaxonomyPage = {
         <div v-for="suggestion in relationshipSuggestions" :key="suggestion.id" class="taxonomy-review-group"><strong>{{relationName(suggestion.kind)}} · {{suggestion.expression || suggestion.term || suggestion.text || suggestion.target_name || (suggestion.target_id ? nodePath(suggestion.target_id) : '')}}</strong><p>{{relationshipReason(suggestion)}}</p>
           <div v-if="relationshipState==='pending'" class="taxonomy-actions"><q-btn v-if="['alias','near','related'].includes(suggestion.kind)" flat :label="tt('采纳关系','Accept relationship')" :disable="busy || relationshipLocked" @click="reviewRelationship(suggestion,true)"></q-btn><q-btn v-else flat :label="tt('转到正式方案','Review a formal plan')" :disable="busy" @click="useRelationshipPlan(suggestion)"></q-btn><q-btn flat :label="tt('拒绝关系','Reject relationship')" :disable="busy" @click="reviewRelationship(suggestion,false)"></q-btn></div></div>
         <p v-if="!relationshipSuggestions.length" class="taxonomy-hint">{{tt('暂无此状态的关系例外','No relationship exceptions in this state')}}</p>
-      </template><p v-else class="taxonomy-hint">{{tt('请在上方选择要维护的标签','Choose a tag above')}}</p>
+      </template><p v-else class="taxonomy-hint">{{tt('请在左侧选择要维护的标签','Choose a tag on the left')}}</p>
     </div>
     <div v-if="tab==='jobs'" class="taxonomy-editor">
-      <div class="taxonomy-configuration"><h3>{{tt('后台分类设置','Background classification')}}</h3>
-        <q-toggle v-model="config.classification_enabled" true-value="true" false-value="false" :label="tt('导入后在后台快速分类','Fast background classification after import')"></q-toggle>
-        <q-toggle v-model="config.classification_omni_enabled" true-value="true" false-value="false" :label="tt('空闲时由本地模型二次补充','Local model refinement while idle')"></q-toggle>
-        <q-toggle v-model="config.classification_relations_enabled" true-value="true" false-value="false" :label="tt('AI 整理词库关系','AI-assisted taxonomy relationships')"></q-toggle>
-        <q-input v-model="config.classification_model_dir" outlined dense :label="tt('本地图文模型目录','Local image/text model directory')"></q-input>
-        <div class="taxonomy-form-grid"><q-input v-model="config.classification_budget_seconds" outlined dense type="number" min="1" max="3600" :label="tt('每轮后台时间预算（秒）','Background time budget (seconds)')"></q-input><q-input v-model="config.classification_resource_limit_mb" outlined dense type="number" min="256" :label="tt('本轮后端额外内存预算（MB）','Additional backend memory budget for this round (MB)')"></q-input></div><p class="taxonomy-hint">{{tt('内存预算根据本轮Python进程峰值的增量判断，不包含模型子进程的内存，也不是应用的总内存上限。','The budget measures this round’s increase in the Python process peak. It excludes model subprocess memory and does not cap total application memory.')}}</p>
-        <q-input v-model="config.classification_candidate_retention_days" outlined dense type="number" min="1" max="3650" :label="tt('已拒绝／过期建议保留天数','Retention days for rejected or stale suggestions')"></q-input><p class="taxonomy-hint">{{tt('默认保留90天，不会自动清理。修改天数后先保存设置，再预览历史建议清理范围。','Default retention is 90 days; cleanup is never automatic. Save a changed period before previewing cleanup.')}}</p><q-btn flat :label="tt('预览清理历史建议','Preview historical suggestion cleanup')" :disable="busy || !configLoaded" @click="previewCandidateCleanup"></q-btn>
-        <q-toggle v-model="config.classification_auto_enabled" true-value="true" false-value="false" :label="tt('自动应用独立验证通过的标签规则','Apply independently validated tag rules automatically')"></q-toggle>
-        <q-toggle v-model="config.classification_auto_relations_enabled" true-value="true" false-value="false" :label="tt('自动应用独立验证通过的关系规则','Apply independently validated relationship rules automatically')"></q-toggle>
-        <p class="taxonomy-hint">{{tt('两种自动策略分别控制。未验证、含歧义或与人工决定冲突的结果继续待审；模型分数不是正确率。','These automatic policies are separate. Unvalidated, ambiguous or conflicting results remain pending. A model score is not accuracy.')}}</p>
-        <div class="taxonomy-actions"><q-btn flat :label="tt('保存分类设置','Save classification settings')" :disable="busy || !configLoaded" @click="saveConfiguration"></q-btn><q-btn flat :label="tt('独立质量验证','Independent quality validation')" @click="openValidation"></q-btn></div>
-      </div>
+      <div class="taxonomy-actions taxonomy-job-tools"><q-btn flat icon="settings" :label="tt('智能分类设置','Smart category settings')" @click="$root.openRecognitionSettings('classification')"></q-btn><q-btn flat :label="tt('独立质量验证','Independent quality validation')" @click="openValidation"></q-btn><q-btn flat :label="tt('预览清理历史建议','Preview historical suggestion cleanup')" :disable="busy" @click="previewCandidateCleanup"></q-btn></div>
+      <p class="taxonomy-hint">{{tt('模型与自动整理选项在「设置 → 智能分类」中维护。后台任务避让前台操作后自动继续；这里可手动暂停或重试。','Manage models and automatic organization in Settings → Smart categories. Background jobs yield to foreground work and resume automatically; pause or retry them here.')}}</p>
       <h3>{{tt('素材标签任务','Media classification jobs')}}</h3><div class="taxonomy-actions"><q-btn v-for="action in ['pause','resume','cancel']" :key="action" flat :label="tt({pause:'暂停当前素材任务',resume:'继续／重试当前素材任务',cancel:'取消当前素材任务'}[action],action+' listed media jobs')" :disable="busy" @click="control(action)"></q-btn></div>
       <p class="taxonomy-hint">{{tt('模型缺失时任务等待，素材仍可浏览。完整 AI 分析与标签整理状态独立。','Missing models leave jobs waiting. Media remain available; analysis and labeling have separate states.')}}</p>
       <div v-for="job in jobs" :key="job.id" class="taxonomy-job"><span>#{{job.media_id}} · {{tt({analysis:'已有分析整理',fast:'快速分类',omni:'本地精补'}[job.stage] || job.stage,job.stage)}}</span><span>{{jobState(job.state)}}</span><small>{{job.error}}</small></div>
@@ -1086,6 +1125,8 @@ const TaxonomyPage = {
     </div>
 
     <div v-if="tab==='history'" class="taxonomy-editor"><div v-for="change in changes" :key="change.id" class="taxonomy-job"><span>{{change.created_at}} · {{tt({merge:'合并',split:'拆分',decision:'标签决定',edit:'词库变更',relation:'关系整理',relationship:'关系整理'}[change.kind] || '变更',change.kind)}}</span><q-btn flat dense :disable="change.state!=='applied' || busy" :label="tt('撤销','Undo')" @click="undo(change.id)"></q-btn></div><p v-if="!changes.length">{{tt('暂无变更记录','No changes yet')}}</p></div>
+    <div v-if="lastChange" class="taxonomy-change-notice" role="status">{{tt('变更已完成','Change applied')}} <q-btn flat dense :label="tt('撤销','Undo')" @click="undo(lastChange)"></q-btn></div>
+    </div></section>
     <q-dialog v-model="showAnalysisPreview"><taxonomy-analysis-preview :preview="analysisPreview" :busy="busy" @confirm="confirmAnalysis" @close="showAnalysisPreview=false"></taxonomy-analysis-preview></q-dialog>
     <q-dialog v-model="showCandidateCleanup"><q-card class="taxonomy-plan"><q-card-section><h3>{{tt('清理历史建议前核对','Review historical suggestion cleanup')}}</h3><p>{{tt('按已保存的 '+(cleanupPreview?.retention_days || 0)+' 天保留期，本次预计清理 '+(cleanupPreview?.count || 0)+' 条已拒绝或过期的历史建议。','Using the saved '+(cleanupPreview?.retention_days || 0)+'-day retention period, approximately '+(cleanupPreview?.count || 0)+' rejected or stale suggestions are eligible.')}}</p><p class="taxonomy-hint">{{tt('预览尚未删除内容。待审建议、正式标注、人工决定和识别来源均保留；不会自动定期清理。','Preview has deleted nothing. Pending suggestions, formal labels, manual decisions and recognition sources remain intact. Cleanup is not scheduled automatically.')}}</p></q-card-section><q-card-actions align="right"><q-btn flat :label="tt('取消','Cancel')" :disable="busy" @click="showCandidateCleanup=false"></q-btn><q-btn color="primary" :label="tt('确认清理历史建议','Clean historical suggestions')" :disable="busy || !cleanupPreview?.count" @click="confirmCandidateCleanup"></q-btn></q-card-actions></q-card></q-dialog>
     <q-dialog v-model="showPlan"><taxonomy-plan-card :plan="plan" :busy="busy" :resolutions="resolutions" @resolve="resolutions[$event.key]=$event.value" @repreview="repreview" @apply="apply" @close="showPlan=false"></taxonomy-plan-card></q-dialog>
@@ -1120,6 +1161,5 @@ const TaxonomyPage = {
       <div v-if="validationResult" class="taxonomy-validation-result"><strong>{{tt('本批验证结果','Results on this annotated set')}}</strong><p>{{tt('留出样本：','Held-out samples: ')}}{{validationResult.heldout_count}} · {{tt('误报：','False positives: ')}}{{validationResult.false_positive}} · {{tt('召回：','Recall: ')}}{{validationResult.recall}}</p><p class="taxonomy-hint">{{tt('这是此批独立样本上的观察，不保证以后所有素材都正确；自动策略仍单独控制。','These are observations on this independent set, not a guarantee for future media. Automatic policies remain separate controls.')}}</p></div>
       <h3>{{tt('已登记的验证','Registered validations')}}</h3><div v-for="profile in validations" :key="profile.id" class="taxonomy-job"><span>{{relationName(profile.kind)}} · {{profile.tag_id ? nodePath(profile.tag_id) : profile.model_key}}</span><span>{{tt('留出样本 ','Held-out samples ')}}{{validationResults(profile.results).heldout_count || 0}}</span><small>{{profile.model_key}}</small></div>
     </q-card-section><q-card-actions align="right"><q-btn flat :label="tt('关闭','Close')" :disable="busy" @click="showValidation=false"></q-btn><q-btn color="primary" :label="tt('提交独立验证','Submit independent validation')" :disable="busy || !humanDeclaration || !validationCases.length" @click="submitValidation"></q-btn></q-card-actions></q-card></q-dialog>
-    <div v-if="lastChange" class="taxonomy-hint">{{tt('变更已完成','Change applied')}} <q-btn flat dense :label="tt('撤销','Undo')" @click="undo(lastChange)"></q-btn></div>
   </div>`
 };

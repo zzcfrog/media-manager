@@ -23,7 +23,11 @@ def main():
     restore.add_argument('--destination', required=True, type=Path)
     verify = sub.add_parser('verify');verify.add_argument('library', type=Path)
     sub.add_parser('self-test')
+    sub.add_parser('people-video-worker')
     args = parser.parse_args()
+    if args.command=='people-video-worker':
+        from backend.services.video_worker import main as video_worker
+        video_worker();return
     from backend.storage import (migrate_library, export_library, restore_library, verify_library,
                                  library_lock, prepare_upgrade, mark_started)
     if args.command == 'migrate':
@@ -47,7 +51,7 @@ def main():
         print(json.dumps({'ok':True,'runtime':sys.version.split()[0],'frozen':bool(getattr(sys,'frozen',False))}));return
 
     from backend.config import DATA_DIR
-    version = os.environ.get('MEDIA_MANAGER_VERSION', '1.0.16')
+    version = os.environ.get('MEDIA_MANAGER_VERSION', '1.0.24')
     DATA_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
     with library_lock(DATA_DIR):
         prepare_upgrade(DATA_DIR, version)  # Always before schema initialization or stale-task reset.
@@ -60,16 +64,8 @@ def main():
             raise SystemExit(0)
         signal.signal(signal.SIGTERM, terminate)
         mark_started(DATA_DIR, version)
-        @app.get('/api/desktop/health')
-        def health():
-            return {'application':'media-manager','version':version,'pid':os.getpid(),
-                    'instance':os.environ.get('MEDIA_MANAGER_INSTANCE','')}
-        @app.get('/api/desktop/activity')
-        def activity():
-            from backend.db import get_db
-            from backend import local_vlm
-            processing = get_db().execute("SELECT COUNT(*) FROM media WHERE analysis_status='processing'").fetchone()[0]
-            return {'busy': bool(processing or local_vlm.download_status()['state'] == 'downloading')}
+        from backend.services.desktop_runtime import install_controls
+        install_controls(app, version, os.environ.get('MEDIA_MANAGER_INSTANCE', ''))
         app.run(host='127.0.0.1', port=int(os.environ.get('PORT',6622)), debug=False, use_reloader=False)
 
 

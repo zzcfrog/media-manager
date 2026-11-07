@@ -8,8 +8,8 @@ const context={console,URLSearchParams,setInterval,clearInterval,Set,Promise,Num
   i18nState:{locale:'zh'},taxText:(zh,en)=>zh,API:{_fetch:async(url,options)=>{requests.push({url,options});return {ok:true};}},
   Quasar:{Notify:{create(){}}},location:{hash:'#/gallery'}};
 vm.createContext(context);
-vm.runInContext(fs.readFileSync(source,'utf8')+'\nthis.testExports={PeopleAPI,PeopleMedia,PeopleRootMixin,PeoplePage,PeopleCoverPicker,PeopleDialogs,peopleImageError};',context);
-const {PeopleAPI,PeopleMedia,PeopleRootMixin,PeoplePage,PeopleCoverPicker,PeopleDialogs,peopleImageError}=context.testExports;
+vm.runInContext(fs.readFileSync(source,'utf8')+'\nthis.testExports={PeopleAPI,PeopleMedia,PeopleRootMixin,PeoplePage,PeopleCoverPicker,PeopleDialogs,PeopleFaceEditor,peopleImageError};',context);
+const {PeopleAPI,PeopleMedia,PeopleRootMixin,PeoplePage,PeopleCoverPicker,PeopleDialogs,PeopleFaceEditor,peopleImageError}=context.testExports;
 (async()=>{
   await PeopleAPI('/faces/decide','POST',{face_ids:[3],action:'confirm',versions:{3:4}});
   assert.equal(requests[0].url,'/api/people/faces/decide');
@@ -59,7 +59,8 @@ const {PeopleAPI,PeopleMedia,PeopleRootMixin,PeoplePage,PeopleCoverPicker,People
   let statusRead;ordinaryGallery.reloadPeopleStatus=()=>statusRead=PeopleRootMixin.methods.reloadPeopleStatus.call(ordinaryGallery);
   PeopleRootMixin.mounted.call(ordinaryGallery);await statusRead;
   assert.equal(mountedReads.length,1,'Ordinary gallery must perform an initial read-only status request');assert.equal(mountedReads[0].method,'GET');assert.equal(ordinaryGallery.peopleStatus.settings.enabled,true);
-  poll();await statusRead;assert.equal(mountedReads.length,2,'Persisted enabled setting must arm polling without opening People');context.setInterval=originalInterval;
+  poll();await statusRead;assert.equal(mountedReads.length,1,'Legacy future-import setting must not arm polling');
+  ordinaryGallery.peopleStatus.jobs={queued:1};poll();await statusRead;assert.equal(mountedReads.length,2,'Queued per-import scans must arm polling without opening People');context.setInterval=originalInterval;
   let catalogRefreshes=0;context.API._fetch=async()=>({revision:'worker-result',settings:{enabled:false},jobs:{done:1}});
   ordinaryGallery.reloadPeopleCatalog=async()=>{catalogRefreshes++;};await ordinaryGallery.reloadPeopleStatus();
   assert.equal(ordinaryGallery.peopleRevision,1,'Background result must refresh inspector keys outside People routes');assert.equal(catalogRefreshes,1);
@@ -100,5 +101,65 @@ const {PeopleAPI,PeopleMedia,PeopleRootMixin,PeoplePage,PeopleCoverPicker,People
   const refreshDialog={busy:false,error:'',request:{token:9},root:refreshRoot,$emit:event=>closed.push(event)};
   const saving=PeopleDialogs.methods.mutate.call(refreshDialog,'/merge/apply','POST',{});finishMutation({person_id:2});await refreshReady;
   refreshRoot.peopleDialog={token:10};finishRefresh();await saving;assert.equal(closed.length,0,'Dialog replacement during global refresh must also be protected');
-  console.log('People API serialization, stale inspector, unmount and route regressions passed');
+  assert.equal(PeopleRootMixin.computed.peoplePendingCount.call({peopleStatus:{jobs:{queued:2,running:1,paused:3,waiting:4,failed:5,done:100,cancelled:20,stale:10,no_faces:6,quality_insufficient:7}}}),15,'Only unfinished actionable tasks belong to the Header queue');
+  let finishControl,controlReads=0,controlPosts=0;
+  context.API._fetch=()=>{controlPosts++;return new Promise(resolve=>finishControl=resolve)};
+  const queue={peopleControlBusy:false,peopleControlError:'old error',reloadPeopleStatus:async()=>{controlReads++}};
+  const pendingControl=PeopleRootMixin.methods.controlPeopleTasks.call(queue,'pause');await PeopleRootMixin.methods.controlPeopleTasks.call(queue,'cancel');
+  assert.equal(controlPosts,1,'An in-flight task control must not submit twice');assert.equal(queue.peopleControlError,'');finishControl({ok:true});await pendingControl;assert.equal(controlReads,1);assert.equal(queue.peopleControlBusy,false);
+  context.API._fetch=async()=>{throw new Error('Synthetic queue control failure')};await PeopleRootMixin.methods.controlPeopleTasks.call(queue,'pause');
+  assert.equal(queue.peopleControlError,'Synthetic queue control failure');assert.equal(queue.peopleControlBusy,false);
+  assert.equal(controlReads,1,'A rejected control must preserve the current queue status');
+  const scanTree=[{path:'/photos',children:[{path:'/photos/sub',children:[{path:'/photos/sub/deep',children:[]}]},{path:'/photos/sub-more',children:[]}]}];
+  const scan={root:{folderTree:scanTree,selectedFolder:'/photos'},folders:[]};
+  for(const method of ['scanFolderPaths','toggleScanFolder','seedScanFolders'])scan[method]=PeopleDialogs.methods[method].bind(scan);
+  for(const name of ['scanFolderSelection','scanFolderScope'])Object.defineProperty(scan,name,{get(){return PeopleDialogs.computed[name].call(scan)}});
+  scan.seedScanFolders();
+  assert.deepEqual([...scan.scanFolderPaths('/photos/')].sort(),[...scan.scanFolderPaths('/photos')].sort(),'A trailing slash retains parent-owned media');
+  assert.deepEqual([...scan.folders].sort(),['/photos','/photos/sub','/photos/sub/deep','/photos/sub-more'].sort(),'A preselected parent includes every descendant checkbox');
+  assert.equal(scan.scanFolderSelection.states.get('/photos/sub/deep'),true);
+  scan.toggleScanFolder('/photos/sub',false);
+  assert.equal(scan.scanFolderSelection.states.get('/photos'),null,'The parent becomes partially selected');
+  assert.equal(scan.scanFolderSelection.states.get('/photos/sub'),false);
+  assert.equal(scan.scanFolderSelection.states.get('/photos/sub/deep'),false);
+  assert.equal(scan.scanFolderSelection.states.get('/photos/sub-more'),true,'Sibling path prefixes do not overlap');
+  assert.deepEqual(JSON.parse(JSON.stringify(scan.scanFolderScope)),{folders:['/photos/sub-more'],directFolders:['/photos'],count:2},'Parent-only media remains selected without recursively restoring the excluded child');
+  scan.toggleScanFolder('/photos/sub/deep',true);
+  assert.equal(scan.scanFolderSelection.states.get('/photos/sub'),null);
+  assert.deepEqual(JSON.parse(JSON.stringify(scan.scanFolderScope)),{folders:['/photos/sub/deep','/photos/sub-more'],directFolders:['/photos'],count:3});
+  scan.toggleScanFolder('/photos',true);
+  assert.equal(scan.scanFolderSelection.states.get('/photos'),true);
+  assert.deepEqual(JSON.parse(JSON.stringify(scan.scanFolderScope)),{folders:['/photos'],directFolders:[],count:1},'A fully selected subtree submits one recursive root');
+  scan.toggleScanFolder('/photos',false);assert.equal(scan.scanFolderScope.count,0);
+  const late={root:{folderTree:[],selectedFolder:'/photos'},folders:[]};
+  for(const method of ['scanFolderPaths','toggleScanFolder','seedScanFolders'])late[method]=PeopleDialogs.methods[method].bind(late);
+  for(const name of ['scanFolderSelection','scanFolderScope'])Object.defineProperty(late,name,{get(){return PeopleDialogs.computed[name].call(late)}});
+  late.seedScanFolders();late.root.folderTree=scanTree;PeopleDialogs.watch['root.folderTree'].call({...late,kind:'scan',seedScanFolders:late.seedScanFolders});
+  assert.equal(late.scanFolderSelection.states.get('/photos/sub/deep'),true,'A late library tree expands the initial selected parent');
+  late.toggleScanFolder('/photos/sub',false);const preserved=[...late.folders];
+  late.root.folderTree=[{path:'/photos',children:[...scanTree[0].children,{path:'/photos/new',children:[]}]}];
+  PeopleDialogs.watch['root.folderTree'].call({...late,kind:'scan',seedScanFolders:late.seedScanFolders});
+  assert.deepEqual([...late.folders],preserved,'A late tree refresh must not override a manual exclusion');
+  assert.equal(late.scanFolderSelection.states.get('/photos/new'),false);
+  const large={root:{folderTree:[{path:'/large',children:Array.from({length:1100},(_,i)=>({path:'/large/'+i,children:[]}))}]},folders:[]};
+  for(const method of ['scanFolderPaths','toggleScanFolder'])large[method]=PeopleDialogs.methods[method].bind(large);
+  for(const name of ['scanFolderSelection','scanFolderScope'])Object.defineProperty(large,name,{get(){return PeopleDialogs.computed[name].call(large)}});
+  large.toggleScanFolder('/large',true);assert.equal(large.folders.length,1101);assert.deepEqual([...large.scanFolderScope.folders],['/large'],'More than 1000 checked descendants compact to one recursive scope');
+  let partialPosts=0;context.API._fetch=async()=>{partialPosts++;return {queued:1,skipped:0}};
+  const partial={busy:false,error:'',scope:'folders',existing:'skip',selectedIds:[],scanFolderScope:{folders:[],directFolders:['/photos'],count:1},root:{peopleStatus:{},reloadPeopleStatus:async()=>{}},pt:(zh,en)=>zh,$emit(){}};
+  await PeopleDialogs.methods.startRecognition.call(partial);assert.equal(partialPosts,0);assert(partial.error.includes('后台版本不一致'),'An old backend must not silently drop direct-folder selections');
+  partial.root.peopleStatus.supports_direct_folders=true;await PeopleDialogs.methods.startRecognition.call(partial);assert.equal(partialPosts,1);
+  for(const disposed of [false,true]){
+    let finishSave;const posted=[],events=[];let refreshes=0;
+    context.API._fetch=async(url,options)=>{posted.push(JSON.parse(options.body));return new Promise(resolve=>finishSave=resolve);};
+    const editableFace={id:15,version:3,person_id:4},form={faces:[editableFace],snapshot:[],action:'move',target:8,newName:'',canConfirm:true,busy:false,
+      loadPeople(){},root:{peopleChanged:async()=>{refreshes++;}},$emit:(...args)=>events.push(args)};
+    PeopleFaceEditor.created.call(form);editableFace.version=20;editableFace.id=16;
+    const save=PeopleFaceEditor.methods.save.call(form);assert.deepEqual(posted[0].face_ids,[15]);assert.equal(posted[0].versions[15],3,'Background refresh must not silently approve a newer face version');
+    if(disposed)PeopleFaceEditor.beforeUnmount.call(form);finishSave({change_id:91});await save;
+    assert.equal(refreshes,1,'A completed correction refreshes shared data even after leaving');
+    assert.equal(events.filter(e=>e[0]==='saved').length,disposed?0:1,'A late save must not close a newer correction');
+    if(!disposed)assert(events.findIndex(e=>e[0]==='busy'&&e[1]===false)<events.findIndex(e=>e[0]==='saved'),'Dialog must unlock before its saved event closes it');
+  }
+  console.log('People API serialization, stale inspector, unmount, route and inline editor snapshot regressions passed');
 })().catch(e=>{console.error(e);process.exit(1)});

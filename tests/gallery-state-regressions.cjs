@@ -3,7 +3,7 @@ const location = { hash: '#/gallery' };
 const context = vm.createContext({ console, location, window: { location }, localStorage: { getItem() { return null; }, setItem() {} },
   document: { querySelector() { return null; } }, requestAnimationFrame: fn => fn(),
   t: key => key, API: {}, Quasar: { Notify: { create() {} } }, Vue: { createApp: options => options } });
-for (const file of ['format.js', 'taxonomy.js', 'people.js', 'gallery.js', 'detail.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '../frontend/js', file), 'utf8'), context);
+for (const file of ['format.js', 'taxonomy.js', 'people.js', 'recognition-settings.js', 'general-settings.js', 'background-tasks.js', 'gallery.js', 'detail.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '../frontend/js', file), 'utf8'), context);
 const index = fs.readFileSync(path.join(__dirname, '../frontend/index.html'), 'utf8');
 vm.runInContext(index.slice(index.indexOf('const app = Vue.createApp('), index.indexOf('app.use(Quasar')), context);
 const root = vm.runInContext('app', context), gallery = vm.runInContext('GalleryPage', context), detail = vm.runInContext('DetailPage', context);

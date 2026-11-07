@@ -331,8 +331,37 @@ def _review(db, kind, left_id=None, right_id=None, face_id=None, payload=None):
                (kind, left_id, right_id, face_id, _json(payload or {}), source))
 
 
+def _video_track_groups(prepared, review_threshold):
+    groups = {}
+    for obs in prepared:
+        track = obs.get('track_id')
+        if isinstance(track, str) and track and obs['frame_time'] is not None:
+            group = groups.setdefault(track, {'samples': [], 'people': set(), 'manual': False, 'vector': None, 'identity': None, 'decided': False, 'conflict': False})
+            obs['_track'] = group
+            previous = obs['_previous']
+            if previous and previous['person_id'] is not None and previous['assignment'] != 'not_face':
+                group['people'].add(previous['person_id'])
+                group['manual'] |= previous['assignment'] == 'manual'
+            if obs['vector'] is not None and obs['quality'] >= .35 and (not previous or previous['assignment'] in ('auto', 'manual')):
+                group['samples'].append(obs)
+    for group in groups.values():
+        group['conflict'] = len(group['people']) > 1
+        if len(group['people']) == 1:
+            group['identity'] = next(iter(group['people'])); group['decided'] = group['manual']
+        samples = group.pop('samples')
+        if samples:
+            matrix = np.stack([obs['vector'] for obs in samples])
+            # Motion is supporting evidence, never authority to join conflicting faces.
+            group['conflict'] |= float(np.min(matrix @ matrix.T)) < review_threshold
+            mean = np.average(matrix, axis=0, weights=[obs['quality'] for obs in samples])
+            if np.linalg.norm(mean) > 1e-10:group['vector'] = _vector(mean.tolist())
+
+
 @atomic
-def record_observations(db, media_id, input_revision, model_key, observations, threshold=.6, review_threshold=.4):
+def record_observations(db, media_id, input_revision, model_key, observations, threshold=None, review_threshold=.4, finalize=True, tracked=False):
+    if threshold is None:
+        from .people_grouping import calibration
+        threshold=calibration(db,model_key)['effective_threshold']
     _media(db, [media_id])
     if not isinstance(input_revision, str) or not input_revision or not isinstance(model_key, str) or not model_key:
         raise Conflict('识别版本无效')
@@ -367,11 +396,16 @@ def record_observations(db, media_id, input_revision, model_key, observations, t
             candidates = [f for f in existing if f['id'] not in used and f['frame_time'] == obs['frame_time'] and _iou(json.loads(f['bbox']), obs['bbox']) >= .6]
             if candidates:
                 match = max(candidates, key=lambda f: _iou(json.loads(f['bbox']), obs['bbox']))
+        obs['_previous'] = match
+        if match:used.add(match['id'])
+    if tracked:_video_track_groups(prepared, review_threshold)
+    for obs in prepared:
+        match = obs['_previous']
         feature = obs['vector'].astype(np.float32).tobytes() if obs['vector'] is not None else None
         values = (model_key, obs['frame_time'], _json(obs['bbox']), feature, len(obs['vector']) if obs['vector'] is not None else 0,
                   obs['quality'], obs['score'], str(obs.get('crop_path', '')))
         if match:
-            fid = match['id']; used.add(fid)
+            fid = match['id']
             # Rescans refresh observations, never replace a manual identity or rejection.
             db.execute('UPDATE people_faces SET model_key=?,frame_time=?,bbox=?,feature=?,dimension=?,quality=?,score=?,crop_path=?,active=1,'
                        "version=version+1,updated_at=datetime('now') WHERE id=?", (*values, fid))
@@ -393,7 +427,21 @@ def record_observations(db, media_id, input_revision, model_key, observations, t
             fid = db.execute('INSERT INTO people_faces(media_id,input_revision,sample_key,model_key,frame_time,bbox,feature,dimension,quality,score,crop_path) '
                              'VALUES (?,?,?,?,?,?,?,?,?,?,?)', (media_id, input_revision, key, *values)).lastrowid
         identity = match['person_id'] if match else None
-        if obs['vector'] is not None and obs['quality'] >= .35:
+        track = obs.get('_track'); reason = None; suggestion = None
+        vector = track['vector'] if track else obs['vector'] if obs['quality'] >= .35 else None
+        if track and track['conflict']:
+            reason = 'track_conflict'; vector = None
+        elif track:
+            target = track['identity']; suggestion = track.get('suggestion')
+            blocked = target and db.execute("SELECT 1 WHERE EXISTS(SELECT 1 FROM people_face_exclusions WHERE face_id=? AND person_id=?) "
+                "OR EXISTS(SELECT 1 FROM people_media_decisions WHERE media_id=? AND person_id=? AND decision='exclude')", (fid, target, media_id, target)).fetchone()
+            if blocked:reason = 'track_conflict'; vector = None
+            else:
+                if target is not None:identity = target
+                if track['decided']:
+                    if target is None or suggestion is not None and suggestion != target:reason = 'track_match_uncertain'
+                    vector = None
+        if vector is not None:
             groups = {}
             for row in db.execute("WITH representatives AS (SELECT f.id,f.person_id,"
                                   'ROW_NUMBER() OVER (PARTITION BY f.person_id ORDER BY f.id) anchor_rank,'
@@ -404,29 +452,52 @@ def record_observations(db, media_id, input_revision, model_key, observations, t
                                   "AND NOT EXISTS (SELECT 1 FROM people_media_decisions d WHERE d.media_id=? AND d.person_id=f.person_id AND d.decision='exclude')) "
                                   'SELECT f.person_id,f.feature FROM representatives r JOIN people_faces f ON f.id=r.id '
                                   'WHERE r.anchor_rank=1 OR r.quality_rank<=4',
-                                  (fid, model_key, len(obs['vector']), fid, media_id)):
+                                  (fid, model_key, len(vector), fid, media_id)):
                 groups.setdefault(row['person_id'], []).append(np.frombuffer(row['feature'], dtype=np.float32))
             # Fixed earliest + quality/id representatives are chosen without the
             # candidate's similarity, so a long chain cannot drop its first anchor.
-            scores = sorted(((float(np.min(np.stack(exemplars) @ obs['vector'])), pid) for pid, exemplars in groups.items()), reverse=True)
+            scores = sorted(((float(np.min(np.stack(exemplars) @ vector)), pid) for pid, exemplars in groups.items()), reverse=True)
             best = scores[0] if scores else None
             if identity is None:
                 if best and best[0] >= threshold and (len(scores) < 2 or best[0]-scores[1][0] >= .08):
                     identity = best[1]
+                elif track and best and best[0] >= review_threshold:
+                    reason = 'track_match_uncertain'; suggestion = best[1]
                 else:
                     identity = create_person(db)['id']; created.append(identity)
                     if best and best[0] >= review_threshold:
                         _review(db, 'merge', identity, best[1], payload={'similarity': round(best[0], 4)})
             elif best and best[1] != identity and best[0] >= review_threshold:
-                _review(db, 'face', identity, best[1], fid, {'similarity': round(best[0], 4)})
+                if track:reason = 'track_match_uncertain'; suggestion = best[1]
+                else:_review(db, 'face', identity, best[1], fid, {'similarity': round(best[0], 4)})
+            if track:
+                track.update(identity=identity, suggestion=suggestion, decided=True)
+        if reason:
+            db.execute("UPDATE people_reviews SET payload=?,updated_at=datetime('now') WHERE state='pending' AND source_key=? "
+                       "AND json_extract(payload,'$.reason') IN ('quality','track_conflict','track_match_uncertain')",
+                       (_json({'reason': reason}), _json(['face', identity, suggestion, fid])))
+            db.execute("UPDATE people_reviews SET state='resolved',updated_at=datetime('now') WHERE face_id=? AND state='pending' AND json_extract(payload,'$.reason')='quality'", (fid,))
+            _review(db, 'face', identity, suggestion, fid, {'reason': reason})
+        elif identity is None:
+            _review(db,'face',face_id=fid,payload={'reason':'quality'})
+        else:
+            db.execute("UPDATE people_reviews SET state='resolved',updated_at=datetime('now') WHERE face_id=? AND state='pending' AND json_extract(payload,'$.reason') IN ('quality','track_conflict','track_match_uncertain')",(fid,))
         db.execute("UPDATE people_faces SET person_id=? WHERE id=?", (identity, fid))
         output.append(_face(db.execute('SELECT * FROM people_faces WHERE id=?', (fid,)).fetchone()))
     # A detector may no longer find an automatic face. Keep explicit human observations.
-    seen_ids = [f['id'] for f in output]
-    where = ' AND id NOT IN ('+','.join('?' for _ in seen_ids)+')' if seen_ids else ''
-    db.execute("UPDATE people_faces SET active=0,version=version+1,updated_at=datetime('now') WHERE media_id=? AND input_revision=? AND assignment='auto' AND active=1"+where,
-               [media_id, input_revision, *seen_ids])
+    if finalize:finish_observations(db,media_id,input_revision,[f['id'] for f in output])
     return {'faces': output, 'created_person_ids': created}
+
+
+def finish_observations(db,media_id,input_revision,seen_ids):
+    # A video can have more observations than SQLite's bind-variable limit.
+    db.execute('CREATE TEMP TABLE IF NOT EXISTS people_scan_seen(id INTEGER PRIMARY KEY)')
+    db.execute('DELETE FROM people_scan_seen')
+    db.executemany('INSERT OR IGNORE INTO people_scan_seen VALUES (?)',((fid,) for fid in seen_ids))
+    db.execute("UPDATE people_faces SET active=0,version=version+1,updated_at=datetime('now') WHERE media_id=? AND input_revision=? AND assignment='auto' AND active=1 AND id NOT IN (SELECT id FROM people_scan_seen)",
+               (media_id,input_revision))
+    db.execute("UPDATE people_reviews SET state='resolved',updated_at=datetime('now') WHERE state='pending' AND json_extract(payload,'$.reason') IN ('quality','track_conflict','track_match_uncertain') AND face_id IN (SELECT id FROM people_faces WHERE media_id=? AND active=0)",(media_id,))
+    db.execute('DELETE FROM people_scan_seen')
 
 
 @atomic

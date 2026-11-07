@@ -178,16 +178,17 @@ def _parse_ts(x) -> float | None:
         return None
 
 
-def extract_video_frames(video_path: str | Path, fps: float = 1.0,
+def iter_video_frames(video_path: str | Path, fps: float = 1.0,
                          max_frames: int = 32,
                          frame_res: int = 480,
                          on_extract=None,
-                         with_audio=False) -> tuple[list[list[tuple[float, str]]], list[str | None]]:
+                         with_audio=False,cancelled=lambda:False):
     """ffmpeg 分窗抽帧（直接降采样率 + 降到 frame_res 短边，无需压缩中间产物）：
     每窗 ≤ max_frames 帧（窗时长 = max_frames/fps）。
-    返回 (windows, audios)：windows = [窗][(绝对时间戳秒, data URL)]，内存占用与视频总时长无关；
-    with_audio 时 audios = [窗](wav base64 | None)（16k 单声道，供 Omni 音视频同析）。
+    每次生成 ([(绝对时间戳秒, data URL)], wav base64 | None)，只保留当前窗；
+    with_audio 时同时生成16k单声道音轨，供 Omni 音视频同析。
     on_extract(cur, total)：每完成一窗回调一次（进度展示用）。"""
+    if cancelled():raise InterruptedError('视频抽帧已暂停')
     if not shutil.which("ffmpeg"):
         raise RuntimeError("ffmpeg 未安装或不在 PATH")
     video_path = Path(video_path)
@@ -224,12 +225,12 @@ def extract_video_frames(video_path: str | Path, fps: float = 1.0,
 
     window_sec = max_frames / fps
     total_windows = max(1, math.ceil((duration - 0.05) / window_sec))
-    windows: list[list[tuple[float, str]]] = []
-    audios: list[str | None] = []
+    count=0
     with tempfile.TemporaryDirectory(prefix="vlm_frames_") as td:
         seq = 0
         start = 0.0
         while start < duration - 0.05:
+            if cancelled():raise InterruptedError('视频抽帧已暂停')
             end = min(start + window_sec, duration)
             out_dir = Path(td) / f"w{seq}"
             out_dir.mkdir()
@@ -264,17 +265,25 @@ def extract_video_frames(video_path: str | Path, fps: float = 1.0,
             else:
                 audio_b64 = None
             if frames:
-                windows.append(frames)
-                audios.append(audio_b64)
+                count+=1
             if on_extract:
-                on_extract(len(windows), total_windows)
+                on_extract(count, total_windows)
+            if cancelled():raise InterruptedError('视频抽帧已暂停')
+            if frames:yield frames,audio_b64
+            shutil.rmtree(out_dir)
             start = end
             seq += 1
-    if not windows:
+    if not count:
         raise RuntimeError("抽帧失败：未得到任何帧")
-    logger.info("Extracted {} windows x {}-{} frames: fps={} max={} res={}x{} audio={} file={}",
-                len(windows), min(len(w) for w in windows), max(len(w) for w in windows),
-                fps, max_frames, new_w, new_h, len(audios), video_path.name)
+    logger.info("Extracted {} windows: fps={} max={} res={}x{} file={}",
+                count,fps,max_frames,new_w,new_h,video_path.name)
+
+
+def extract_video_frames(video_path: str | Path, fps: float = 1.0,max_frames: int = 32,
+                         frame_res: int = 480,on_extract=None,with_audio=False):
+    windows=[];audios=[]
+    for frames,audio in iter_video_frames(video_path,fps,max_frames,frame_res,on_extract,with_audio):
+        windows.append(frames);audios.append(audio)
     return windows, audios
 
 

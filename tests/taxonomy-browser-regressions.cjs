@@ -10,7 +10,7 @@ let browser;
   page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text());});page.on('requestfailed',r=>failed.push(new URL(r.url()).pathname));
   await page.goto(fixture.url+'/#/taxonomy');await page.waitForLoadState('networkidle');
   await page.screenshot({path:path.join(output,'initial.png')});
-  await page.locator('.taxonomy-page-tabs').getByRole('button',{name:'新增标签',exact:true}).click();
+  await page.locator('.taxonomy-tree-toolbar').getByRole('button',{name:'新增标签',exact:true}).click();
   await page.locator('.q-dialog input').fill('主体-'+Date.now());await page.locator('.q-dialog').getByRole('button',{name:'OK',exact:true}).click();
   await page.getByLabel('标准名称',{exact:true}).waitFor();
   const state=()=>page.evaluate(()=>document.querySelector('[data-v-app]').__vue_app__._container._vnode.component.proxy.taxonomySelected);

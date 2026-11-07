@@ -1,0 +1,97 @@
+{
+  "flow": {
+    "roi_size": 384,
+    "roi_expansion": 4.0,
+    "roi_edge_padding_pixels": 12,
+    "max_source_canvas_side_pixels": 1024,
+    "max_points": 32,
+    "min_points": 6,
+    "pyramid_levels": 3,
+    "window_radius": 3,
+    "max_iterations": 8,
+    "termination_epsilon": 0.03,
+    "forward_backward_max_error": 1.75,
+    "residual_threshold": 2.5,
+    "feature_box_expansion": 0.05,
+    "max_scale_change": 0.15,
+    "max_coast_frames": 8,
+    "require_cycle_consistency_after_coast": true,
+    "recovery_cycle_min_iou": 0.1,
+    "endpoint_affine_repair": {
+      "enabled": true,
+      "max_frames": 8
+    },
+    "process_noise_position": 0.35,
+    "process_noise_velocity": 0.08,
+    "detector_measurement_noise": 0.75,
+    "flow_measurement_noise": 2.5,
+    "flow_updates_size": false,
+    "bidirectional_fusion": {
+      "max_gap_frames": 180,
+      "max_materialized_bytes": 268435456,
+      "corridor_expansion": 3.0,
+      "max_corridor_side_pixels": 2048,
+      "geometry_bridge": {
+        "enabled": true,
+        "edge_epsilon_pixels": 1.0,
+        "min_edge_expansion_ratio": 1.5,
+        "min_both_trusted_fraction": 0.75,
+        "min_mutual_consistent_fraction": 0.75
+      },
+      "association_rescue": {
+        "enabled": true,
+        "max_endpoint_center_speed": 0.08,
+        "max_area_ratio": 2.5,
+        "min_endpoint_iou": 0.2,
+        "max_endpoint_center_distance": 0.5
+      },
+      "mutual_min_iou": 0.5,
+      "mutual_max_center_distance": 0.4,
+      "anchor_max_center_distance": 0.75,
+      "anchor_max_area_ratio": 2.5,
+      "local_review_min_confidence": 0.25,
+      "local_review_min_iou": 0.5,
+      "local_review_min_iou_margin": 0.15,
+      "soft_bias_beta": 8.0,
+      "soft_bias_radius": 3,
+      "soft_confidence_low": 0.18,
+      "soft_confidence_high": 0.55
+    }
+  },
+  "scan": {
+    "scene_cut_detector": {
+      "signature_size": 96,
+      "history_frames": 30,
+      "min_mean_absdiff": 25.0,
+      "bootstrap_min_mean_absdiff": 45.0,
+      "relative_multiplier": 3.0,
+      "relative_offset": 18.0,
+      "max_corners": 120,
+      "min_corners": 6,
+      "quality_level": 0.01,
+      "min_distance": 3.0,
+      "block_size": 5,
+      "lk_window_size": 15,
+      "lk_max_level": 2,
+      "lk_max_iterations": 20,
+      "lk_epsilon": 0.01,
+      "lk_min_eigenvalue": 0.0001,
+      "max_forward_backward_error": 1.5,
+      "ransac_reprojection_threshold": 2.0,
+      "max_flow_inlier_fraction": 0.2,
+      "appearance_confirmation": {
+        "enabled": true,
+        "min_mean_absdiff": 50.0,
+        "max_histogram_correlation": 0.2,
+        "max_spatial_correlation": 0.5,
+        "max_flow_inlier_fraction": 0.3
+      },
+      "flash_suppression": {
+        "enabled": true,
+        "max_skip_mean_absdiff": 12.0,
+        "max_skip_to_transition_ratio": 0.3,
+        "min_skip_spatial_correlation": 0.9
+      }
+    }
+  }
+}

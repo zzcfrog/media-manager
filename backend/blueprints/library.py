@@ -712,14 +712,27 @@ def batch_get():
     return jsonify([dict(r) for r in rows])
 
 
+@bp.get('/import-options')
+def import_options():
+    from ..services.model_preferences import classification_enabled, people_enabled
+    db=get_db()
+    return jsonify({'classification_enabled':classification_enabled(db,'fast'),'people_enabled':people_enabled(db)})
+
+
 @bp.route("/import-one", methods=["POST"])
 def import_one():
     from ..services.importer import import_single_file
     data = request.get_json()
     file_path = data.get("path", "")
+    classify_media=data.get('classify_media',False)
+    if type(classify_media) is not bool:return jsonify({'error':'快速分类选项需为开关'}),400
+    organize_people=data.get('organize_people',False)
+    if type(organize_people) is not bool:return jsonify({'error':'人脸识别选项需为开关'}),400
+    people_media_type=data.get('people_media_type','all')
+    if people_media_type not in ('all','image','video'):return jsonify({'error':'人脸识别范围请选择仅图片、仅视频或两者识别'}),400
     if not file_path:
         return jsonify({"error": "No path"}), 400
-    result = import_single_file(file_path)
+    result = import_single_file(file_path,organize_people=organize_people,people_media_type=people_media_type,classify_media=classify_media)
     if result:
         result.pop("embedding", None)
         return jsonify({"data": result})
@@ -733,6 +746,12 @@ def import_batch():
 
     data = request.get_json()
     paths = data.get("paths", [])
+    classify_media=data.get('classify_media',False)
+    if type(classify_media) is not bool:return jsonify({'error':'快速分类选项需为开关'}),400
+    organize_people=data.get('organize_people',False)
+    if type(organize_people) is not bool:return jsonify({'error':'人脸识别选项需为开关'}),400
+    people_media_type=data.get('people_media_type','all')
+    if people_media_type not in ('all','image','video'):return jsonify({'error':'人脸识别范围请选择仅图片、仅视频或两者识别'}),400
     if not paths:
         return jsonify({"error": "No paths"}), 400
 
@@ -740,7 +759,7 @@ def import_batch():
         db = get_db()
         imported = failed = 0
         from contextlib import closing
-        with closing(prepare_and_import(db, paths)) as events:
+        with closing(prepare_and_import(db, paths, organize_people=organize_people,people_media_type=people_media_type,classify_media=classify_media)) as events:
             for event in events:
                 imported += event["type"] == "ok"
                 failed += event["type"] == "fail"

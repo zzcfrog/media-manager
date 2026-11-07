@@ -55,10 +55,10 @@ def create_app() -> Flask:
         from .db import get_db
         db = get_db()
         asr_engine_name = get_setting(db, "asr_engine", "whisper")
+        asr_model_name = get_setting(db, "asr_model", "large-v3")
         needs_asr = get_setting(db, "video_engine", "cloud") == "local" or \
             get_setting(db, "use_multimodal", "true") != "true"
-        if needs_asr and not __import__("os").environ.get("MEDIA_MANAGER_SKIP_PRELOAD") and asr_engine_name in available_engines():
-            asr_model_name = get_setting(db, "asr_model", "large-v3")
+        if needs_asr and asr_model_name!='none' and get_setting(db,'video_analysis_enabled','true')!='false' and not __import__("os").environ.get("MEDIA_MANAGER_SKIP_PRELOAD") and asr_engine_name in available_engines():
             preload_all(asr_engine_name, asr_model_name)
 
     from .services.classification_jobs import ensure_worker

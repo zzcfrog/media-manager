@@ -302,6 +302,8 @@ def generate_plan(pid):
 
     progress = {"step": "starting", "percent": 0, "done": False, "result": None, "error": None}
     app = current_app._get_current_object()
+    active_creative = app.extensions.setdefault('creative_progress', {})
+    active_creative[id(progress)] = progress
 
     def do_generate():
         """Run in thread — call LLM API. Must use its own DB connection."""
@@ -371,10 +373,15 @@ def generate_plan(pid):
             logger.error("Creative generate [pid={}]: error — {}", pid, e)
           finally:
             progress["done"] = True
+            active_creative.pop(id(progress), None)
 
     import threading
     thread = threading.Thread(target=do_generate)
-    thread.start()
+    try:
+        thread.start()
+    except Exception:
+        active_creative.pop(id(progress), None)
+        raise
 
     def generate_sse():
         import time

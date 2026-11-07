@@ -86,7 +86,7 @@ const save = () => fs.writeFileSync(path.join(output, 'results.json'), JSON.stri
                 border: getComputedStyle(document.documentElement).getPropertyValue('--border').trim(),
                 pageBackground: getComputedStyle(document.body).backgroundColor};
             }, view);
-            assert.equal(state.overflow, false, JSON.stringify(state));assert.equal(state.mainTrees, 0, 'No second tree in main panel');
+            assert.equal(state.overflow, false, JSON.stringify(state));assert.equal(state.mainTrees, view==='taxonomy'?1:0, 'Only maintenance has a persistent content tree');
             assert.equal(state.sidebarTrees, view==='classify'?1:0, 'Only classification renders a sidebar tree');
             if (geometry[view]) for (const key of ['sidebar', 'header', 'main']) assert.deepEqual(state[key], geometry[view][key], 'Theme must preserve ' + key + ' geometry');
             else geometry[view] = state;

@@ -1,0 +1,531 @@
+{
+  "date": "2026-11-07",
+  "status": "installed-data-verified",
+  "version": "1.0.22",
+  "previous_version": "1.0.21",
+  "installed_application": "/Users/zack/Applications/映屿 · luminisle.app",
+  "scope": [
+    "Remove the people queue ten-minute cutoff and resume only legacy budget pauses.",
+    "Full pending-review rescan across both categories and every page, deduplicated; names, merges and manual corrections retained.",
+    "Offline images without a high-quality preview wait instead of using a low-resolution thumbnail."
+  ],
+  "package": {
+    "version": "1.0.22",
+    "previous_version": "1.0.21",
+    "app_id": "com.zack.media-manager",
+    "architecture": "arm64",
+    "frontend_files_matched": 47,
+    "frozen_modules_match_source": {
+      "backend.services.people_jobs": true,
+      "backend.services.face_engine": true,
+      "backend.blueprints.people": true
+    },
+    "frozen_worker_has_no_ten_minute_cutoff": true,
+    "private_data_files": 0,
+    "external_model_weights": 0,
+    "artifacts": {
+      "Luminisle-1.0.22-arm64.dmg": {
+        "bytes": 314375934,
+        "sha256": "c37962e30a8c0a01467d896f47e7a3a7ac8a9abeda7d44c73b354e7dce813a4b"
+      },
+      "Luminisle-1.0.22-arm64.zip": {
+        "bytes": 314073020,
+        "sha256": "9632d8f3b63093d80b296fa76f12b6dae929ee397b5c0bc4300d036bb3f63541"
+      }
+    },
+    "signing": "local ad-hoc; no Developer ID notarization",
+    "source_validation": "build/people-review-rescan-2026-11-07/validation.json",
+    "desktop_runtime_and_model_path_checks": "build/release-1.0.22/desktop-tests.log"
+  },
+  "checks": {
+    "source_python_tests": 151,
+    "source_browser_groups": 14,
+    "fresh_desktop_tests": "passed",
+    "frozen_self_test": "passed",
+    "signed_package_and_dmg_zip_integrity": "passed"
+  },
+  "migration_rehearsal": {
+    "ok": true,
+    "version": "1.0.22",
+    "packaged_frontend_files_matched": 47,
+    "private_or_external_model_weights": 0,
+    "bundled_runtime_vad_and_examples_bytes": 1246054,
+    "original_tables_unchanged": 48,
+    "new_tables": [],
+    "new_tables_empty": true,
+    "physical_column_order_unchanged": true,
+    "foreign_key_violations": 0,
+    "automatic_upgrade_snapshot_verified": true,
+    "model_paths_match_normal_profile": true,
+    "model_inference_disabled": true
+  },
+  "packaged_browser": {
+    "routes": [
+      {
+        "route": "#/gallery",
+        "title": "映屿 · luminisle"
+      },
+      {
+        "route": "#/classify",
+        "title": "映屿 · luminisle"
+      },
+      {
+        "route": "#/taxonomy",
+        "title": "映屿 · luminisle"
+      },
+      {
+        "route": "#/people",
+        "title": "映屿 · luminisle"
+      }
+    ],
+    "settings": [
+      {
+        "tab": "general",
+        "height": 740
+      },
+      {
+        "tab": "image",
+        "height": 740
+      },
+      {
+        "tab": "video",
+        "height": 740
+      },
+      {
+        "tab": "music",
+        "height": 740
+      },
+      {
+        "tab": "people",
+        "height": 740
+      },
+      {
+        "tab": "classification",
+        "height": 740
+      },
+      {
+        "tab": "creative",
+        "height": 740
+      }
+    ],
+    "errors": [],
+    "failedRequests": [],
+    "writes": [],
+    "metrics": [
+      {
+        "width": 1600,
+        "overflow": false,
+        "controls": [
+          32,
+          32,
+          32
+        ]
+      },
+      {
+        "width": 1000,
+        "overflow": false,
+        "controls": [
+          32,
+          32,
+          32
+        ]
+      }
+    ],
+    "settingsOpeningHeight": 225.56283569335938,
+    "peopleGrouping": {
+      "base_threshold": 0.5,
+      "calibrated": true,
+      "effective_threshold": 0.45,
+      "enabled": true,
+      "negative_feedback": 0,
+      "positive_feedback": 52
+    },
+    "galleryLayout": [
+      {
+        "width": 1600,
+        "inspectorOpen": false,
+        "usable": 1328,
+        "controlGap": 8,
+        "rowGaps": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "width": 1600,
+        "inspectorOpen": true,
+        "usable": 1040,
+        "controlGap": 8,
+        "rowGaps": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "width": 1600,
+        "inspectorOpen": false,
+        "usable": 1328,
+        "controlGap": 8,
+        "rowGaps": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "width": 1000,
+        "inspectorOpen": false,
+        "usable": 728,
+        "controlGap": 8,
+        "rowGaps": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "width": 1000,
+        "inspectorOpen": true,
+        "usable": 476,
+        "controlGap": 8,
+        "rowGaps": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "width": 1000,
+        "inspectorOpen": false,
+        "usable": 728,
+        "controlGap": 8,
+        "rowGaps": [
+          0,
+          0,
+          0
+        ]
+      }
+    ],
+    "peopleReview": {
+      "cards": 40,
+      "widths": [
+        {
+          "width": 1440,
+          "columns": 2
+        },
+        {
+          "width": 1000,
+          "columns": 1
+        }
+      ],
+      "avatarChosenWithoutSaving": true,
+      "confirmButtonBackground": "rgb(36, 111, 96)"
+    },
+    "reviewRescan": {
+      "total": 1259,
+      "active": 0,
+      "previewOnly": true
+    },
+    "toast": [
+      {
+        "mode": "light",
+        "color": "rgb(32, 62, 55)",
+        "background": "rgb(248, 250, 244)",
+        "contrast": 11.060871810643535
+      },
+      {
+        "mode": "dark",
+        "color": "rgb(236, 241, 230)",
+        "background": "rgb(23, 52, 49)",
+        "contrast": 11.635863103554755
+      }
+    ],
+    "ok": true
+  },
+  "installed_validation": {
+    "status": "installed-data-verified",
+    "version": "1.0.22",
+    "target": "/Users/zack/Applications/映屿 · luminisle.app",
+    "stage": "/Users/zack/Applications/.Luminisle-1.0.22-staging-cb60fb70aa5a4c589c462fcda5f808fa.app",
+    "previous": "/Users/zack/program/python/video_analyzer/build/release-1.0.22/previous-1.0.21.app",
+    "gated_app_pid": 42531,
+    "background_held_for_validation": true,
+    "grouping": {
+      "base_threshold": 0.5,
+      "calibrated": true,
+      "effective_threshold": 0.45,
+      "enabled": true,
+      "negative_feedback": 0,
+      "positive_feedback": 52
+    },
+    "health_version": "1.0.22",
+    "normal_profile_and_library": true,
+    "media": 11835,
+    "projects": 2,
+    "original_tables_unchanged": {
+      "collection_items": true,
+      "collections": true,
+      "dup_exclusions": true,
+      "media": true,
+      "media_fts": true,
+      "media_segment": true,
+      "media_tags": true,
+      "music_segment": true,
+      "people_changes": true,
+      "people_distinct": true,
+      "people_face_exclusions": true,
+      "people_faces": true,
+      "people_jobs": true,
+      "people_media_decisions": true,
+      "people_persons": true,
+      "people_plans": true,
+      "people_reviews": true,
+      "project_media": true,
+      "project_tracks": true,
+      "projects": true,
+      "settings": true,
+      "tags": true,
+      "taxonomy_analysis_batches": true,
+      "taxonomy_analysis_requests": true,
+      "taxonomy_candidate_context": true,
+      "taxonomy_candidates": true,
+      "taxonomy_changes": true,
+      "taxonomy_closed_proposals": true,
+      "taxonomy_collections": true,
+      "taxonomy_decision_events": true,
+      "taxonomy_decisions": true,
+      "taxonomy_examples": true,
+      "taxonomy_expressions": true,
+      "taxonomy_features": true,
+      "taxonomy_field_provenance": true,
+      "taxonomy_historical_snapshots": true,
+      "taxonomy_job_context": true,
+      "taxonomy_jobs": true,
+      "taxonomy_nodes": true,
+      "taxonomy_plans": true,
+      "taxonomy_relation_jobs": true,
+      "taxonomy_relation_locks": true,
+      "taxonomy_relation_suggestions": true,
+      "taxonomy_relations": true,
+      "taxonomy_sources": true,
+      "taxonomy_split_targets": true,
+      "taxonomy_text_features": true,
+      "taxonomy_validation_profiles": true
+    },
+    "new_tables": 0,
+    "new_tables_empty": true,
+    "physical_column_order_unchanged": true,
+    "foreign_key_violations": 0,
+    "existing_files_verified": 16535,
+    "model_configuration_unchanged": true,
+    "automatic_policies_preserved": true,
+    "preexisting_queue_states_preserved": true,
+    "signature_deep_strict": true,
+    "automatic_upgrade_snapshot": "/Users/zack/Library/Application Support/Media Manager/library/upgrade-backups/20261107-163148-1232f77a.db",
+    "snapshot_matches_original": true,
+    "original_media_or_model_files_modified": false,
+    "background_hold_released": true
+  },
+  "normal_startup_validation": {
+    "ok": true,
+    "version": "1.0.22",
+    "backend_pid": 44091,
+    "normal_profile_and_models": true,
+    "all_48_tables_identical_before_resume": true,
+    "protected_tables_after_resume": {
+      "collection_items": true,
+      "collections": true,
+      "dup_exclusions": true,
+      "media": true,
+      "media_fts": true,
+      "media_segment": true,
+      "media_tags": true,
+      "music_segment": true,
+      "people_changes": true,
+      "people_distinct": true,
+      "people_face_exclusions": true,
+      "people_media_decisions": true,
+      "people_plans": true,
+      "project_media": true,
+      "project_tracks": true,
+      "projects": true,
+      "settings": true,
+      "tags": true,
+      "taxonomy_analysis_batches": true,
+      "taxonomy_analysis_requests": true,
+      "taxonomy_candidate_context": true,
+      "taxonomy_candidates": true,
+      "taxonomy_changes": true,
+      "taxonomy_closed_proposals": true,
+      "taxonomy_collections": true,
+      "taxonomy_decision_events": true,
+      "taxonomy_decisions": true,
+      "taxonomy_examples": true,
+      "taxonomy_expressions": true,
+      "taxonomy_features": true,
+      "taxonomy_field_provenance": true,
+      "taxonomy_historical_snapshots": true,
+      "taxonomy_job_context": true,
+      "taxonomy_jobs": true,
+      "taxonomy_nodes": true,
+      "taxonomy_plans": true,
+      "taxonomy_relation_jobs": true,
+      "taxonomy_relation_locks": true,
+      "taxonomy_relation_suggestions": true,
+      "taxonomy_relations": true,
+      "taxonomy_sources": true,
+      "taxonomy_split_targets": true,
+      "taxonomy_text_features": true,
+      "taxonomy_validation_profiles": true
+    },
+    "media": 11835,
+    "projects": 2,
+    "legacy_budget_jobs": 3366,
+    "legacy_budget_jobs_after_resume": {
+      "done": 1,
+      "no_faces": 1,
+      "quality_insufficient": 1,
+      "queued": 3362,
+      "running": 1
+    },
+    "legacy_waiting_for_sources_at_check": 0,
+    "unrelated_and_previously_finished_jobs_unchanged": true,
+    "existing_person_names_and_manual_assignments_preserved": true,
+    "physical_columns_unchanged": true,
+    "existing_files_verified": 16535,
+    "model_configuration_unchanged": true,
+    "automatic_upgrade_snapshot_verified": true,
+    "review_rescan_preview": {
+      "active": 0,
+      "total": 1261
+    },
+    "new_full_rescan_started_by_agent": false
+  },
+  "startup_issue": {
+    "issue": "Temporary verification GUI exited; detached gated backend remained and blocked a duplicate launch.",
+    "version": "1.0.22",
+    "backend_pid": 42546,
+    "all_original_tables_still_unchanged": true,
+    "application_version_not_switched": true,
+    "backups_and_logs_preserved": true,
+    "action": "Gracefully terminate this orphan verification backend only; no restore or rollback.",
+    "same_version_gated_launch_healthy": true,
+    "restarted_backend_pid": 43364,
+    "launch_method": "LaunchServices with temporary inference gate",
+    "gated_native_preview_total": 1259,
+    "gated_native_preview_cancelled": true,
+    "all_48_tables_unchanged_after_native_preview": true,
+    "normal_gated_shutdown_confirmed": true,
+    "resolved": true,
+    "resolved_with_same_version": true,
+    "rollback_or_restore": false,
+    "normal_startup_verified": true
+  },
+  "native_window": {
+    "observed": true,
+    "rescan_preview_total": 1259,
+    "rescan_preview_cancelled_without_starting": true,
+    "normal_startup_header_showed_progress": true,
+    "new_rescan_button_visible": true
+  },
+  "retained_installer": "/Users/zack/program/python/video_analyzer/dist/Luminisle-1.0.22-arm64.dmg",
+  "schema": {
+    "new_tables_or_columns": false,
+    "existing_physical_column_order_preserved": true,
+    "legacy_projects_timestamp_column_drift_preserved": true
+  },
+  "cleanup": {
+    "status": "complete",
+    "removed": [
+      {
+        "path": "dist/mac-arm64",
+        "logical_bytes": 773572132
+      },
+      {
+        "path": "dist/Luminisle-1.0.22-arm64.zip",
+        "logical_bytes": 314073020
+      },
+      {
+        "path": "dist/Luminisle-1.0.22-arm64.zip.blockmap",
+        "logical_bytes": 327794
+      },
+      {
+        "path": "dist/Luminisle-1.0.22-arm64.dmg.blockmap",
+        "logical_bytes": 327949
+      },
+      {
+        "path": "dist/builder-debug.yml",
+        "logical_bytes": 1028
+      },
+      {
+        "path": "build/runtime",
+        "logical_bytes": 425280337
+      },
+      {
+        "path": "build/tools",
+        "logical_bytes": 101211590
+      },
+      {
+        "path": "build/pyinstaller",
+        "logical_bytes": 116991644
+      },
+      {
+        "path": "build/release-1.0.22/rehearsal-library",
+        "logical_bytes": 2411001810
+      },
+      {
+        "path": "build/release-1.0.22/previous-1.0.21.app",
+        "logical_bytes": 773568204
+      }
+    ],
+    "logical_bytes": 4916355508,
+    "retained": [
+      "Current 1.0.22 DMG and all preexisting installers, including verified 1.0.21 rollback version.",
+      "Real library, all real upgrade snapshots, external models and configuration.",
+      "Release baseline and pre-install recovery databases, startup incident logs, scripts and validation evidence."
+    ],
+    "note": "Logical size counts may share APFS extents. No original or existing backup was deleted."
+  },
+  "git": {
+    "committed": false,
+    "pushed": false
+  },
+  "limitations": [
+    "Local ad-hoc signing; no Developer ID notarization.",
+    "No new accuracy benchmark or real-clock ten-minute endurance run. Time-continuation behavior was covered by synthetic-clock tests and frozen-code verification."
+  ],
+  "final_verification": {
+    "ok": true,
+    "version": "1.0.22",
+    "media": 11835,
+    "projects": 2,
+    "remaining_legacy_budget_pauses": 0,
+    "jobs_at_final_check": {
+      "cancelled": 0,
+      "done": 239,
+      "failed": 0,
+      "no_faces": 30,
+      "paused": 0,
+      "quality_insufficient": 5759,
+      "queued": 4536,
+      "running": 1,
+      "stale": 0,
+      "waiting": 1100
+    },
+    "model_configuration_unchanged": true,
+    "installed_frontend_files_match_source": 47,
+    "installer_integrity_verified": true,
+    "removed_copies_absent": true,
+    "signature_deep_strict": true
+  },
+  "post_checkpoint_note": "Subsequent additional rescan queue activity was observed after the initial preservation checkpoint. The agent only previewed and cancelled the new rescan dialog; it did not submit a full-rescan request.",
+  "subsequent_source_work": {
+    "date": "2026-11-07",
+    "scope": "Video track consensus and uncertainty review descriptions",
+    "installed": false,
+    "evidence": "build/video-track-identity-2026-11-07/validation.json",
+    "note": "Package source-match verification applies to the sources at 1.0.22 build time."
+  }
+}

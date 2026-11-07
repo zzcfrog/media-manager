@@ -1,0 +1,383 @@
+{
+  "date": "2026-11-07",
+  "status": "installed-data-verified",
+  "version": "1.0.19",
+  "previous_version": "1.0.18",
+  "installed_application": "/Users/zack/Applications/映屿 · luminisle.app",
+  "authorization": "User requested a formal release and replacement of the local application. No hosted publication or Git actions requested.",
+  "scope": [
+    "RAW high-quality camera preview and full decode fallback; versioned offline cache; separate photo portrait and identity model pixels.",
+    "Configurable grouping threshold default 0.55 and enabled local calibration from undoable human corrections."
+  ],
+  "package": {
+    "version": "1.0.19",
+    "previous_version": "1.0.18",
+    "app_id": "com.zack.media-manager",
+    "architecture": "arm64",
+    "frontend_files_matched": 47,
+    "application_bytes": 773546388,
+    "artifacts": {
+      "Luminisle-1.0.19-arm64.dmg": {
+        "bytes": 314372687,
+        "sha256": "7317b734b7e3735666016370825d7101d1d0a059d7abd81bd672c50fabe2c3d8"
+      },
+      "Luminisle-1.0.19-arm64.zip": {
+        "bytes": 314067207,
+        "sha256": "27f1d800374567f39a011c0ec0bae1ca1aa8507683941dce21d7607c69c20f2e"
+      }
+    },
+    "private_data_files": 0,
+    "source_validation": "build/raw-and-grouping-2026-11-07/validation-summary.json",
+    "installation": "installed-data-verified",
+    "signature_deep_strict": true,
+    "dmg_and_zip_integrity": "passed"
+  },
+  "checks": {
+    "python_tests_fresh": 357,
+    "desktop_runtime_and_paths": "passed",
+    "desktop_migration_groups": 9,
+    "desktop_live_model_directory_groups": 6,
+    "source_browser_groups_previous_turn": 27,
+    "packaged_browser": {
+      "routes": [
+        {
+          "route": "#/gallery",
+          "title": "映屿 · luminisle"
+        },
+        {
+          "route": "#/classify",
+          "title": "映屿 · luminisle"
+        },
+        {
+          "route": "#/taxonomy",
+          "title": "映屿 · luminisle"
+        },
+        {
+          "route": "#/people",
+          "title": "映屿 · luminisle"
+        }
+      ],
+      "settings": [
+        {
+          "tab": "general",
+          "height": 740
+        },
+        {
+          "tab": "image",
+          "height": 740
+        },
+        {
+          "tab": "video",
+          "height": 740
+        },
+        {
+          "tab": "music",
+          "height": 740
+        },
+        {
+          "tab": "people",
+          "height": 740
+        },
+        {
+          "tab": "classification",
+          "height": 740
+        },
+        {
+          "tab": "creative",
+          "height": 740
+        }
+      ],
+      "errors": [],
+      "failedRequests": [],
+      "writes": [],
+      "metrics": [
+        {
+          "width": 1600,
+          "overflow": false,
+          "controls": [
+            32,
+            32,
+            32
+          ]
+        },
+        {
+          "width": 1000,
+          "overflow": false,
+          "controls": [
+            32,
+            32,
+            32
+          ]
+        }
+      ],
+      "settingsOpeningHeight": 407.20703125,
+      "peopleGrouping": {
+        "base_threshold": 0.55,
+        "calibrated": true,
+        "effective_threshold": 0.5,
+        "enabled": true,
+        "negative_feedback": 0,
+        "positive_feedback": 19
+      },
+      "toast": [
+        {
+          "mode": "light",
+          "color": "rgb(32, 62, 55)",
+          "background": "rgb(248, 250, 244)",
+          "contrast": 11.060871810643535
+        },
+        {
+          "mode": "dark",
+          "color": "rgb(236, 241, 230)",
+          "background": "rgb(23, 52, 49)",
+          "contrast": 11.635863103554755
+        }
+      ],
+      "ok": true
+    },
+    "frozen_features": {
+      "version": "1.0.19",
+      "synthetic_only": true,
+      "real_ai_inference": false,
+      "real_library_used": false,
+      "initial_grouping": {
+        "base_threshold": 0.55,
+        "calibrated": true,
+        "effective_threshold": 0.5,
+        "enabled": true,
+        "negative_feedback": 0,
+        "positive_feedback": 5
+      },
+      "settings_save_validation_and_undo_redo": true,
+      "offline_raw_dimensions": [
+        2400,
+        1600
+      ],
+      "missing_and_invalid_raw_status": [
+        404,
+        422
+      ],
+      "no_scans_or_analysis_queued": true,
+      "ok": true
+    }
+  },
+  "migration_rehearsal": {
+    "ok": true,
+    "version": "1.0.19",
+    "packaged_frontend_files_matched": 47,
+    "private_or_external_model_weights": 0,
+    "bundled_runtime_vad_and_examples_bytes": 1246054,
+    "original_tables_unchanged": 48,
+    "new_tables": [],
+    "new_tables_empty": true,
+    "foreign_key_violations": 0,
+    "automatic_upgrade_snapshot_verified": true,
+    "model_paths_match_normal_profile": true,
+    "model_inference_disabled": true
+  },
+  "installed_validation": {
+    "status": "installed-data-verified",
+    "version": "1.0.19",
+    "target": "/Users/zack/Applications/映屿 · luminisle.app",
+    "grouping": {
+      "base_threshold": 0.55,
+      "calibrated": true,
+      "effective_threshold": 0.5,
+      "enabled": true,
+      "negative_feedback": 0,
+      "positive_feedback": 19
+    },
+    "health_version": "1.0.19",
+    "normal_profile_and_library": true,
+    "media": 11835,
+    "projects": 2,
+    "original_tables_unchanged": {
+      "collection_items": true,
+      "collections": true,
+      "dup_exclusions": true,
+      "media": true,
+      "media_fts": true,
+      "media_segment": true,
+      "media_tags": true,
+      "music_segment": true,
+      "people_changes": true,
+      "people_distinct": true,
+      "people_face_exclusions": true,
+      "people_faces": true,
+      "people_jobs": true,
+      "people_media_decisions": true,
+      "people_persons": true,
+      "people_plans": true,
+      "people_reviews": true,
+      "project_media": true,
+      "project_tracks": true,
+      "projects": true,
+      "settings": true,
+      "tags": true,
+      "taxonomy_analysis_batches": true,
+      "taxonomy_analysis_requests": true,
+      "taxonomy_candidate_context": true,
+      "taxonomy_candidates": true,
+      "taxonomy_changes": true,
+      "taxonomy_closed_proposals": true,
+      "taxonomy_collections": true,
+      "taxonomy_decision_events": true,
+      "taxonomy_decisions": true,
+      "taxonomy_examples": true,
+      "taxonomy_expressions": true,
+      "taxonomy_features": true,
+      "taxonomy_field_provenance": true,
+      "taxonomy_historical_snapshots": true,
+      "taxonomy_job_context": true,
+      "taxonomy_jobs": true,
+      "taxonomy_nodes": true,
+      "taxonomy_plans": true,
+      "taxonomy_relation_jobs": true,
+      "taxonomy_relation_locks": true,
+      "taxonomy_relation_suggestions": true,
+      "taxonomy_relations": true,
+      "taxonomy_sources": true,
+      "taxonomy_split_targets": true,
+      "taxonomy_text_features": true,
+      "taxonomy_validation_profiles": true
+    },
+    "new_tables": 0,
+    "new_tables_empty": true,
+    "foreign_key_violations": 0,
+    "existing_files_verified": 15949,
+    "model_configuration_unchanged": true,
+    "automatic_policies_preserved": true,
+    "preexisting_queue_states_preserved": true,
+    "signature_deep_strict": true,
+    "automatic_upgrade_snapshot": "/Users/zack/Library/Application Support/Media Manager/library/upgrade-backups/20261107-115434-e29d19cb.db",
+    "snapshot_matches_original": true,
+    "original_media_or_model_files_modified": false
+  },
+  "queues": {
+    "before": {
+      "people_jobs": {
+        "done": 202,
+        "no_faces": 1,
+        "paused": 5244,
+        "quality_insufficient": 5488,
+        "waiting": 730
+      },
+      "taxonomy_jobs": {},
+      "taxonomy_relation_jobs": {}
+    },
+    "preserved_exactly": true,
+    "resumed_by_upgrade": false,
+    "policy": "No queued or running work existed before quit. Existing paused/waiting/completed states and global flag were preserved.",
+    "unchanged_after_native_ui_and_cleanup": true
+  },
+  "native_window": {
+    "observed": true,
+    "settings_tab": "人脸识别",
+    "group": "人物归组",
+    "manual_threshold": 0.55,
+    "effective_threshold": 0.5,
+    "calibration_switch": "on",
+    "same_person_feedback": 19,
+    "different_person_feedback": 0,
+    "dialog_left_open_without_saving": true
+  },
+  "schema": {
+    "tables_or_columns_added": false,
+    "existing_physical_column_order_preserved": true,
+    "legacy_timestamp_column_drift_preserved": [
+      {
+        "table": "projects",
+        "last_columns": [
+          "creative_brief",
+          "ai_plan"
+        ]
+      }
+    ]
+  },
+  "retained_installer": "/Users/zack/program/python/video_analyzer/dist/Luminisle-1.0.19-arm64.dmg",
+  "cleanup": {
+    "status": "complete",
+    "removed": [
+      {
+        "path": "dist/mac-arm64",
+        "logical_bytes": 773546388
+      },
+      {
+        "path": "dist/Luminisle-1.0.19-arm64.zip",
+        "logical_bytes": 314067207
+      },
+      {
+        "path": "dist/Luminisle-1.0.19-arm64.zip.blockmap",
+        "logical_bytes": 328070
+      },
+      {
+        "path": "dist/Luminisle-1.0.19-arm64.dmg.blockmap",
+        "logical_bytes": 327795
+      },
+      {
+        "path": "dist/builder-debug.yml",
+        "logical_bytes": 1028
+      },
+      {
+        "path": "build/runtime",
+        "logical_bytes": 425256310
+      },
+      {
+        "path": "build/tools",
+        "logical_bytes": 101211590
+      },
+      {
+        "path": "build/pyinstaller",
+        "logical_bytes": 116997667
+      },
+      {
+        "path": "build/release-1.0.19/baseline",
+        "logical_bytes": 109088768
+      },
+      {
+        "path": "build/release-1.0.19/rehearsal-library",
+        "logical_bytes": 2069848343
+      },
+      {
+        "path": "build/release-1.0.19/runtime-fixture",
+        "logical_bytes": 2445988
+      },
+      {
+        "path": "build/release-1.0.19/previous-1.0.18.app",
+        "logical_bytes": 773527384
+      },
+      {
+        "path": "build/release-1.0.19/pre-install.db",
+        "logical_bytes": 109056000
+      },
+      {
+        "path": "build/release-1.0.19/pre-install.db-wal",
+        "logical_bytes": 0
+      },
+      {
+        "path": "build/release-1.0.19/pre-install.db-shm",
+        "logical_bytes": 32768
+      }
+    ],
+    "logical_bytes": 4795735306,
+    "note": "Logical sizes; APFS cloned files may share physical extents. Only this release build and verification copies were removed.",
+    "retained": [
+      "installed 1.0.19 application",
+      "1.0.19 DMG and pre-existing installers",
+      "real library and all existing upgrade snapshots",
+      "external model files and model-paths.json",
+      "release evidence, logs, prior development work and build virtual environment"
+    ],
+    "production_healthy_after_cleanup": true
+  },
+  "limitations": [
+    "Local ad-hoc signature; no Developer ID notarization.",
+    "Actual NEF image quality and face accuracy were not re-benchmarked while source originals were offline.",
+    "Existing low-quality portraits require an explicit rescan with the original or a usable high-quality preview.",
+    "Calibration is bounded local statistics, not model retraining or a measured accuracy guarantee."
+  ],
+  "git": {
+    "committed": false,
+    "pushed": false
+  }
+}

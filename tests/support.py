@@ -25,7 +25,7 @@ class DatabaseCase(unittest.TestCase):
     def setUp(self):
         self.case = Path(tempfile.mkdtemp(dir=_ROOT))
         self.app = Flask(__name__)
-        self.app.config.update(TESTING=True, DATABASE=str(self.case / 'test.db'))
+        self.app.config.update(TESTING=True, DATABASE=str(self.case / 'test.db'), MODELS_ROOT=str(self.case / 'models'))
         init_db(self.app)
         for module in (analysis, library, workbench, creative, tags, taxonomy):
             self.app.register_blueprint(module.bp, url_prefix='/api/' + module.bp.name)

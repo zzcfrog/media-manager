@@ -25,9 +25,9 @@ test('example writes freeze both selected tag and media before navigation',async
   fetcher=async(url)=>{calls.push(url);if(first){first=false;e.node={id:2};e.selectedMedia=[99];}return{data:[]};};
   e.example('positive');await tick();assert(calls.slice(0,2).every(url=>url==='/api/taxonomy/examples/1'));assert.equal(calls.length,3);
 });
-test('periodic progress refresh preserves unsaved configuration',async()=>{
-  const c=state(component);c.tab='jobs';c.configLoaded=true;c.config={classification_model_dir:'unsaved'};
-  fetcher=async()=>({data:[]});await c.refresh();assert.equal(c.config.classification_model_dir,'unsaved');
+test('task refresh reads jobs without reading or writing configuration',async()=>{
+  const c=state(component);c.tab='jobs';const requests=[];
+  fetcher=async url=>{requests.push(url);return{data:[]};};await c.refresh();assert.equal(requests.some(url=>url.includes('/configuration')),false);
 });
 test('late example read cannot replace the current selection',async()=>{
   let resolve;const s=state(component);fetcher=()=>new Promise(r=>resolve=r);const pending=s.loadExamples();

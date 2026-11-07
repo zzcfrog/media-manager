@@ -162,9 +162,8 @@ const GalleryPage = {
   template: `
   <div class="library-workspace" :aria-busy="loading ? 'true' : 'false'" style="position:relative">
     <q-linear-progress v-if="loading" indeterminate class="gallery-loading" :aria-label="taxText('正在读取素材…','Loading media…')" style="position:absolute;top:0;left:0;right:0;z-index:2"></q-linear-progress>
-    <taxonomy-tools v-if="!$root.pickerMode && selArr.length && !$root.route.startsWith('#/classify')" :gallery="this"></taxonomy-tools>
     <div v-if="$root.taxonomyCollectionError" class="taxonomy-error" role="alert">{{$root.taxonomyCollectionError}}<q-btn flat dense icon="refresh" :aria-label="taxText('重试图集','Retry collection')" @click="$root.loadTaxonomyCollection(Number($root.route.split('/')[3]))"></q-btn></div>
-    <people-gallery-tools v-if="!$root.pickerMode" :gallery="this"></people-gallery-tools>
+    <people-gallery-tools v-if="!$root.pickerMode && $root.route.startsWith('#/people/person/')" :gallery="this"></people-gallery-tools>
     <!-- Filter bar: type, fav/analyzed, stars, colors, reset, search, sort, group, view -->
     <div class="filter-bar" :class="{ 'adv-open': advPanelOpen && currentSpec.length }">
       <div class="filter-controls">
@@ -245,6 +244,11 @@ const GalleryPage = {
         <q-tooltip :delay="1000">{{ t('g.reset_filter') }}</q-tooltip>
       </q-btn>
       </div><div class="filter-display-controls">
+      <div v-if="!$root.pickerMode && !$root.route.startsWith('#/classify')" class="gallery-selection-actions" :class="{'is-empty':!selArr.length}" :aria-hidden="!selArr.length">
+        <taxonomy-tools :gallery="this"></taxonomy-tools>
+        <q-btn :disable="!selArr.length" unelevated dense no-caps color="primary" icon="auto_awesome" class="batch-analysis-btn"
+               :aria-label="t('g.ctx_analyze_n', {n: selArr.length})" @click="openBatchAnalysisDialog()"><span class="batch-analysis-label">{{t('ui.ai_analysis')}}</span><q-tooltip>{{t('g.ctx_analyze_n', {n: selArr.length})}}</q-tooltip></q-btn>
+      </div>
       <gallery-order-controls :sort-by="sortBy" :sort-order="sortOrder" :group-by="groupBy" :sort-options="sortOptions" :group-options="isTimeSort?timeGroupOptions:(sortBy==='duration'?durGroupOptions:[])"
         @update:sort-by="sortBy=$event;load()" @update:sort-order="sortOrder=$event;load()" @update:group-by="groupBy=$event"></gallery-order-controls>
       <div class="gallery-view-controls">
@@ -258,8 +262,6 @@ const GalleryPage = {
       </div>
       </div>
       <div v-if="!$root.pickerMode" class="filter-actions">
-        <q-btn v-if="selArr.length" unelevated dense no-caps color="primary" icon="auto_awesome" class="batch-analysis-btn"
-               :aria-label="t('g.ctx_analyze_n', {n: selArr.length})" @click="openBatchAnalysisDialog()"><span class="batch-analysis-label">{{t('g.ctx_analyze_n', {n: selArr.length})}}</span><q-tooltip>{{t('g.ctx_analyze_n', {n: selArr.length})}}</q-tooltip></q-btn>
         <q-btn flat round dense icon="info_outline" class="inspector-toggle" :aria-label="t('ui.inspector')"
                :aria-pressed="inspectorOpen" :class="{'is-active': inspectorOpen}" @click="inspectorOpen = !inspectorOpen">
           <q-tooltip :delay="600">{{ t('ui.inspector') }}</q-tooltip>
@@ -1014,6 +1016,7 @@ const GalleryPage = {
       showTagSuggestions:false,
       items: [], loadError: '', total: 0, page: 1, perPage: 60, loading: false, loadingMore: false, allLoaded: false, viewMode: "grid", searchText: "",
       sortBy: "imported_at", sortOrder: "desc", gridScale: 1, masonryCols: 5, justifiedRowH: 220,
+      galleryWidth: 0,
       selArr: [], _allSelected: false, lasso: null, lastClickIdx: -1,
       inspectorOpen: localStorage.getItem('libraryInspector') !== 'false',
       stackMode: ['off', 'near', 'similar', 'cluster'].includes(localStorage.getItem('favoriteStackMode')) ? localStorage.getItem('favoriteStackMode') : 'near',
@@ -1300,6 +1303,14 @@ const GalleryPage = {
     document.addEventListener("mousedown", this._closeSimilarCtx);
   },
   mounted() {
+    this._galleryResizeObserver = new ResizeObserver(([entry]) => {
+      const width = entry.contentRect.width;
+      if (width > 0 && width !== this.galleryWidth) {
+        this.galleryWidth = width;
+        this.$nextTick(() => this._checkFill());
+      }
+    });
+    this._galleryResizeObserver.observe(this.$refs.galleryPage);
     this._observer = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting) this.loadMore();
     }, { root: this.$refs.galleryPage, rootMargin: "200px" });
@@ -1307,11 +1318,18 @@ const GalleryPage = {
       if (this.$refs.sentinel) this._observer.observe(this.$refs.sentinel);
     });
   },
+  activated() {
+    if (this._galleryResizeObserver) this._galleryResizeObserver.observe(this.$refs.galleryPage);
+  },
+  deactivated() {
+    if (this._galleryResizeObserver) this._galleryResizeObserver.disconnect();
+  },
   beforeUnmount() {
     document.removeEventListener("mousedown", this.closeCtx);
     document.removeEventListener("mousedown", this._closeSimilarCtx);
     document.removeEventListener("keydown", this.handleKey, true);
     if (this._observer) this._observer.disconnect();
+    if (this._galleryResizeObserver) this._galleryResizeObserver.disconnect();
   },
   // -- Methods: data loading, selection, keyboard, context menu, formatting --
   methods: {
@@ -1883,6 +1901,7 @@ const GalleryPage = {
     },
     handleKey(e) {
       if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.isContentEditable) return;
+      if (e.target.closest('.taxonomy-selection-menu,.taxonomy-picker-menu')) return;
       // In picker mode, only the picker instance handles keys; main instance must skip
       if (this.$root.pickerMode && !this._isPicker) return;
       if (!this.$root.pickerMode && this.$root.currentView !== "gallery") return;
@@ -2330,9 +2349,7 @@ const GalleryPage = {
     onThumbLoad,
     layoutJustified(items) {
       if (!items.length) return [];
-      const page = this.$refs.galleryPage;
-      const w = (page ? page.clientWidth : 800) - 16;
-      return this._calcRows(items, w, this.justifiedRowH);
+      return this._calcRows(items, this.galleryWidth || 800, this.justifiedRowH);
     },
     _calcRows(items, containerW, targetH) {
       const gap = 8, rows = [];

@@ -1,4 +1,4 @@
-"""Durable, cancellable local classification with bounded foreground-aware work."""
+"""Durable, cancellable local classification that yields to foreground work."""
 import functools
 import hashlib
 import json
@@ -57,7 +57,8 @@ def matching_basis(db, stage, media_id=None):
     model = get_setting(db,'classification_omni_model','qwen3-omni-30b-a3b')
     if stage == 'omni':
         return {'policy':'local-observation-v2','model':model}
-    directory=get_setting(db,'classification_model_dir','')
+    from .classification_models import configured_directory
+    directory=configured_directory(db)
     manifest=Path(directory)/'classification.json'
     try:
         config=json.loads(manifest.read_text())
@@ -75,6 +76,8 @@ def matching_basis(db, stage, media_id=None):
 
 
 def enqueue(db, media_id, stage='fast', priority=0, batch_id=None):
+    from .model_preferences import classification_enabled
+    if not classification_enabled(db,stage):return None
     media=db.execute('SELECT media_type FROM media WHERE id=?',(media_id,)).fetchone()
     if not media or media[0] not in ('image','video'): return None
     revision=tx.input_revision(db,media_id,stage)
@@ -121,7 +124,15 @@ def map_analysis(db,job):
 
 def process(db,job,infer=None):
     def cancelled():
+        from .model_preferences import classification_enabled, sync_classification_jobs
+        if not classification_enabled(db,job['stage']):
+            with db:sync_classification_jobs(db)
+            return True
         r=db.execute('SELECT state,lease FROM taxonomy_jobs WHERE id=?',(job['id'],)).fetchone()
+        if r and r['state']=='running' and r['lease']==job['lease'] and job['stage']!='analysis' and busy(current_app.config['DATABASE']):
+            with db:
+                db.execute("UPDATE taxonomy_jobs SET state='queued',lease=NULL,lease_until=NULL,attempts=MAX(0,attempts-1),error='等待前台任务结束' WHERE id=? AND state='running' AND lease=?",(job['id'],job['lease']))
+            return True
         if r and r['state']=='running' and r['lease']==job['lease'] and time.monotonic()>=job.get('_deadline',float('inf')):
             with db:db.execute("UPDATE taxonomy_jobs SET state='paused',lease=NULL,error='已达到本轮时间预算' WHERE id=? AND lease=?",(job['id'],job['lease']))
             return True
@@ -194,6 +205,8 @@ def claim(db,oldest=False,allow_heavy=True):
     now=time.time()
     with db:
         db.execute("UPDATE taxonomy_jobs SET state=CASE WHEN attempts>=3 THEN 'failed' ELSE 'queued' END,lease=NULL WHERE state='running' AND COALESCE(lease_until,0)<?",(now,))
+        from .model_preferences import sync_classification_jobs
+        sync_classification_jobs(db)
         condition="state='queued' AND attempts<3" + ('' if allow_heavy else " AND stage='analysis'")
         row=db.execute('SELECT * FROM taxonomy_jobs WHERE '+condition+' ORDER BY '+('id' if oldest else 'priority DESC,id')+' LIMIT 1').fetchone()
         if not row: return None
@@ -226,29 +239,24 @@ def _resume_expired_leases(app,key,db):
 
 
 def _run(app,key):
-    started=time.monotonic();completed=0;budget=600
+    completed=0
     with app.app_context():
         db=get_db()
         try:
-            budget=max(1,min(3600,int(get_setting(db,'classification_budget_seconds','600'))))
-            import resource,sys
-            baseline=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-            memory_unit=1 if sys.platform=='darwin' else 1024
-            limit=max(256,int(get_setting(db,'classification_resource_limit_mb','4096')))*1024*1024
-            while time.monotonic()-started<budget:
-                if (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss-baseline)*memory_unit>limit:
-                    with db:db.execute("UPDATE taxonomy_jobs SET state='paused',error='达到本轮额外内存预算' WHERE state='queued'")
-                    break
+            # Recover only identifiable legacy resource cutoffs; explicit pauses stay paused.
+            with db:
+                db.execute("UPDATE taxonomy_jobs SET state='queued',lease=NULL,attempts=0,error='' WHERE state='paused' AND error IN ('已达到本轮时间预算','达到本轮额外内存预算')")
+                db.execute("UPDATE taxonomy_relation_jobs SET state='queued',lease=NULL,error='' WHERE state='paused' AND error='已达到本轮时间预算'")
+            while True:
                 job=claim(db,oldest=completed%10==9,allow_heavy=not busy(key))
                 if not job:
                     from .taxonomy_relations import process_next
-                    if not busy(key) and process_next(db,deadline=started+budget):
+                    if not busy(key) and process_next(db):
                         completed+=1;continue
                     if busy(key) and (db.execute("SELECT 1 FROM taxonomy_jobs WHERE state='queued' LIMIT 1").fetchone() or
                                       db.execute("SELECT 1 FROM taxonomy_relation_jobs WHERE state='queued' LIMIT 1").fetchone()):
                         threading.Event().wait(.25);continue
                     break
-                job['_deadline']=started+budget
                 try: process(db,job)
                 except FileNotFoundError as exc:
                     db.rollback()
@@ -262,12 +270,9 @@ def _run(app,key):
                     with db: db.execute("UPDATE taxonomy_jobs SET state='failed',lease=NULL,error='分类失败，可重试' WHERE id=? AND lease=?",(job['id'],job['lease']))
                 completed+=1
         finally:
-            if time.monotonic()-started>=budget:
-                with db: db.execute("UPDATE taxonomy_jobs SET state='paused',error='已达到本轮时间预算' WHERE state='queued'")
-                with db: db.execute("UPDATE taxonomy_relation_jobs SET state='paused',error='已达到本轮时间预算' WHERE state='queued'")
             with _workers_lock:
                 if _workers.get(key) is threading.current_thread(): _workers.pop(key,None)
                 pending=db.execute("SELECT 1 FROM taxonomy_jobs WHERE state='queued' AND attempts<3 LIMIT 1").fetchone()
                 pending=pending or db.execute("SELECT 1 FROM taxonomy_relation_jobs WHERE state='queued' OR (state='running' AND updated_at<datetime('now','-600 seconds')) LIMIT 1").fetchone()
-            if pending and time.monotonic()-started<budget: ensure_worker(app)
+            if pending: ensure_worker(app)
             elif not pending:_resume_expired_leases(app,key,db)

@@ -1,0 +1,80 @@
+/* B: one quiet surface per group, aligned rows and consistent hierarchy. */
+body.native-ui .settings-dialog { height:min(740px,calc(100vh - 48px)); max-height:min(740px,calc(100vh - 48px)); }
+body.native-ui .settings-dialog .q-tab-panels { display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden; }
+body.native-ui .settings-dialog .q-tab-panels > .q-panel { flex:1; min-height:0; height:auto; overflow-y:auto; }
+body.native-ui .settings-dialog .q-tabs { margin:0 20px !important; border-radius:var(--radius-control); }
+body.native-ui .settings-dialog .q-tabs__content { padding:3px; gap:2px; }
+body.native-ui .settings-dialog .q-tab { min-height:28px; border-radius:calc(var(--radius-control) - 2px); }
+body.native-ui .settings-dialog > .q-card__section { padding:20px 24px 16px; }
+body.native-ui .settings-dialog > .q-card__section .text-h6 { font-size:17px; font-weight:600; }
+body.native-ui .settings-dialog > .q-card__actions { border-top:1px solid var(--border); padding:16px 24px 20px; }
+body.native-ui .settings-panel { gap:18px; padding:20px; }
+.settings-group { flex-shrink:0; min-width:0; }
+.settings-group-heading { display:flex; align-items:center; gap:7px; min-height:22px; margin:0 4px 7px; }
+.settings-group-heading > .q-icon { flex-shrink:0; color:var(--accent); font-size:18px; }
+.settings-group-heading > h3 { margin:0; color:var(--text); font-size:14px; line-height:20px; font-weight:600; }
+.settings-group-note,.settings-row-note { min-width:0; margin-left:auto; color:var(--text3); font-size:11px; font-weight:400; line-height:17px; text-align:right; overflow-wrap:anywhere; }
+.settings-group-body { min-width:0; padding:3px 14px; border-radius:var(--radius-inset); background:var(--surface2); }
+.settings-group--bare > .settings-group-body { padding:0; border-radius:0; background:transparent; }
+.settings-row { display:flex; align-items:center; justify-content:space-between; min-width:0; min-height:44px; gap:16px; padding:5px 0; }
+.settings-row+.settings-row { border-top:1px solid color-mix(in srgb,var(--text) 7%,transparent); }
+body.native-ui .settings-row-label.settings-label { display:flex; align-items:center; gap:5px; min-width:0; margin:0; padding:0; color:var(--text); font-size:13px; font-weight:400; line-height:19px; }
+.settings-row-label > span { min-width:0; }
+.settings-row-control { display:flex; align-items:center; justify-content:flex-end; flex:0 0 320px; max-width:52%; min-width:0; gap:8px; }
+.settings-row-control > .q-field,.settings-row-control > .model-select { width:100%; min-width:0; }
+.settings-row-control > .q-toggle { flex-shrink:0; font-size:13px; }
+.settings-row-control > .q-checkbox { flex-shrink:0; }
+body.native-ui .settings-row-control > .settings-number { width:88px; }
+body.native-ui .settings-row .q-field--filled .q-field__control { background:var(--surface); }
+body.native-ui .settings-row .q-field--dense .q-field__control,body.native-ui .settings-row .q-field--dense .q-field__marginal { height:34px; min-height:34px; }
+body.native-ui .settings-row .q-field--dense .q-field__native { min-height:34px; padding-top:0; padding-bottom:0; }
+.settings-row .q-field { font-size:12px; }
+.settings-row .q-field__append { padding-left:4px; }
+.settings-row .q-field__append .q-btn { min-height:26px; padding:3px 5px; font-size:11px; color:var(--text2); }
+.settings-row .q-field__append .q-btn .q-icon { font-size:18px; }
+body.native-ui .settings-row .engine-toggle { min-height:32px; padding:2px; border:0; border-radius:var(--radius-control); background:var(--surface); }
+body.native-ui .settings-row .engine-toggle .q-btn { min-height:28px; padding:3px 12px; }
+.settings-row .engine-toggle .q-btn+.q-btn { border:0; }
+.settings-status { display:flex; flex-wrap:wrap; align-items:center; gap:6px; min-width:0; padding:8px 0; color:var(--text2); font-size:11px; line-height:18px; overflow-wrap:anywhere; }
+.settings-status .q-linear-progress { flex:0 0 100%; width:100%; color:var(--accent); }
+.settings-status > .q-icon { flex-shrink:0; font-size:16px; }
+.settings-status--error { color:var(--negative); }
+body.native-ui .settings-help { width:20px; height:20px; min-width:20px; min-height:20px; padding:0; flex-shrink:0; color:var(--text3); }
+.settings-help .q-icon { font-size:15px; }
+.settings-help:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.settings-group-heading > .settings-help { margin-left:0; }
+.recognition-settings,.recognition-settings--people { gap:18px; padding-bottom:0; }
+.settings-dialog .face-model-heading { display:flex; align-items:center; gap:16px; }
+.settings-dialog .face-model-heading > .settings-row-label { flex:0 1 auto; }
+.settings-dialog .face-model-heading > .settings-row-control { flex:0 0 320px; }
+.settings-dialog .face-model-stage-heading { display:block; }
+.settings-dialog .face-model-stage { background:var(--surface2); }
+.settings-dialog .face-stage-hero { min-height:86px; }
+.settings-dialog .face-model-details { margin:0; }
+.settings-dialog .general-model-migration-row { flex-wrap:nowrap; margin-top:0; }
+.settings-dialog .general-model-directory .q-input .q-field__append .q-btn { min-height:26px; }
+.general-settings > .appearance-picker { display:contents; }
+.general-settings .appearance-theme-grid { padding:9px 0; gap:8px; }
+.general-settings .theme-preview { height:80px; }
+.general-settings .theme-preview-title { height:7px; flex-shrink:0; }
+.general-settings .theme-preview-media i { height:8px; }
+.general-settings .theme-preview-sidebar { padding-top:3px; padding-bottom:1px; }
+.general-settings .theme-preview-sidebar b { height:3px; margin-bottom:3px; }
+.general-settings .theme-preview-sidebar i { height:2px; margin-bottom:3px; }
+.general-settings .theme-preview-inspector { padding-top:3px; }
+.general-settings .theme-preview-inspector b { height:7px; margin-bottom:3px; }
+.general-settings .theme-preview-inspector i { height:2px; margin-bottom:3px; }
+.general-settings .theme-preview-toolbar { margin:1px 0 3px; height:3px; }
+.general-settings .appearance-theme-card { padding:5px; gap:4px; background:var(--surface); }
+.general-settings .appearance-theme-name { font-size:11px; }
+.general-settings .appearance-modes { width:100%; gap:2px; padding:2px; background:var(--surface); border-radius:var(--radius-control); }
+.general-settings .appearance-modes button { flex:1; min-height:28px; padding:3px 8px; border-radius:calc(var(--radius-control) - 2px); border:0; background:transparent; box-shadow:none; font-size:12px; white-space:nowrap; }
+.general-settings .appearance-modes button .q-icon { font-size:16px; }
+.general-settings .appearance-modes button[aria-pressed="true"] { background:var(--accent-dim); color:var(--accent); box-shadow:none; }
+@media(max-width:600px) {
+  .settings-row { gap:8px; flex-wrap:wrap; }
+  .settings-row-control { flex:0 0 100%; max-width:100%; }
+  .settings-dialog .face-model-heading > .settings-row-control { flex-basis:100%; }
+  .settings-group-heading { flex-wrap:wrap; }
+  .settings-group-note { flex:1; }
+}

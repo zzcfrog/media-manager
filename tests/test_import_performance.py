@@ -43,9 +43,9 @@ class ImportPipelineTests(DatabaseCase):
             workers.add(threading.get_ident())
             barrier.wait(timeout=5)
             return {'width': 320}
-        def save(*args):
+        def save(*args,**kwargs):
             writers.append(threading.get_ident())
-            return original_save(*args)
+            return original_save(*args,**kwargs)
         with patch.object(importer, '_run_exiftool_batch', return_value={}), \
              patch.object(importer, '_probe', side_effect=probe), \
              patch.object(importer, '_generate_thumbnail', side_effect=self.thumbnail), \
@@ -145,8 +145,8 @@ class ImportPipelineTests(DatabaseCase):
 
     def test_raw_preview_is_first_and_handles_all_exif_orientations(self):
         path = self.case / 'synthetic.nef'; path.write_bytes(b'raw placeholder')
-        source = Image.new('RGB', (640, 320), 'red')
-        source.paste('blue', (0, 0, 320, 160))
+        source = Image.new('RGB', (3200, 1600), 'red')
+        source.paste('blue', (0, 0, 1600, 800))
         encoded = io.BytesIO(); source.save(encoded, format='JPEG', quality=95)
         with patch.object(importer.subprocess, 'run', return_value=SimpleNamespace(returncode=0, stdout=encoded.getvalue())) as run, \
              patch.object(importer.shutil, 'which', return_value='/synthetic/tool'), \

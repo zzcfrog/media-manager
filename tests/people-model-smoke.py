@@ -3,7 +3,9 @@
 Run from repository root: .build-venv/bin/python tests/people-model-smoke.py
 No production factory/DB, no model download, no sensitive filenames in results.
 """
+import argparse
 import json
+from datetime import date
 from pathlib import Path
 import shutil
 import subprocess
@@ -13,6 +15,8 @@ from support import DatabaseCase
 from backend.services import face_engine, people_jobs, people
 from PIL import Image
 
+parser=argparse.ArgumentParser();parser.add_argument('--models-dir',type=Path,default=Path.home()/'models')
+args=parser.parse_args();models=args.models_dir.expanduser().resolve()
 fixture=DatabaseCase();fixture.setUp()
 root=Path('build/face-benchmark-2026-10-29').resolve()
 faces=json.loads((root/'results/faces.json').read_text())
@@ -22,10 +26,10 @@ for face in faces:
     if len(chosen)==6:break
 sources=[root/'samples'/p/'preview.jpg' for p in chosen]
 before={p:(p.stat().st_size,p.stat().st_mtime_ns) for p in sources}
-report={'date':'2026-10-30','scope':'Isolated library; six prior benchmark previews only; no originals/production DB accessed','models':{}}
+report={'date':date.today().isoformat(),'scope':'Isolated library; six prior benchmark previews only; no originals/production DB accessed','models':{}}
 try:
     for profile in ('buffalo_l','raccoon_s'):
-        start=time.perf_counter();model=face_engine.load_engine(root/'models'/profile,profile)
+        start=time.perf_counter();model=face_engine.load_engine(models/profile,profile)
         initialized=time.perf_counter()-start;total_faces=0;qualified=0;elapsed=[]
         assert not model.observe(Image.new('RGB',(640,480),'white'))
         for source in sources:
@@ -37,7 +41,7 @@ try:
             'blank_no_faces':True,'available_session_providers':model.detector.get_providers()}
         print(profile,report['models'][profile],flush=True)
         assert total_faces>0 and qualified>0
-    people_jobs.configure(fixture.db,{'profile':'buffalo_l','model_dir':str(root/'models'/'buffalo_l'),'enabled':False,'max_frames':3});fixture.db.commit()
+    people_jobs.configure(fixture.db,{'profile':'buffalo_l','model_dir':str(models/'buffalo_l'),'enabled':False,'max_frames':3});fixture.db.commit()
     photo=fixture.case/'sample.jpg';shutil.copyfile(sources[0],photo)
     mid=fixture.seed(photo,media_type='image',file_size=photo.stat().st_size,file_mtime=photo.stat().st_mtime)
     people_jobs.enqueue(fixture.db,mid);fixture.db.commit();job=people_jobs.claim(fixture.db)
@@ -59,14 +63,20 @@ try:
     people_jobs.enqueue(fixture.db,vid);fixture.db.commit()
     assert people_jobs.process(fixture.db,people_jobs.claim(fixture.db))
     points=[r[0] for r in fixture.db.execute('SELECT DISTINCT frame_time FROM people_faces WHERE media_id=? AND active=1 ORDER BY frame_time',(vid,))]
-    assert points==[0.,1.,2.],points
+    assert points and len(points)<=people_jobs.settings(fixture.db)['video_identity_samples'] and all(p in (0.,.5,1.,1.5,2.,2.5) for p in points),points
     assert any(p['video_count']==1 for p in people.media_people(fixture.db,vid)['people'])
     video.unlink();people_jobs.enqueue(fixture.db,vid,force=True);fixture.db.commit()
-    assert people_jobs.process(fixture.db,people_jobs.claim(fixture.db))
-    report['pipeline'].update(video_observation_points=points,video_media_deduplicated=True,offline_video_cache_rescan=True)
+    try:
+        people_jobs.process(fixture.db,people_jobs.claim(fixture.db))
+    except FileNotFoundError:
+        pass
+    else:
+        raise AssertionError('Continuous tracking must wait for an offline original video')
+    report['pipeline'].update(video_observation_points=points,video_media_deduplicated=True,offline_video_waits_for_original=True)
     assert before=={p:(p.stat().st_size,p.stat().st_mtime_ns) for p in sources}
     report['benchmark_cache_unchanged']=True
-    Path('docs/product-design/people/model-validation.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
+    output=Path('build/people-model-smoke');output.mkdir(parents=True,exist_ok=True)
+    (output/'results.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
     print('isolated actual model pipeline passed',flush=True)
 finally:
     fixture.doCleanups()

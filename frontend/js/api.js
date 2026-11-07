@@ -61,11 +61,12 @@ const API = {
 scanPaths(paths) {
     return this._fetch(`/api/library/scan`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths }) });
   },
-  importOne(path) {
-    return this._fetch(`/api/library/import-one`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path }) });
+  importOne(path,classifyMedia=false) {
+    return this._fetch(`/api/library/import-one`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path,classify_media:classifyMedia }) });
   },
-  importBatch(paths) {
-    return fetch(`/api/library/import-batch`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths }) })
+  importOptions() { return this._fetch('/api/library/import-options'); },
+  importBatch(paths,organizePeople=false,peopleMediaType='all',classifyMedia=false) {
+    return fetch(`/api/library/import-batch`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ paths,organize_people:organizePeople,people_media_type:peopleMediaType,classify_media:classifyMedia }) })
       .then(r => { if (!r.ok) throw new Error(r.status); return r; });
   },
   getFolders() {

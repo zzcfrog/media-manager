@@ -5,7 +5,15 @@ contextBridge.exposeInMainWorld("electronAPI", {
   platform: process.platform,
   setTheme: (mode) => ipcRenderer.invoke("set-theme", mode),
   selectFiles: () => ipcRenderer.invoke("select-files"),
-  selectDirectory: () => ipcRenderer.invoke("select-directory"),
+  selectDirectory: (defaultPath) => ipcRenderer.invoke("select-directory", defaultPath),
+  getModelDirectory: () => ipcRenderer.invoke("get-model-directory"),
+  saveModelDirectory: (directory, options) => ipcRenderer.invoke("save-model-directory", directory, options),
+  onModelDirectoryProgress: (callback) => {
+    const listener = (event, progress) => callback(progress);
+    ipcRenderer.on("model-directory-progress", listener);
+    return () => ipcRenderer.removeListener("model-directory-progress", listener);
+  },
+  selectModelFile: () => ipcRenderer.invoke("select-model-file"),
   openInFinder: (path) => ipcRenderer.invoke("open-in-finder", path),
   pickSavePath: (suggestedName, filterExt) => ipcRenderer.invoke("pick-save-path", suggestedName, filterExt),
   writeFile: (filePath, data) => ipcRenderer.invoke("write-file", filePath, data),

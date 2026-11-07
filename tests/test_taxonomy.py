@@ -247,10 +247,10 @@ class ClassificationIntentTests(DatabaseCase):
         self.db.execute("INSERT OR REPLACE INTO settings VALUES ('classification_enabled','true')");self.db.commit()
         prepared={'file_path':str(path),'file_name':path.name,'media_type':'image','file_size':path.stat().st_size,'file_mtime':path.stat().st_mtime}
         with patch('backend.services.classification_jobs.enqueue',side_effect=RuntimeError('synthetic intent failure')):
-            with self.assertRaises(RuntimeError): importer._save_import(self.db,prepared,None)
+            with self.assertRaises(RuntimeError): importer._save_import(self.db,prepared,None,classify_media=True)
         self.assertEqual(self.db.execute('SELECT COUNT(*) FROM media').fetchone()[0],0)
         with patch('backend.services.classification_jobs.ensure_worker'):
-            row=importer._save_import(self.db,prepared,None)
+            row=importer._save_import(self.db,prepared,None,classify_media=True)
         self.assertEqual(self.db.execute('SELECT media_id FROM taxonomy_jobs').fetchone()[0],row['id'])
 
     def test_analysis_and_task_intent_failure_keeps_previous_analysis(self):

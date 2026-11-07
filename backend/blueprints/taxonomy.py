@@ -299,6 +299,8 @@ def jobs(db):
         data=request.get_json() or {}; ids=data.get('media_ids',[])
         stage=data.get('stage','analysis')
         if not ids or len(ids)>10000 or stage not in ('analysis','fast','omni'): raise tx.Conflict('任务范围或阶段无效')
+        from ..services.model_preferences import classification_enabled, FAST_OFF, OMNI_OFF
+        if not classification_enabled(db,stage):raise tx.Conflict(OMNI_OFF if stage=='omni' else FAST_OFF)
         for mid in dict.fromkeys(ids): jobs.enqueue(db,int(mid),stage,priority=100)
         db.commit()
         jobs.ensure_worker(current_app._get_current_object())
@@ -349,24 +351,66 @@ def find_examples(db,tag_id):
 @operation
 def configuration(db):
     from ..db import get_setting
-    keys={'classification_enabled':'false','classification_model_dir':'','classification_budget_seconds':'600',
+    # Budget keys remain readable for older clients, but workers no longer use them.
+    keys={'classification_enabled':'false','classification_model_enabled':'true','classification_model_dir':'','classification_model_id':'','classification_budget_seconds':'600',
           'classification_omni_model':'qwen3-omni-30b-a3b','classification_omni_enabled':'false',
           'classification_relations_enabled':'false','classification_auto_enabled':'false','classification_auto_relations_enabled':'false',
           'classification_resource_limit_mb':'4096','classification_candidate_retention_days':'90'}
     if request.method=='PATCH':
         data=request.get_json() or {}
         if set(data)-set(keys): raise tx.Conflict('未知分类设置')
-        for key in ('classification_enabled','classification_omni_enabled','classification_relations_enabled','classification_auto_enabled','classification_auto_relations_enabled'):
+        for key in ('classification_enabled','classification_model_enabled','classification_omni_enabled','classification_relations_enabled','classification_auto_enabled','classification_auto_relations_enabled'):
             if data.get(key,'false') not in ('true','false'): raise tx.Conflict('开关无效')
         if 'classification_resource_limit_mb' in data and not 256<=int(data['classification_resource_limit_mb'])<=65536: raise tx.Conflict('资源预算范围为256～65536MB')
         if 'classification_candidate_retention_days' in data and not 1<=int(data['classification_candidate_retention_days'])<=3650: raise tx.Conflict('候选保留期范围为1～3650天')
         if 'classification_budget_seconds' in data and not 1<=int(data['classification_budget_seconds'])<=3600: raise tx.Conflict('时间预算范围为 1～3600 秒')
         if 'classification_omni_model' in data:
             from ..local_vlm import MODELS
-            if data['classification_omni_model'] not in MODELS: raise tx.Conflict('未知本地模型')
+            if data['classification_omni_model'] not in ('none',*MODELS): raise tx.Conflict('未知本地模型')
+        if 'classification_model_id' in data:
+            from ..services.classification_models import CATALOG
+            if data['classification_model_id'] not in ('', *CATALOG):raise tx.Conflict('未知快速分类模型')
         for key,value in data.items():
             db.execute('INSERT INTO settings(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',(key,str(value)))
-    return jsonify({k:get_setting(db,k,v) for k,v in keys.items()})
+        from ..services.model_preferences import sync_classification_jobs
+        resumed=sync_classification_jobs(db)
+        db.commit()
+        if resumed:
+            from ..services.classification_jobs import ensure_worker
+            ensure_worker(current_app._get_current_object())
+    result={k:get_setting(db,k,v) for k,v in keys.items()}
+    if result['classification_model_id']:
+        from ..services.classification_models import configured_directory
+        result['classification_model_dir']=configured_directory(db)
+    return jsonify(result)
+
+
+@bp.get('/models/catalog')
+def classification_model_catalog():
+    from ..services.classification_models import catalog
+    return jsonify(catalog())
+
+
+@bp.route('/models/download', methods=['GET', 'POST'])
+def classification_model_download():
+    from ..services import classification_models as models
+    key=current_app.config['DATABASE']
+    if request.method=='GET':return jsonify(models.status(key))
+    data=request.get_json(silent=True)
+    try:
+        if not isinstance(data,dict) or set(data)-{'model_id'}:raise ValueError('模型下载字段无效')
+        return jsonify(models.start(key,data.get('model_id')))
+    except (ValueError,TypeError,KeyError) as error:return jsonify({'error':str(error)}),409
+
+
+@bp.post('/models/download/cancel')
+def classification_model_download_cancel():
+    from ..services.classification_models import cancel
+    data=request.get_json(silent=True)
+    try:
+        if not isinstance(data,dict) or set(data)-{'id'}:raise ValueError('下载取消字段无效')
+        return jsonify(cancel(current_app.config['DATABASE'],data.get('id')))
+    except (ValueError,TypeError,KeyError) as error:return jsonify({'error':str(error)}),409
 
 
 @bp.get('/media/<int:media_id>/labels')
@@ -413,6 +457,8 @@ def relationships(db):
 @operation
 def organize_relationships(db):
     from ..services import taxonomy_relations,classification_jobs
+    from ..services.model_preferences import classification_enabled, OMNI_OFF
+    if not classification_enabled(db,'omni'):raise tx.Conflict(OMNI_OFF)
     ids=(request.get_json() or {}).get('tag_ids',[])
     if not ids or len(ids)>5000:raise tx.Conflict('请明确选择标签范围')
     jobs=[taxonomy_relations.queue(db,int(i),explicit=True) for i in dict.fromkeys(ids)]

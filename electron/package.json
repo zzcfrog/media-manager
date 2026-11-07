@@ -1,11 +1,11 @@
 {
   "name": "media-manager",
   "productName": "映屿 · luminisle",
-  "version": "1.0.16",
+  "version": "1.0.24",
   "main": "main.js",
   "scripts": {
     "start": "ELECTRON_RUN_AS_NODE= electron .",
-    "test": "node ../tests/desktop-runtime.cjs",
+    "test": "node ../tests/desktop-runtime.cjs && node ../tests/desktop-model-paths.cjs && node ../tests/desktop-model-migration.cjs && node ../tests/desktop-model-apply.cjs",
     "build:icons": "python3 ../packaging/build_icons.py",
     "build:mac": "npm run build:icons && electron-builder --mac dmg zip --arm64"
   },
@@ -24,6 +24,8 @@
     "files": [
       "main.js",
       "runtime.js",
+      "model-paths.js",
+      "model-migration.js",
       "preload.js",
       "package.json",
       "icon.icns",

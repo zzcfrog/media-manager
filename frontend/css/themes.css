@@ -145,6 +145,22 @@ body.native-ui .q-menu.appearance-menu { width: 440px; max-width: calc(100vw - 2
 .appearance-modes .q-icon { font-size: 18px; }
 .appearance-save-hint { margin: 12px 0 0; font-size: 11px; text-align: right; color: var(--text3); }
 .settings-panel > .appearance-picker { padding: 0; }
+.general-settings .appearance-section-heading { color: var(--text); line-height: 18px; }
+.general-settings .appearance-mode-section { border-top: 0; padding-top: 0; }
+.general-settings .appearance-theme-grid { grid-template-columns:repeat(4,minmax(0,1fr)); }
+.general-settings .theme-preview { height:120px; flex-direction:column; }
+.general-settings .theme-preview-half { width:100%; flex:1; min-height:0; }
+.general-settings .theme-preview-media { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.general-settings .theme-preview-media i { height:12px; }
+.general-settings .appearance-theme-card { gap: 6px; }
+.general-model-directory .q-field__native { cursor: pointer; }
+.general-model-directory .q-btn { color: var(--accent); font-size: 12px; }
+.general-model-directory .general-model-error { color: var(--negative); }
+.general-model-migration-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.general-model-migration-option { font-size: 12px; color: var(--text); }
+.general-model-migration-help { font-size: 11px; color: var(--text2); }
+.settings-model-migration-progress { flex-shrink: 0; padding: 8px 20px; color: var(--text2); font-size: 12px; }
+.settings-model-migration-progress > div:first-child { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   :root[data-appearance-theme] body.native-ui { --glass: var(--surface); --glass-light: transparent; --material-filter: none; --material-grain: linear-gradient(transparent, transparent); --glass-edge: var(--border2); }
 }

@@ -64,8 +64,9 @@ class FaceEngineTests(DatabaseCase):
         def session(path,**kwargs):
             calls.append(kwargs['providers'])
             if len(kwargs['providers'])>1:raise RuntimeError('synthetic unavailable CoreML compiler')
-            return SimpleNamespace(get_outputs=lambda:[None]*9,
-                                   get_inputs=lambda:[SimpleNamespace(shape=[1,3,112,112])])
+            detector=path=='det.onnx'
+            return SimpleNamespace(get_outputs=lambda:[None]*(9 if detector else 1),
+                                   get_inputs=lambda:[SimpleNamespace(shape=[1,3,640,640] if detector else [1,3,112,112],type='tensor(float)')])
         with patch.object(ort,'get_available_providers',return_value=['CoreMLExecutionProvider','CPUExecutionProvider']),patch.object(ort,'InferenceSession',side_effect=session):
             engine.FaceEngine({'paths':['det.onnx','rec.onnx'],'key':'synthetic'})
         self.assertEqual(calls[-1],['CPUExecutionProvider'])
@@ -90,6 +91,34 @@ class FaceEngineTests(DatabaseCase):
         with patch.object(engine,'THUMB_DIR',preview):
             with self.assertRaises(FileNotFoundError):engine.read_frames(row,self.case/'cache',cancelled=lambda:False)
 
+    def test_offline_small_image_cache_waits_instead_of_generating_low_quality_faces(self):
+        from unittest.mock import patch
+        preview=self.case/'thumbs';preview.mkdir()
+        for width in (320,799,800):
+            Image.new('RGB',(width,width),'green').save(preview/'cached.jpg')
+            row={'id':1,'media_type':'image','thumbnail_path':'cached.jpg','file_path':str(self.case/'offline.jpg')}
+            with patch.object(engine,'THUMB_DIR',preview):
+                if width<800:
+                    with self.assertRaisesRegex(FileNotFoundError,'高清预览'):engine.read_frames(row,self.case/'cache',lambda:False)
+                else:
+                    self.assertEqual(engine.read_frames(row,self.case/'cache',lambda:False)[1],'image_preview')
+
+    def test_online_image_uses_original_when_cache_is_too_small(self):
+        from unittest.mock import patch
+        preview=self.case/'thumbs';preview.mkdir();Image.new('RGB',(320,240),'red').save(preview/'cached.jpg')
+        original=self.case/'original.jpg';Image.new('RGB',(2400,1600),'green').save(original)
+        row={'id':1,'media_type':'image','thumbnail_path':'cached.jpg','file_path':str(original)}
+        with patch.object(engine,'THUMB_DIR',preview):frames,scope=engine.read_frames(row,self.case/'cache',lambda:False)
+        self.assertEqual(scope,'image_preview');self.assertEqual(frames[0][1].size,(1600,1067))
+
+    def test_corrupt_original_does_not_fall_back_to_blurry_cache(self):
+        from unittest.mock import patch
+        preview=self.case/'thumbs';preview.mkdir();Image.new('RGB',(320,240),'gray').save(preview/'cached.jpg')
+        original=self.case/'bad.jpg';original.write_bytes(b'synthetic invalid image')
+        row={'id':1,'media_type':'image','thumbnail_path':'cached.jpg','file_path':str(original)}
+        with patch.object(engine,'THUMB_DIR',preview):
+            with self.assertRaisesRegex(FileNotFoundError,'图片解码失败'):engine.read_frames(row,self.case/'cache',lambda:False)
+
     def test_video_cache_is_revision_scoped_and_all_points_are_real(self):
         import subprocess
         video=self.case/'synthetic.mp4'
@@ -109,16 +138,20 @@ class FaceEngineTests(DatabaseCase):
         row={'id':1,'media_type':'video','duration':2,'file_path':'offline','thumbnail_path':None}
         with self.assertRaises(InterruptedError):engine.read_frames(row,self.case/'cache',cancelled=lambda:True)
 
-    def test_raw_embedded_previews_are_bounded_and_small_ones_mark_low_quality(self):
+    def test_raw_embedded_previews_are_bounded_and_small_ones_wait_for_original(self):
         from unittest.mock import patch
         from types import SimpleNamespace
-        raw=self.case/'sample.nef';raw.write_bytes(b'synthetic')
-        for size in ((3200,2400),(224,168)):
+        from backend.services import raw_preview
+        for index,size in enumerate(((3200,2400),(224,168))):
+            raw=self.case/(str(index)+'.nef');raw.write_bytes(b'synthetic')
             buffer=io.BytesIO();Image.new('RGB',size,'green').save(buffer,format='JPEG')
-            with patch.object(engine.subprocess,'run',return_value=SimpleNamespace(returncode=0,stdout=buffer.getvalue())):
+            with patch.object(raw_preview,'PREVIEW_DIR',self.case/'raw-cache'),patch.object(engine.subprocess,'run',return_value=SimpleNamespace(returncode=0,stdout=buffer.getvalue())),patch('rawpy.imread',side_effect=RuntimeError('synthetic decoder unavailable')):
+                if size[0]<800:
+                    with self.assertRaises(FileNotFoundError):engine.read_frames({'id':1,'media_type':'image','file_path':str(raw),'thumbnail_path':None},self.case/'cache',lambda:False)
+                    continue
                 frames,scope=engine.read_frames({'id':1,'media_type':'image','file_path':str(raw),'thumbnail_path':None},self.case/'cache',lambda:False)
-            self.assertLessEqual(max(frames[0][1].size),1600)
-            self.assertEqual(scope,'image_preview_lowres' if size[0]<800 else 'image_preview')
+            self.assertLessEqual(max(frames[0][1].size),2560)
+            self.assertEqual(scope,'image_preview')
 
     def test_low_fps_video_samples_snap_to_existing_frame_times(self):
         import subprocess

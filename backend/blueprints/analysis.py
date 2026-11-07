@@ -13,6 +13,7 @@ from ..config import HEIF_EXTS, ANALYSIS_API_CONCURRENCY, ANALYSIS_THREAD_POOL_S
 from ..analyzer import (analyze_video, analyze_image, analyze_video_frames, CODING_BASE_URL,
                         analyze_music, probe_audio_duration, music_taxonomy_labels, validate_analysis_segments)
 from ..asr import get_engine as get_asr_engine, preload_all, reload_engine
+from ..services.model_preferences import analysis_enabled
 from .. import local_vlm
 from ..emotion_labels import dominant_mood, aggregate_emotions
 
@@ -152,6 +153,8 @@ def start_analysis(media_id):
     if not media:
         return jsonify({"error": "Not found"}), 404
 
+    if not analysis_enabled(db,media['media_type']):
+        return jsonify({'error':'此类素材的分析未启用，请先在设置中选择模型'}),409
     if media["analysis_status"] == "processing":
         return jsonify({"error": "该素材正在分析中"}), 409
     app = current_app._get_current_object()
@@ -192,6 +195,7 @@ def start_batch_analysis():
         ).fetchone()
         if not media:
             continue
+        if not analysis_enabled(db,media['media_type']):continue
         if request.json.get('organize_people'):
             from ..services.people_jobs import enqueue as enqueue_people
             enqueue_people(db,media_id,priority=100,force=True)
@@ -277,6 +281,7 @@ def _process_video(media_id, file_path, api_key, model, resolution, fps, hw_acce
     try:
         with app.app_context():
             # --- Compress (仅云端需要控制上传体积；本地抽帧时直接 scale，无需中间产物) ---
+            if not analysis_enabled(get_db(),'video'):raise ValueError('视频分析未启用')
             source_path = file_path
             if engine != "local":
                 progress["step"] = "compressing"
@@ -361,7 +366,8 @@ def _process_video(media_id, file_path, api_key, model, resolution, fps, hw_acce
             #     本地直接吃原片音轨（未再编码，音质更好）。
             #     Omni「音视频一起」模式下音轨已随帧送入模型，跳过独立转写 ---
             if not use_multimodal and progress.get("asr_mode") != "merged":
-                asr_engine = get_asr_engine(asr_engine_name) if asr_engine_name else None
+                asr_model_name = get_setting(get_db(), "asr_model", "large-v3")
+                asr_engine = get_asr_engine(asr_engine_name) if asr_engine_name and asr_model_name!='none' else None
                 if asr_engine:
                     try:
                         progress["step"] = "asr_start"
@@ -370,7 +376,6 @@ def _process_video(media_id, file_path, api_key, model, resolution, fps, hw_acce
                             progress["step"] = "asr_progress"
                             progress["asr_substep"] = sub
 
-                        asr_model_name = get_setting(get_db(), "asr_model", "large-v3")
                         asr_segments = asr_engine.transcribe(source_path, model_name=asr_model_name,
                                                              on_progress=on_asr)
                         if asr_segments:
@@ -418,6 +423,7 @@ def _process_image(media_id, file_path, image_api_key, model, image_resolution,
     try:
         with app.app_context():
             needs_compress = image_resolution != "original" or Path(file_path).suffix.lower() in HEIF_EXTS
+            if not analysis_enabled(get_db(),'image'):raise ValueError('图片分析未启用')
             if needs_compress:
                 progress["step"] = "compressing"
                 cp, compress_time = compress_image(file_path, max_long_edge=int(image_resolution) if image_resolution != "original" else 99999)
@@ -488,7 +494,7 @@ def _process_image(media_id, file_path, image_api_key, model, image_resolution,
 
 def _music_cfg(db):
     model_id = get_setting(db, "music_model", "qwen3-omni-30b-a3b")
-    if model_id not in local_vlm.MODELS or not local_vlm.MODELS[model_id].get("audio"):
+    if model_id!='none' and (model_id not in local_vlm.MODELS or not local_vlm.MODELS[model_id].get("audio")):
         model_id = next((mid for mid, m in local_vlm.MODELS.items() if m.get("audio")),
                         "qwen3-omni-30b-a3b")
     return {
@@ -643,6 +649,7 @@ def _process_music(media_id, file_path, app, progress, engine="local",
         with app.app_context():
             if engine != "local":
                 raise RuntimeError("云端音乐分析引擎尚未支持，请在设置中选择本地引擎")
+            if not analysis_enabled(get_db(),'audio'):raise ValueError('音乐分析未启用')
             if not local_vlm.MODELS.get(model_id, {}).get("audio"):
                 raise RuntimeError(f"模型 {model_id} 不支持音频输入，请选择 Omni 系模型")
 
@@ -1317,6 +1324,7 @@ def delete_segment(media_id, seg_id):
 def asr_reload():
     data = request.get_json(force=True)
     model_name = data.get("asr_model", "large-v3")
+    if model_name=='none':return jsonify({'ok':True,'message':'语音转写未启用'})
     engine_name = data.get("asr_engine", "whisper")
     logger.info("ASR model reload requested: {} {}", engine_name, model_name)
     reload_engine(engine_name, model_name)

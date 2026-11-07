@@ -85,6 +85,13 @@ def undo(db,change_id):
     return jsonify(people.undo(db,change_id))
 
 
+@bp.get('/reviews/rescan')
+@operation
+def review_rescan(db):
+    from ..services.people_jobs import review_scan_summary
+    return jsonify(review_scan_summary(db))
+
+
 @bp.get('/reviews')
 @operation
 def reviews(db):
@@ -149,8 +156,43 @@ def status(db):
 @operation
 def settings(db):
     from ..services import people_jobs
+    was_enabled=people_jobs.settings(db)['model_enabled']
     result=people_jobs.configure(db,request.get_json())
+    db.commit()
+    if result['model_enabled'] and not was_enabled:people_jobs.ensure_worker(current_app._get_current_object())
     return jsonify(result)
+
+
+@bp.post('/models/probe')
+@operation
+def model_probe(db):
+    from ..services.face_engine import probe_model
+    data=request.get_json()
+    return jsonify(probe_model(data.get('path'),data.get('stage')))
+
+
+@bp.get('/models/catalog')
+def model_catalog():
+    from ..services.face_model_downloads import catalog
+    return jsonify(catalog())
+
+
+@bp.route('/models/download',methods=['GET','POST'])
+@operation
+def model_download(db):
+    from ..services import face_model_downloads as downloads
+    key=current_app.config['DATABASE']
+    if request.method=='GET':return jsonify(downloads.status(key))
+    data=request.get_json()
+    if set(data)-{'profile','directory','stage','subdirectory'}:raise ValueError('下载字段无效')
+    return jsonify(downloads.start(key,data.get('profile'),data.get('directory'),data.get('stage'),data.get('subdirectory')))
+
+
+@bp.post('/models/download/cancel')
+@operation
+def model_download_cancel(db):
+    from ..services.face_model_downloads import cancel
+    return jsonify(cancel(current_app.config['DATABASE'],request.get_json().get('id')))
 
 
 @bp.post('/jobs')

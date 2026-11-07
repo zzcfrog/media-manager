@@ -1,0 +1,330 @@
+{
+  "date": "2026-11-07",
+  "status": "installed-data-verified",
+  "version": "1.0.17",
+  "previous_version": "1.0.16",
+  "installed_application": "/Users/zack/Applications/映屿 · luminisle.app",
+  "authorization": "User requested a production release and replacement of the local application. No hosted publication or Git changes requested.",
+  "package": {
+    "version": "1.0.17",
+    "previous_version": "1.0.16",
+    "app_id": "com.zack.media-manager",
+    "architecture": "arm64",
+    "application_bytes": 773526409,
+    "signature_deep_strict": true,
+    "artifacts": {
+      "Luminisle-1.0.17-arm64.dmg": {
+        "bytes": 314365493,
+        "sha256": "2631cde0060ba199d5240962b7384b63114038b4782988e2d8c4ec0f97fd5bfe"
+      },
+      "Luminisle-1.0.17-arm64.zip": {
+        "bytes": 314053261,
+        "sha256": "af2054e4bfdb5bedd144213656a6a7cef600dd34e066dd5412ab7397bdd9679d"
+      }
+    },
+    "private_data_or_external_models_bundled": false
+  },
+  "checks": {
+    "python_unittests": 338,
+    "desktop_runtime_and_paths": "passed",
+    "desktop_model_migration_groups": 9,
+    "desktop_live_model_directory_groups": 6,
+    "source_tag_actions_browser_groups": 14,
+    "source_state_regressions": 47,
+    "packaged_browser": {
+      "routes": [
+        {
+          "route": "#/gallery",
+          "title": "映屿 · luminisle"
+        },
+        {
+          "route": "#/classify",
+          "title": "映屿 · luminisle"
+        },
+        {
+          "route": "#/taxonomy",
+          "title": "映屿 · luminisle"
+        },
+        {
+          "route": "#/people",
+          "title": "映屿 · luminisle"
+        }
+      ],
+      "settings": [
+        {
+          "tab": "general",
+          "height": 740
+        },
+        {
+          "tab": "image",
+          "height": 740
+        },
+        {
+          "tab": "video",
+          "height": 740
+        },
+        {
+          "tab": "music",
+          "height": 740
+        },
+        {
+          "tab": "people",
+          "height": 740
+        },
+        {
+          "tab": "classification",
+          "height": 740
+        },
+        {
+          "tab": "creative",
+          "height": 740
+        }
+      ],
+      "errors": [],
+      "failedRequests": [],
+      "writes": [],
+      "metrics": [
+        {
+          "width": 1600,
+          "overflow": false,
+          "controls": [
+            32,
+            32,
+            32
+          ]
+        },
+        {
+          "width": 1000,
+          "overflow": false,
+          "controls": [
+            32,
+            32,
+            32
+          ]
+        }
+      ],
+      "settingsOpeningHeight": 323.3864440917969,
+      "ok": true
+    },
+    "frozen_video": {
+      "ok": true,
+      "synthetic_only": true,
+      "frame_rates": [
+        {
+          "fps": 1,
+          "decoded_frames": 4
+        },
+        {
+          "fps": 2,
+          "decoded_frames": 8
+        },
+        {
+          "fps": 3,
+          "decoded_frames": 12
+        }
+      ],
+      "identity_space_reused": true,
+      "missing_model_error_preserved": true,
+      "real_face_accuracy_tested": false
+    },
+    "installed_payload": {
+      "private_database_or_dotenv_files": 0,
+      "private_or_external_weight_files": 0,
+      "bundled_runtime_vad_and_examples": 4
+    }
+  },
+  "migration_rehearsal": {
+    "ok": true,
+    "version": "1.0.17",
+    "packaged_frontend_files_matched": 47,
+    "private_or_external_model_weights": 0,
+    "bundled_runtime_vad_and_examples_bytes": 1246054,
+    "original_tables_unchanged": 48,
+    "new_tables": [],
+    "new_tables_empty": true,
+    "foreign_key_violations": 0,
+    "automatic_upgrade_snapshot_verified": true
+  },
+  "installed_validation": {
+    "status": "installed-data-verified",
+    "version": "1.0.17",
+    "target": "/Users/zack/Applications/映屿 · luminisle.app",
+    "health_version": "1.0.17",
+    "normal_profile_and_library": true,
+    "media": 11835,
+    "projects": 2,
+    "original_tables_unchanged": {
+      "collection_items": true,
+      "collections": true,
+      "dup_exclusions": true,
+      "media": true,
+      "media_fts": true,
+      "media_segment": true,
+      "media_tags": true,
+      "music_segment": true,
+      "people_changes": true,
+      "people_distinct": true,
+      "people_face_exclusions": true,
+      "people_faces": true,
+      "people_jobs": true,
+      "people_media_decisions": true,
+      "people_persons": true,
+      "people_plans": true,
+      "people_reviews": true,
+      "project_media": true,
+      "project_tracks": true,
+      "projects": true,
+      "settings": true,
+      "tags": true,
+      "taxonomy_analysis_batches": true,
+      "taxonomy_analysis_requests": true,
+      "taxonomy_candidate_context": true,
+      "taxonomy_candidates": true,
+      "taxonomy_changes": true,
+      "taxonomy_closed_proposals": true,
+      "taxonomy_collections": true,
+      "taxonomy_decision_events": true,
+      "taxonomy_decisions": true,
+      "taxonomy_examples": true,
+      "taxonomy_expressions": true,
+      "taxonomy_features": true,
+      "taxonomy_field_provenance": true,
+      "taxonomy_historical_snapshots": true,
+      "taxonomy_job_context": true,
+      "taxonomy_jobs": true,
+      "taxonomy_nodes": true,
+      "taxonomy_plans": true,
+      "taxonomy_relation_jobs": true,
+      "taxonomy_relation_locks": true,
+      "taxonomy_relation_suggestions": true,
+      "taxonomy_relations": true,
+      "taxonomy_sources": true,
+      "taxonomy_split_targets": true,
+      "taxonomy_text_features": true,
+      "taxonomy_validation_profiles": true
+    },
+    "new_tables": 0,
+    "new_tables_empty": true,
+    "foreign_key_violations": 0,
+    "existing_files_verified": 14058,
+    "model_configuration_unchanged": true,
+    "automatic_policies_off": true,
+    "signature_deep_strict": true,
+    "automatic_upgrade_snapshot": "/Users/zack/Library/Application Support/Media Manager/library/upgrade-backups/20261107-101542-d4342ec4.db",
+    "snapshot_matches_original": true,
+    "original_media_or_model_files_modified": false
+  },
+  "schema": {
+    "new_tables": [],
+    "existing_physical_column_order_unchanged": true,
+    "legacy_column_order_drift_unchanged": [
+      {
+        "table": "projects",
+        "last_columns": [
+          "creative_brief",
+          "ai_plan"
+        ]
+      }
+    ],
+    "new_business_columns_added": false
+  },
+  "native_window": {
+    "observed": true,
+    "title": "映屿 · luminisle",
+    "library_count": 11835,
+    "observed_view": "justified"
+  },
+  "diagnostic": {
+    "initial_isolated_browser_observer_measured_during_dialog_animation": true,
+    "opening_height_observed": 323.3864440917969,
+    "settled_settings_height": 740,
+    "original_tables_unchanged_after_initial_check": 48,
+    "production_modified_before_all_checks_passed": false,
+    "logs_preserved": true
+  },
+  "retained_installer": "/Users/zack/program/python/video_analyzer/dist/Luminisle-1.0.17-arm64.dmg",
+  "cleanup": {
+    "status": "complete",
+    "removed": [
+      {
+        "path": "dist/mac-arm64",
+        "logical_bytes": 773530840
+      },
+      {
+        "path": "dist/Luminisle-1.0.17-arm64.zip",
+        "logical_bytes": 314053261
+      },
+      {
+        "path": "dist/Luminisle-1.0.17-arm64.zip.blockmap",
+        "logical_bytes": 327859
+      },
+      {
+        "path": "dist/Luminisle-1.0.17-arm64.dmg.blockmap",
+        "logical_bytes": 328222
+      },
+      {
+        "path": "dist/builder-debug.yml",
+        "logical_bytes": 1028
+      },
+      {
+        "path": "build/runtime",
+        "logical_bytes": 425241398
+      },
+      {
+        "path": "build/tools",
+        "logical_bytes": 101211590
+      },
+      {
+        "path": "build/pyinstaller",
+        "logical_bytes": 116947392
+      },
+      {
+        "path": "build/release-1.0.17/baseline",
+        "logical_bytes": 99033088
+      },
+      {
+        "path": "build/release-1.0.17/rehearsal-library",
+        "logical_bytes": 1838761121
+      },
+      {
+        "path": "build/release-1.0.17/worker-fixture",
+        "logical_bytes": 1054195
+      },
+      {
+        "path": "build/release-1.0.17/previous-1.0.16.app",
+        "logical_bytes": 665598114
+      },
+      {
+        "path": "build/release-1.0.17/pre-install.db",
+        "logical_bytes": 99000320
+      },
+      {
+        "path": "build/release-1.0.17/pre-install.db-wal",
+        "logical_bytes": 0
+      },
+      {
+        "path": "build/release-1.0.17/pre-install.db-shm",
+        "logical_bytes": 32768
+      }
+    ],
+    "logical_bytes": 4435121196,
+    "note": "Logical sizes; APFS cloned extents do not imply the same physical space gain.",
+    "retained": [
+      "installed 1.0.17 application",
+      "formal DMG installer",
+      "real library and all existing upgrade backups including 1.0.17",
+      "external model files and model-paths.json",
+      "build virtual environment and unrelated development/test work",
+      "release logs, diagnostics and integrity receipts"
+    ],
+    "production_healthy_after_cleanup": true
+  },
+  "limitations": [
+    "No new real-media AI accuracy/performance benchmark or paid AI request.",
+    "Local ad-hoc signature; no Developer ID notarization."
+  ],
+  "git": {
+    "committed": false,
+    "pushed": false
+  }
+}

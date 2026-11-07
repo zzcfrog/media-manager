@@ -5,6 +5,8 @@ const http = require("http");
 const fs = require("fs");
 const crypto = require("crypto");
 const { runtimeConfig } = require("./runtime");
+const { readModelPaths, modelDirectoryState } = require("./model-paths");
+const { applyModelDirectory } = require("./model-migration");
 
 const APP_NAME = "映屿 · luminisle";
 app.setName(APP_NAME);
@@ -16,48 +18,34 @@ const hasLock = app.requestSingleInstanceLock();
 if (!hasLock) app.quit();
 const ICON = path.join(__dirname, "dock-icon.png");
 const PORT = Number(process.env.MEDIA_MANAGER_PORT || 6622);
-const INSTANCE = crypto.randomUUID();
-let pyProc = null, win = null, quitting = false, maintenance = false;
+let backendInstance = crypto.randomUUID();
+let pyProc = null, win = null, quitting = false, maintenance = false, modelMigration = false;
 let config;
 
 function loadRuntimeConfig() {
-  const file = path.join(app.getPath("userData"), "model-paths.json");
-  const modelPaths = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {};
+  const modelPaths = readModelPaths(app.getPath("userData"));
   return runtimeConfig({ packaged: app.isPackaged, appRoot: __dirname, resources: process.resourcesPath, userData: app.getPath("userData"), modelPaths });
 }
 
-async function selectModelDirectory() {
-  const chosen = await dialog.showOpenDialog(win, { title: "选择已有模型根目录（包含 vlm 子目录）", defaultPath: config.env.MEDIA_MANAGER_MODELS, properties: ["openDirectory"] });
-  if (chosen.canceled) return;
-  try {
-    const modelsDir = path.resolve(chosen.filePaths[0]), profile = path.resolve(app.getPath("userData"));
-    if (modelsDir === profile || modelsDir.startsWith(profile + path.sep) || profile.startsWith(modelsDir + path.sep)) {
-      throw new Error("请选择用户配置目录之外的独立模型目录，以免导出资料库时重复包含模型。");
-    }
-    const file = path.join(profile, "model-paths.json"), temporary = file + ".tmp-" + crypto.randomUUID();
-    fs.writeFileSync(temporary, JSON.stringify({ modelsDir, hfHome: path.join(require("os").homedir(), ".cache", "huggingface") }, null, 2), { mode: 0o600 });
-    fs.renameSync(temporary, file);
-    await dialog.showMessageBox(win, { type: "info", message: "模型目录已保存，重新启动应用后生效", detail: "直接加载所选目录中的模型；不会复制、移动或删除模型文件。Whisper 继续使用本机 Hugging Face 缓存。" });
-  } catch (error) { dialog.showErrorBox("无法设置模型目录", error.message); }
-}
-
-function getJSON(endpoint) {
+function getJSON(endpoint, method = "GET") {
   return new Promise((resolve, reject) => {
-    const req = http.get(`http://127.0.0.1:${PORT}${endpoint}`, res => {
+    const req = http.request(`http://127.0.0.1:${PORT}${endpoint}`, { method, headers: { "X-Media-Manager-Instance": backendInstance } }, res => {
       let body = "";
       res.on("data", chunk => { body += chunk; });
-      res.on("end", () => { try { if (res.statusCode !== 200) throw new Error(`HTTP ${res.statusCode}`); resolve(JSON.parse(body)); } catch (error) { reject(error); } });
+      res.on("end", () => { try { const data = JSON.parse(body);if (res.statusCode !== 200) throw new Error(data.error || `HTTP ${res.statusCode}`);resolve(data); } catch (error) { reject(error); } });
     });
-    req.setTimeout(2000, () => req.destroy(new Error("backend timeout")));
+    req.setTimeout(method === "POST" ? 10000 : 2000, () => req.destroy(new Error("backend timeout")));
     req.on("error", reject);
+    req.end();
   });
 }
 
 function startPython() {
   return new Promise((resolve, reject) => {
+    backendInstance = crypto.randomUUID();
     const child = spawn(config.command, config.args, { cwd: config.library, detached: true,
       stdio: ["ignore", "pipe", "pipe"], env: { ...config.env, PORT: String(PORT),
-        MEDIA_MANAGER_VERSION: app.getVersion(), MEDIA_MANAGER_INSTANCE: INSTANCE } });
+        MEDIA_MANAGER_VERSION: app.getVersion(), MEDIA_MANAGER_INSTANCE: backendInstance } });
     pyProc = child;
     const log = fs.createWriteStream(path.join(config.library, "logs", "desktop.log"), { flags: "a", mode: 0o600 });
     child.stdout.pipe(log, { end: false });child.stderr.pipe(log, { end: false });
@@ -73,7 +61,8 @@ function startPython() {
       if (settled) return;
       try {
         const health = await getJSON("/api/desktop/health");
-        if (health.application !== "media-manager" || health.instance !== INSTANCE) throw new Error("端口已被其他服务占用");
+        if (health.application !== "media-manager" || health.instance !== backendInstance) throw new Error("端口已被其他服务占用");
+        if (health.models_root && path.resolve(health.models_root) !== path.resolve(config.env.MEDIA_MANAGER_MODELS)) throw new Error("模型目录尚未切换");
         settled = true;resolve();
       } catch (error) {
         if (++attempts >= 120) fail(error);else setTimeout(check, 500);
@@ -98,6 +87,7 @@ async function exportData() {
   if (chosen.canceled) return;
   const destination = path.join(chosen.filePaths[0], "Luminisle-Data-" + new Date().toISOString().replace(/[:.]/g, "-"));
   try {
+    if (modelMigration) throw new Error("模型正在迁移，请完成后再导出资料库。");
     const active = await getJSON("/api/desktop/activity");
     if (active.busy) throw new Error("仍有分析或模型下载任务，请等待任务结束再导出。");
     maintenance = true;win.setEnabled(false);
@@ -127,7 +117,6 @@ function createMenu() {
     { label: "资料库", submenu: [
       { label: "打开数据目录", click: () => shell.openPath(config.library) },
       { label: "打开模型目录", click: () => shell.openPath(config.env.MEDIA_MANAGER_MODELS) },
-      { label: "选择外部模型目录…", click: selectModelDirectory },
       { label: "导出完整迁移副本…", click: exportData },
       { label: "升级与迁移说明", click: () => shell.openPath(path.join(process.resourcesPath, "UPGRADE-AND-DATA.md")) },
     ] },
@@ -193,10 +182,44 @@ app.on("ready", async () => {
     return result.canceled ? [] : result.filePaths;
   });
 
-  ipcMain.handle("select-directory", async () => {
+  ipcMain.handle("select-directory", async (event, defaultPath) => {
     const result = await dialog.showOpenDialog(win, {
       title: "选择文件夹",
-      properties: ["openDirectory"],
+      defaultPath: typeof defaultPath === "string" && path.isAbsolute(defaultPath) ? defaultPath : undefined,
+      properties: defaultPath ? ["openDirectory", "createDirectory"] : ["openDirectory"],
+    });
+    return result.canceled ? [] : result.filePaths;
+  });
+
+  ipcMain.handle("get-model-directory", (event) => {
+    if (event.sender !== win?.webContents) throw new Error("Invalid settings sender");
+    return { ...modelDirectoryState(app.getPath("userData"), config.env.MEDIA_MANAGER_MODELS), migrationSupported: true, liveApplySupported: true };
+  });
+
+  ipcMain.handle("save-model-directory", async (event, directory, options) => {
+    if (event.sender !== win?.webContents) throw new Error("Invalid settings sender");
+    if (maintenance || modelMigration) throw new Error("资料库维护或模型迁移正在进行，请完成后重试");
+    modelMigration = true;
+    try {
+      const activity = await getJSON("/api/desktop/activity");
+      if (!activity.supports_model_directory_apply) throw new Error("请重新打开应用，以加载支持即时切换目录的服务");
+      if (activity.model_directory_busy) throw new Error("请先完成或停止导入、分析、识别及下载任务，再切换模型目录");
+      const result = await applyModelDirectory({ profile: app.getPath("userData"), directory, activePath: config.env.MEDIA_MANAGER_MODELS,
+        env: process.env, migrate: options?.migrate === true,
+        onProgress: progress => { try { if (!event.sender.isDestroyed()) event.sender.send("model-directory-progress", progress); } catch {} },
+        prepare: async () => { await getJSON("/api/desktop/model-directory/prepare", "POST");maintenance = true; },
+        stopBackend: stopPython,
+        startBackend: async () => { config = loadRuntimeConfig();await startPython();return config.env.MEDIA_MANAGER_MODELS; },
+      });
+      maintenance = false;return result;
+    } finally { modelMigration = false; }
+  });
+
+  ipcMain.handle("select-model-file", async () => {
+    const result = await dialog.showOpenDialog(win, {
+      title: "选择人脸模型文件",
+      properties: ["openFile"],
+      filters: [{ name: "ONNX 模型", extensions: ["onnx"] }],
     });
     return result.canceled ? [] : result.filePaths;
   });

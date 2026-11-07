@@ -37,10 +37,10 @@ class PeopleIntegrationTests(DatabaseCase):
         self.db.execute("INSERT OR REPLACE INTO settings VALUES ('people_enabled','true')");self.db.commit()
         prepared={'file_path':str(path),'file_name':path.name,'media_type':'image','file_size':path.stat().st_size,'file_mtime':path.stat().st_mtime}
         with patch('backend.services.people_jobs.enqueue',side_effect=RuntimeError('synthetic intent failure')):
-            with self.assertRaises(RuntimeError):importer._save_import(self.db,prepared,None)
+            with self.assertRaises(RuntimeError):importer._save_import(self.db,prepared,None,organize_people=True)
         self.assertEqual(self.db.execute('SELECT COUNT(*) FROM media').fetchone()[0],0)
         with patch('backend.services.people_jobs.ensure_worker'),patch('backend.services.face_engine.load_engine',side_effect=AssertionError('in import')):
-            result=importer._save_import(self.db,prepared,None)
+            result=importer._save_import(self.db,prepared,None,organize_people=True)
         self.assertEqual(self.db.execute('SELECT media_id FROM people_jobs').fetchone()[0],result['id'])
 
     def test_skip_done_analysis_can_queue_people_without_reanalyzing(self):

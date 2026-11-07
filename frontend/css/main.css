@@ -142,8 +142,6 @@ body.body--dark input::placeholder { color: #555 !important; -webkit-text-fill-c
 /* Import drop zone */
 .import-drop-zone { border: 2px dashed var(--border2); border-radius: 12px; padding: 32px 20px; text-align: center; transition: border-color 0.2s, background 0.2s; cursor: default; }
 .import-drop-zone.drag-over { border-color: var(--accent); background: var(--accent-dim); }
-.import-link { color: var(--accent); text-decoration: none; }
-.import-link:hover { text-decoration: underline; }
 
 /* Import preview grid */
 .import-preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }

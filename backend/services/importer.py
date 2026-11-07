@@ -119,7 +119,7 @@ def scan_only(paths: list[str], encrypted=None) -> list[dict]:
     return results, skipped
 
 
-def import_single_file(file_path: str) -> dict | None:
+def import_single_file(file_path: str, organize_people=False, people_media_type='all', classify_media=False) -> dict | None:
     filepath = Path(file_path)
     if not filepath.exists() or filepath.name.startswith("._"):
         return None
@@ -127,7 +127,7 @@ def import_single_file(file_path: str) -> dict | None:
         return None
     db = get_db()
     try:
-        return _import_one(db, filepath)
+        return _import_one(db, filepath, organize_people=organize_people, people_media_type=people_media_type, classify_media=classify_media)
     except Exception as e:
         logger.exception("import failed: {} — {}", filepath, e)
         raise
@@ -205,7 +205,7 @@ def _prepare_import(filepath: Path, exif_tags=None) -> dict:
             image.close()
 
 
-def _import_one(db, filepath: Path, force_update: bool = False, prepared=None) -> dict | None:
+def _import_one(db, filepath: Path, force_update: bool = False, prepared=None, organize_people=False, people_media_type='all', classify_media=False) -> dict | None:
     """Commit one prepared item on the caller's database thread."""
     saved = False
     generated = []
@@ -224,7 +224,7 @@ def _import_one(db, filepath: Path, force_update: bool = False, prepared=None) -
         stat = filepath.stat()
         if prepared["file_size"] != stat.st_size or prepared["file_mtime"] != stat.st_mtime:
             raise RuntimeError("Source changed during import; retry this file")
-        row = _save_import(db, prepared, existing)
+        row = _save_import(db, prepared, existing, organize_people=organize_people, people_media_type=people_media_type, classify_media=classify_media)
         saved = True
         return row
     finally:
@@ -232,7 +232,7 @@ def _import_one(db, filepath: Path, force_update: bool = False, prepared=None) -
             cleanup_thumbnails(generated)
 
 
-def _save_import(db, prepared, existing):
+def _save_import(db, prepared, existing, organize_people=False, people_media_type='all', classify_media=False):
     columns = [
         "file_path", "file_name", "media_type", "file_size", "file_mtime", "duration", "width", "height", "fps",
         "video_codec", "video_profile", "bit_rate", "audio_codec", "audio_sample_rate", "audio_channels",
@@ -256,13 +256,13 @@ def _save_import(db, prepared, existing):
         from ..blueprints.analysis import refresh_media_fts
         refresh_media_fts(db, media_id)
         row = dict(db.execute("SELECT * FROM media WHERE id = ?", (media_id,)).fetchone())
-        from ..db import get_setting
-        classify = get_setting(db,'classification_enabled','false') == 'true'
+        from .model_preferences import classification_enabled, people_enabled
+        classify = classify_media and classification_enabled(db,'fast') and row['media_type']=='image'
         if classify:
             from .classification_jobs import enqueue
             enqueue(db,media_id,'fast',batch_id=prepared.get('_classification_batch'))
-        organize_people = get_setting(db,'people_enabled','false') == 'true'
-        if organize_people:
+        recognize_people=organize_people and people_enabled(db) and row['media_type'] in ('image','video') and people_media_type in ('all',row['media_type'])
+        if recognize_people:
             from .people_jobs import enqueue as enqueue_people
             enqueue_people(db,media_id)
         db.commit()
@@ -284,7 +284,7 @@ def _save_import(db, prepared, existing):
             ensure_worker(current_app._get_current_object())
         except Exception:
             logger.warning('分类任务已登记，后台调度稍后重试')
-    if organize_people:
+    if recognize_people:
         try:
             from flask import current_app
             from .people_jobs import ensure_worker as ensure_people_worker
@@ -295,7 +295,7 @@ def _save_import(db, prepared, existing):
     return row
 
 
-def import_batch(db, paths):
+def import_batch(db, paths, organize_people=False, people_media_type='all', classify_media=False):
     """Bounded preparation, ordered commits and progress; discard uncommitted caches on disconnect."""
     classification_batch=__import__("uuid").uuid4().hex
     with ThreadPoolExecutor(max_workers=IMPORT_WORKERS, thread_name_prefix="media-import") as pool:
@@ -315,7 +315,7 @@ def import_batch(db, paths):
                         if future:
                             prepared=future.result()
                             prepared['_classification_batch']=classification_batch
-                            result=_import_one(db,path,prepared=prepared)
+                            result=_import_one(db,path,prepared=prepared,organize_people=organize_people,people_media_type=people_media_type,classify_media=classify_media)
                         else:
                             result=None
                         if result:
@@ -606,8 +606,9 @@ def _write_thumbnail(filepath, media_type, thumb_path, image, orientation):
     raw = filepath.suffix.lower() in RAW_EXTS
     if raw and shutil.which("exiftool"):
         try:
-            if _extract_exif_thumbnail(filepath, thumb_path, thumb_name):
-                _rotate_thumbnail(thumb_path, orientation if orientation is not None else _get_exif_orientation(filepath))
+            orient = orientation if orientation is not None else _get_exif_orientation(filepath)
+            if _extract_exif_thumbnail(filepath, thumb_path, thumb_name, orientation=orient):
+                _rotate_thumbnail(thumb_path, orient)
                 return thumb_name
         except Exception:
             thumb_path.unlink(missing_ok=True)
@@ -737,8 +738,27 @@ def _extract_cover_art(filepath: Path) -> str | None:
     return None
 
 
-def _extract_exif_thumbnail(filepath: Path, thumb_path: Path, thumb_name: str) -> str | None:
+def _extract_exif_thumbnail(filepath: Path, thumb_path: Path, thumb_name: str, orientation=1) -> str | None:
     # Prefer full-resolution embedded JPEGs over tiny 4:3 ThumbnailImage
+    raw = filepath.suffix.lower() in RAW_EXTS
+    stamp = filepath.stat() if raw else None
+    fallback = None
+    def write(content):
+        from PIL import Image
+        with Image.open(io.BytesIO(content)) as img:
+            # Retain RAW detail once, alongside the lightweight grid thumbnail.
+            if raw:
+                from .raw_preview import save_preview, MAX_EDGE
+                img.draft('RGB', (MAX_EDGE, MAX_EDGE))
+                try:save_preview(filepath, img, orientation, stamp=stamp)
+                except OSError:pass  # A cache failure must not fail the import.
+            else:
+                img.draft('RGB', (320, max(1, round(320 * img.height / img.width))))
+            img = img.convert('RGB')
+            img = img.resize((320, max(1, round(320 * img.height / img.width))),
+                             Image.Resampling.LANCZOS, reducing_gap=3.0)
+            img.save(thumb_path, 'JPEG', quality=85)
+        return thumb_name
     for tag in ("JpgFromRaw", "PreviewImage", "ThumbnailImage"):
         cmd = ["exiftool", "-b", f"-{tag}", str(filepath)]
         result = subprocess.run(cmd, capture_output=True, timeout=EXIFTOOL_TIMEOUT)
@@ -746,15 +766,14 @@ def _extract_exif_thumbnail(filepath: Path, thumb_path: Path, thumb_name: str) -
             from PIL import Image
             try:
                 with Image.open(io.BytesIO(result.stdout)) as img:
-                    # JPEG decoder downsampling is sufficient for a 320px preview.
-                    img.draft("RGB", (320, max(1, round(320 * img.height / img.width))))
-                    img = img.convert("RGB")
-                    img = img.resize((320, max(1, round(320 * img.height / img.width))),
-                                     Image.Resampling.LANCZOS, reducing_gap=3.0)
-                    img.save(thumb_path, "JPEG", quality=85)
-                return thumb_name
+                    if raw and max(img.size) < 1600:
+                        if fallback is None or max(img.size)>fallback[0]:fallback=(max(img.size),result.stdout)
+                        continue
+                return write(result.stdout)
             except (OSError, ValueError):
                 continue  # A damaged embedded preview must not prevent the other fallbacks.
+    if fallback:
+        return write(fallback[1])
     return None
 
 

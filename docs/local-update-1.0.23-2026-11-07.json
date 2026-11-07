@@ -1,0 +1,561 @@
+{
+  "date": "2026-11-07",
+  "status": "installed-and-recognition-resumed",
+  "version": "1.0.23",
+  "previous_version": "1.0.22",
+  "installed_application": "/Users/zack/Applications/映屿 · luminisle.app",
+  "scope": [
+    "Feature-checked consensus per complete video track reduces new duplicate identities from representative frames.",
+    "Conflicting or ambiguous video identities enter review; preserve human decisions and existing identities.",
+    "Pause for local update, validate all data, then resume only the preexisting paused queue."
+  ],
+  "package": {
+    "version": "1.0.23",
+    "previous_version": "1.0.22",
+    "app_id": "com.zack.media-manager",
+    "architecture": "arm64",
+    "frontend_files_matched": 47,
+    "frozen_modules_match_source": {
+      "backend.services.people": true,
+      "backend.services.people_jobs": true,
+      "backend.services.video_people": true,
+      "backend.services.face_engine": true,
+      "backend.blueprints.people": true
+    },
+    "frozen_video_track_consensus_present": true,
+    "frozen_worker_has_no_ten_minute_cutoff": true,
+    "private_data_files": 0,
+    "external_model_weights": 0,
+    "artifacts": {
+      "Luminisle-1.0.23-arm64.dmg": {
+        "bytes": 314385500,
+        "sha256": "500df43560298b2cf40742e334be38e9c9ae0267c03837999fed9904028a98d2"
+      },
+      "Luminisle-1.0.23-arm64.zip": {
+        "bytes": 314075636,
+        "sha256": "bd53e58eb56764d97a2bf58f8885056258d013facfca8d92472d85ff46423d01"
+      }
+    },
+    "signature_deep_strict": true,
+    "signing": "local ad-hoc; no Developer ID notarization",
+    "source_validation": "build/video-track-identity-2026-11-07/validation.json",
+    "desktop_runtime_and_model_path_checks": "build/release-1.0.23/desktop-tests.log",
+    "dmg_checksum_verified": true,
+    "zip_integrity_verified": true
+  },
+  "checks": {
+    "source_python_tests": 392,
+    "source_browser_groups": 13,
+    "fresh_desktop_tests": "passed",
+    "frozen_self_test": "passed",
+    "signed_package_and_dmg_zip_integrity": "passed"
+  },
+  "migration_rehearsal": {
+    "ok": true,
+    "version": "1.0.23",
+    "packaged_frontend_files_matched": 47,
+    "private_or_external_model_weights": 0,
+    "bundled_runtime_vad_and_examples_bytes": 1246054,
+    "original_tables_unchanged": 48,
+    "new_tables": [],
+    "new_tables_empty": true,
+    "physical_column_order_unchanged": true,
+    "foreign_key_violations": 0,
+    "automatic_upgrade_snapshot_verified": true,
+    "model_paths_match_normal_profile": true,
+    "model_inference_disabled": true
+  },
+  "packaged_browser": {
+    "routes": [
+      {
+        "route": "#/gallery",
+        "title": "映屿 · luminisle"
+      },
+      {
+        "route": "#/classify",
+        "title": "映屿 · luminisle"
+      },
+      {
+        "route": "#/taxonomy",
+        "title": "映屿 · luminisle"
+      },
+      {
+        "route": "#/people",
+        "title": "映屿 · luminisle"
+      }
+    ],
+    "settings": [
+      {
+        "tab": "general",
+        "height": 740
+      },
+      {
+        "tab": "image",
+        "height": 740
+      },
+      {
+        "tab": "video",
+        "height": 740
+      },
+      {
+        "tab": "music",
+        "height": 740
+      },
+      {
+        "tab": "people",
+        "height": 740
+      },
+      {
+        "tab": "classification",
+        "height": 740
+      },
+      {
+        "tab": "creative",
+        "height": 740
+      }
+    ],
+    "errors": [],
+    "failedRequests": [],
+    "writes": [],
+    "metrics": [
+      {
+        "width": 1600,
+        "overflow": false,
+        "controls": [
+          32,
+          32,
+          32
+        ]
+      },
+      {
+        "width": 1000,
+        "overflow": false,
+        "controls": [
+          32,
+          32,
+          32
+        ]
+      }
+    ],
+    "settingsOpeningHeight": 115.62295532226562,
+    "peopleGrouping": {
+      "base_threshold": 0.5,
+      "calibrated": true,
+      "effective_threshold": 0.45,
+      "enabled": true,
+      "negative_feedback": 0,
+      "positive_feedback": 64
+    },
+    "galleryLayout": [
+      {
+        "width": 1600,
+        "inspectorOpen": false,
+        "usable": 1328,
+        "controlGap": 8,
+        "rowGaps": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "width": 1600,
+        "inspectorOpen": true,
+        "usable": 1040,
+        "controlGap": 8,
+        "rowGaps": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "width": 1600,
+        "inspectorOpen": false,
+        "usable": 1328,
+        "controlGap": 8,
+        "rowGaps": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "width": 1000,
+        "inspectorOpen": false,
+        "usable": 728,
+        "controlGap": 8,
+        "rowGaps": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "width": 1000,
+        "inspectorOpen": true,
+        "usable": 476,
+        "controlGap": 8,
+        "rowGaps": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "width": 1000,
+        "inspectorOpen": false,
+        "usable": 728,
+        "controlGap": 8,
+        "rowGaps": [
+          0,
+          0,
+          0
+        ]
+      }
+    ],
+    "peopleReview": {
+      "cards": 40,
+      "widths": [
+        {
+          "width": 1440,
+          "columns": 2
+        },
+        {
+          "width": 1000,
+          "columns": 1
+        }
+      ],
+      "avatarChosenWithoutSaving": true,
+      "confirmButtonBackground": "rgb(36, 111, 96)"
+    },
+    "reviewRescan": {
+      "total": 1212,
+      "active": 0,
+      "previewOnly": true
+    },
+    "toast": [
+      {
+        "mode": "light",
+        "color": "rgb(32, 62, 55)",
+        "background": "rgb(248, 250, 244)",
+        "contrast": 11.060871810643535
+      },
+      {
+        "mode": "dark",
+        "color": "rgb(236, 241, 230)",
+        "background": "rgb(23, 52, 49)",
+        "contrast": 11.635863103554755
+      }
+    ],
+    "ok": true
+  },
+  "installation": {
+    "status": "installed-data-verified",
+    "version": "1.0.23",
+    "target": "/Users/zack/Applications/映屿 · luminisle.app",
+    "stage": "/Users/zack/Applications/.Luminisle-1.0.23-staging-cbb6498ca53e49ecb1dbb939d367044c.app",
+    "previous": "/Users/zack/program/python/video_analyzer/build/release-1.0.23/previous-1.0.22.app",
+    "launch_method": "LaunchServices",
+    "background_held_by_existing_pause": true,
+    "grouping": {
+      "base_threshold": 0.5,
+      "calibrated": true,
+      "effective_threshold": 0.45,
+      "enabled": true,
+      "negative_feedback": 0,
+      "positive_feedback": 64
+    },
+    "health_version": "1.0.23",
+    "normal_profile_and_library": true,
+    "media": 11835,
+    "projects": 2,
+    "original_tables_unchanged": {
+      "collection_items": true,
+      "collections": true,
+      "dup_exclusions": true,
+      "media": true,
+      "media_fts": true,
+      "media_segment": true,
+      "media_tags": true,
+      "music_segment": true,
+      "people_changes": true,
+      "people_distinct": true,
+      "people_face_exclusions": true,
+      "people_faces": true,
+      "people_jobs": true,
+      "people_media_decisions": true,
+      "people_persons": true,
+      "people_plans": true,
+      "people_reviews": true,
+      "project_media": true,
+      "project_tracks": true,
+      "projects": true,
+      "settings": true,
+      "tags": true,
+      "taxonomy_analysis_batches": true,
+      "taxonomy_analysis_requests": true,
+      "taxonomy_candidate_context": true,
+      "taxonomy_candidates": true,
+      "taxonomy_changes": true,
+      "taxonomy_closed_proposals": true,
+      "taxonomy_collections": true,
+      "taxonomy_decision_events": true,
+      "taxonomy_decisions": true,
+      "taxonomy_examples": true,
+      "taxonomy_expressions": true,
+      "taxonomy_features": true,
+      "taxonomy_field_provenance": true,
+      "taxonomy_historical_snapshots": true,
+      "taxonomy_job_context": true,
+      "taxonomy_jobs": true,
+      "taxonomy_nodes": true,
+      "taxonomy_plans": true,
+      "taxonomy_relation_jobs": true,
+      "taxonomy_relation_locks": true,
+      "taxonomy_relation_suggestions": true,
+      "taxonomy_relations": true,
+      "taxonomy_sources": true,
+      "taxonomy_split_targets": true,
+      "taxonomy_text_features": true,
+      "taxonomy_validation_profiles": true
+    },
+    "new_tables": 0,
+    "new_tables_empty": true,
+    "physical_column_order_unchanged": true,
+    "foreign_key_violations": 0,
+    "existing_files_verified": 17659,
+    "model_configuration_unchanged": true,
+    "automatic_policies_preserved": true,
+    "preexisting_queue_states_preserved": true,
+    "signature_deep_strict": true,
+    "automatic_upgrade_snapshot": "/Users/zack/Library/Application Support/Media Manager/library/upgrade-backups/20261107-174059-952a721a.db",
+    "snapshot_matches_original": true,
+    "original_media_or_model_files_modified": false
+  },
+  "resume": {
+    "ok": true,
+    "version": "1.0.23",
+    "backend_pid": 75995,
+    "normal_profile_and_models": true,
+    "all_48_tables_identical_before_resume": true,
+    "protected_tables_after_resume": {
+      "collection_items": true,
+      "collections": true,
+      "dup_exclusions": true,
+      "media": true,
+      "media_fts": true,
+      "media_segment": true,
+      "media_tags": true,
+      "music_segment": true,
+      "people_changes": true,
+      "people_distinct": true,
+      "people_face_exclusions": true,
+      "people_media_decisions": true,
+      "people_plans": true,
+      "project_media": true,
+      "project_tracks": true,
+      "projects": true,
+      "tags": true,
+      "taxonomy_analysis_batches": true,
+      "taxonomy_analysis_requests": true,
+      "taxonomy_candidate_context": true,
+      "taxonomy_candidates": true,
+      "taxonomy_changes": true,
+      "taxonomy_closed_proposals": true,
+      "taxonomy_collections": true,
+      "taxonomy_decision_events": true,
+      "taxonomy_decisions": true,
+      "taxonomy_examples": true,
+      "taxonomy_expressions": true,
+      "taxonomy_features": true,
+      "taxonomy_field_provenance": true,
+      "taxonomy_historical_snapshots": true,
+      "taxonomy_job_context": true,
+      "taxonomy_jobs": true,
+      "taxonomy_nodes": true,
+      "taxonomy_plans": true,
+      "taxonomy_relation_jobs": true,
+      "taxonomy_relation_locks": true,
+      "taxonomy_relation_suggestions": true,
+      "taxonomy_relations": true,
+      "taxonomy_sources": true,
+      "taxonomy_split_targets": true,
+      "taxonomy_text_features": true,
+      "taxonomy_validation_profiles": true
+    },
+    "media": 11835,
+    "projects": 2,
+    "resumed_original_jobs": 4168,
+    "original_paused_jobs_after_resume": {
+      "done": 43,
+      "quality_insufficient": 14,
+      "queued": 4110,
+      "running": 1
+    },
+    "queue_state_at_check": {
+      "cancelled": 0,
+      "done": 610,
+      "failed": 0,
+      "no_faces": 32,
+      "paused": 0,
+      "quality_insufficient": 5812,
+      "queued": 4110,
+      "running": 1,
+      "stale": 0,
+      "waiting": 1100
+    },
+    "unrelated_and_previously_finished_jobs_unchanged": true,
+    "existing_person_names_and_manual_assignments_preserved": true,
+    "settings_preserved_except_authorized_resume": true,
+    "grouping": {
+      "base_threshold": 0.5,
+      "calibrated": true,
+      "effective_threshold": 0.45,
+      "enabled": true,
+      "negative_feedback": 0,
+      "positive_feedback": 64
+    },
+    "physical_columns_unchanged": true,
+    "foreign_key_violations": 0,
+    "existing_files_verified": 17659,
+    "model_configuration_unchanged": true,
+    "automatic_upgrade_snapshot_verified": true,
+    "new_full_rescan_started": false,
+    "native_window_verified": true,
+    "native_header_changed_from_continue_to_pause": true
+  },
+  "resume_action": {
+    "version": "1.0.23",
+    "action": "resume",
+    "via": "native-header-continue",
+    "before": {
+      "jobs": {
+        "cancelled": 0,
+        "done": 567,
+        "failed": 0,
+        "no_faces": 32,
+        "paused": 4168,
+        "quality_insufficient": 5798,
+        "queued": 0,
+        "running": 0,
+        "stale": 0,
+        "waiting": 1100
+      },
+      "paused": true,
+      "grouping": {
+        "base_threshold": 0.5,
+        "calibrated": true,
+        "effective_threshold": 0.45,
+        "enabled": true,
+        "negative_feedback": 0,
+        "positive_feedback": 64
+      }
+    },
+    "after": {
+      "jobs": {
+        "cancelled": 0,
+        "done": 610,
+        "failed": 0,
+        "no_faces": 32,
+        "paused": 0,
+        "quality_insufficient": 5812,
+        "queued": 4110,
+        "running": 1,
+        "stale": 0,
+        "waiting": 1100
+      },
+      "paused": false,
+      "grouping": {
+        "base_threshold": 0.5,
+        "calibrated": true,
+        "effective_threshold": 0.45,
+        "enabled": true,
+        "negative_feedback": 0,
+        "positive_feedback": 64
+      }
+    },
+    "ok": true
+  },
+  "native_verification": {
+    "normal_application_window": true,
+    "header_original_paused_queue_visible": true,
+    "continue_clicked_once": true,
+    "header_control_changed_to_pause": true
+  },
+  "data_safety": {
+    "all_48_tables_identical_before_resume": true,
+    "media": 11835,
+    "projects": 2,
+    "existing_files_verified": 17659,
+    "user_model_configuration_preserved": true,
+    "user_thresholds_and_feedback_preserved": true,
+    "original_media_and_models_not_moved_or_overwritten": true,
+    "all_preexisting_upgrade_backups_preserved": true,
+    "automatic_1_0_23_database_snapshot_verified": true,
+    "no_schema_changes": true,
+    "legacy_projects_timestamp_column_drift_preserved": true
+  },
+  "limitations": [
+    "No real-video accuracy benchmark was repeated for this release.",
+    "Previously split people are not automatically merged; no additional full rescan was started."
+  ],
+  "git": {
+    "committed": false,
+    "pushed": false
+  },
+  "evidence_directory": "/Users/zack/program/python/video_analyzer/build/release-1.0.23",
+  "temporary_cleanup": {
+    "ok": true,
+    "removed_current_build_paths": [
+      "build/release-1.0.23/baseline",
+      "build/release-1.0.23/rehearsal-library",
+      "build/release-1.0.23/previous-1.0.22.app",
+      "build/release-1.0.23/pre-install.db",
+      "build/release-1.0.23/observed-after-resume.db",
+      "build/runtime",
+      "build/tools",
+      "build/pyinstaller",
+      "dist/mac-arm64",
+      "dist/Luminisle-1.0.23-arm64.zip",
+      "dist/Luminisle-1.0.23-arm64.zip.blockmap",
+      "dist/Luminisle-1.0.23-arm64.dmg.blockmap",
+      "dist/builder-debug.yml"
+    ],
+    "retained_current_installer": "dist/Luminisle-1.0.23-arm64.dmg",
+    "preexisting_installers_and_backups_preserved": true,
+    "real_library_and_models_untouched": true,
+    "logs_checks_and_upgrade_receipt_preserved": true
+  },
+  "final_verification": {
+    "ok": true,
+    "version": "1.0.23",
+    "backend_pid": 75995,
+    "recognition_resumed": true,
+    "queue_at_final_check": {
+      "cancelled": 0,
+      "done": 727,
+      "failed": 0,
+      "no_faces": 33,
+      "paused": 0,
+      "quality_insufficient": 5832,
+      "queued": 3972,
+      "running": 1,
+      "stale": 0,
+      "waiting": 1100
+    },
+    "grouping": {
+      "base_threshold": 0.5,
+      "calibrated": true,
+      "effective_threshold": 0.45,
+      "enabled": true,
+      "negative_feedback": 0,
+      "positive_feedback": 64
+    },
+    "installer_sha256": "500df43560298b2cf40742e334be38e9c9ae0267c03837999fed9904028a98d2",
+    "installer_bytes": 314385500,
+    "temporary_cleanup_verified": true,
+    "installed_app_signature_verified": true,
+    "git_diff_check": "passed"
+  }
+}

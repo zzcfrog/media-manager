@@ -23,18 +23,20 @@ Appearance.apply(initialAppearance.theme, initialAppearance.mode);
 // Shared by the toolbar popover and General settings. Previews use the actual
 // theme tokens, so their materials cannot drift away from the selected theme.
 const AppearancePicker = {
-  props: { theme: String, mode: String },
+  props: { theme: String, mode: String, compact: Boolean },
   emits: ['theme-change', 'mode-change', 'dismiss'],
   data() {
     return { themes: Appearance.themes, modes: Appearance.modes,
       modeIcons: { light: 'light_mode', dark: 'dark_mode', auto: 'desktop_windows' } };
   },
-  methods: { t(...args) { return t(...args); } },
+  computed: { displayModes() { return this.compact?['auto','light','dark']:this.modes; } },
+  methods: { t(...args) { return t(...args); }, tt(zh,en) { return taxText(zh,en); } },
   template: `
     <section class="appearance-picker" :aria-label="t('appearance.title')" @keydown.stop @keydown.esc.prevent="$emit('dismiss')">
-      <div class="appearance-section-heading">
+      <component :is="compact?'settings-group':'div'" v-bind="compact?{title:t('appearance.styles'),icon:'palette',note:t('appearance.saved')}:{}">
+      <div v-if="!compact" class="appearance-section-heading">
         <span>{{ t('appearance.styles') }}</span>
-        <small>{{ t('appearance.styles_hint') }}</small>
+        <small>{{ t(compact ? 'appearance.saved' : 'appearance.styles_hint') }}</small>
       </div>
       <div class="appearance-theme-grid" role="group" :aria-label="t('appearance.styles')">
         <button v-for="item in themes" :key="item" type="button" class="appearance-theme-card"
@@ -57,17 +59,20 @@ const AppearancePicker = {
           <span class="appearance-theme-name">{{ t('appearance.' + item) }}</span>
         </button>
       </div>
-      <div class="appearance-mode-section">
-        <div class="appearance-section-heading">{{ t('appearance.mode') }}</div>
+      </component>
+      <component :is="compact?'settings-group':'div'" v-bind="compact?{title:t('appearance.mode'),icon:'contrast'}:{class:'appearance-mode-section'}">
+        <div v-if="!compact" class="appearance-section-heading">{{ t('appearance.mode') }}</div>
+        <div :class="{'settings-row':compact}"><div v-if="compact" class="settings-row-label settings-label"><span>{{tt('显示方式','Display mode')}}</span></div><div :class="{'settings-row-control':compact}">
         <div class="appearance-modes" role="group" :aria-label="t('appearance.mode')">
-          <button v-for="item in modes" :key="item" type="button" :data-mode-choice="item"
+          <button v-for="item in displayModes" :key="item" type="button" :data-mode-choice="item"
                   :aria-pressed="mode === item" @click="$emit('mode-change', item)">
             <q-icon :name="modeIcons[item]" aria-hidden="true"></q-icon>
             <span>{{ t('s.theme_' + item) }}</span>
           </button>
         </div>
-      </div>
-      <p class="appearance-save-hint">{{ t('appearance.saved') }}</p>
+        </div></div>
+      </component>
+      <p v-if="!compact" class="appearance-save-hint">{{ t('appearance.saved') }}</p>
     </section>
   `,
 };

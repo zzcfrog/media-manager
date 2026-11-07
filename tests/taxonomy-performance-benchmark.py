@@ -262,15 +262,12 @@ def import_benchmark():
             thumbs.mkdir(exist_ok=True)
             with database(path, fresh=True) as (app, db, _), ExitStack() as patches:
                 seed_nodes(db)
-                db.execute('INSERT OR REPLACE INTO settings(key,value) VALUES (?,?)',
-                           ('classification_enabled', 'true' if enabled else 'false'))
-                db.commit()
                 patches.enter_context(patch.object(importer, 'THUMB_DIR', thumbs))
                 patches.enter_context(patch.object(config, 'THUMB_DIR', thumbs))
                 patches.enter_context(patch.object(embedding, 'compute_embedding', return_value=None))
                 worker = patches.enter_context(patch.object(classification_jobs, 'ensure_worker'))
                 started = time.perf_counter()
-                events = list(importer.import_batch(db, [str(p) for p in paths]))
+                events = list(importer.import_batch(db, [str(p) for p in paths],classify_media=enabled))
                 elapsed = (time.perf_counter() - started) * 1000
                 assert all(e['type'] == 'ok' for e in events), events
                 jobs = db.execute('SELECT COUNT(*) FROM taxonomy_jobs').fetchone()[0]

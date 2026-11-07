@@ -19,6 +19,9 @@ def get_settings():
 def save_settings():
     db = get_db()
     data = request.get_json(silent=True) or {}
+    for key in ('image_analysis_enabled','video_analysis_enabled','music_analysis_enabled'):
+        if key in data and data[key] not in ('true','false'):
+            return jsonify({'error':'分析启用状态需为开关'}),400
     for k, v in data.items():
         db.execute("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=?",
                    (k, v, v))

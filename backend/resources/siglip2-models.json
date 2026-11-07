@@ -1,0 +1,943 @@
+{
+  "siglip2-base-patch16-224-fp32": {
+    "label": "SigLIP 2 Base/16 · 224",
+    "manufacturer": "Google",
+    "quant": "FP32",
+    "repository": "onnx-community/siglip2-base-patch16-224-ONNX",
+    "revision": "ba1f3b0843f24bc5417d38e19c37b287d719b2f4",
+    "base_model": "google/siglip2-base-patch16-224",
+    "converter": "ONNX Community",
+    "dimension": 768,
+    "variant": "fixed",
+    "patch_size": 16,
+    "preprocessing": {
+      "size": {
+        "height": 224,
+        "width": 224
+      },
+      "resample": 2,
+      "rescale_factor": 0.00392156862745098,
+      "image_mean": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "image_std": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "outputs": {
+      "image": "pooler_output",
+      "text": "pooler_output"
+    },
+    "files": {
+      "text.onnx": {
+        "remote": "onnx/text_model.onnx",
+        "bytes": 1129469657,
+        "sha256": "baf12d941beabafafb14f7b4adb38dc15be18681b964a84410ec53d9d65e6293"
+      },
+      "image.onnx": {
+        "remote": "onnx/vision_model.onnx",
+        "bytes": 371807752,
+        "sha256": "c0573e3f4140c3a7c4e9cc5912bd6b26a033b46a6a8e8af26cbea262b163bcad"
+      },
+      "tokenizer.json": {
+        "remote": "tokenizer.json",
+        "bytes": 34363039,
+        "sha256": "cb9140fae3ac5122c972d37adf83e1248471a38147ad76f8215c8872c6fd8322"
+      }
+    }
+  },
+  "siglip2-base-patch16-256-fp32": {
+    "label": "SigLIP 2 Base/16 · 256",
+    "manufacturer": "Google",
+    "quant": "FP32",
+    "repository": "onnx-community/siglip2-base-patch16-256-ONNX",
+    "revision": "d1114256522a37ffa257a0a58017348ab0058db2",
+    "base_model": "google/siglip2-base-patch16-256",
+    "converter": "ONNX Community",
+    "dimension": 768,
+    "variant": "fixed",
+    "patch_size": 16,
+    "preprocessing": {
+      "size": {
+        "height": 256,
+        "width": 256
+      },
+      "resample": 2,
+      "rescale_factor": 0.00392156862745098,
+      "image_mean": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "image_std": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "outputs": {
+      "image": "pooler_output",
+      "text": "pooler_output"
+    },
+    "files": {
+      "text.onnx": {
+        "remote": "onnx/text_model.onnx",
+        "bytes": 1129469657,
+        "sha256": "d3de4a6bbbfcb429b6615ac496790353cf4a4fc0f19fbbe7179e523ae60daaef"
+      },
+      "image.onnx": {
+        "remote": "onnx/vision_model.onnx",
+        "bytes": 371992072,
+        "sha256": "f5cb16728a704703f05516ded628397e11dbca4de2eb5db04b0c0bcee988aa7a"
+      },
+      "tokenizer.json": {
+        "remote": "tokenizer.json",
+        "bytes": 34363039,
+        "sha256": "cb9140fae3ac5122c972d37adf83e1248471a38147ad76f8215c8872c6fd8322"
+      }
+    }
+  },
+  "siglip2-base-patch16-384-fp32": {
+    "label": "SigLIP 2 Base/16 · 384",
+    "manufacturer": "Google",
+    "quant": "FP32",
+    "repository": "onnx-community/siglip2-base-patch16-384-ONNX",
+    "revision": "99f5d40afb5331b81eecee4bb02c360fbb9cdf8a",
+    "base_model": "google/siglip2-base-patch16-384",
+    "converter": "ONNX Community",
+    "dimension": 768,
+    "variant": "fixed",
+    "patch_size": 16,
+    "preprocessing": {
+      "size": {
+        "height": 384,
+        "width": 384
+      },
+      "resample": 2,
+      "rescale_factor": 0.00392156862745098,
+      "image_mean": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "image_std": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "outputs": {
+      "image": "pooler_output",
+      "text": "pooler_output"
+    },
+    "files": {
+      "text.onnx": {
+        "remote": "onnx/text_model.onnx",
+        "bytes": 1129469657,
+        "sha256": "d28c21c7f12c38b0ec43aacb7ce2228fba6bd6b20641802ef2b29809ece46af8"
+      },
+      "image.onnx": {
+        "remote": "onnx/vision_model.onnx",
+        "bytes": 372975112,
+        "sha256": "49ae4958b1098ca995e929d646f7be05a69c65e6344beae07d58c6598ffc5210"
+      },
+      "tokenizer.json": {
+        "remote": "tokenizer.json",
+        "bytes": 34363039,
+        "sha256": "cb9140fae3ac5122c972d37adf83e1248471a38147ad76f8215c8872c6fd8322"
+      }
+    }
+  },
+  "siglip2-base-patch16-512-fp32": {
+    "label": "SigLIP 2 Base/16 · 512",
+    "manufacturer": "Google",
+    "quant": "FP32",
+    "repository": "onnx-community/siglip2-base-patch16-512-ONNX",
+    "revision": "323fe16b35d8ced8182f8d9ff5e5ec935dd79bd7",
+    "base_model": "google/siglip2-base-patch16-512",
+    "converter": "ONNX Community",
+    "dimension": 768,
+    "variant": "fixed",
+    "patch_size": 16,
+    "preprocessing": {
+      "size": {
+        "height": 512,
+        "width": 512
+      },
+      "resample": 2,
+      "rescale_factor": 0.00392156862745098,
+      "image_mean": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "image_std": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "outputs": {
+      "image": "pooler_output",
+      "text": "pooler_output"
+    },
+    "files": {
+      "text.onnx": {
+        "remote": "onnx/text_model.onnx",
+        "bytes": 1129469657,
+        "sha256": "469679f9160d3ddfe72904c8b91d2ddeab3fa08dda727877c34ff16d77b9e31a"
+      },
+      "image.onnx": {
+        "remote": "onnx/vision_model.onnx",
+        "bytes": 374352089,
+        "sha256": "a2c02e842727cc1c5661e54d4e7671676781c4efc0047d3d17f6211593e12b4e"
+      },
+      "tokenizer.json": {
+        "remote": "tokenizer.json",
+        "bytes": 34363039,
+        "sha256": "cb9140fae3ac5122c972d37adf83e1248471a38147ad76f8215c8872c6fd8322"
+      }
+    }
+  },
+  "siglip2-base-patch32-256-fp32": {
+    "label": "SigLIP 2 Base/32 · 256",
+    "manufacturer": "Google",
+    "quant": "FP32",
+    "repository": "onnx-community/siglip2-base-patch32-256-ONNX",
+    "revision": "7efccb86b5b6601bfe9e14326e1c11b40b68d44c",
+    "base_model": "google/siglip2-base-patch32-256",
+    "converter": "ONNX Community",
+    "dimension": 768,
+    "variant": "fixed",
+    "patch_size": 32,
+    "preprocessing": {
+      "size": {
+        "height": 256,
+        "width": 256
+      },
+      "resample": 2,
+      "rescale_factor": 0.00392156862745098,
+      "image_mean": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "image_std": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "outputs": {
+      "image": "pooler_output",
+      "text": "pooler_output"
+    },
+    "files": {
+      "text.onnx": {
+        "remote": "onnx/text_model.onnx",
+        "bytes": 1129469657,
+        "sha256": "e8950ceb970ea302be3559055df99af8a1c5e1bf5a25e34d4ed0069340a3c8aa"
+      },
+      "image.onnx": {
+        "remote": "onnx/vision_model.onnx",
+        "bytes": 378478689,
+        "sha256": "0ddb7507cfcb54c2cd503029949add9dc6586de67164bb69c2c09588cdcc9719"
+      },
+      "tokenizer.json": {
+        "remote": "tokenizer.json",
+        "bytes": 34363039,
+        "sha256": "cb9140fae3ac5122c972d37adf83e1248471a38147ad76f8215c8872c6fd8322"
+      }
+    }
+  },
+  "siglip2-base-patch16-naflex-fp32": {
+    "label": "SigLIP 2 Base/16 · NaFlex",
+    "manufacturer": "Google",
+    "quant": "FP32",
+    "repository": "upshift/siglip2-base-patch16-naflex-onnx",
+    "revision": "e0e68ca8ad7eeeb6ac67669e5afa0f8c30ffe0be",
+    "base_model": "google/siglip2-base-patch16-naflex",
+    "converter": "upshift",
+    "dimension": 768,
+    "variant": "naflex",
+    "patch_size": 16,
+    "max_num_patches": 256,
+    "preprocessing": {
+      "resample": 2,
+      "rescale_factor": 0.00392156862745098,
+      "image_mean": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "image_std": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "outputs": {
+      "image": "image_embeds",
+      "text": "text_embeds"
+    },
+    "files": {
+      "text.onnx": {
+        "remote": "text_model.onnx",
+        "bytes": 189195,
+        "sha256": "f4d8bf8d1b158aaf72b8b15dbefc2c107aad7a892ac7a9cbe6dd93eab9082b0d"
+      },
+      "text_model.onnx_data": {
+        "remote": "text_model.onnx_data",
+        "bytes": 1129250816,
+        "sha256": "cff26d9567cf085199feb431a374dfc52fa6c1f4d1e760c8af0473cd3b95c65b"
+      },
+      "tokenizer.json": {
+        "remote": "tokenizer.json",
+        "bytes": 34356304,
+        "sha256": "58a1696e79c9d97937389ed116f552a15c84811d7b8023918b86f4bc5775b1b0"
+      },
+      "image.onnx": {
+        "remote": "vision_model.onnx",
+        "bytes": 219002,
+        "sha256": "3a715a6d27dfe5984098053e16bd245ebc8012894687a0bb3e01c05d1e5a6714"
+      },
+      "vision_model.onnx_data": {
+        "remote": "vision_model.onnx_data",
+        "bytes": 371785728,
+        "sha256": "0e3d9cd8405d55ac1a10173ebae7f653965982dd7ff3dc4af121aa40dfdaae1a"
+      }
+    }
+  },
+  "siglip2-large-patch16-256-fp32": {
+    "label": "SigLIP 2 Large/16 · 256",
+    "manufacturer": "Google",
+    "quant": "FP32",
+    "repository": "onnx-community/siglip2-large-patch16-256-ONNX",
+    "revision": "c03fb63ddd5fe363212cbd08110f92a35250db6a",
+    "base_model": "google/siglip2-large-patch16-256",
+    "converter": "ONNX Community",
+    "dimension": 1024,
+    "variant": "fixed",
+    "patch_size": 16,
+    "preprocessing": {
+      "size": {
+        "height": 256,
+        "width": 256
+      },
+      "resample": 2,
+      "rescale_factor": 0.00392156862745098,
+      "image_mean": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "image_std": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "outputs": {
+      "image": "pooler_output",
+      "text": "pooler_output"
+    },
+    "files": {
+      "text.onnx": {
+        "remote": "onnx/text_model.onnx",
+        "bytes": 532930,
+        "sha256": "49caa52593fd81dadbcf235db6df97e15ea0b2c481ab3f45574ebd2f94b0a81b"
+      },
+      "text_model.onnx_data": {
+        "remote": "onnx/text_model.onnx_data",
+        "bytes": 2262282240,
+        "sha256": "e96fc7fc9137be54768ec23ae0c3e9576f7cee4da7d0616b4c30bd0a4cc62477"
+      },
+      "image.onnx": {
+        "remote": "onnx/vision_model.onnx",
+        "bytes": 1264345246,
+        "sha256": "a68762da4fab7335558d4713c77e42d8abe23dcd48d38b5dbe1c00765c07ca56"
+      },
+      "tokenizer.json": {
+        "remote": "tokenizer.json",
+        "bytes": 34363039,
+        "sha256": "cb9140fae3ac5122c972d37adf83e1248471a38147ad76f8215c8872c6fd8322"
+      }
+    }
+  },
+  "siglip2-large-patch16-384-fp32": {
+    "label": "SigLIP 2 Large/16 · 384",
+    "manufacturer": "Google",
+    "quant": "FP32",
+    "repository": "onnx-community/siglip2-large-patch16-384-ONNX",
+    "revision": "257daa8df5100fdd0add12f4c2187aebf0beb409",
+    "base_model": "google/siglip2-large-patch16-384",
+    "converter": "ONNX Community",
+    "dimension": 1024,
+    "variant": "fixed",
+    "patch_size": 16,
+    "preprocessing": {
+      "size": {
+        "height": 384,
+        "width": 384
+      },
+      "resample": 2,
+      "rescale_factor": 0.00392156862745098,
+      "image_mean": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "image_std": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "outputs": {
+      "image": "pooler_output",
+      "text": "pooler_output"
+    },
+    "files": {
+      "text.onnx": {
+        "remote": "onnx/text_model.onnx",
+        "bytes": 532930,
+        "sha256": "49caa52593fd81dadbcf235db6df97e15ea0b2c481ab3f45574ebd2f94b0a81b"
+      },
+      "text_model.onnx_data": {
+        "remote": "onnx/text_model.onnx_data",
+        "bytes": 2262282240,
+        "sha256": "4b84d56ccf4aa9d2302657d6b774ac3698388df057fe50bc52f301b9d882e93a"
+      },
+      "image.onnx": {
+        "remote": "onnx/vision_model.onnx",
+        "bytes": 1265655968,
+        "sha256": "a91b175aeb1bf2aebf134fe2450e3ff212a210adc0dc5d02df4e2338a5943f3e"
+      },
+      "tokenizer.json": {
+        "remote": "tokenizer.json",
+        "bytes": 34363039,
+        "sha256": "cb9140fae3ac5122c972d37adf83e1248471a38147ad76f8215c8872c6fd8322"
+      }
+    }
+  },
+  "siglip2-large-patch16-512-fp32": {
+    "label": "SigLIP 2 Large/16 · 512",
+    "manufacturer": "Google",
+    "quant": "FP32",
+    "repository": "onnx-community/siglip2-large-patch16-512-ONNX",
+    "revision": "7f1c7f57a87748a71bb04bf36f4ad57eb65953b2",
+    "base_model": "google/siglip2-large-patch16-512",
+    "converter": "ONNX Community",
+    "dimension": 1024,
+    "variant": "fixed",
+    "patch_size": 16,
+    "preprocessing": {
+      "size": {
+        "height": 512,
+        "width": 512
+      },
+      "resample": 2,
+      "rescale_factor": 0.00392156862745098,
+      "image_mean": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "image_std": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "outputs": {
+      "image": "pooler_output",
+      "text": "pooler_output"
+    },
+    "files": {
+      "text.onnx": {
+        "remote": "onnx/text_model.onnx",
+        "bytes": 532930,
+        "sha256": "49caa52593fd81dadbcf235db6df97e15ea0b2c481ab3f45574ebd2f94b0a81b"
+      },
+      "text_model.onnx_data": {
+        "remote": "onnx/text_model.onnx_data",
+        "bytes": 2262282240,
+        "sha256": "3ca4582ebca37f7956544ccf185406894ba111bb2d45c0c50be23d7acc86fefc"
+      },
+      "image.onnx": {
+        "remote": "onnx/vision_model.onnx",
+        "bytes": 1267491818,
+        "sha256": "7dad110031f57b95df29ec58caa5e987fccef612be14ca7bf1c7bc596f099d00"
+      },
+      "tokenizer.json": {
+        "remote": "tokenizer.json",
+        "bytes": 34363039,
+        "sha256": "cb9140fae3ac5122c972d37adf83e1248471a38147ad76f8215c8872c6fd8322"
+      }
+    }
+  },
+  "siglip2-so400m-patch14-224-fp32": {
+    "label": "SigLIP 2 So400m/14 · 224",
+    "manufacturer": "Google",
+    "quant": "FP32",
+    "repository": "onnx-community/siglip2-so400m-patch14-224-ONNX",
+    "revision": "550df64f1b9c56b2d1d4b82447e64a5fe2d7312b",
+    "base_model": "google/siglip2-so400m-patch14-224",
+    "converter": "ONNX Community",
+    "dimension": 1152,
+    "variant": "fixed",
+    "patch_size": 14,
+    "preprocessing": {
+      "size": {
+        "height": 224,
+        "width": 224
+      },
+      "resample": 2,
+      "rescale_factor": 0.00392156862745098,
+      "image_mean": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "image_std": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "outputs": {
+      "image": "pooler_output",
+      "text": "pooler_output"
+    },
+    "files": {
+      "text.onnx": {
+        "remote": "onnx/text_model.onnx",
+        "bytes": 599026,
+        "sha256": "1be6a35f94aa0d1aa15024569ccb7637c7157809624922e50e22d746d43745a5"
+      },
+      "text_model.onnx_data": {
+        "remote": "onnx/text_model.onnx_data",
+        "bytes": 2831131584,
+        "sha256": "43bf86d15f312b28bdf7b3d5ba9b2ce9301586ba21af380a686887bce43bd1b9"
+      },
+      "image.onnx": {
+        "remote": "onnx/vision_model.onnx",
+        "bytes": 1711305533,
+        "sha256": "f452b9e3fbc2c76e2eb097295c3f8d1f913835849af023634325d3dace28e173"
+      },
+      "tokenizer.json": {
+        "remote": "tokenizer.json",
+        "bytes": 34363039,
+        "sha256": "cb9140fae3ac5122c972d37adf83e1248471a38147ad76f8215c8872c6fd8322"
+      }
+    }
+  },
+  "siglip2-so400m-patch14-384-fp32": {
+    "label": "SigLIP 2 So400m/14 · 384",
+    "manufacturer": "Google",
+    "quant": "FP32",
+    "repository": "onnx-community/siglip2-so400m-patch14-384-ONNX",
+    "revision": "8ecf3f2bbb135bec33f4bb721c11479bf6a8a254",
+    "base_model": "google/siglip2-so400m-patch14-384",
+    "converter": "ONNX Community",
+    "dimension": 1152,
+    "variant": "fixed",
+    "patch_size": 14,
+    "preprocessing": {
+      "size": {
+        "height": 384,
+        "width": 384
+      },
+      "resample": 2,
+      "rescale_factor": 0.00392156862745098,
+      "image_mean": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "image_std": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "outputs": {
+      "image": "pooler_output",
+      "text": "pooler_output"
+    },
+    "files": {
+      "text.onnx": {
+        "remote": "onnx/text_model.onnx",
+        "bytes": 599026,
+        "sha256": "1be6a35f94aa0d1aa15024569ccb7637c7157809624922e50e22d746d43745a5"
+      },
+      "text_model.onnx_data": {
+        "remote": "onnx/text_model.onnx_data",
+        "bytes": 2831131584,
+        "sha256": "ab0cf5e72daf08c79449968899cc05b05138c07aa7f67d467bea5f7d61b5710a"
+      },
+      "image.onnx": {
+        "remote": "onnx/vision_model.onnx",
+        "bytes": 1713485119,
+        "sha256": "7ca661a08aa82a00649bf17bd57673eba8abfeef7f14dc8ed4d297bf47695da5"
+      },
+      "tokenizer.json": {
+        "remote": "tokenizer.json",
+        "bytes": 34363039,
+        "sha256": "cb9140fae3ac5122c972d37adf83e1248471a38147ad76f8215c8872c6fd8322"
+      }
+    }
+  },
+  "siglip2-so400m-patch16-256-fp32": {
+    "label": "SigLIP 2 So400m/16 · 256",
+    "manufacturer": "Google",
+    "quant": "FP32",
+    "repository": "onnx-community/siglip2-so400m-patch16-256-ONNX",
+    "revision": "7881d8f282cbd7cdeac1aca6bed493a36d58e713",
+    "base_model": "google/siglip2-so400m-patch16-256",
+    "converter": "ONNX Community",
+    "dimension": 1152,
+    "variant": "fixed",
+    "patch_size": 16,
+    "preprocessing": {
+      "size": {
+        "height": 256,
+        "width": 256
+      },
+      "resample": 2,
+      "rescale_factor": 0.00392156862745098,
+      "image_mean": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "image_std": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "outputs": {
+      "image": "pooler_output",
+      "text": "pooler_output"
+    },
+    "files": {
+      "text.onnx": {
+        "remote": "onnx/text_model.onnx",
+        "bytes": 599026,
+        "sha256": "1be6a35f94aa0d1aa15024569ccb7637c7157809624922e50e22d746d43745a5"
+      },
+      "text_model.onnx_data": {
+        "remote": "onnx/text_model.onnx_data",
+        "bytes": 2831131584,
+        "sha256": "63d8d7143941701e6582bcbdb2385bcad49e825c58aafa0e28dcf828c6121e53"
+      },
+      "image.onnx": {
+        "remote": "onnx/vision_model.onnx",
+        "bytes": 1712134973,
+        "sha256": "2415065fbb48adfbc675ce65d8ed8eec057a8317fcdb2144032e84f645e59709"
+      },
+      "tokenizer.json": {
+        "remote": "tokenizer.json",
+        "bytes": 34363039,
+        "sha256": "cb9140fae3ac5122c972d37adf83e1248471a38147ad76f8215c8872c6fd8322"
+      }
+    }
+  },
+  "siglip2-so400m-patch16-384-fp32": {
+    "label": "SigLIP 2 So400m/16 · 384",
+    "manufacturer": "Google",
+    "quant": "FP32",
+    "repository": "onnx-community/siglip2-so400m-patch16-384-ONNX",
+    "revision": "29f74e673c298fd07482d8e20138179282001eb7",
+    "base_model": "google/siglip2-so400m-patch16-384",
+    "converter": "ONNX Community",
+    "dimension": 1152,
+    "variant": "fixed",
+    "patch_size": 16,
+    "preprocessing": {
+      "size": {
+        "height": 384,
+        "width": 384
+      },
+      "resample": 2,
+      "rescale_factor": 0.00392156862745098,
+      "image_mean": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "image_std": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "outputs": {
+      "image": "pooler_output",
+      "text": "pooler_output"
+    },
+    "files": {
+      "text.onnx": {
+        "remote": "onnx/text_model.onnx",
+        "bytes": 599026,
+        "sha256": "1be6a35f94aa0d1aa15024569ccb7637c7157809624922e50e22d746d43745a5"
+      },
+      "text_model.onnx_data": {
+        "remote": "onnx/text_model.onnx_data",
+        "bytes": 2831131584,
+        "sha256": "80d50b22c6a56758717e6acdbf03f3e564b3a701d152b6741d8b62181cae7983"
+      },
+      "image.onnx": {
+        "remote": "onnx/vision_model.onnx",
+        "bytes": 1713609535,
+        "sha256": "e3f730b2a37c69ac08c2159fe3c7fab97f23fbe3f32319f9953375ba82ecb1e6"
+      },
+      "tokenizer.json": {
+        "remote": "tokenizer.json",
+        "bytes": 34363039,
+        "sha256": "cb9140fae3ac5122c972d37adf83e1248471a38147ad76f8215c8872c6fd8322"
+      }
+    }
+  },
+  "siglip2-so400m-patch16-512-fp32": {
+    "label": "SigLIP 2 So400m/16 · 512",
+    "manufacturer": "Google",
+    "quant": "FP32",
+    "repository": "onnx-community/siglip2-so400m-patch16-512-ONNX",
+    "revision": "1e9056af07969a25d4e3111fa2c28e36de75930c",
+    "base_model": "google/siglip2-so400m-patch16-512",
+    "converter": "ONNX Community",
+    "dimension": 1152,
+    "variant": "fixed",
+    "patch_size": 16,
+    "preprocessing": {
+      "size": {
+        "height": 512,
+        "width": 512
+      },
+      "resample": 2,
+      "rescale_factor": 0.00392156862745098,
+      "image_mean": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "image_std": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "outputs": {
+      "image": "pooler_output",
+      "text": "pooler_output"
+    },
+    "files": {
+      "text.onnx": {
+        "remote": "onnx/text_model.onnx",
+        "bytes": 599026,
+        "sha256": "1be6a35f94aa0d1aa15024569ccb7637c7157809624922e50e22d746d43745a5"
+      },
+      "text_model.onnx_data": {
+        "remote": "onnx/text_model.onnx_data",
+        "bytes": 2831131584,
+        "sha256": "ce71effeebc0c1a36fb191a17f05f501128bbc5b60d18c5754b8a99cd797a5d3"
+      },
+      "image.onnx": {
+        "remote": "onnx/vision_model.onnx",
+        "bytes": 1715675448,
+        "sha256": "7e15ed9b95813d792408327bdadba733c7e4d5939f0bbbed20d632c9f3c61a57"
+      },
+      "tokenizer.json": {
+        "remote": "tokenizer.json",
+        "bytes": 34363039,
+        "sha256": "cb9140fae3ac5122c972d37adf83e1248471a38147ad76f8215c8872c6fd8322"
+      }
+    }
+  },
+  "siglip2-so400m-patch16-naflex-fp32": {
+    "label": "SigLIP 2 So400m/16 · NaFlex",
+    "manufacturer": "Google",
+    "quant": "FP32",
+    "repository": "upshift/siglip2-so400m-patch16-naflex-onnx",
+    "revision": "a3569a9b7af2a34037ecca795a7d5ed95741133b",
+    "base_model": "google/siglip2-so400m-patch16-naflex",
+    "converter": "upshift",
+    "dimension": 1152,
+    "variant": "naflex",
+    "patch_size": 16,
+    "max_num_patches": 256,
+    "preprocessing": {
+      "resample": 2,
+      "rescale_factor": 0.00392156862745098,
+      "image_mean": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "image_std": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "outputs": {
+      "image": "image_embeds",
+      "text": "text_embeds"
+    },
+    "files": {
+      "text.onnx": {
+        "remote": "text_model.onnx",
+        "bytes": 420156,
+        "sha256": "dee2d3e4ced3d97423982de17119f4b790ac4d2d12f270339c4dc8dbced4ff7d"
+      },
+      "text_model.onnx_data": {
+        "remote": "text_model.onnx_data",
+        "bytes": 2832465920,
+        "sha256": "74abba0c6695dafb536020ff35fbe41b0beae2ff7403e4f089e7432976a97f97"
+      },
+      "tokenizer.json": {
+        "remote": "tokenizer.json",
+        "bytes": 34356304,
+        "sha256": "58a1696e79c9d97937389ed116f552a15c84811d7b8023918b86f4bc5775b1b0"
+      },
+      "image.onnx": {
+        "remote": "vision_model.onnx",
+        "bytes": 458034,
+        "sha256": "0f8f553d279f3fbf9661c5a6e664da2ede279220f3044aff6760423c7849593e"
+      },
+      "vision_model.onnx_data": {
+        "remote": "vision_model.onnx_data",
+        "bytes": 1712955392,
+        "sha256": "7fd4efa791dd8d3a3616170ebd7bccfacfe28128b0f6871b63b115cac14cde73"
+      }
+    }
+  },
+  "siglip2-giant-opt-patch16-256-fp32": {
+    "label": "SigLIP 2 Giant-opt/16 · 256",
+    "manufacturer": "Google",
+    "quant": "FP32",
+    "repository": "onnx-community/siglip2-giant-opt-patch16-256-ONNX",
+    "revision": "a64352ec5a6bd00cd851bd37e7c23aa37ed82a37",
+    "base_model": "google/siglip2-giant-opt-patch16-256",
+    "converter": "ONNX Community",
+    "dimension": 1536,
+    "variant": "fixed",
+    "patch_size": 16,
+    "preprocessing": {
+      "size": {
+        "height": 256,
+        "width": 256
+      },
+      "resample": 2,
+      "rescale_factor": 0.00392156862745098,
+      "image_mean": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "image_std": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "outputs": {
+      "image": "pooler_output",
+      "text": "pooler_output"
+    },
+    "files": {
+      "text.onnx": {
+        "remote": "onnx/text_model.onnx",
+        "bytes": 599026,
+        "sha256": "caa9002dd629eb8cb88b37af3dec5b4e5f190a06561328085a67d892203a9fc9"
+      },
+      "text_model.onnx_data": {
+        "remote": "onnx/text_model.onnx_data",
+        "bytes": 2832902592,
+        "sha256": "99d190ecc9d5510a7468978f847efa55af3a4f55c0346db22f1b28f5736e33aa"
+      },
+      "image.onnx": {
+        "remote": "onnx/vision_model.onnx",
+        "bytes": 900295,
+        "sha256": "dfd92c0a8017b51c3bb4ae1764c86ac2db23e9fc53a199b8310805ca28330a7c"
+      },
+      "vision_model.onnx_data": {
+        "remote": "onnx/vision_model.onnx_data",
+        "bytes": 4652673024,
+        "sha256": "48eafd27a6824d6b7fdd82bc51edeadeb2c451d09f14aa723c0916c1f67b5301"
+      },
+      "tokenizer.json": {
+        "remote": "tokenizer.json",
+        "bytes": 34363039,
+        "sha256": "cb9140fae3ac5122c972d37adf83e1248471a38147ad76f8215c8872c6fd8322"
+      }
+    }
+  },
+  "siglip2-giant-opt-patch16-384-fp32": {
+    "label": "SigLIP 2 Giant-opt/16 · 384",
+    "manufacturer": "Google",
+    "quant": "FP32",
+    "repository": "onnx-community/siglip2-giant-opt-patch16-384-ONNX",
+    "revision": "5eb77343667e0bd747a4aea8a59746184c3d50a4",
+    "base_model": "google/siglip2-giant-opt-patch16-384",
+    "converter": "ONNX Community",
+    "dimension": 1536,
+    "variant": "fixed",
+    "patch_size": 16,
+    "preprocessing": {
+      "size": {
+        "height": 384,
+        "width": 384
+      },
+      "resample": 2,
+      "rescale_factor": 0.00392156862745098,
+      "image_mean": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "image_std": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "outputs": {
+      "image": "pooler_output",
+      "text": "pooler_output"
+    },
+    "files": {
+      "text.onnx": {
+        "remote": "onnx/text_model.onnx",
+        "bytes": 599026,
+        "sha256": "caa9002dd629eb8cb88b37af3dec5b4e5f190a06561328085a67d892203a9fc9"
+      },
+      "text_model.onnx_data": {
+        "remote": "onnx/text_model.onnx_data",
+        "bytes": 2832902592,
+        "sha256": "839edee8bdda94a583a4f96ceca7e84262a45407f68776ab2de0be0949f5bf4c"
+      },
+      "image.onnx": {
+        "remote": "onnx/vision_model.onnx",
+        "bytes": 900295,
+        "sha256": "e256e08219286ff5d4bced8ee10625716c721dd1f8a794e4e8cbe2d8e3611248"
+      },
+      "vision_model.onnx_data": {
+        "remote": "onnx/vision_model.onnx_data",
+        "bytes": 4654639104,
+        "sha256": "713620114d348ebab98910d69fb6daa1088b76dc70705ba724f31968855ef0e9"
+      },
+      "tokenizer.json": {
+        "remote": "tokenizer.json",
+        "bytes": 34363039,
+        "sha256": "cb9140fae3ac5122c972d37adf83e1248471a38147ad76f8215c8872c6fd8322"
+      }
+    }
+  }
+}

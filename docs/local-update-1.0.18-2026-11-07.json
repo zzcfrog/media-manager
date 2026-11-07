@@ -1,0 +1,432 @@
+{
+  "date": "2026-11-07",
+  "status": "installed-data-verified",
+  "version": "1.0.18",
+  "previous_version": "1.0.17",
+  "installed_application": "/Users/zack/Applications/映屿 · luminisle.app",
+  "scope": "Toast contrast hotfix. No recognition thresholds, RAW reading logic, database schema or model paths changed.",
+  "authorization": [
+    "User requested the local production update and subsequently chose pause recognition, update, and continue.",
+    "User completed the merge preview before the old application was closed."
+  ],
+  "package": {
+    "version": "1.0.18",
+    "previous_version": "1.0.17",
+    "app_id": "com.zack.media-manager",
+    "frontend_files_matched": 47,
+    "application_bytes": 773527384,
+    "artifacts": {
+      "Luminisle-1.0.18-arm64.dmg": {
+        "bytes": 314364904,
+        "sha256": "4ca6a44ecb9b1e30f8ae7420d9c0f28e7397cc058dac45619044842c024dd621"
+      },
+      "Luminisle-1.0.18-arm64.zip": {
+        "bytes": 314053595,
+        "sha256": "e9f598e882315fb434071fbf1b82497d5e19067e96f6ea70f2b98f0fd91fbee3"
+      }
+    },
+    "toast_validation": {
+      "ok": true,
+      "groups": 4,
+      "paint_combinations": 72,
+      "minimum_message_contrast": 5.906794043068397,
+      "minimum_caption_contrast": 5.272604993409428,
+      "minimum_action_contrast": 5.906794043068397,
+      "fixture_cleaned": true,
+      "page_errors": [],
+      "writes": []
+    },
+    "installation": "installed-data-verified",
+    "signature_deep_strict": true,
+    "dmg_and_zip_integrity": "passed"
+  },
+  "checks": {
+    "toast": {
+      "ok": true,
+      "groups": 4,
+      "paint_combinations": 72,
+      "minimum_message_contrast": 5.906794043068397,
+      "minimum_caption_contrast": 5.272604993409428,
+      "minimum_action_contrast": 5.906794043068397,
+      "fixture_cleaned": true,
+      "page_errors": [],
+      "writes": []
+    },
+    "desktop_tests": "Fresh npm test passed runtime, paths, nine migration and six live-directory groups.",
+    "packaged_browser": {
+      "routes": [
+        {
+          "route": "#/gallery",
+          "title": "映屿 · luminisle"
+        },
+        {
+          "route": "#/classify",
+          "title": "映屿 · luminisle"
+        },
+        {
+          "route": "#/taxonomy",
+          "title": "映屿 · luminisle"
+        },
+        {
+          "route": "#/people",
+          "title": "映屿 · luminisle"
+        }
+      ],
+      "settings": [
+        {
+          "tab": "general",
+          "height": 740
+        },
+        {
+          "tab": "image",
+          "height": 740
+        },
+        {
+          "tab": "video",
+          "height": 740
+        },
+        {
+          "tab": "music",
+          "height": 740
+        },
+        {
+          "tab": "people",
+          "height": 740
+        },
+        {
+          "tab": "classification",
+          "height": 740
+        },
+        {
+          "tab": "creative",
+          "height": 740
+        }
+      ],
+      "errors": [],
+      "failedRequests": [],
+      "writes": [],
+      "metrics": [
+        {
+          "width": 1600,
+          "overflow": false,
+          "controls": [
+            32,
+            32,
+            32
+          ]
+        },
+        {
+          "width": 1000,
+          "overflow": false,
+          "controls": [
+            32,
+            32,
+            32
+          ]
+        }
+      ],
+      "settingsOpeningHeight": 407.5666809082031,
+      "toast": [
+        {
+          "mode": "light",
+          "color": "rgb(32, 62, 55)",
+          "background": "rgb(248, 250, 244)",
+          "contrast": 11.060871810643535
+        },
+        {
+          "mode": "dark",
+          "color": "rgb(236, 241, 230)",
+          "background": "rgb(23, 52, 49)",
+          "contrast": 11.635863103554755
+        }
+      ],
+      "ok": true
+    },
+    "python_suite": "338 tests passed for 1.0.17 immediately before this CSS-only hotfix; not rerun for 1.0.18.",
+    "frozen_backend_self_test": "passed in build; isolated full-library clone rehearsal passed."
+  },
+  "migration_rehearsal": {
+    "ok": true,
+    "version": "1.0.18",
+    "packaged_frontend_files_matched": 47,
+    "private_or_external_model_weights": 0,
+    "bundled_runtime_vad_and_examples_bytes": 1246054,
+    "original_tables_unchanged": 48,
+    "new_tables": [],
+    "new_tables_empty": true,
+    "foreign_key_violations": 0,
+    "automatic_upgrade_snapshot_verified": true
+  },
+  "installed_validation": {
+    "status": "installed-data-verified",
+    "version": "1.0.18",
+    "target": "/Users/zack/Applications/映屿 · luminisle.app",
+    "health_version": "1.0.18",
+    "normal_profile_and_library": true,
+    "media": 11835,
+    "projects": 2,
+    "original_tables_unchanged": {
+      "collection_items": true,
+      "collections": true,
+      "dup_exclusions": true,
+      "media": true,
+      "media_fts": true,
+      "media_segment": true,
+      "media_tags": true,
+      "music_segment": true,
+      "people_changes": true,
+      "people_distinct": true,
+      "people_face_exclusions": true,
+      "people_faces": true,
+      "people_jobs": true,
+      "people_media_decisions": true,
+      "people_persons": true,
+      "people_plans": true,
+      "people_reviews": true,
+      "project_media": true,
+      "project_tracks": true,
+      "projects": true,
+      "settings": true,
+      "tags": true,
+      "taxonomy_analysis_batches": true,
+      "taxonomy_analysis_requests": true,
+      "taxonomy_candidate_context": true,
+      "taxonomy_candidates": true,
+      "taxonomy_changes": true,
+      "taxonomy_closed_proposals": true,
+      "taxonomy_collections": true,
+      "taxonomy_decision_events": true,
+      "taxonomy_decisions": true,
+      "taxonomy_examples": true,
+      "taxonomy_expressions": true,
+      "taxonomy_features": true,
+      "taxonomy_field_provenance": true,
+      "taxonomy_historical_snapshots": true,
+      "taxonomy_job_context": true,
+      "taxonomy_jobs": true,
+      "taxonomy_nodes": true,
+      "taxonomy_plans": true,
+      "taxonomy_relation_jobs": true,
+      "taxonomy_relation_locks": true,
+      "taxonomy_relation_suggestions": true,
+      "taxonomy_relations": true,
+      "taxonomy_sources": true,
+      "taxonomy_split_targets": true,
+      "taxonomy_text_features": true,
+      "taxonomy_validation_profiles": true
+    },
+    "new_tables": 0,
+    "new_tables_empty": true,
+    "foreign_key_violations": 0,
+    "existing_files_verified": 15404,
+    "model_configuration_unchanged": true,
+    "automatic_policies_preserved": true,
+    "face_scan_still_paused": true,
+    "signature_deep_strict": true,
+    "automatic_upgrade_snapshot": "/Users/zack/Library/Application Support/Media Manager/library/upgrade-backups/20261107-110319-bbd97ef1.db",
+    "snapshot_matches_original": true,
+    "original_media_or_model_files_modified": false
+  },
+  "schema": {
+    "new_tables": [],
+    "new_business_columns": [],
+    "existing_physical_column_order_unchanged": true,
+    "legacy_timestamp_column_drift_unchanged": [
+      {
+        "table": "projects",
+        "last_columns": [
+          "creative_brief",
+          "ai_plan"
+        ]
+      }
+    ]
+  },
+  "recognition_continuation": {
+    "authorization": "User chose pause recognition, update, and continue",
+    "before_pause": {
+      "jobs": {
+        "people_jobs": {
+          "done": 127,
+          "no_faces": 1,
+          "quality_insufficient": 4112,
+          "queued": 7101,
+          "running": 1,
+          "waiting": 323
+        },
+        "taxonomy_jobs": {},
+        "taxonomy_relation_jobs": {}
+      },
+      "people_paused": [
+        "false"
+      ],
+      "people_faces": 1343,
+      "people_persons": 93
+    },
+    "pause_response": true,
+    "after_pause": {
+      "jobs": {
+        "people_jobs": {
+          "done": 127,
+          "no_faces": 1,
+          "paused": 7102,
+          "quality_insufficient": 4112,
+          "waiting": 323
+        },
+        "taxonomy_jobs": {},
+        "taxonomy_relation_jobs": {}
+      },
+      "people_paused": [
+        "true"
+      ],
+      "people_faces": 1343,
+      "people_persons": 93
+    },
+    "before_resume": {
+      "done": 127,
+      "no_faces": 1,
+      "paused": 7102,
+      "quality_insufficient": 4112,
+      "waiting": 323
+    },
+    "resume_acknowledged": true,
+    "immediate_after_resume": {
+      "done": 127,
+      "no_faces": 1,
+      "quality_insufficient": 4112,
+      "queued": 7102,
+      "waiting": 323
+    },
+    "status": "resumed-verified",
+    "after_resume": {
+      "done": 127,
+      "no_faces": 1,
+      "quality_insufficient": 4112,
+      "queued": 7101,
+      "running": 1,
+      "waiting": 323
+    },
+    "existing_finished_job_states_preserved": 4563,
+    "pending_jobs_preserved": 7102,
+    "existing_face_observations_preserved": 1343,
+    "existing_person_records_preserved": 93,
+    "worker_running_or_making_progress": true,
+    "latest_observed_states": {
+      "done": 131,
+      "no_faces": 1,
+      "quality_insufficient": 4114,
+      "queued": 6961,
+      "running": 1,
+      "waiting": 457
+    }
+  },
+  "recognition_diagnosis": {
+    "status": "read-only diagnosis; no recognition policy changes",
+    "source": "paused baseline plus code inspection",
+    "profile": "raccoon_s",
+    "nef_total": 2969,
+    "nef_processed_lowres": 2018,
+    "nef_quality_insufficient": 2012,
+    "nef_done": 6,
+    "nef_paused": 951,
+    "original_online_in_first20": 0,
+    "preview_long_edge_in_first20": 320,
+    "face_crop_pixels": [
+      112,
+      112
+    ],
+    "automatic_similarity_threshold": 0.6,
+    "review_similarity_threshold": 0.4,
+    "best_candidate_margin": 0.08,
+    "group_representative_scoring": "minimum cosine across earliest anchor and up to four quality representatives",
+    "thresholds_user_configurable": false,
+    "raw_full_decode_fallback_in_face_reader": false,
+    "scope": "No source media read beyond file-existence metadata; cached thumbnail dimensions inspected; no AI calls or changes."
+  },
+  "native_window": {
+    "observed": true,
+    "title": "映屿 · luminisle",
+    "media_count": 11835,
+    "background_tasks_visible": true
+  },
+  "retained_installer": "/Users/zack/program/python/video_analyzer/dist/Luminisle-1.0.18-arm64.dmg",
+  "cleanup": {
+    "status": "complete",
+    "removed": [
+      {
+        "path": "dist/mac-arm64",
+        "logical_bytes": 773527384
+      },
+      {
+        "path": "dist/Luminisle-1.0.18-arm64.zip",
+        "logical_bytes": 314053595
+      },
+      {
+        "path": "dist/Luminisle-1.0.18-arm64.zip.blockmap",
+        "logical_bytes": 328034
+      },
+      {
+        "path": "dist/Luminisle-1.0.18-arm64.dmg.blockmap",
+        "logical_bytes": 326515
+      },
+      {
+        "path": "dist/builder-debug.yml",
+        "logical_bytes": 1028
+      },
+      {
+        "path": "build/runtime",
+        "logical_bytes": 425238037
+      },
+      {
+        "path": "build/tools",
+        "logical_bytes": 101211590
+      },
+      {
+        "path": "build/pyinstaller",
+        "logical_bytes": 116947505
+      },
+      {
+        "path": "build/release-1.0.18/baseline",
+        "logical_bytes": 107757568
+      },
+      {
+        "path": "build/release-1.0.18/rehearsal-library",
+        "logical_bytes": 1958133173
+      },
+      {
+        "path": "build/release-1.0.18/previous-1.0.17.app",
+        "logical_bytes": 773526409
+      },
+      {
+        "path": "build/release-1.0.18/pre-install.db",
+        "logical_bytes": 107724800
+      },
+      {
+        "path": "build/release-1.0.18/pre-install.db-wal",
+        "logical_bytes": 0
+      },
+      {
+        "path": "build/release-1.0.18/pre-install.db-shm",
+        "logical_bytes": 32768
+      }
+    ],
+    "logical_bytes": 4678808406,
+    "note": "Logical sizes; APFS clones may share physical blocks. Only this hotfix build and rehearsal files were removed.",
+    "retained": [
+      "installed 1.0.18 application",
+      "1.0.18 DMG and pre-existing 1.0.17 DMG",
+      "real library and all automatic upgrade snapshots",
+      "external models and model-paths.json",
+      "release evidence, logs, build virtual environment and pre-existing development work"
+    ],
+    "production_healthy_after_cleanup": true
+  },
+  "limitations": [
+    "Local ad-hoc signature; no Developer ID notarization.",
+    "No new real-media AI benchmark or paid AI call. Recognition continues as user work, not as a diagnostic test.",
+    "NEF preview and grouping issues diagnosed only; recognition behavior unchanged."
+  ],
+  "git": {
+    "committed": false,
+    "pushed": false
+  }
+}

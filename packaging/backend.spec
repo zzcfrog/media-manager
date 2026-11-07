@@ -4,7 +4,9 @@ from PyInstaller.utils.hooks import collect_all, collect_submodules
 root = Path(SPECPATH).parent
 hidden = collect_submodules('backend') + collect_submodules('hdbscan')
 datas = [(str(root / 'frontend'), 'frontend'), (str(root / 'backend/prompts'), 'backend/prompts'),
-         (str(root / 'backend/resources'), 'backend/resources')]
+         (str(root / 'backend/resources'), 'backend/resources'),
+         (str(root / 'backend/vendor/insightface_privateframe/defaults.json'), 'backend/vendor/insightface_privateframe'),
+         (str(root / 'backend/vendor/insightface_privateframe/NOTICE.md'), 'backend/vendor/insightface_privateframe')]
 binaries = []
 for package in ('hdbscan', 'ctranslate2', 'onnxruntime', 'faster_whisper', 'pillow_heif', 'rawpy'):
     data, binary, imports = collect_all(package)

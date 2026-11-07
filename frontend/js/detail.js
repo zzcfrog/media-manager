@@ -153,8 +153,9 @@ const DetailPage = {
           </div>
           <div ref="imgContainer" class="img-view-area">
             <q-spinner-dots v-if="imgLoading" color="grey-6" size="40px" style="position:absolute;z-index:1"></q-spinner-dots>
-            <div style="position:relative;display:inline-flex;max-width:100%;max-height:100%;line-height:0">
-              <img ref="imgEl" :src="API.imageUrl(media.id)" @load="onImageLoaded" :style="{transform: 'scale(' + imgZoom + ') translate(' + imgPanX + 'px,' + imgPanY + 'px)', transformOrigin: 'center center', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', background: 'var(--surface2)', transition: imgZooming ? 'transform 0.15s ease' : 'none', cursor: imgZoom > 1 ? (imgDragging ? 'grabbing' : 'grab') : 'default'}" @wheel="onImgWheel" @mousedown="onImgMouseDown" @mousemove="onImgMouseMove" @mouseup="onImgMouseUp" @mouseleave="onImgMouseUp" @dragstart.prevent>
+            <div v-if="imgError" class="image-preview-error" role="status"><q-icon name="image_not_supported" size="32px" aria-hidden="true"></q-icon><p>{{t('d.image_unavailable')}}</p><q-btn outline no-caps icon="refresh" :label="t('d.image_retry')" @click="retryImage"></q-btn></div>
+            <div v-show="!imgError" style="position:relative;display:inline-flex;max-width:100%;max-height:100%;line-height:0">
+              <img ref="imgEl" :key="media.id+':'+imgRetry" :src="API.imageUrl(media.id)+(imgRetry?'?retry='+imgRetry:'')" @load="onImageLoaded" @error="imgLoading=false;imgError=true" :style="{transform: 'scale(' + imgZoom + ') translate(' + imgPanX + 'px,' + imgPanY + 'px)', transformOrigin: 'center center', maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', background: 'var(--surface2)', transition: imgZooming ? 'transform 0.15s ease' : 'none', cursor: imgZoom > 1 ? (imgDragging ? 'grabbing' : 'grab') : 'default'}" @wheel="onImgWheel" @mousedown="onImgMouseDown" @mousemove="onImgMouseMove" @mouseup="onImgMouseUp" @mouseleave="onImgMouseUp" @dragstart.prevent>
               <div class="img-zoom-bar">
                 <q-btn flat round dense icon="remove" size="xs" color="grey-6" @click="imgZoomBy(-0.25)"></q-btn>
                 <span style="font-size:11px;color:var(--text2);min-width:36px;text-align:center">{{ Math.round(imgZoom * 100) }}%</span>
@@ -435,7 +436,7 @@ const DetailPage = {
     return {
       media: null, analysis: { status: "none", segments: [] },
       metadataExpanded: false,
-      imgLoading: false,
+      imgLoading: false, imgError: false, imgRetry: 0,
       imgZoom: 1,
       imgZooming: false,
       imgPanX: 0, imgPanY: 0,
@@ -520,7 +521,9 @@ const DetailPage = {
     const hash = location.hash || "";
     const id = parseInt(hash.split("/")[2]);
     try {
-      this.media = await API.getMedia(id);
+      const media = await API.getMedia(id);
+      this.imgLoading = media.media_type === 'image';
+      this.media = media;
     } catch (e) {
       console.error("load media error:", e);
       location.hash = "#/gallery";
@@ -627,7 +630,6 @@ const DetailPage = {
     }
     this.$nextTick(() => {
       if (!this.analyzing && this.analysis.status !== "done") this._initLottieIdle();
-      if (this.media?.media_type === "image") this.imgLoading = true;
     });
   },
   methods: {
@@ -659,12 +661,16 @@ const DetailPage = {
     },
     onImageLoaded(e) {
       this.imgLoading = false;
+      this.imgError = false;
       this.imgZoom = 1;
       this.imgPanX = 0;
       this.imgPanY = 0;
       this.imgNatW = e.target.naturalWidth;
       this.imgNatH = e.target.naturalHeight;
       this.drawHistogram();
+    },
+    retryImage() {
+      this.imgError=false;this.imgLoading=true;this.imgRetry++;
     },
     imgZoomBy(delta) {
       this.imgZooming = true;

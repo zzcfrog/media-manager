@@ -14,6 +14,12 @@ from ..config import THUMB_DIR, IMAGE_EXTS, DATA_DIR
 
 bp = Blueprint("serve", __name__)
 
+
+@bp.record_once
+def register_background_tasks(state):
+    from ..services.background_tasks import install
+    install(state.app)
+
 _RAW_EXTS = IMAGE_EXTS - {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"}
 
 MIME_MAP = {
@@ -176,9 +182,13 @@ def _decode_raw(path):
     import rawpy
     from PIL import Image
 
+    stamp = path.stat()
     with rawpy.imread(str(path)) as raw:
         rgb = raw.postprocess(use_camera_wb=True, half_size=False)
     img = Image.fromarray(rgb)
+    from ..services.raw_preview import save_preview
+    try:save_preview(path, img, stamp=stamp)
+    except OSError:pass
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=92)
     buf.seek(0)
@@ -206,6 +216,13 @@ def serve_image(media_id):
     row = _media_or_404(media_id)
     path = Path(row["file_path"])
     if not path.exists():
+        if path.suffix.lower() in _RAW_EXTS:
+            from ..services.raw_preview import cached_preview
+            cached = cached_preview(row)
+            if cached is not None:
+                response = send_file(cached, mimetype="image/jpeg", conditional=True)
+                response.headers['X-Luminisle-Preview'] = 'cached'
+                return response
         from flask import abort
         abort(404)
 
@@ -217,6 +234,13 @@ def serve_image(media_id):
             return send_file(_decode_raw(path), mimetype="image/jpeg")
         except Exception as e:
             logger.warning("rawpy decode failed for {}: {}", path, e)
+            from ..services.raw_preview import read_preview
+            try:
+                preview = read_preview(path)
+                output = io.BytesIO();preview.save(output, format='JPEG', quality=93);output.seek(0)
+                return send_file(output, mimetype='image/jpeg')
+            except (OSError,ValueError):
+                return jsonify({'error':'RAW 预览解码失败，请检查原片是否可用'}),422
 
     # HEIC/HIF/AVIF: full-resolution decode via pillow-heif
     if ext in _HEIC_EXTS:

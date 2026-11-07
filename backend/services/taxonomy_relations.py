@@ -34,6 +34,8 @@ def _node_revision(db,node):
 
 
 def queue(db,tag_id,explicit=False):
+    from .model_preferences import classification_enabled
+    if not classification_enabled(db,'omni'):return None
     if not explicit and get_setting(db,'classification_relations_enabled','false')!='true': return None
     node=tx.get_node(db,tag_id)
     if node['status'] not in ('active','paused'): return None
@@ -190,6 +192,8 @@ def try_auto_association(db,candidate_id):
 
 
 def _infer(db,node,deadline,cancelled=None):
+    from .model_preferences import classification_enabled, OMNI_OFF
+    if not classification_enabled(db,'omni'):raise FileNotFoundError(OMNI_OFF)
     from .. import local_vlm
     import urllib.request
     model=get_setting(db,'classification_omni_model','qwen3-omni-30b-a3b')
@@ -231,6 +235,10 @@ def _foreground_busy():
 
 
 def process_next(db,deadline=float('inf'),infer=None,cancelled=None):
+    from .model_preferences import classification_enabled, sync_classification_jobs
+    if not classification_enabled(db,'omni'):
+        with db:sync_classification_jobs(db)
+        return False
     if time.monotonic()>=deadline or cancelled and cancelled() or _foreground_busy(): return False
     with db:
         db.execute("UPDATE taxonomy_relation_jobs SET state='queued',lease=NULL,error='上轮中断，已恢复队列',updated_at=datetime('now') "
@@ -240,6 +248,9 @@ def process_next(db,deadline=float('inf'),infer=None,cancelled=None):
         token=uuid.uuid4().hex
         if db.execute("UPDATE taxonomy_relation_jobs SET state='running',lease=?,error='',updated_at=datetime('now') WHERE id=? AND state='queued'",(token,row['id'])).rowcount!=1:return False
     def stopped():
+        if not classification_enabled(db,'omni'):
+            with db:sync_classification_jobs(db)
+            return True
         current=db.execute('SELECT state,lease FROM taxonomy_relation_jobs WHERE id=?',(row['id'],)).fetchone()
         return (not current or current['state']!='running' or current['lease']!=token or time.monotonic()>=deadline
                 or bool(cancelled and cancelled()) or _foreground_busy())
